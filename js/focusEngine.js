@@ -444,8 +444,24 @@ var FocusEngine = (function () {
     });
   }
 
+  /**
+   * 17/08/2026 (Session 5, Phase 5 — Civilisation) : wrapper public léger
+   * autour de resoudreJson_ (aucune nouvelle logique), pour permettre à
+   * civilisationService.js de résoudre l'effet d'une case de piste de
+   * Civilisation en réutilisant CE moteur plutôt que d'en dupliquer un
+   * second. Toujours "pur" : ne fait aucune écriture, retourne
+   * {succes, journal, mutations, etatResultat} — ⚠️ champ "etatResultat",
+   * PAS "plateauMaisonApres" (nom différent de resoudreAction ci-dessus,
+   * qui enveloppe ce même résultat interne — attention à l'appelant).
+   * Signe toujours +1 : une case de piste n'a jamais de "coût".
+   */
+  function resoudreEffet(plateauMaison, effetJson, source, texteAction, demanderChoix) {
+    return resoudreJson_(effetJson, 1, source, texteAction, plateauMaison, demanderChoix);
+  }
+
   return {
     resoudreAction: resoudreAction,
+    resoudreEffet: resoudreEffet,
     jouerActionEtPersister: jouerActionEtPersister,
     // Exposés pour les tests / debug uniquement :
     BONUS_COMMERCE: BONUS_COMMERCE,

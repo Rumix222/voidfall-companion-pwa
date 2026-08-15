@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 8 — 2026-08-17
+ * Version 12 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,42 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Session 9, Phase 7 — Nettoyage) : incrémenté suite à la
+ * correction de deux commentaires obsolètes dans gameService.js/
+ * index.html (mentionnaient encore Focus non-jouable / Civilisation
+ * lecture seule, faux depuis les Sessions 4/5 — aucun changement de
+ * comportement, uniquement de la documentation). Confirmation que
+ * LogService.js/UiService.js/Version.js (GAS) n'ont aucun équivalent PWA
+ * à porter — voir docs-migration-pwa-plan.md §6.
+ *
+ * 17/08/2026 (Session 8, Phase 6 — Historique) : incrémenté suite à
+ * l'ajout de js/historiqueVueService.js (écran Historique enrichi —
+ * événements/technologies/vainqueur, reprendre/archiver/supprimer/tout-
+ * supprimer) et à la refonte d'index.html (v9 — la simple liste "Parties
+ * enregistrées" de l'accueil, présente depuis la Session 4, est retirée
+ * au profit d'un bouton "Historique des parties" ouvrant ce nouvel
+ * écran). css/style.css a aussi changé (styles historique/badges).
+ *
+ * 17/08/2026 (Session 7, Phase 5 — Score) : incrémenté suite à l'ajout de
+ * js/scoreService.js (fin de partie, Influence du Néant, portage pur
+ * depuis ScoreService.js GAS) et js/scoreVueService.js (écran Fin de
+ * partie, bouton "Terminer la partie" sur l'écran Partie). index.html et
+ * css/style.css ont aussi changé mais restent au même chemin.
+ *
+ * 17/08/2026 (Session 6, Phase 5 — Combat/Invasion) : incrémenté suite à
+ * l'ajout de js/combatService.js (moteur de combat pur, portage quasi
+ * textuel de combat.html GAS) et js/combatVueService.js (écran Combat,
+ * nav "Combat" ajoutée) à FICHIERS_A_METTRE_EN_CACHE. index.html et
+ * css/style.css ont aussi changé mais restent au même chemin.
+ *
+ * 17/08/2026 (Session 5, Phase 5 — Civilisation) : incrémenté suite à
+ * l'ajout de js/civilisationService.js (avancement des pistes de
+ * Civilisation + effet de case, réutilise focusEngine.js) et à la mise à
+ * jour de js/gameService.js (v5 — ajout majCivilisation), js/focusEngine.js
+ * (ajout du wrapper public resoudreEffet), js/strategieService.js (v2 —
+ * pistes interactives) et index.html (nouveaux boutons Civilisation,
+ * script civilisationService.js).
  *
  * 17/08/2026 (Session 4, suite — rebranchement DOM) : incrémenté suite à
  * l'ajout de js/strategieService.js (écran Stratégie complet : ressources,
@@ -48,4 +84,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.6';
+var APP_VERSION = '20260817.11';

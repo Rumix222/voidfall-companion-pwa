@@ -1,37 +1,46 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 4, Phase 4 suite — rebranchement DOM)
+ * Version 2 — 17/08/2026 (Session 5, Phase 5 — Civilisation)
  *
- * Rebranche l'écran Stratégie (ressources, cartes Focus, annulation) sur
- * js/focusEngine.js (moteur pur) et js/annulationService.js (pile LIFO),
- * portage/adaptation des parties DOM de strategie.html (GAS) qui restent
- * dans le périmètre de cette PWA (voir focusEngine.js en-tête pour la
- * liste des clés Coût/Effet volontairement hors périmètre — non jouables
- * automatiquement, journalisées "à appliquer manuellement").
+ * 17/08/2026 (Session 5) : Pistes de Civilisation devenues INTERACTIVES —
+ * bouton "Avancer" par piste (résout aussi l'effet de la case atteinte),
+ * case à cocher "Corrompue", boutons "Avancer la moins avancée"/"Avancer
+ * la piste Corrompue", branchés sur js/civilisationService.js (nouveau ce
+ * jour). Remplace l'affichage lecture seule de la session précédente.
  *
- * PÉRIMÈTRE VOLONTAIREMENT RÉDUIT à cette session (cohérent avec l'état
- * réel de gameService.js/secteurService.js — rien à porter faute de RPC
- * source côté GAS) :
- *   - Pistes de Civilisation : AFFICHAGE SEUL (avancer_civilisation* est
- *     hors périmètre côté focusEngine.js, et CivilisationService n'existe
- *     pas encore côté PWA).
+ * Rebranche l'écran Stratégie (ressources, cartes Focus, annulation,
+ * Civilisation) sur js/focusEngine.js (moteur pur), js/annulationService.js
+ * (pile LIFO) et js/civilisationService.js, portage/adaptation des parties
+ * DOM de strategie.html (GAS) qui restent dans le périmètre de cette PWA
+ * (voir focusEngine.js en-tête pour la liste des clés Coût/Effet
+ * volontairement hors périmètre — non jouables automatiquement,
+ * journalisées "à appliquer manuellement").
+ *
+ * PÉRIMÈTRE VOLONTAIREMENT RÉDUIT (cohérent avec l'état réel de
+ * gameService.js/secteurService.js — rien à porter faute de RPC source
+ * côté GAS) :
  *   - Focus héroïques : AFFICHAGE SEUL (choisirFocusHeroique hors
  *     périmètre côté gameService.js — les 3 emplacements du cycle restent
  *     toujours à null pour l'instant, rien à sélectionner).
  *   - Scratchpad manuel (édition directe des ressources par l'utilisateur,
  *     indépendante des actions Focus, présent dans strategie.html GAS) :
- *     PAS PORTÉ cette session — hors sujet de "rebrancher focusEngine.js +
- *     bouton Annuler". Les ressources ne bougent ici que via une action
- *     Focus jouée (ou son annulation).
+ *     toujours pas porté — hors sujet des sessions Focus/Civilisation.
+ *   - Les clés avancer_civilisation_* À L'INTÉRIEUR d'une carte Focus
+ *     restent journalisées "non automatisé" par focusEngine.js (pas de
+ *     pont Focus -> CivilisationService cette session, voir focusEngine.js
+ *     en-tête) — seuls les boutons dédiés de cette page font avancer les
+ *     pistes.
  *
  * demanderChoix(contexte) est l'implémentation DOM (modale #modal-choix)
  * du callback attendu par focusEngine.js — voir focusEngine.js pour le
- * contrat exact de chaque contexte.type.
+ * contrat exact de chaque contexte.type. Réutilisée telle quelle par
+ * CivilisationService.avancerPiste (résolution de l'effet de case).
  *
- * Dépend de : db.js, gameService.js, focusEngine.js, annulationService.js
- * (à charger avant ce fichier), et de l'objet global App défini dans
- * index.html (App.getPartieCourante/App.rafraichirPartieCourante).
+ * Dépend de : db.js, gameService.js, focusEngine.js, annulationService.js,
+ * civilisationService.js (à charger avant ce fichier), et de l'objet
+ * global App défini dans index.html (App.getPartieCourante/
+ * App.rafraichirPartieCourante).
  */
 
 var StrategieService = (function () {
@@ -48,6 +57,9 @@ var StrategieService = (function () {
 
   var LABEL_PISTE = { societe: 'Société', gouvernement: 'Gouvernement', economie: 'Économie' };
   var PISTES_ORDRE = ['societe', 'gouvernement', 'economie'];
+  // Cache du détail des 7 cases par maison (référence statique, une seule
+  // lecture catalogue par maison — voir CivilisationService.obtenirDetailPistes).
+  var detailPistesCache = {};
 
   // Portage direct de LIBELLES_OPTIONS (strategie.html GAS) — clés brutes
   // -> texte lisible pour les popups de choix. Repli sur la clé brute si
@@ -122,14 +134,147 @@ var StrategieService = (function () {
       '</ul>';
   }
 
+  /**
+   * 17/08/2026 (Session 5, Phase 5 — Civilisation) : chaque piste gagne un
+   * bouton "Avancer" (résout aussi l'effet de la case atteinte, via
+   * CivilisationService.avancerPiste) et une case "Corrompue" — remplace
+   * l'affichage lecture-seule de la session précédente.
+   */
   function renderPistesCivilisation_(partie) {
-    var civ = partie.civilisation || { societe: 0, gouvernement: 0, economie: 0 };
-    document.getElementById('pistes-civilisation-liste').innerHTML = PISTES_ORDRE.map(function (piste) {
+    var civ = partie.civilisation || { societe: 0, gouvernement: 0, economie: 0, corrompues: {} };
+    var corrompues = civ.corrompues || {};
+    var nomMaison = partie.joueur ? partie.joueur.nom : null;
+    var container = document.getElementById('pistes-civilisation-liste');
+
+    container.innerHTML = PISTES_ORDRE.map(function (piste) {
+      var niveau = civ[piste] || 0;
+      var auMax = niveau >= CivilisationService.NIVEAU_MAX;
       return '<div class="piste-civilisation-case">' +
         '<div class="piste-civilisation-nom">' + LABEL_PISTE[piste] + '</div>' +
-        '<div class="piste-civilisation-niveau">' + (civ[piste] || 0) + '</div>' +
+        '<div class="piste-civilisation-niveau">' + niveau + ' / ' + CivilisationService.NIVEAU_MAX + '</div>' +
+        '<p class="hint piste-civilisation-texte-prochaine" id="piste-texte-' + piste + '" style="margin:4px 0;"></p>' +
+        '<button class="btn btn-secondary btn-avancer-piste" data-piste="' + piste + '"' + (auMax ? ' disabled' : '') + '>Avancer</button>' +
+        '<label class="piste-civilisation-corrompue"><input type="checkbox" class="check-corrompue" data-piste="' + piste + '"' + (corrompues[piste] ? ' checked' : '') + '> Corrompue</label>' +
         '</div>';
     }).join('');
+
+    Array.prototype.forEach.call(container.querySelectorAll('.btn-avancer-piste'), function (btn) {
+      btn.addEventListener('click', function () { avancerPiste_(btn.dataset.piste, btn); });
+    });
+    Array.prototype.forEach.call(container.querySelectorAll('.check-corrompue'), function (cb) {
+      cb.addEventListener('change', function () { toggleCorruption_(cb.dataset.piste, cb.checked, cb); });
+    });
+
+    document.getElementById('btn-avancer-corrompue').disabled = !PISTES_ORDRE.some(function (p) { return corrompues[p]; });
+
+    if (nomMaison) {
+      obtenirDetailPistesCache_(nomMaison).then(function (detail) {
+        PISTES_ORDRE.forEach(function (piste) {
+          var niveau = civ[piste] || 0;
+          var el = document.getElementById('piste-texte-' + piste);
+          if (!el) return; // l'écran a pu être re-rendu entre-temps
+          if (niveau >= CivilisationService.NIVEAU_MAX) { el.textContent = 'Piste au maximum.'; return; }
+          var prochaine = (detail[piste] || [])[niveau]; // case niveau+1, index 0-based
+          el.textContent = prochaine ? ('Prochaine case : ' + prochaine.texte) : '';
+        });
+      }).catch(function (erreur) {
+        console.warn('StrategieService : détail des pistes indisponible :', erreur);
+      });
+    }
+  }
+
+  function obtenirDetailPistesCache_(nomMaison) {
+    if (detailPistesCache[nomMaison]) return Promise.resolve(detailPistesCache[nomMaison]);
+    return CivilisationService.obtenirDetailPistes(nomMaison).then(function (detail) {
+      detailPistesCache[nomMaison] = detail;
+      return detail;
+    });
+  }
+
+  function avancerPiste_(piste, btn) {
+    if (btn.disabled) return;
+    var partie = partieAffichee;
+    var nomMaison = partie.joueur ? partie.joueur.nom : null;
+    if (!nomMaison) return;
+    var texteOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Passage en cours…';
+
+    CivilisationService.avancerPiste(partie.id, nomMaison, piste, demanderChoix)
+      .then(function (resultat) {
+        if (resultat.dejaMaximum) {
+          journal.push('Piste ' + LABEL_PISTE[piste] + ' : déjà au maximum.');
+        } else {
+          journal.push('Piste ' + LABEL_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
+            ' — ' + (resultat.texte || 'aucun effet de case.'));
+          journal = journal.concat(resultat.effetJournal || []);
+        }
+        return App.rafraichirPartieCourante();
+      })
+      .then(function (partieFraiche) { afficher(partieFraiche); })
+      .catch(function (erreur) {
+        window.alert('Échec de l\'avancement : ' + erreur.message);
+        btn.disabled = false;
+        btn.textContent = texteOriginal;
+      });
+  }
+
+  function avancerMoinsAvancee_() {
+    var btn = document.getElementById('btn-avancer-moins-avancee');
+    if (btn.disabled) return;
+    var partie = partieAffichee;
+    var nomMaison = partie.joueur ? partie.joueur.nom : null;
+    if (!nomMaison) return;
+    var texteOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Passage en cours…';
+
+    CivilisationService.avancerPisteMoinsAvancee(partie.id, nomMaison, demanderChoix)
+      .then(function (resultat) {
+        journal.push('Piste la moins avancée (' + LABEL_PISTE[resultat.piste] + ') : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
+          ' — ' + (resultat.texte || 'aucun effet de case.'));
+        journal = journal.concat(resultat.effetJournal || []);
+        return App.rafraichirPartieCourante();
+      })
+      .then(function (partieFraiche) { afficher(partieFraiche); })
+      .catch(function (erreur) {
+        window.alert('Échec de l\'avancement : ' + erreur.message);
+        btn.disabled = false;
+        btn.textContent = texteOriginal;
+      });
+  }
+
+  function avancerCorrompue_() {
+    var btn = document.getElementById('btn-avancer-corrompue');
+    if (btn.disabled) return;
+    var partie = partieAffichee;
+    var texteOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Passage en cours…';
+
+    CivilisationService.avancerPisteCorrompue(partie.id)
+      .then(function (resultat) {
+        journal.push('Piste Corrompue (' + LABEL_PISTE[resultat.piste] + ') : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau + ' (sans bénéfice de case).');
+        return App.rafraichirPartieCourante();
+      })
+      .then(function (partieFraiche) { afficher(partieFraiche); })
+      .catch(function (erreur) {
+        window.alert('Échec : ' + erreur.message);
+        btn.disabled = false;
+        btn.textContent = texteOriginal;
+      });
+  }
+
+  function toggleCorruption_(piste, valeur, cb) {
+    cb.disabled = true;
+    CivilisationService.definirCorruption(partieAffichee.id, piste, valeur)
+      .then(function () { return App.rafraichirPartieCourante(); })
+      .then(function (partieFraiche) { afficher(partieFraiche); })
+      .catch(function (erreur) {
+        window.alert('Échec : ' + erreur.message);
+        cb.checked = !valeur;
+        cb.disabled = false;
+      });
   }
 
   // ------------------------------------------------------------
@@ -417,6 +562,8 @@ var StrategieService = (function () {
   }
 
   document.getElementById('btn-annuler-action').addEventListener('click', annulerDerniereAction_);
+  document.getElementById('btn-avancer-moins-avancee').addEventListener('click', avancerMoinsAvancee_);
+  document.getElementById('btn-avancer-corrompue').addEventListener('click', avancerCorrompue_);
 
   return {
     afficher: afficher,

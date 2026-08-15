@@ -29,6 +29,7 @@
       <button id="nav-partie" class="btn btn-toggle active" data-nav="game">Partie</button>
       <button id="nav-strategie" class="btn btn-toggle" data-nav="strategie">Stratégie</button>
       <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs">Secteurs</button>
+      <button id="nav-combat" class="btn btn-toggle" data-nav="combat">Combat</button>
     </nav>
   </div>
 
@@ -43,8 +44,7 @@
     </div>
 
     <div class="setup-bloc" id="bloc-parties-enregistrees">
-      <label>Parties enregistrées</label>
-      <div id="liste-parties"></div>
+      <button id="btn-historique" class="btn btn-secondary" style="width:100%;">Historique des parties</button>
     </div>
 
     <p class="hint" id="etat-sw" style="text-align:center;"></p>
@@ -119,12 +119,53 @@
 
     <p class="hint" style="margin-top:18px;">Cycle actuel : <span id="game-cycle-actuel">—</span></p>
 
+    <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Terminer la partie</button>
     <button id="btn-retour-accueil-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Retour à l'accueil</button>
   </section>
 
-  <!-- Écran Stratégie : ressources, pistes de Civilisation (lecture seule
-       cette session — avancement hors périmètre), Focus jouables, Focus
-       héroïques (affichage), annulation de la dernière action jouée. -->
+  <!-- Écran Fin de partie : score final + calcul de l'Influence du Néant.
+       17/08/2026 (Session 7, Phase 5 — Score) : le calcul faisant foi est
+       fait côté ScoreService.enregistrerFinDePartie ; le total affiché
+       ici pendant la saisie n'est qu'un aperçu (voir scoreVueService.js). -->
+  <section id="screen-fin" class="screen" hidden>
+    <h2 class="section-title">Fin de partie</h2>
+
+    <div class="setup-bloc">
+      <label for="fin-score-final">Score final du joueur</label>
+      <input type="number" id="fin-score-final" placeholder="Score total">
+    </div>
+
+    <h2 class="section-title">Influence du Néant</h2>
+    <p class="hint">Renseignez les éléments encore en jeu pour calculer l'Influence finale du Néant dans la galaxie.</p>
+
+    <div class="setup-bloc">
+      <label for="influence-difficulte">Influence de base (selon difficulté choisie)</label>
+      <select id="influence-difficulte">
+        <option value="">— Choisir —</option>
+        <option value="60">60</option>
+        <option value="100">100</option>
+        <option value="140">140</option>
+      </select>
+    </div>
+
+    <div id="influence-champs" class="form-grid"></div>
+
+    <div class="card total-influence">
+      <p>Influence totale du Néant</p>
+      <h3 id="influence-total">0</h3>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-retour-fin" class="btn btn-secondary">Retour</button>
+      <button id="btn-enregistrer-fin" class="btn btn-primary">Enregistrer</button>
+    </div>
+  </section>
+
+  <!-- Écran Stratégie : ressources, pistes de Civilisation (interactives
+       depuis la Session 5, voir civilisationService.js), Focus jouables,
+       Focus héroïques (affichage), annulation de la dernière action jouée.
+       [Nettoyage Session 9] Cette légende disait encore "lecture seule —
+       avancement hors périmètre", obsolète depuis la Session 5 : corrigé. -->
   <section id="screen-strategie" class="screen" hidden>
     <h2 class="section-title">Stratégie</h2>
 
@@ -141,8 +182,11 @@
 
     <div class="game-block" style="margin-top:18px;">
       <h3 class="subsection-title">Pistes de Civilisation</h3>
-      <p class="hint">Affichage seul cette session — l'avancement des pistes n'est pas encore automatisé côté PWA.</p>
       <div class="pistes-civilisation-liste" id="pistes-civilisation-liste"></div>
+      <div class="civilisation-actions-globales">
+        <button id="btn-avancer-moins-avancee" class="btn btn-secondary">Avancer la moins avancée</button>
+        <button id="btn-avancer-corrompue" class="btn btn-secondary" disabled>Avancer la piste Corrompue</button>
+      </div>
     </div>
 
     <div class="game-block" style="margin-top:18px;">
@@ -161,6 +205,51 @@
   <section id="screen-secteurs" class="screen" hidden>
     <h2 class="section-title">Plateau des secteurs</h2>
     <div class="game-block" style="overflow-x:auto;" id="secteurs-conteneur"></div>
+  </section>
+
+  <!-- Écran Combat : calculateur Envahir/Escarmouche (voir combatService.js
+       en-tête — la persistance des conséquences sur les secteurs reste
+       hors périmètre, ce n'est qu'un calculateur pour l'instant). -->
+  <section id="screen-combat" class="screen" hidden>
+    <h2 class="section-title">Simulation combat</h2>
+
+    <div class="mode-toggle">
+      <button id="mode-envahir" class="btn btn-toggle active" data-mode-combat="envahir">Envahir</button>
+      <button id="mode-escarmouche" class="btn btn-toggle" data-mode-combat="escarmouche">Escarmouche</button>
+    </div>
+
+    <div class="combat-colonnes">
+      <div class="combat-colonne">
+        <h3 class="subsection-title">Attaquant</h3>
+        <div id="combat-champs-attaquant"></div>
+      </div>
+      <div class="combat-colonne">
+        <h3 class="subsection-title">Défenseur</h3>
+        <div id="combat-champs-defenseur"></div>
+      </div>
+    </div>
+
+    <div class="combat-actions">
+      <button id="btn-simuler-combat" class="btn btn-primary">Simuler</button>
+      <button id="btn-details-combat" class="btn btn-secondary">Détails</button>
+    </div>
+
+    <div id="combat-resultat" class="combat-resultat"></div>
+  </section>
+
+  <!-- Écran Historique — liste enrichie (événements, technologies,
+       vainqueur), reprendre/archiver/supprimer par partie + suppression
+       en masse des parties non archivées. 17/08/2026 (Session 8,
+       Phase 6) : remplace la simple liste "Parties enregistrées" qui
+       vivait sur l'écran d'accueil depuis la Session 4 — voir
+       historiqueVueService.js. -->
+  <section id="screen-historique" class="screen" hidden>
+    <h2 class="section-title">Historique des parties</h2>
+    <button id="btn-supprimer-non-archivees" class="btn btn-danger" style="width:100%;margin-bottom:12px;">Tout supprimer (parties non archivées)</button>
+    <div id="liste-historique" class="card-list"></div>
+    <div class="setup-actions">
+      <button id="btn-retour-historique" class="btn btn-secondary">Retour</button>
+    </div>
   </section>
 
   <!-- Modale de choix (popup) pour les coûts/effets Focus impliquant un
@@ -187,8 +276,14 @@
 <script src="js/gameService.js"></script>
 <script src="js/focusEngine.js"></script>
 <script src="js/annulationService.js"></script>
+<script src="js/civilisationService.js"></script>
+<script src="js/combatService.js"></script>
+<script src="js/scoreService.js"></script>
 <script src="js/setupService.js"></script>
 <script src="js/strategieService.js"></script>
+<script src="js/combatVueService.js"></script>
+<script src="js/scoreVueService.js"></script>
+<script src="js/historiqueVueService.js"></script>
 <script>
   /**
    * index.html (script inline)
@@ -317,6 +412,7 @@
       renderEcranGame_(partie);
       renderEcranSecteurs_(partie);
       if (typeof StrategieService !== 'undefined') StrategieService.afficher(partie);
+      if (typeof CombatVueService !== 'undefined') CombatVueService.afficher(partie);
       afficherEcran('game');
     }
 
@@ -342,7 +438,6 @@
     var versionApp = document.getElementById('version-app');
     var btnSync = document.getElementById('btn-sync-catalogue');
     var etatCatalogue = document.getElementById('etat-catalogue');
-    var listeParties = document.getElementById('liste-parties');
 
     versionApp.textContent = 'v' + APP_VERSION;
 
@@ -383,126 +478,26 @@
     });
 
     // --------------------------------------------------------
-    // Parties enregistrées (accueil) — liste + continuer/archiver/supprimer.
+    // 17/08/2026 (Session 8, Phase 6) : la liste "Parties enregistrées"
+    // (Continuer/Archiver/Supprimer) qui vivait ici depuis la Session 4 a
+    // été retirée — remplacée par l'écran Historique dédié, enrichi
+    // (événements/technologies/vainqueur), voir historiqueVueService.js.
     // --------------------------------------------------------
 
-    function formaterDate_(iso) {
-      if (!iso) return '';
-      var d = new Date(iso);
-      return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function rendreCartePartie_(partie) {
-      var carte = document.createElement('div');
-      carte.className = 'card';
-      carte.style.marginTop = '10px';
-      carte.style.padding = '12px 14px';
-
-      var titre = document.createElement('div');
-      titre.style.fontWeight = '600';
-      titre.textContent = (partie.joueur ? partie.joueur.nom : '?') + (partie.archivee ? ' (archivée)' : '');
-      carte.appendChild(titre);
-
-      var detail = document.createElement('div');
-      detail.className = 'hint';
-      detail.style.margin = '4px 0 8px';
-      detail.textContent = 'Cycle ' + partie.cycleActuel + ' · créée le ' + formaterDate_(partie.dateCreation);
-      carte.appendChild(detail);
-
-      var actions = document.createElement('div');
-      actions.className = 'carte-partie-actions';
-
-      // 17/08/2026 (Session 4) : nouveau — rouvre la partie (App.ouvrirPartie)
-      // sur l'écran Partie, seul moyen d'atteindre Stratégie/Secteurs pour
-      // une partie déjà enregistrée (créée lors d'une session précédente).
-      var btnContinuer = document.createElement('button');
-      btnContinuer.className = 'btn btn-primary';
-      btnContinuer.style.flex = '1';
-      btnContinuer.style.padding = '8px 10px';
-      btnContinuer.style.fontSize = '0.82rem';
-      btnContinuer.textContent = 'Continuer';
-      btnContinuer.addEventListener('click', function () {
-        btnContinuer.disabled = true;
-        btnContinuer.textContent = 'Passage en cours…';
-        GameService.obtenirPartie(partie.id).then(function (partieFraiche) {
-          App.ouvrirPartie(partieFraiche);
-        }).catch(function (erreur) {
-          window.alert('Échec ouverture : ' + erreur.message);
-          btnContinuer.disabled = false;
-          btnContinuer.textContent = 'Continuer';
-        });
-      });
-      actions.appendChild(btnContinuer);
-
-      var btnArchiver = document.createElement('button');
-      btnArchiver.className = 'btn btn-secondary';
-      btnArchiver.style.padding = '8px 10px';
-      btnArchiver.style.fontSize = '0.82rem';
-      btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
-      btnArchiver.addEventListener('click', function () {
-        btnArchiver.disabled = true;
-        btnArchiver.textContent = 'Passage en cours…';
-        GameService.archiverPartie(partie.id, !partie.archivee)
-          .then(rafraichirListeParties_)
-          .catch(function (erreur) {
-            window.alert('Échec archivage : ' + erreur.message);
-            btnArchiver.disabled = false;
-            btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
-          });
-      });
-      actions.appendChild(btnArchiver);
-
-      var btnSupprimer = document.createElement('button');
-      btnSupprimer.className = 'btn btn-danger';
-      btnSupprimer.style.padding = '8px 10px';
-      btnSupprimer.style.fontSize = '0.82rem';
-      btnSupprimer.textContent = 'Supprimer';
-      btnSupprimer.addEventListener('click', function () {
-        if (!window.confirm('Supprimer définitivement cette partie (' + titre.textContent + ') ?')) return;
-        btnSupprimer.disabled = true;
-        btnArchiver.disabled = true;
-        btnContinuer.disabled = true;
-        btnSupprimer.textContent = 'Passage en cours…';
-        GameService.supprimerPartie(partie.id)
-          .then(rafraichirListeParties_)
-          .catch(function (erreur) {
-            window.alert('Échec suppression : ' + erreur.message);
-            btnSupprimer.disabled = false;
-            btnArchiver.disabled = false;
-            btnContinuer.disabled = false;
-            btnSupprimer.textContent = 'Supprimer';
-          });
-      });
-      actions.appendChild(btnSupprimer);
-
-      carte.appendChild(actions);
-      return carte;
-    }
-
-    function rafraichirListeParties_() {
-      return GameService.listerParties().then(function (parties) {
-        listeParties.innerHTML = '';
-        if (!parties.length) {
-          listeParties.innerHTML = '<p class="hint">Aucune partie enregistrée.</p>';
-          return;
-        }
-        parties.forEach(function (partie) {
-          listeParties.appendChild(rendreCartePartie_(partie));
-        });
-      });
-    }
-
-    // 17/08/2026 (Session 4) : remplace l'ancien btn-retour-accueil-creation
-    // (n'existe plus, screen-partie-creee a disparu) — masque aussi la nav
-    // Partie/Stratégie/Secteurs en quittant une partie.
+    // 17/08/2026 (Session 7) : remplace l'ancien btn-retour-accueil-creation
+    // (n'existe plus, screen-partie-creee a disparu) — déclenche l'événement
+    // partagé voidfall:retour-accueil, réutilisé aussi par scoreVueService.js
+    // après l'enregistrement d'une fin de partie.
     document.getElementById('btn-retour-accueil-partie').addEventListener('click', function () {
+      document.dispatchEvent(new Event('voidfall:retour-accueil'));
+    });
+
+    document.addEventListener('voidfall:retour-accueil', function () {
       document.getElementById('barre-navigation-partie').hidden = true;
       App.afficherEcran('home');
-      rafraichirListeParties_();
     });
 
     SetupService.init();
-    rafraichirListeParties_();
   })();
 </script>
 </body>

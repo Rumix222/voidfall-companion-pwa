@@ -1,6 +1,22 @@
 /**
  * service-worker.js
- * Version 8 — 2026-08-17
+ * Version 12 — 2026-08-17
+ * 17/08/2026 (Session 8, Phase 6 — Historique) : ajout de
+ * js/historiqueVueService.js à FICHIERS_A_METTRE_EN_CACHE. index.html
+ * (liste accueil retirée, bouton "Historique des parties" ajouté) et
+ * css/style.css ont aussi changé mais restent au même chemin.
+ * 17/08/2026 (Session 7, Phase 5 — Score) : ajout de js/scoreService.js
+ * et js/scoreVueService.js à FICHIERS_A_METTRE_EN_CACHE. index.html et
+ * css/style.css ont aussi changé (écran Fin de partie) mais restent au
+ * même chemin.
+ * 17/08/2026 (Session 6, Phase 5 — Combat/Invasion) : ajout de
+ * js/combatService.js et js/combatVueService.js à
+ * FICHIERS_A_METTRE_EN_CACHE. index.html et css/style.css ont aussi
+ * changé (nav "Combat") mais restent au même chemin.
+ * 17/08/2026 (Session 5, Phase 5 — Civilisation) : ajout de
+ * js/civilisationService.js à FICHIERS_A_METTRE_EN_CACHE. index.html,
+ * css/style.css, js/gameService.js, js/focusEngine.js et
+ * js/strategieService.js ont aussi changé mais restent au même chemin.
  * 17/08/2026 (Session 4, suite — rebranchement DOM) : ajout de
  * js/strategieService.js à FICHIERS_A_METTRE_EN_CACHE (écran Stratégie
  * complet). index.html et css/style.css ont aussi changé (v8/v3) mais
@@ -62,9 +78,15 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/focusService.js',
   './js/focusEngine.js',
   './js/annulationService.js',
+  './js/civilisationService.js',
+  './js/combatService.js',
+  './js/scoreService.js',
   './js/gameService.js',
   './js/setupService.js',
   './js/strategieService.js',
+  './js/combatVueService.js',
+  './js/scoreVueService.js',
+  './js/historiqueVueService.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

@@ -1,15 +1,23 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 4 — 17/08/2026
+ * Version 5 — 17/08/2026
+ *
+ * 17/08/2026 (Session 5, Phase 5 — Civilisation) : ajout de
+ * majCivilisation(partieId, champs) — seul changement de cette version.
+ * civilisationService.js (nouveau ce jour) en est l'unique appelant
+ * prévu. Le reste du fichier est inchangé.
  *
  * 17/08/2026 (Phase 4, partielle) : creerPartie remplit désormais
  * partie.focusJoueur avec la vraie mise en place (voir
  * FocusService.obtenirMiseEnPlace, focusService.js) au lieu d'un tableau
- * vide — tolérant (garde typeof, comme SecteurService). Les cartes ne
- * sont pas encore jouables (moteur coût/effet hors périmètre, voir
- * focusService.js en-tête). Dépend désormais aussi de focusService.js,
- * à charger AVANT ce fichier (même principe que secteurService.js).
+ * vide — tolérant (garde typeof, comme SecteurService). Dépend désormais
+ * aussi de focusService.js, à charger AVANT ce fichier (même principe
+ * que secteurService.js).
+ * [Nettoyage Session 9] Les cartes SONT jouables depuis la Session 4 —
+ * voir js/focusEngine.js/js/strategieService.js. Ce commentaire disait
+ * encore le contraire (rédigé avant l'existence de focusEngine.js) :
+ * corrigé ici, aucune conséquence fonctionnelle, juste une note obsolète.
  *
  * 17/08/2026 (Phase 3) : creerPartie appelle désormais
  * SecteurService.instancierSecteurs(partie) après la sauvegarde
@@ -35,10 +43,15 @@
  * + mise à jour partielle du plateau maison (majPlateauMaison). Restent
  * HORS PÉRIMÈTRE (repoussés aux phases correspondantes du plan) :
  *   - choisirEvenement, choisirFocusHeroique, choisirTechnologieObtenue,
- *     définirTechnologieAmelioree, avancerCycle, avancerCivilisation* :
- *     plusieurs de ces fonctions étaient des RPC Postgres dont le SQL
- *     source n'a jamais été récupéré côté GAS (voir en-tête de
- *     DataService.js) — rien à porter, à réécrire depuis les règles.
+ *     définirTechnologieAmelioree, avancerCycle : plusieurs de ces
+ *     fonctions étaient des RPC Postgres dont le SQL source n'a jamais
+ *     été récupéré côté GAS (voir en-tête de DataService.js) — rien à
+ *     porter, à réécrire depuis les règles.
+ *   - [Nettoyage Session 9] avancerCivilisation* retiré de cette liste :
+ *     PORTÉ depuis, mais PAS comme fonction de gameService.js — voir
+ *     civilisationService.js (Session 5), qui avance les pistes via le
+ *     nouveau majCivilisation ci-dessous, sans passer par une RPC du même
+ *     nom que côté GAS.
  *   - focusJoueur (mise en place Focus, FocusService — Phase 4) et les
  *     secteurs (SecteurService — Phase 3) : creerPartie amorce les champs
  *     correspondants à vide/null, dans la forme attendue, pour ne pas
@@ -476,9 +489,10 @@ var GameService = (function () {
               // Focus héroïques / secteurs : hors périmètre de cette session
               // (Phases 3 et 4), champs prévus dans la forme attendue.
               // focusJoueur (Phase 4, partielle) : vraie mise en place
-              // désormais (voir FocusService.obtenirMiseEnPlace ci-dessus) —
-              // les cartes ne sont pas encore jouables (moteur coût/effet
-              // hors périmètre, voir focusService.js en-tête).
+              // désormais (voir FocusService.obtenirMiseEnPlace ci-dessus).
+              // [Nettoyage Session 9] Les cartes SONT jouables depuis la
+              // Session 4 (js/focusEngine.js) — l'ancienne mention "pas
+              // encore jouables" ici était obsolète, corrigée.
               focusHeroiques: { cycle1: [null, null, null], cycle2: [null, null, null], cycle3: [null, null, null] },
               focusHeroiquesPioches: [],
               focusJoueur: focusJoueur
@@ -655,6 +669,37 @@ var GameService = (function () {
       });
       if (!Object.keys(filtre).length) {
         return Promise.reject(new Error('Aucun champ valide à mettre à jour.'));
+      }
+
+      return DB.get('plateauMaison', partieId).then(function (ligne) {
+        if (!ligne) throw new Error('Plateau maison introuvable pour mise à jour (partie ' + partieId + ').');
+        Object.keys(filtre).forEach(function (cle) { ligne[cle] = filtre[cle]; });
+        return DB.put('plateauMaison', ligne);
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 5, Phase 5 — Civilisation) : mise à jour
+     * partielle des 6 champs Civilisation (niveaux des 3 pistes + leurs 3
+     * marqueurs "Corrompue"), auparavant explicitement exclus de
+     * majPlateauMaison ("leurs propres fonctions dédiées, portées en
+     * Phase 3/5" — voir commentaire ci-dessus, on y est). Même principe
+     * lecture-fusion-écriture, liste blanche séparée par cohérence avec le
+     * découpage fonctionnel (civilisationService.js est seul appelant
+     * prévu de celle-ci, comme focusEngine.js/écran Stratégie le sont de
+     * majPlateauMaison).
+     */
+    majCivilisation: function (partieId, champs) {
+      var CHAMPS_CIVILISATION_AUTORISES = [
+        'civSociete', 'civGouvernement', 'civEconomie',
+        'civCorrompueSociete', 'civCorrompueGouvernement', 'civCorrompueEconomie'
+      ];
+      var filtre = {};
+      Object.keys(champs || {}).forEach(function (cle) {
+        if (CHAMPS_CIVILISATION_AUTORISES.indexOf(cle) !== -1) filtre[cle] = champs[cle];
+      });
+      if (!Object.keys(filtre).length) {
+        return Promise.reject(new Error('Aucun champ Civilisation valide à mettre à jour.'));
       }
 
       return DB.get('plateauMaison', partieId).then(function (ligne) {
