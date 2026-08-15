@@ -1,6 +1,14 @@
 /**
  * css/style.css
- * Version 2 — 17/08/2026
+ * Version 3 — 17/08/2026
+ *
+ * 17/08/2026 (Session 4, Phase 4 suite — rebranchement DOM) : ajout de la
+ * nav Partie/Stratégie/Secteurs (.barre-navigation-partie, .nav-ecrans),
+ * de l'écran Stratégie (ressources, cartes Focus jouables, pastilles de
+ * coût, journal, bouton Annuler) et de la modale de choix générique
+ * (.modal-overlay/.modal-box/.modal-actions) — reprise des classes de
+ * strategie.html/style.html GAS, adaptées aux variables CSS déjà en place
+ * ici (mêmes couleurs, pas de nouvelle palette).
  *
  * 17/08/2026 (Phase 3) : ajout de .table-secteurs / .ligne-corrompue —
  * affichage du plateau des secteurs sur l'écran de confirmation de
@@ -409,3 +417,244 @@ input:disabled {
 .table-secteurs .ligne-corrompue td {
   color: var(--color-coral);
 }
+
+/* --- Nav Partie/Stratégie/Secteurs (visible seulement partie active) --- */
+.barre-navigation-partie {
+  margin-bottom: 22px;
+}
+.barre-navigation-partie[hidden] { display: none; }
+.nav-ecrans {
+  display: flex;
+  gap: 8px;
+}
+
+/* --- Cartes "parties enregistrées" (accueil) : bouton Continuer --- */
+.carte-partie-actions {
+  display: flex;
+  gap: 8px;
+}
+.carte-partie-actions .btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+/* --- Écran Stratégie : suivi de ressources --- */
+.ressources-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ressource-case {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+}
+.ressource-case-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.ressource-case-valeur {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--color-coral);
+}
+.ressources-jetons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.ressources-jetons .ressource-case { flex: 1; min-width: 90px; }
+
+.ressources-journal {
+  margin-top: 14px;
+}
+.journal-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.journal-liste li {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+.journal-liste li.journal-avertissement {
+  color: var(--color-coral);
+  border-color: var(--color-coral-dim);
+}
+
+.bloc-annulation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.bloc-annulation .btn { flex: 1; }
+.bloc-annulation-compteur {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* --- Pistes de Civilisation (lecture seule cette session) --- */
+.pistes-civilisation-liste {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.piste-civilisation-case {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+}
+.piste-civilisation-nom {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.piste-civilisation-niveau {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* --- Cartes Focus jouables --- */
+.focus-action {
+  padding: 10px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.focus-action:first-child { border-top: none; padding-top: 0; }
+.focus-action-titre {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.focus-action-texte {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+.focus-action-cout {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.pastille-cout {
+  background: var(--couleur-pastille, var(--color-surface-2));
+  color: #1a0f0a;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.btn-jouer-action {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+}
+.focus-action-insuffisant .btn-jouer-action {
+  opacity: 0.5;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+.badge-type-standard { border-color: var(--color-text-muted); }
+.badge-type-heroique { border-color: var(--color-coral); color: var(--color-coral); }
+.badge-type-maison { border-color: #06afe5; color: #06afe5; }
+
+/* --- Modale de choix générique (demanderChoix, coûts/effets Focus) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(6,4,12,0.72);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-overlay[hidden] { display: none; }
+.modal-box {
+  width: 100%;
+  max-width: 640px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  padding: 20px 18px 24px;
+}
+.modal-box h3 {
+  font-family: var(--font-display);
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+.modal-choix-boutons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.modal-choix-boutons .btn {
+  width: 100%;
+  text-align: left;
+}
+.modal-choix-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.modal-choix-case {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.modal-choix-case input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-coral);
+  flex-shrink: 0;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+.modal-actions .btn { flex: 1; }
+.modal-actions .btn[hidden] { display: none; }

@@ -1,6 +1,10 @@
 /**
  * service-worker.js
- * Version 6 — 2026-08-17
+ * Version 7 — 2026-08-17
+ * 17/08/2026 (Session 4, Phase 4 suite) : ajout de js/focusEngine.js et
+ * js/annulationService.js à FICHIERS_A_METTRE_EN_CACHE (moteur coût/effet
+ * Focus pur + pile d'annulation). js/db.js a aussi changé (v3, nouveau
+ * store pileAnnulation) mais reste au même chemin.
  * 17/08/2026 (Phase 4, partielle) : ajout de js/focusService.js à
  * FICHIERS_A_METTRE_EN_CACHE (mise en place des Focus à la création de
  * partie). js/gameService.js a aussi changé (appelle
@@ -52,6 +56,8 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/catalogueSync.js',
   './js/secteurService.js',
   './js/focusService.js',
+  './js/focusEngine.js',
+  './js/annulationService.js',
   './js/gameService.js',
   './js/setupService.js',
   './icons/icon-192.png',

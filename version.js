@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 6 — 2026-08-17
+ * Version 7 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,12 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Session 4, Phase 4 suite) : incrémenté suite à l'ajout de
+ * js/focusEngine.js (moteur coût/effet Focus, pur) et
+ * js/annulationService.js (pile d'annulation des actions Focus) à
+ * FICHIERS_A_METTRE_EN_CACHE. js/db.js a aussi changé (v3 — ajout du
+ * store pileAnnulation, VERSION_BASE 1 -> 2) mais reste au même chemin.
  *
  * 17/08/2026 (Phase 4, partielle) : incrémenté suite à l'ajout de
  * js/focusService.js (mise en place des Focus) à
@@ -34,4 +40,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.4';
+var APP_VERSION = '20260817.5';

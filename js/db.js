@@ -1,12 +1,17 @@
 /**
  * db.js
  * Wrapper IndexedDB — Voidfall Companion PWA
- * Version 2 — 17/08/2026
+ * Version 3 — 17/08/2026
  *
- * 17/08/2026 (Session 3, Phase 2) : ajout de DB.supprimer(nomStore, cle) —
- * seul changement de cette version, nécessaire à gameService.js pour
- * supprimerPartie / supprimerToutesPartiesNonArchivees. Le reste de l'API
- * (get/getAll/put/putTout/vider) est inchangé.
+ * 17/08/2026 (Session 4, Phase 4 suite) : ajout du store `pileAnnulation`
+ * (annulation de la dernière action Focus jouée, en chaîne — voir
+ * annulationService.js) — VERSION_BASE passée à 2 pour déclencher la
+ * création du nouveau store à la prochaine ouverture (onupgradeneeded
+ * générique déjà en place, aucune autre modification nécessaire ici).
+ * Seul changement de cette version, le reste de l'API (get/getAll/put/
+ * putTout/supprimer/vider) est inchangé.
+ *
+ * 17/08/2026 (Session 3, Phase 2) : ajout de DB.supprimer(nomStore, cle).
  *
  * Ouvre la base 'voidfallCompanion' (schéma détaillé en section 2 de
  * docs-migration-pwa-plan.md) et expose un accès générique get/put/getAll
@@ -21,7 +26,7 @@ var DB = (function () {
   'use strict';
 
   var NOM_BASE = 'voidfallCompanion';
-  var VERSION_BASE = 1;
+  var VERSION_BASE = 2;
   var promesseDB_ = null;
 
   /**
@@ -54,6 +59,19 @@ var DB = (function () {
       index: [
         { nom: 'partieId', cle: 'partieId' },
         { nom: 'dateAction', cle: 'dateAction' }
+      ]
+    },
+    // 17/08/2026 (Session 4) : une entrée = une action Focus jouée avec
+    // succès (effet + coût éventuel), sous forme de mutations de champs
+    // {champ, avant, apres} — voir focusEngine.js pour la production de
+    // ces mutations et annulationService.js pour la pile LIFO qui s'en
+    // sert. Limitée à 10 entrées par partie (purge côté
+    // annulationService.js, pas ici) et vidée à chaque fin de cycle.
+    pileAnnulation: {
+      keyPath: 'id',
+      autoIncrement: true,
+      index: [
+        { nom: 'partieId', cle: 'partieId' }
       ]
     },
 
@@ -188,12 +206,7 @@ var DB = (function () {
 
   /**
    * Suppression d'un seul enregistrement par sa clé (simple ou composée).
-   * 17/08/2026 (Session 3, Phase 2) : ajouté pour gameService.js
-   * (supprimerPartie / supprimerToutesPartiesNonArchivees) — absent
-   * jusqu'ici, seul ajout à ce fichier pour cette session, le reste de
-   * l'API n'est pas touché.
-   * Pas d'erreur si la clé n'existe pas (IndexedDB delete() est idempotent) —
-   * cohérent avec le comportement tolérant déjà en place dans ce fichier.
+   * Pas d'erreur si la clé n'existe pas (IndexedDB delete() est idempotent).
    */
   function supprimer(nomStore, cle) {
     verifierStore_(nomStore);
