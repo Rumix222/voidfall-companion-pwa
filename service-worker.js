@@ -1,6 +1,10 @@
 /**
  * service-worker.js
- * Version 7 — 2026-08-17
+ * Version 8 — 2026-08-17
+ * 17/08/2026 (Session 4, suite — rebranchement DOM) : ajout de
+ * js/strategieService.js à FICHIERS_A_METTRE_EN_CACHE (écran Stratégie
+ * complet). index.html et css/style.css ont aussi changé (v8/v3) mais
+ * restent au même chemin.
  * 17/08/2026 (Session 4, Phase 4 suite) : ajout de js/focusEngine.js et
  * js/annulationService.js à FICHIERS_A_METTRE_EN_CACHE (moteur coût/effet
  * Focus pur + pile d'annulation). js/db.js a aussi changé (v3, nouveau
@@ -60,6 +64,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/annulationService.js',
   './js/gameService.js',
   './js/setupService.js',
+  './js/strategieService.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

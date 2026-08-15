@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 7 — 2026-08-17
+ * Version 8 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,14 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Session 4, suite — rebranchement DOM) : incrémenté suite à
+ * l'ajout de js/strategieService.js (écran Stratégie complet : ressources,
+ * Focus jouables, pistes de Civilisation en lecture seule, bouton
+ * Annuler) et à la refonte d'index.html (v8 — nav Partie/Stratégie/
+ * Secteurs, écran Partie persistant remplaçant l'ancien écran de
+ * confirmation, bouton "Continuer" sur les parties enregistrées) et de
+ * css/style.css (v3 — styles modale/ressources/cartes Focus/nav).
  *
  * 17/08/2026 (Session 4, Phase 4 suite) : incrémenté suite à l'ajout de
  * js/focusEngine.js (moteur coût/effet Focus, pur) et
@@ -40,4 +48,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.5';
+var APP_VERSION = '20260817.6';
