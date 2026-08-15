@@ -41,25 +41,39 @@
     font-size: 0.85rem;
     color: #7c5cff;
   }
+  #version-app {
+    position: fixed;
+    bottom: 12px;
+    right: 14px;
+    font-size: 0.7rem;
+    color: #4a4d5e;
+  }
 </style>
 </head>
 <body>
   <div class="conteneur">
     <h1>Voidfall Companion</h1>
-    <p>Voidfall Companion — PWA OK super</p>
+    <p>Voidfall Companion — PWA OK</p>
     <p id="etat-sw">Service Worker : en cours de vérification…</p>
   </div>
+  <p id="version-app"></p>
 
+  <script src="version.js"></script>
   <script>
     /**
      * index.html (script inline)
-     * Version 1 — 2026-08-15
+     * Version 2 — 2026-08-15
      * PoC minimal : enregistrement du Service Worker uniquement.
      * Aucune logique de jeu, aucun accès IndexedDB à ce stade
      * (voir docs-migration-pwa-plan.md, section 4).
+     * Affiche APP_VERSION (défini dans version.js) en pied de page, pour
+     * vérifier visuellement qu'une mise à jour a bien été prise en compte.
      */
     (function () {
       var etatSw = document.getElementById('etat-sw');
+      var versionApp = document.getElementById('version-app');
+
+      versionApp.textContent = 'v' + APP_VERSION;
 
       if (!('serviceWorker' in navigator)) {
         etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';

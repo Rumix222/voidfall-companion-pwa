@@ -11,19 +11,23 @@
  *
  * IMPORTANT — condition de mise à jour :
  * Le navigateur ne réinstalle ce Service Worker que s'il détecte que CE
- * FICHIER a changé (comparaison octet à octet). Modifier index.html seul,
- * sans changer service-worker.js, ne déclenche AUCUNE mise à jour, même
- * après plusieurs relances de l'app. Il faut donc incrémenter CACHE_NOM
- * (ex. -v1 -> -v2) à chaque déploiement qui modifie un fichier mis en
- * cache, même si service-worker.js n'a par ailleurs pas changé.
+ * FICHIER a changé (comparaison octet à octet). Pour garantir qu'un
+ * changement de contenu déclenche bien une mise à jour, CACHE_NOM est
+ * dérivé de APP_VERSION (voir version.js) plutôt que codé en dur ici :
+ * il suffit d'incrémenter APP_VERSION à chaque push qui modifie un
+ * fichier mis en cache pour que ce fichier change aussi, et donc que le
+ * Service Worker soit réinstallé.
  */
 
-var CACHE_NOM = 'voidfall-companion-poc-v2';
+importScripts('./version.js');
+
+var CACHE_NOM = 'voidfall-companion-' + APP_VERSION;
 
 var FICHIERS_A_METTRE_EN_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './version.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
