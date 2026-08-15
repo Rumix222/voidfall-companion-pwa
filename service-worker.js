@@ -1,6 +1,9 @@
 /**
  * service-worker.js
- * Version 1 — 2026-08-15
+ * Version 2 — 2026-08-16
+ * 16/08/2026 : ajout de js/db.js et js/catalogueSync.js à
+ * FICHIERS_A_METTRE_EN_CACHE (Phase 1 — couche IndexedDB + import
+ * catalogue, voir docs-migration-pwa-plan.md section 1).
  * PoC minimal de migration PWA (voir docs-migration-pwa-plan.md, section 4).
  * Stratégie : cache-first strict sur une liste statique de fichiers.
  * Aucune logique de jeu ici — uniquement l'installabilité et l'offline.
@@ -28,6 +31,8 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './index.html',
   './manifest.json',
   './version.js',
+  './js/db.js',
+  './js/catalogueSync.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

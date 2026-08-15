@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 1 — 2026-08-15
+ * Version 2 — 2026-08-16
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,9 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 16/08/2026 : incrémenté suite à l'ajout de js/db.js et
+ * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260815.1';
+var APP_VERSION = '20260816.1';

@@ -41,6 +41,30 @@
     font-size: 0.85rem;
     color: #7c5cff;
   }
+  #bloc-catalogue {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  #btn-sync-catalogue {
+    background: #7c5cff;
+    color: #f4f4f8;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  #btn-sync-catalogue:disabled {
+    opacity: 0.5;
+  }
+  #etat-catalogue {
+    font-size: 0.8rem;
+    color: #9a9db0;
+    white-space: pre-line;
+  }
   #version-app {
     position: fixed;
     bottom: 12px;
@@ -55,39 +79,70 @@
     <h1>Voidfall Companion</h1>
     <p>Voidfall Companion — PWA OK</p>
     <p id="etat-sw">Service Worker : en cours de vérification…</p>
+
+    <div id="bloc-catalogue">
+      <button id="btn-sync-catalogue">Synchroniser le catalogue</button>
+      <p id="etat-catalogue"></p>
+    </div>
   </div>
   <p id="version-app"></p>
 
   <script src="version.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/catalogueSync.js"></script>
   <script>
     /**
      * index.html (script inline)
-     * Version 2 — 2026-08-15
-     * PoC minimal : enregistrement du Service Worker uniquement.
-     * Aucune logique de jeu, aucun accès IndexedDB à ce stade
-     * (voir docs-migration-pwa-plan.md, section 4).
-     * Affiche APP_VERSION (défini dans version.js) en pied de page, pour
-     * vérifier visuellement qu'une mise à jour a bien été prise en compte.
+     * Version 3 — 16/08/2026
+     * PoC Service Worker (v2) + test manuel de la synchronisation
+     * catalogue Supabase -> IndexedDB (voir js/db.js, js/catalogueSync.js
+     * et docs-migration-pwa-plan.md, section 1 Phase 1).
+     * Toujours aucune logique de jeu ici — juste de quoi valider Phase 1
+     * depuis l'iPhone, sans devtools/Mac.
      */
     (function () {
       var etatSw = document.getElementById('etat-sw');
       var versionApp = document.getElementById('version-app');
+      var btnSync = document.getElementById('btn-sync-catalogue');
+      var etatCatalogue = document.getElementById('etat-catalogue');
 
       versionApp.textContent = 'v' + APP_VERSION;
 
       if (!('serviceWorker' in navigator)) {
         etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
-        return;
+      } else {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(function () {
+            etatSw.textContent = 'Service Worker : installé.';
+          })
+          .catch(function (erreur) {
+            etatSw.textContent = 'Service Worker : échec d\'installation.';
+            console.error('Erreur enregistrement Service Worker :', erreur);
+          });
       }
 
-      navigator.serviceWorker.register('./service-worker.js')
-        .then(function () {
-          etatSw.textContent = 'Service Worker : installé.';
-        })
-        .catch(function (erreur) {
-          etatSw.textContent = 'Service Worker : échec d\'installation.';
-          console.error('Erreur enregistrement Service Worker :', erreur);
-        });
+      btnSync.addEventListener('click', function () {
+        btnSync.disabled = true;
+        btnSync.textContent = 'Passage en cours…';
+        etatCatalogue.textContent = '';
+
+        CatalogueSync.synchroniser()
+          .then(function (rapport) {
+            var lignes = rapport.map(function (r) {
+              return r.statut === 'ok'
+                ? r.table + ' : ' + r.nombre + ' ligne(s)'
+                : r.table + ' : ERREUR — ' + r.message;
+            });
+            etatCatalogue.textContent = lignes.join('\n');
+          })
+          .catch(function (erreur) {
+            etatCatalogue.textContent = 'Échec de synchronisation : ' + erreur.message;
+          })
+          .finally(function () {
+            btnSync.disabled = false;
+            btnSync.textContent = 'Synchroniser le catalogue';
+          });
+      });
     })();
   </script>
 </body>
