@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voidfall Companion</title>
+<meta name="theme-color" content="#0d0f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Voidfall">
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0d0f1a;
+    color: #f4f4f8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .conteneur {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 8px;
+  }
+  p {
+    color: #9a9db0;
+    margin: 4px 0;
+  }
+  #etat-sw {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #7c5cff;
+  }
+</style>
+</head>
+<body>
+  <div class="conteneur">
+    <h1>Voidfall Companion</h1>
+    <p>Voidfall Companion — PWA OK</p>
+    <p id="etat-sw">Service Worker : en cours de vérification…</p>
+  </div>
+
+  <script>
+    /**
+     * index.html (script inline)
+     * Version 1 — 2026-08-15
+     * PoC minimal : enregistrement du Service Worker uniquement.
+     * Aucune logique de jeu, aucun accès IndexedDB à ce stade
+     * (voir docs-migration-pwa-plan.md, section 4).
+     */
+    (function () {
+      var etatSw = document.getElementById('etat-sw');
+
+      if (!('serviceWorker' in navigator)) {
+        etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
+        return;
+      }
+
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(function () {
+          etatSw.textContent = 'Service Worker : installé.';
+        })
+        .catch(function (erreur) {
+          etatSw.textContent = 'Service Worker : échec d\'installation.';
+          console.error('Erreur enregistrement Service Worker :', erreur);
+        });
+    })();
+  </script>
+</body>
+</html>
