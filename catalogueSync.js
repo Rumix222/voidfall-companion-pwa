@@ -32,8 +32,8 @@
 var CatalogueSync = (function () {
   'use strict';
 
-  var SUPABASE_URL = 'https://VOTRE-PROJET.supabase.co'; // TODO : remplacer par l'URL réelle
-  var SUPABASE_ANON_KEY = 'VOTRE_CLE_ANON';               // TODO : remplacer par la clé anon réelle
+  var SUPABASE_URL = 'https://qzrescihdqhbeiaxtrux.supabase.co'; // TODO : remplacer par l'URL réelle
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cmVzY2loZHFoYmVpYXh0cnV4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjM4Njc0NywiZXhwIjoyMTAxOTYyNzQ3fQ.5uTBh4qAKLPyAGwbI03FO0Ed9lOa-08cuWRHTAOGks0';               // TODO : remplacer par la clé anon réelle
 
   /**
    * Table Supabase -> store IndexedDB correspondant (mapping 1:1, voir §2
