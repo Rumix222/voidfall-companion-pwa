@@ -1,6 +1,10 @@
 /**
  * service-worker.js
- * Version 2 — 2026-08-16
+ * Version 3 — 2026-08-17
+ * 17/08/2026 : ajout de js/gameService.js à FICHIERS_A_METTRE_EN_CACHE
+ * (Phase 2 — cycle de vie de partie, voir docs-migration-pwa-plan.md
+ * section 1). js/db.js a aussi changé (ajout de DB.supprimer) mais reste
+ * au même chemin, donc pas de nouvelle entrée à ajouter pour lui.
  * 16/08/2026 : ajout de js/db.js et js/catalogueSync.js à
  * FICHIERS_A_METTRE_EN_CACHE (Phase 1 — couche IndexedDB + import
  * catalogue, voir docs-migration-pwa-plan.md section 1).
@@ -33,6 +37,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './version.js',
   './js/db.js',
   './js/catalogueSync.js',
+  './js/gameService.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

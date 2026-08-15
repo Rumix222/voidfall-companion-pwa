@@ -1,7 +1,12 @@
 /**
  * db.js
  * Wrapper IndexedDB — Voidfall Companion PWA
- * Version 1 — 16/08/2026
+ * Version 2 — 17/08/2026
+ *
+ * 17/08/2026 (Session 3, Phase 2) : ajout de DB.supprimer(nomStore, cle) —
+ * seul changement de cette version, nécessaire à gameService.js pour
+ * supprimerPartie / supprimerToutesPartiesNonArchivees. Le reste de l'API
+ * (get/getAll/put/putTout/vider) est inchangé.
  *
  * Ouvre la base 'voidfallCompanion' (schéma détaillé en section 2 de
  * docs-migration-pwa-plan.md) et expose un accès générique get/put/getAll
@@ -182,6 +187,27 @@ var DB = (function () {
   }
 
   /**
+   * Suppression d'un seul enregistrement par sa clé (simple ou composée).
+   * 17/08/2026 (Session 3, Phase 2) : ajouté pour gameService.js
+   * (supprimerPartie / supprimerToutesPartiesNonArchivees) — absent
+   * jusqu'ici, seul ajout à ce fichier pour cette session, le reste de
+   * l'API n'est pas touché.
+   * Pas d'erreur si la clé n'existe pas (IndexedDB delete() est idempotent) —
+   * cohérent avec le comportement tolérant déjà en place dans ce fichier.
+   */
+  function supprimer(nomStore, cle) {
+    verifierStore_(nomStore);
+    return ouvrir_().then(function (base) {
+      return new Promise(function (resoudre, rejeter) {
+        var transaction = base.transaction(nomStore, 'readwrite');
+        var requete = transaction.objectStore(nomStore).delete(cle);
+        requete.onsuccess = function () { resoudre(); };
+        requete.onerror = function () { rejeter(requete.error); };
+      });
+    });
+  }
+
+  /**
    * Vide entièrement un store (sans réinsertion).
    */
   function vider(nomStore) {
@@ -202,6 +228,7 @@ var DB = (function () {
     getAll: getAll,
     put: put,
     putTout: putTout,
+    supprimer: supprimer,
     vider: vider,
     NOMS_STORES: Object.keys(STORES)
   };

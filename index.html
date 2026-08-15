@@ -72,6 +72,87 @@
     font-size: 0.7rem;
     color: #4a4d5e;
   }
+  #bloc-gameservice {
+    margin-top: 32px;
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    text-align: left;
+  }
+  #bloc-gameservice h2 {
+    font-size: 1rem;
+    margin: 0 0 4px;
+    text-align: center;
+    color: #f4f4f8;
+  }
+  #select-maison-test {
+    background: #16192b;
+    color: #f4f4f8;
+    border: 1px solid #2a2e45;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  #btn-creer-partie-test {
+    background: #7c5cff;
+    color: #f4f4f8;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-family: inherit;
+  }
+  #btn-creer-partie-test:disabled {
+    opacity: 0.5;
+  }
+  #resultat-creation-test {
+    font-size: 0.8rem;
+    color: #9a9db0;
+    white-space: pre-line;
+  }
+  .carte-partie-test {
+    background: #16192b;
+    border: 1px solid #2a2e45;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .carte-partie-test-titre {
+    color: #f4f4f8;
+    font-weight: 600;
+  }
+  .carte-partie-test-detail {
+    color: #9a9db0;
+  }
+  .carte-partie-test-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .carte-partie-test-actions button {
+    flex: 1;
+    background: #22263c;
+    color: #f4f4f8;
+    border: 1px solid #2a2e45;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.78rem;
+    font-family: inherit;
+  }
+  .carte-partie-test-actions button:disabled {
+    opacity: 0.5;
+  }
+  .carte-partie-test-actions button.danger {
+    border-color: #7a3140;
+    color: #ff8a97;
+  }
 </style>
 </head>
 <body>
@@ -84,21 +165,36 @@
       <button id="btn-sync-catalogue">Synchroniser le catalogue</button>
       <p id="etat-catalogue"></p>
     </div>
+
+    <div id="bloc-gameservice">
+      <h2>Test — cycle de vie de partie</h2>
+      <select id="select-maison-test">
+        <option value="">— Synchronise le catalogue d'abord —</option>
+      </select>
+      <button id="btn-creer-partie-test">Créer une partie (test)</button>
+      <p id="resultat-creation-test"></p>
+      <div id="liste-parties-test"></div>
+    </div>
   </div>
   <p id="version-app"></p>
 
   <script src="version.js"></script>
   <script src="js/db.js"></script>
   <script src="js/catalogueSync.js"></script>
+  <script src="js/gameService.js"></script>
   <script>
     /**
      * index.html (script inline)
-     * Version 3 — 16/08/2026
+     * Version 4 — 17/08/2026
+     * 17/08/2026 (Session 3, Phase 2) : ajout d'un bloc de test manuel pour
+     * gameService.js (créer / lister / archiver / supprimer une partie),
+     * même esprit que le bloc "Synchroniser le catalogue" (Session 2) —
+     * pas encore l'écran de création complet (setup.html à porter, mise
+     * en place manuelle/aléatoire avec toutes les options), juste de quoi
+     * valider le cycle de vie CRUD depuis l'iPhone sans devtools/Mac.
      * PoC Service Worker (v2) + test manuel de la synchronisation
      * catalogue Supabase -> IndexedDB (voir js/db.js, js/catalogueSync.js
      * et docs-migration-pwa-plan.md, section 1 Phase 1).
-     * Toujours aucune logique de jeu ici — juste de quoi valider Phase 1
-     * depuis l'iPhone, sans devtools/Mac.
      */
     (function () {
       var etatSw = document.getElementById('etat-sw');
@@ -134,6 +230,7 @@
                 : r.table + ' : ERREUR — ' + r.message;
             });
             etatCatalogue.textContent = lignes.join('\n');
+            return chargerMaisonsSelect_();
           })
           .catch(function (erreur) {
             etatCatalogue.textContent = 'Échec de synchronisation : ' + erreur.message;
@@ -143,6 +240,133 @@
             btnSync.textContent = 'Synchroniser le catalogue';
           });
       });
+
+      // --------------------------------------------------------
+      // Bloc de test gameService.js (Session 3, Phase 2) — création,
+      // liste, archivage, suppression. Pas l'écran de création définitif
+      // (mode aléatoire / mise en place manuelle à venir avec setup.html) :
+      // ici uniquement le mode manuel simple, pour valider le CRUD.
+      // --------------------------------------------------------
+      var selectMaisonTest = document.getElementById('select-maison-test');
+      var btnCreerPartieTest = document.getElementById('btn-creer-partie-test');
+      var resultatCreationTest = document.getElementById('resultat-creation-test');
+      var listePartiesTest = document.getElementById('liste-parties-test');
+
+      function chargerMaisonsSelect_() {
+        return DB.getAll('maisons').then(function (maisons) {
+          if (!maisons.length) {
+            selectMaisonTest.innerHTML = '<option value="">— Synchronise le catalogue d\'abord —</option>';
+            return;
+          }
+          maisons.sort(function (a, b) { return a.nom.localeCompare(b.nom); });
+          selectMaisonTest.innerHTML = maisons.map(function (m) {
+            return '<option value="' + m.nom + '">' + m.nom + '</option>';
+          }).join('');
+        });
+      }
+
+      function formaterDate_(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      }
+
+      function rendreCartePartie_(partie) {
+        var carte = document.createElement('div');
+        carte.className = 'carte-partie-test';
+
+        var titre = document.createElement('div');
+        titre.className = 'carte-partie-test-titre';
+        titre.textContent = (partie.joueur ? partie.joueur.nom : '?') + (partie.archivee ? ' (archivée)' : '');
+        carte.appendChild(titre);
+
+        var detail = document.createElement('div');
+        detail.className = 'carte-partie-test-detail';
+        detail.textContent = 'Cycle ' + partie.cycleActuel + ' · créée le ' + formaterDate_(partie.dateCreation) + ' · id ' + partie.id.slice(0, 8) + '…';
+        carte.appendChild(detail);
+
+        var actions = document.createElement('div');
+        actions.className = 'carte-partie-test-actions';
+
+        var btnArchiver = document.createElement('button');
+        btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
+        btnArchiver.addEventListener('click', function () {
+          btnArchiver.disabled = true;
+          btnArchiver.textContent = 'Passage en cours…';
+          GameService.archiverPartie(partie.id, !partie.archivee)
+            .then(rafraichirListeParties_)
+            .catch(function (erreur) {
+              window.alert('Échec archivage : ' + erreur.message);
+              btnArchiver.disabled = false;
+              btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
+            });
+        });
+        actions.appendChild(btnArchiver);
+
+        var btnSupprimer = document.createElement('button');
+        btnSupprimer.className = 'danger';
+        btnSupprimer.textContent = 'Supprimer';
+        btnSupprimer.addEventListener('click', function () {
+          if (!window.confirm('Supprimer définitivement cette partie (' + titre.textContent + ') ?')) return;
+          btnSupprimer.disabled = true;
+          btnArchiver.disabled = true;
+          btnSupprimer.textContent = 'Passage en cours…';
+          GameService.supprimerPartie(partie.id)
+            .then(rafraichirListeParties_)
+            .catch(function (erreur) {
+              window.alert('Échec suppression : ' + erreur.message);
+              btnSupprimer.disabled = false;
+              btnArchiver.disabled = false;
+              btnSupprimer.textContent = 'Supprimer';
+            });
+        });
+        actions.appendChild(btnSupprimer);
+
+        carte.appendChild(actions);
+        return carte;
+      }
+
+      function rafraichirListeParties_() {
+        return GameService.listerParties().then(function (parties) {
+          listePartiesTest.innerHTML = '';
+          if (!parties.length) {
+            listePartiesTest.innerHTML = '<p class="hint" style="color:#9a9db0;font-size:0.8rem;">Aucune partie enregistrée.</p>';
+            return;
+          }
+          parties.forEach(function (partie) {
+            listePartiesTest.appendChild(rendreCartePartie_(partie));
+          });
+        });
+      }
+
+      btnCreerPartieTest.addEventListener('click', function () {
+        if (!selectMaisonTest.value) {
+          window.alert('Choisis une maison (synchronise le catalogue si la liste est vide).');
+          return;
+        }
+        btnCreerPartieTest.disabled = true;
+        btnCreerPartieTest.textContent = 'Passage en cours…';
+        resultatCreationTest.textContent = '';
+
+        GameService.creerPartie({ mode: 'manuel', maison: selectMaisonTest.value })
+          .then(function (partie) {
+            resultatCreationTest.textContent = 'Partie créée : ' + partie.joueur.nom +
+              ' (technologie de départ : ' + partie.joueur.technologieDepart.nom + ')';
+            return rafraichirListeParties_();
+          })
+          .catch(function (erreur) {
+            resultatCreationTest.textContent = 'Échec de création : ' + erreur.message;
+          })
+          .finally(function () {
+            btnCreerPartieTest.disabled = false;
+            btnCreerPartieTest.textContent = 'Créer une partie (test)';
+          });
+      });
+
+      // Chargement initial : liste des maisons (si catalogue déjà
+      // synchronisé lors d'une session précédente) + parties existantes.
+      chargerMaisonsSelect_();
+      rafraichirListeParties_();
     })();
   </script>
 </body>
