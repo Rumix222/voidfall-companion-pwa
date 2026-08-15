@@ -1,7 +1,28 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 1 — 17/08/2026
+ * Version 4 — 17/08/2026
+ *
+ * 17/08/2026 (Phase 4, partielle) : creerPartie remplit désormais
+ * partie.focusJoueur avec la vraie mise en place (voir
+ * FocusService.obtenirMiseEnPlace, focusService.js) au lieu d'un tableau
+ * vide — tolérant (garde typeof, comme SecteurService). Les cartes ne
+ * sont pas encore jouables (moteur coût/effet hors périmètre, voir
+ * focusService.js en-tête). Dépend désormais aussi de focusService.js,
+ * à charger AVANT ce fichier (même principe que secteurService.js).
+ *
+ * 17/08/2026 (Phase 3) : creerPartie appelle désormais
+ * SecteurService.instancierSecteurs(partie) après la sauvegarde
+ * (tolérant — voir secteurService.js, ne bloque jamais la création de
+ * partie) ; scenarioId se défaut sur SecteurService.SCENARIO_PAR_DEFAUT
+ * si non fourni (comme côté GAS), au lieu de rester null. Dépend
+ * désormais de secteurService.js, à charger AVANT ce fichier — via un
+ * garde `typeof SecteurService !== 'undefined'`, gameService.js reste
+ * utilisable seul (tests) si secteurService.js n'est pas chargé.
+ *
+ * 17/08/2026 (suite Session 3) : obtenirMaisonsCatalogue exposée
+ * publiquement (était privée) — utilisée par js/setupService.js (portage
+ * de l'écran de création de partie, setup.html GAS).
  *
  * Session 3 (Phase 2 du plan de migration) : remplace GameService.js (GAS)
  * + la partie "état de jeu" de DataService.js. Écriture directe dans les
@@ -314,6 +335,15 @@ var GameService = (function () {
   return {
 
     /**
+     * 17/08/2026 (Session 3, suite) : exposée publiquement pour
+     * setupService.js — remplace à la fois Api.getMaisonsPourSelection et
+     * Api.getDetailMaisons(noms) côté GAS. Plus de distinction "légère vs
+     * détaillée" : la donnée est déjà locale (IndexedDB), pas d'enjeu de
+     * poids de payload réseau à optimiser ici.
+     */
+    obtenirMaisonsCatalogue: obtenirMaisonsCatalogue_,
+
+    /**
      * Crée une nouvelle partie. Portage de GameService.creerPartie (GAS),
      * réduit à ce qui ne dépend pas de FocusService/SecteurService (voir
      * en-tête) : focusJoueur démarre à [] et aucun secteur n'est instancié.
@@ -380,12 +410,25 @@ var GameService = (function () {
           marquerTechnologiesSansPoint_(adversaires, 3);
         }
 
-        return obtenirOrigineMaison_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
-          .catch(function (erreur) {
-            console.warn('GameService.creerPartie : lecture originesMaison a échoué (civilisation/ressources de départ à 0) :', erreur);
-            return null;
-          })
-          .then(function (origineDepart) {
+        return Promise.all([
+          obtenirOrigineMaison_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
+            .catch(function (erreur) {
+              console.warn('GameService.creerPartie : lecture originesMaison a échoué (civilisation/ressources de départ à 0) :', erreur);
+              return null;
+            }),
+          // 17/08/2026 (Phase 4, partielle) : mise en place des Focus de la
+          // maison — tolérant (garde typeof, comme SecteurService), une
+          // erreur ici ne doit jamais empêcher la création de la partie.
+          (typeof FocusService !== 'undefined' && FocusService.obtenirMiseEnPlace)
+            ? FocusService.obtenirMiseEnPlace(maisonJoueur.nom).catch(function (erreur) {
+                console.warn('GameService.creerPartie : mise en place Focus échouée (partie créée quand même, sans Focus) :', erreur);
+                return [];
+              })
+            : Promise.resolve([])
+        ])
+          .then(function (resultats) {
+            var origineDepart = resultats[0];
+            var focusJoueur = resultats[1];
             var civilisationDepart = { societe: 0, gouvernement: 0, economie: 0 };
             var ressourcesDepart = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
             var cubeActifDepart = 0;
@@ -415,7 +458,7 @@ var GameService = (function () {
               id: id,
               dateCreation: dateCreation,
               archivee: false,
-              scenarioId: options.scenarioId || null,
+              scenarioId: options.scenarioId || (typeof SecteurService !== 'undefined' ? SecteurService.SCENARIO_PAR_DEFAUT : null),
               cycleNum: 1,
               cycleTermine: false,
               cycleActuel: 1,
@@ -432,9 +475,13 @@ var GameService = (function () {
               },
               // Focus héroïques / secteurs : hors périmètre de cette session
               // (Phases 3 et 4), champs prévus dans la forme attendue.
+              // focusJoueur (Phase 4, partielle) : vraie mise en place
+              // désormais (voir FocusService.obtenirMiseEnPlace ci-dessus) —
+              // les cartes ne sont pas encore jouables (moteur coût/effet
+              // hors périmètre, voir focusService.js en-tête).
               focusHeroiques: { cycle1: [null, null, null], cycle2: [null, null, null], cycle3: [null, null, null] },
               focusHeroiquesPioches: [],
-              focusJoueur: []
+              focusJoueur: focusJoueur
             };
 
             var plateauMaison = {
@@ -480,6 +527,16 @@ var GameService = (function () {
               DB.put('parties', enregistrementPartie),
               DB.put('plateauMaison', plateauMaison)
             ]).then(function () {
+              // 17/08/2026 (Phase 3) : instanciation du plateau des secteurs
+              // — après l'écriture de "parties" (secteursPartie.partieId
+              // n'a pas de contrainte FK sous IndexedDB, mais on garde le
+              // même ordre que côté GAS par cohérence). Tolérant en soi
+              // (voir SecteurService.instancierSecteurs) : une erreur ici
+              // ne remonte jamais jusqu'à la création de la partie.
+              if (typeof SecteurService !== 'undefined' && SecteurService.instancierSecteurs) {
+                return SecteurService.instancierSecteurs(partie);
+              }
+            }).then(function () {
               return ajouterHistorique_(id, 'creation_partie', maisonJoueur.nom);
             }).then(function () {
               return assemblerPartie_(enregistrementPartie, plateauMaison);

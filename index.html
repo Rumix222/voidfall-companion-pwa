@@ -4,370 +4,391 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Voidfall Companion</title>
-<meta name="theme-color" content="#0d0f1a">
+<meta name="theme-color" content="#0a0813">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Voidfall">
-<style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: #0d0f1a;
-    color: #f4f4f8;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  .conteneur {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 24px;
-    box-sizing: border-box;
-  }
-  h1 {
-    font-size: 1.4rem;
-    margin: 0 0 8px;
-  }
-  p {
-    color: #9a9db0;
-    margin: 4px 0;
-  }
-  #etat-sw {
-    margin-top: 20px;
-    font-size: 0.85rem;
-    color: #7c5cff;
-  }
-  #bloc-catalogue {
-    margin-top: 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-  #btn-sync-catalogue {
-    background: #7c5cff;
-    color: #f4f4f8;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 0.9rem;
-    font-family: inherit;
-  }
-  #btn-sync-catalogue:disabled {
-    opacity: 0.5;
-  }
-  #etat-catalogue {
-    font-size: 0.8rem;
-    color: #9a9db0;
-    white-space: pre-line;
-  }
-  #version-app {
-    position: fixed;
-    bottom: 12px;
-    right: 14px;
-    font-size: 0.7rem;
-    color: #4a4d5e;
-  }
-  #bloc-gameservice {
-    margin-top: 32px;
-    width: 100%;
-    max-width: 420px;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    text-align: left;
-  }
-  #bloc-gameservice h2 {
-    font-size: 1rem;
-    margin: 0 0 4px;
-    text-align: center;
-    color: #f4f4f8;
-  }
-  #select-maison-test {
-    background: #16192b;
-    color: #f4f4f8;
-    border: 1px solid #2a2e45;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 0.9rem;
-    font-family: inherit;
-  }
-  #btn-creer-partie-test {
-    background: #7c5cff;
-    color: #f4f4f8;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 0.9rem;
-    font-family: inherit;
-  }
-  #btn-creer-partie-test:disabled {
-    opacity: 0.5;
-  }
-  #resultat-creation-test {
-    font-size: 0.8rem;
-    color: #9a9db0;
-    white-space: pre-line;
-  }
-  .carte-partie-test {
-    background: #16192b;
-    border: 1px solid #2a2e45;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 0.82rem;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .carte-partie-test-titre {
-    color: #f4f4f8;
-    font-weight: 600;
-  }
-  .carte-partie-test-detail {
-    color: #9a9db0;
-  }
-  .carte-partie-test-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-  }
-  .carte-partie-test-actions button {
-    flex: 1;
-    background: #22263c;
-    color: #f4f4f8;
-    border: 1px solid #2a2e45;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 0.78rem;
-    font-family: inherit;
-  }
-  .carte-partie-test-actions button:disabled {
-    opacity: 0.5;
-  }
-  .carte-partie-test-actions button.danger {
-    border-color: #7a3140;
-    color: #ff8a97;
-  }
-</style>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="conteneur">
-    <h1>Voidfall Companion</h1>
-    <p>Voidfall Companion — PWA OK</p>
-    <p id="etat-sw">Service Worker : en cours de vérification…</p>
 
-    <div id="bloc-catalogue">
-      <button id="btn-sync-catalogue">Synchroniser le catalogue</button>
-      <p id="etat-catalogue"></p>
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+
+  <header class="topbar">
+    <h1>Voidfall<span class="topbar-accent">Companion</span></h1>
+  </header>
+
+  <!-- Écran d'accueil -->
+  <section id="screen-home" class="screen">
+    <button id="btn-nouvelle-partie" class="btn btn-primary">Créer une partie</button>
+
+    <div class="setup-bloc" style="margin-top:24px;">
+      <label>Catalogue de jeu</label>
+      <button id="btn-sync-catalogue" class="btn btn-secondary" style="width:100%;">Synchroniser le catalogue</button>
+      <p class="hint" id="etat-catalogue" style="white-space:pre-line;margin-top:8px;"></p>
     </div>
 
-    <div id="bloc-gameservice">
-      <h2>Test — cycle de vie de partie</h2>
-      <select id="select-maison-test">
-        <option value="">— Synchronise le catalogue d'abord —</option>
-      </select>
-      <button id="btn-creer-partie-test">Créer une partie (test)</button>
-      <p id="resultat-creation-test"></p>
-      <div id="liste-parties-test"></div>
+    <div class="setup-bloc" id="bloc-parties-enregistrees">
+      <label>Parties enregistrées</label>
+      <div id="liste-parties"></div>
     </div>
-  </div>
-  <p id="version-app"></p>
 
-  <script src="version.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/catalogueSync.js"></script>
-  <script src="js/gameService.js"></script>
-  <script>
-    /**
-     * index.html (script inline)
-     * Version 4 — 17/08/2026
-     * 17/08/2026 (Session 3, Phase 2) : ajout d'un bloc de test manuel pour
-     * gameService.js (créer / lister / archiver / supprimer une partie),
-     * même esprit que le bloc "Synchroniser le catalogue" (Session 2) —
-     * pas encore l'écran de création complet (setup.html à porter, mise
-     * en place manuelle/aléatoire avec toutes les options), juste de quoi
-     * valider le cycle de vie CRUD depuis l'iPhone sans devtools/Mac.
-     * PoC Service Worker (v2) + test manuel de la synchronisation
-     * catalogue Supabase -> IndexedDB (voir js/db.js, js/catalogueSync.js
-     * et docs-migration-pwa-plan.md, section 1 Phase 1).
-     */
-    (function () {
-      var etatSw = document.getElementById('etat-sw');
-      var versionApp = document.getElementById('version-app');
-      var btnSync = document.getElementById('btn-sync-catalogue');
-      var etatCatalogue = document.getElementById('etat-catalogue');
+    <p class="hint" id="etat-sw" style="text-align:center;"></p>
+    <p style="text-align:center;font-size:0.7rem;color:#4a4d5e;" id="version-app"></p>
+  </section>
 
-      versionApp.textContent = 'v' + APP_VERSION;
+  <!-- Écran de création de partie -->
+  <section id="screen-setup" class="screen" hidden>
+    <h2 class="section-title">Nouvelle partie</h2>
 
-      if (!('serviceWorker' in navigator)) {
-        etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
-      } else {
-        navigator.serviceWorker.register('./service-worker.js')
-          .then(function () {
-            etatSw.textContent = 'Service Worker : installé.';
-          })
-          .catch(function (erreur) {
-            etatSw.textContent = 'Service Worker : échec d\'installation.';
-            console.error('Erreur enregistrement Service Worker :', erreur);
-          });
-      }
+    <div class="mode-toggle">
+      <button id="mode-manuel" class="btn btn-toggle active" data-mode="manuel">Choix manuel</button>
+      <button id="mode-aleatoire" class="btn btn-toggle" data-mode="aleatoire">Choix aléatoire</button>
+    </div>
 
-      btnSync.addEventListener('click', function () {
-        btnSync.disabled = true;
-        btnSync.textContent = 'Passage en cours…';
-        etatCatalogue.textContent = '';
+    <div id="bloc-manuel" class="setup-bloc">
+      <label for="select-maison">Maison</label>
+      <select id="select-maison"></select>
 
-        CatalogueSync.synchroniser()
-          .then(function (rapport) {
-            var lignes = rapport.map(function (r) {
-              return r.statut === 'ok'
-                ? r.table + ' : ' + r.nombre + ' ligne(s)'
-                : r.table + ' : ERREUR — ' + r.message;
-            });
-            etatCatalogue.textContent = lignes.join('\n');
-            return chargerMaisonsSelect_();
-          })
-          .catch(function (erreur) {
-            etatCatalogue.textContent = 'Échec de synchronisation : ' + erreur.message;
-          })
-          .finally(function () {
-            btnSync.disabled = false;
-            btnSync.textContent = 'Synchroniser le catalogue';
-          });
+      <label class="case-mise-en-place-manuelle">
+        <input type="checkbox" id="check-mise-en-place-manuelle">
+        Reproduire une partie physique déjà en cours
+      </label>
+
+      <div id="bloc-mise-en-place-manuelle" class="setup-bloc-imbrique" hidden>
+        <p class="hint">Renseigne ce que tu as déjà tiré/choisi sur table : la technologie de départ, les 4 maisons déchues, puis les 3 de leurs technologies qui ne rapportent pas d'Influence.</p>
+
+        <label for="select-techno-depart-manuelle">Technologie de départ</label>
+        <select id="select-techno-depart-manuelle">
+          <option value="">— Choisissez une maison ci-dessus —</option>
+        </select>
+
+        <label class="label-section">Maisons déchues</label>
+        <select id="select-maison-dechue-0" class="select-maison-dechue" data-slot="0"></select>
+        <select id="select-maison-dechue-1" class="select-maison-dechue" data-slot="1"></select>
+        <select id="select-maison-dechue-2" class="select-maison-dechue" data-slot="2"></select>
+        <select id="select-maison-dechue-3" class="select-maison-dechue" data-slot="3"></select>
+
+        <label class="label-section">Technologies sans gain d'Influence (choisissez-en exactement 3)</label>
+        <p class="hint" id="compteur-sans-point">0 / 3 sélectionnée(s)</p>
+        <div id="liste-technologies-sans-point" class="liste-technologies-sans-point">
+          <p class="hint">Choisissez d'abord les 4 maisons déchues ci-dessus.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="bloc-aleatoire" class="setup-bloc" hidden>
+      <label for="select-complexite">Difficulté</label>
+      <select id="select-complexite"></select>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-retour-home" class="btn btn-secondary">Retour</button>
+      <button id="btn-lancer-partie" class="btn btn-primary">Lancer la partie</button>
+    </div>
+  </section>
+
+  <!-- Résultat de création — temporaire : l'écran de partie complet
+       (ressources, secteurs, Focus…) arrive avec les Phases 3/4 du plan
+       de migration. Ici, juste la confirmation que la partie est bien
+       enregistrée localement. -->
+  <section id="screen-partie-creee" class="screen" hidden>
+    <div class="resultat-partie-creee">
+      <h3>Partie créée</h3>
+      <p id="resultat-partie-maison"></p>
+      <p id="resultat-partie-technologie"></p>
+      <p class="hint" style="margin-top:14px;">L'écran de partie complet arrive dans une prochaine session — la partie est bien enregistrée sur cet appareil (IndexedDB).</p>
+    </div>
+
+    <div class="setup-bloc" style="margin-top:20px;">
+      <label>Plateau des secteurs</label>
+      <div id="resultat-secteurs" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="setup-bloc" style="margin-top:20px;">
+      <label>Vos Focus (mise en place)</label>
+      <div id="resultat-focus"></div>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-retour-accueil-creation" class="btn btn-primary">Retour à l'accueil</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="version.js"></script>
+<script src="js/db.js"></script>
+<script src="js/catalogueSync.js"></script>
+<script src="js/secteurService.js"></script>
+<script src="js/focusService.js"></script>
+<script src="js/gameService.js"></script>
+<script src="js/setupService.js"></script>
+<script>
+  /**
+   * index.html (script inline)
+   * Version 7 — 17/08/2026
+   *
+   * 17/08/2026 (Phase 4, partielle) : App.afficherPartieCreee affiche
+   * aussi les Focus de mise en place (partie.focusJoueur, déjà rempli
+   * par GameService.creerPartie via FocusService.obtenirMiseEnPlace) —
+   * affichage seul, pas encore jouable (moteur coût/effet hors
+   * périmètre, voir focusService.js en-tête).
+   *
+   * 17/08/2026 (Phase 3) : App.afficherPartieCreee affiche désormais
+   * aussi le plateau des secteurs fraîchement instancié (voir
+   * js/secteurService.js, SecteurService.instancierSecteurs — appelé
+   * depuis GameService.creerPartie).
+   *
+   * 17/08/2026 (Session 3, suite) : remplace le bloc de test ad-hoc
+   * ("Test — cycle de vie de partie", index.html v4) par le véritable
+   * écran de création de partie (screen-setup, porté depuis setup.html
+   * GAS — voir js/setupService.js) + un écran de confirmation temporaire
+   * (screen-partie-creee, en attendant l'écran de partie complet des
+   * Phases 3/4). La liste "Parties enregistrées" de l'accueil reprend
+   * archiver/supprimer de la v4 (toujours utile en l'absence d'écran
+   * Historique dédié).
+   *
+   * Objet App : orchestration minimale (bascule d'écrans + rendu du
+   * résultat de création) — remplace App.showScreen/App.renderPartie
+   * côté GAS. Volontairement réduit à ce qui est nécessaire aujourd'hui ;
+   * deviendra js/app.js à part entière quand plus d'écrans existeront
+   * (voir structure de repo proposée, docs-migration-pwa-plan.md section 3).
+   */
+  var App = (function () {
+    function afficherEcran(nom) {
+      document.querySelectorAll('.screen').forEach(function (ecran) {
+        ecran.hidden = (ecran.id !== 'screen-' + nom);
       });
+    }
 
-      // --------------------------------------------------------
-      // Bloc de test gameService.js (Session 3, Phase 2) — création,
-      // liste, archivage, suppression. Pas l'écran de création définitif
-      // (mode aléatoire / mise en place manuelle à venir avec setup.html) :
-      // ici uniquement le mode manuel simple, pour valider le CRUD.
-      // --------------------------------------------------------
-      var selectMaisonTest = document.getElementById('select-maison-test');
-      var btnCreerPartieTest = document.getElementById('btn-creer-partie-test');
-      var resultatCreationTest = document.getElementById('resultat-creation-test');
-      var listePartiesTest = document.getElementById('liste-parties-test');
+    /**
+     * 17/08/2026 (Phase 3) : affiche aussi le plateau des secteurs
+     * instancié par SecteurService.instancierSecteurs (appelé depuis
+     * GameService.creerPartie). Le type affiché (Secteur-Mère / Avant-
+     * poste / Maison déchue) est déduit à l'affichage — secteursPartie ne
+     * stocke pas le type catalogue, seulement maisonAssociee.
+     */
+    function afficherPartieCreee(partie) {
+      document.getElementById('resultat-partie-maison').textContent =
+        'Maison : ' + partie.joueur.nom;
+      document.getElementById('resultat-partie-technologie').textContent =
+        'Technologie de départ : ' + partie.joueur.technologieDepart.nom;
+      afficherEcran('partie-creee');
+      afficherSecteurs_(partie);
+      afficherFocus_(partie);
+    }
 
-      function chargerMaisonsSelect_() {
-        return DB.getAll('maisons').then(function (maisons) {
-          if (!maisons.length) {
-            selectMaisonTest.innerHTML = '<option value="">— Synchronise le catalogue d\'abord —</option>';
-            return;
-          }
-          maisons.sort(function (a, b) { return a.nom.localeCompare(b.nom); });
-          selectMaisonTest.innerHTML = maisons.map(function (m) {
-            return '<option value="' + m.nom + '">' + m.nom + '</option>';
-          }).join('');
-        });
+    /**
+     * 17/08/2026 (Phase 4, partielle) : partie.focusJoueur est déjà
+     * disponible synchrone (rempli par GameService.creerPartie via
+     * FocusService.obtenirMiseEnPlace) — pas de nouvel appel nécessaire
+     * ici, contrairement à afficherSecteurs_. Affichage seul : les cartes
+     * ne sont pas encore jouables (pas de moteur coût/effet, hors
+     * périmètre — voir focusService.js en-tête).
+     */
+    function afficherFocus_(partie) {
+      var conteneur = document.getElementById('resultat-focus');
+      var cartes = partie.focusJoueur || [];
+
+      if (!cartes.length) {
+        conteneur.innerHTML = '<p class="hint">Aucun Focus (catalogue "focus" vide — resynchronise si besoin).</p>';
+        return;
       }
 
-      function formaterDate_(iso) {
-        if (!iso) return '';
-        var d = new Date(iso);
-        return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      }
+      conteneur.innerHTML = cartes.map(function (carte) {
+        var actions = carte.actions.map(function (a) {
+          return '<div class="hint" style="margin:2px 0;">' + (a.action || '—') + (a.texte ? ' — ' + a.texte : '') + '</div>';
+        }).join('');
+        return '<div class="card" style="margin-top:8px;padding:10px 14px;">' +
+          '<div style="font-weight:600;">' + carte.focus + ' <span class="hint-inline">(' + carte.type + ')</span></div>' +
+          actions +
+          '</div>';
+      }).join('');
+    }
 
-      function rendreCartePartie_(partie) {
-        var carte = document.createElement('div');
-        carte.className = 'carte-partie-test';
+    function afficherSecteurs_(partie) {
+      var conteneur = document.getElementById('resultat-secteurs');
+      conteneur.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
 
-        var titre = document.createElement('div');
-        titre.className = 'carte-partie-test-titre';
-        titre.textContent = (partie.joueur ? partie.joueur.nom : '?') + (partie.archivee ? ' (archivée)' : '');
-        carte.appendChild(titre);
+      Promise.all([
+        SecteurService.obtenirSecteurs(partie.id),
+        SecteurService.obtenirSecteurMere(partie.scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var numeroMere = resultats[1];
 
-        var detail = document.createElement('div');
-        detail.className = 'carte-partie-test-detail';
-        detail.textContent = 'Cycle ' + partie.cycleActuel + ' · créée le ' + formaterDate_(partie.dateCreation) + ' · id ' + partie.id.slice(0, 8) + '…';
-        carte.appendChild(detail);
-
-        var actions = document.createElement('div');
-        actions.className = 'carte-partie-test-actions';
-
-        var btnArchiver = document.createElement('button');
-        btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
-        btnArchiver.addEventListener('click', function () {
-          btnArchiver.disabled = true;
-          btnArchiver.textContent = 'Passage en cours…';
-          GameService.archiverPartie(partie.id, !partie.archivee)
-            .then(rafraichirListeParties_)
-            .catch(function (erreur) {
-              window.alert('Échec archivage : ' + erreur.message);
-              btnArchiver.disabled = false;
-              btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
-            });
-        });
-        actions.appendChild(btnArchiver);
-
-        var btnSupprimer = document.createElement('button');
-        btnSupprimer.className = 'danger';
-        btnSupprimer.textContent = 'Supprimer';
-        btnSupprimer.addEventListener('click', function () {
-          if (!window.confirm('Supprimer définitivement cette partie (' + titre.textContent + ') ?')) return;
-          btnSupprimer.disabled = true;
-          btnArchiver.disabled = true;
-          btnSupprimer.textContent = 'Passage en cours…';
-          GameService.supprimerPartie(partie.id)
-            .then(rafraichirListeParties_)
-            .catch(function (erreur) {
-              window.alert('Échec suppression : ' + erreur.message);
-              btnSupprimer.disabled = false;
-              btnArchiver.disabled = false;
-              btnSupprimer.textContent = 'Supprimer';
-            });
-        });
-        actions.appendChild(btnSupprimer);
-
-        carte.appendChild(actions);
-        return carte;
-      }
-
-      function rafraichirListeParties_() {
-        return GameService.listerParties().then(function (parties) {
-          listePartiesTest.innerHTML = '';
-          if (!parties.length) {
-            listePartiesTest.innerHTML = '<p class="hint" style="color:#9a9db0;font-size:0.8rem;">Aucune partie enregistrée.</p>';
-            return;
-          }
-          parties.forEach(function (partie) {
-            listePartiesTest.appendChild(rendreCartePartie_(partie));
-          });
-        });
-      }
-
-      btnCreerPartieTest.addEventListener('click', function () {
-        if (!selectMaisonTest.value) {
-          window.alert('Choisis une maison (synchronise le catalogue si la liste est vide).');
+        if (!secteurs.length) {
+          conteneur.innerHTML = '<p class="hint">Aucun secteur instancié (scénario "' + partie.scenarioId + '" introuvable dans le catalogue — resynchronise si besoin).</p>';
           return;
         }
-        btnCreerPartieTest.disabled = true;
-        btnCreerPartieTest.textContent = 'Passage en cours…';
-        resultatCreationTest.textContent = '';
 
-        GameService.creerPartie({ mode: 'manuel', maison: selectMaisonTest.value })
-          .then(function (partie) {
-            resultatCreationTest.textContent = 'Partie créée : ' + partie.joueur.nom +
-              ' (technologie de départ : ' + partie.joueur.technologieDepart.nom + ')';
-            return rafraichirListeParties_();
-          })
+        var lignes = secteurs.map(function (s) {
+          var pnTotal = (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
+          var type = s.numero === numeroMere ? 'Secteur-Mère' : (s.maisonAssociee ? 'Déchue : ' + s.maisonAssociee : 'Avant-poste');
+          return '<tr class="' + (s.corrompu ? 'ligne-corrompue' : '') + '">' +
+            '<td>' + s.numero + '</td><td>' + type + '</td><td>' + (s.population == null ? '—' : s.population) + '</td><td>' + pnTotal + '</td>' +
+            '</tr>';
+        }).join('');
+
+        conteneur.innerHTML = '<table class="table-secteurs"><thead><tr><th>N°</th><th>Type</th><th>Pop.</th><th>PN</th></tr></thead><tbody>' + lignes + '</tbody></table>';
+      }).catch(function (erreur) {
+        conteneur.innerHTML = '<p class="hint">Erreur de chargement des secteurs : ' + erreur.message + '</p>';
+      });
+    }
+
+    return { afficherEcran: afficherEcran, afficherPartieCreee: afficherPartieCreee };
+  })();
+
+  (function () {
+    var etatSw = document.getElementById('etat-sw');
+    var versionApp = document.getElementById('version-app');
+    var btnSync = document.getElementById('btn-sync-catalogue');
+    var etatCatalogue = document.getElementById('etat-catalogue');
+    var listeParties = document.getElementById('liste-parties');
+
+    versionApp.textContent = 'v' + APP_VERSION;
+
+    if (!('serviceWorker' in navigator)) {
+      etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
+    } else {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(function () {
+          etatSw.textContent = 'Service Worker : installé.';
+        })
+        .catch(function (erreur) {
+          etatSw.textContent = 'Service Worker : échec d\'installation.';
+          console.error('Erreur enregistrement Service Worker :', erreur);
+        });
+    }
+
+    btnSync.addEventListener('click', function () {
+      btnSync.disabled = true;
+      btnSync.textContent = 'Passage en cours…';
+      etatCatalogue.textContent = '';
+
+      CatalogueSync.synchroniser()
+        .then(function (rapport) {
+          var lignes = rapport.map(function (r) {
+            return r.statut === 'ok'
+              ? r.table + ' : ' + r.nombre + ' ligne(s)'
+              : r.table + ' : ERREUR — ' + r.message;
+          });
+          etatCatalogue.textContent = lignes.join('\n');
+        })
+        .catch(function (erreur) {
+          etatCatalogue.textContent = 'Échec de synchronisation : ' + erreur.message;
+        })
+        .finally(function () {
+          btnSync.disabled = false;
+          btnSync.textContent = 'Synchroniser le catalogue';
+        });
+    });
+
+    // --------------------------------------------------------
+    // Parties enregistrées (accueil) — liste + archiver/supprimer.
+    // En attendant un écran Historique dédié (avec "Tout supprimer",
+    // etc.), cette liste reste la seule vue sur les parties existantes.
+    // --------------------------------------------------------
+
+    function formaterDate_(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function rendreCartePartie_(partie) {
+      var carte = document.createElement('div');
+      carte.className = 'card';
+      carte.style.marginTop = '10px';
+      carte.style.padding = '12px 14px';
+
+      var titre = document.createElement('div');
+      titre.style.fontWeight = '600';
+      titre.textContent = (partie.joueur ? partie.joueur.nom : '?') + (partie.archivee ? ' (archivée)' : '');
+      carte.appendChild(titre);
+
+      var detail = document.createElement('div');
+      detail.className = 'hint';
+      detail.style.margin = '4px 0 8px';
+      detail.textContent = 'Cycle ' + partie.cycleActuel + ' · créée le ' + formaterDate_(partie.dateCreation);
+      carte.appendChild(detail);
+
+      var actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '8px';
+
+      var btnArchiver = document.createElement('button');
+      btnArchiver.className = 'btn btn-secondary';
+      btnArchiver.style.flex = '1';
+      btnArchiver.style.padding = '8px 10px';
+      btnArchiver.style.fontSize = '0.82rem';
+      btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
+      btnArchiver.addEventListener('click', function () {
+        btnArchiver.disabled = true;
+        btnArchiver.textContent = 'Passage en cours…';
+        GameService.archiverPartie(partie.id, !partie.archivee)
+          .then(rafraichirListeParties_)
           .catch(function (erreur) {
-            resultatCreationTest.textContent = 'Échec de création : ' + erreur.message;
-          })
-          .finally(function () {
-            btnCreerPartieTest.disabled = false;
-            btnCreerPartieTest.textContent = 'Créer une partie (test)';
+            window.alert('Échec archivage : ' + erreur.message);
+            btnArchiver.disabled = false;
+            btnArchiver.textContent = partie.archivee ? 'Désarchiver' : 'Archiver';
           });
       });
+      actions.appendChild(btnArchiver);
 
-      // Chargement initial : liste des maisons (si catalogue déjà
-      // synchronisé lors d'une session précédente) + parties existantes.
-      chargerMaisonsSelect_();
+      var btnSupprimer = document.createElement('button');
+      btnSupprimer.className = 'btn btn-danger';
+      btnSupprimer.style.flex = '1';
+      btnSupprimer.style.padding = '8px 10px';
+      btnSupprimer.style.fontSize = '0.82rem';
+      btnSupprimer.textContent = 'Supprimer';
+      btnSupprimer.addEventListener('click', function () {
+        if (!window.confirm('Supprimer définitivement cette partie (' + titre.textContent + ') ?')) return;
+        btnSupprimer.disabled = true;
+        btnArchiver.disabled = true;
+        btnSupprimer.textContent = 'Passage en cours…';
+        GameService.supprimerPartie(partie.id)
+          .then(rafraichirListeParties_)
+          .catch(function (erreur) {
+            window.alert('Échec suppression : ' + erreur.message);
+            btnSupprimer.disabled = false;
+            btnArchiver.disabled = false;
+            btnSupprimer.textContent = 'Supprimer';
+          });
+      });
+      actions.appendChild(btnSupprimer);
+
+      carte.appendChild(actions);
+      return carte;
+    }
+
+    function rafraichirListeParties_() {
+      return GameService.listerParties().then(function (parties) {
+        listeParties.innerHTML = '';
+        if (!parties.length) {
+          listeParties.innerHTML = '<p class="hint">Aucune partie enregistrée.</p>';
+          return;
+        }
+        parties.forEach(function (partie) {
+          listeParties.appendChild(rendreCartePartie_(partie));
+        });
+      });
+    }
+
+    document.getElementById('btn-retour-accueil-creation').addEventListener('click', function () {
+      App.afficherEcran('home');
       rafraichirListeParties_();
-    })();
-  </script>
+    });
+
+    SetupService.init();
+    rafraichirListeParties_();
+  })();
+</script>
 </body>
 </html>

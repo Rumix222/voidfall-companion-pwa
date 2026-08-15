@@ -1,6 +1,18 @@
 /**
  * service-worker.js
- * Version 3 — 2026-08-17
+ * Version 6 — 2026-08-17
+ * 17/08/2026 (Phase 4, partielle) : ajout de js/focusService.js à
+ * FICHIERS_A_METTRE_EN_CACHE (mise en place des Focus à la création de
+ * partie). js/gameService.js a aussi changé (appelle
+ * FocusService.obtenirMiseEnPlace) mais reste au même chemin.
+ * 17/08/2026 (Phase 3) : ajout de js/secteurService.js à
+ * FICHIERS_A_METTRE_EN_CACHE (instanciation du plateau des secteurs à la
+ * création de partie). js/gameService.js a aussi changé (appelle
+ * SecteurService.instancierSecteurs) mais reste au même chemin.
+ * 17/08/2026 (suite) : ajout de css/style.css et js/setupService.js à
+ * FICHIERS_A_METTRE_EN_CACHE (écran "Créer une partie", voir
+ * docs-migration-pwa-plan.md section 1). js/gameService.js a aussi
+ * changé (obtenirMaisonsCatalogue exposée) mais reste au même chemin.
  * 17/08/2026 : ajout de js/gameService.js à FICHIERS_A_METTRE_EN_CACHE
  * (Phase 2 — cycle de vie de partie, voir docs-migration-pwa-plan.md
  * section 1). js/db.js a aussi changé (ajout de DB.supprimer) mais reste
@@ -35,9 +47,13 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './index.html',
   './manifest.json',
   './version.js',
+  './css/style.css',
   './js/db.js',
   './js/catalogueSync.js',
+  './js/secteurService.js',
+  './js/focusService.js',
   './js/gameService.js',
+  './js/setupService.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

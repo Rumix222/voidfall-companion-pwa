@@ -1,0 +1,411 @@
+/**
+ * css/style.css
+ * Version 2 — 17/08/2026
+ *
+ * 17/08/2026 (Phase 3) : ajout de .table-secteurs / .ligne-corrompue —
+ * affichage du plateau des secteurs sur l'écran de confirmation de
+ * création de partie (voir index.html, App.afficherPartieCreee).
+ *
+ * Sous-ensemble de style.html (app GAS legacy, 1368 l.) extrait pour les
+ * écrans Accueil + Créer une partie (Session 3). Mêmes variables/classes
+ * que l'app d'origine (identité visuelle inchangée), MAIS seuls les
+ * sélecteurs réellement utilisés par ces écrans ont été copiés — pas un
+ * port intégral de style.html. Les prochains écrans portés
+ * (Partie/Stratégie/Combat, Phases 4+) ajouteront leurs propres blocs
+ * ici au fur et à mesure, plutôt que de tout importer d'un coup.
+ *
+ * Contenu ajouté : variables racine, fond étoilé/nébuleuse, conteneur
+ * #app, topbar, .screen (bascule d'écrans), .section-title,
+ * .hint/.hint-inline, boutons (.btn/.btn-primary/.btn-secondary/
+ * .btn-toggle/.btn-danger), .mode-toggle, .setup-bloc(-imbrique), select,
+ * .setup-actions, .card (cartes "parties enregistrées" sur l'accueil),
+ * mise en place manuelle (.case-mise-en-place-manuelle, .label-section,
+ * .techno-sans-point-*), .table-secteurs.
+ */
+
+:root {
+  /* Fond spatial quasi noir, teinté violet, comme la jaquette */
+  --color-bg: #0a0813;
+  --color-surface: #140f22;
+  --color-surface-2: #1d1730;
+  --color-border: #33274d;
+
+  /* Nébuleuse violet -> magenta, en fond du header */
+  --color-nebula-1: #4c1d95;
+  --color-nebula-2: #c0257a;
+
+  /* Corail : seul accent chaud, réservé aux actions et éléments sélectionnés */
+  --color-coral: #ff6b52;
+  --color-coral-dim: #7a2f22;
+
+  --color-text: #f2ece1;
+  --color-text-muted: #9a90b3;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* --- Signature visuelle : étoiles + halo de nébuleuse fixes en arrière-plan --- */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(242,236,225,0.55), transparent),
+    radial-gradient(1.5px 1.5px at 65% 15%, rgba(242,236,225,0.4), transparent),
+    radial-gradient(1px 1px at 80% 60%, rgba(242,236,225,0.5), transparent),
+    radial-gradient(1px 1px at 35% 75%, rgba(242,236,225,0.35), transparent),
+    radial-gradient(1.5px 1.5px at 90% 85%, rgba(242,236,225,0.4), transparent),
+    radial-gradient(1px 1px at 10% 90%, rgba(242,236,225,0.3), transparent);
+  background-repeat: repeat;
+  background-size: 400px 400px;
+}
+
+.nebula-glow {
+  position: fixed;
+  top: -220px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 720px;
+  height: 480px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 35% 40%, rgba(192,37,122,0.35), transparent 60%),
+    radial-gradient(circle at 65% 55%, rgba(76,29,149,0.45), transparent 65%);
+  filter: blur(30px);
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 18px 48px;
+}
+
+.topbar {
+  text-align: center;
+  padding: 28px 0 32px;
+}
+
+.topbar h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.9rem;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.topbar-accent {
+  display: block;
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--color-coral);
+  margin-top: 4px;
+}
+
+.screen { display: block; }
+.screen[hidden] { display: none; }
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+  color: var(--color-text);
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-coral);
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  margin: -6px 0 16px;
+}
+
+.hint-inline {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.btn {
+  display: inline-block;
+  padding: 15px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.btn:active { transform: scale(0.98); }
+
+/* .btn force display:inline-block, ce qui écraserait [hidden] sans cette
+   règle plus spécifique. */
+.btn[hidden] {
+  display: none;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-coral), #ff8a6b);
+  color: #1a0f0a;
+  width: 100%;
+  box-shadow: 0 6px 20px -6px rgba(255,107,82,0.55);
+}
+.btn-primary:hover { filter: brightness(1.05); }
+
+.btn-secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-danger {
+  background: rgba(224,54,79,0.10);
+  color: #e0364f;
+  border: 1px solid #e0364f;
+}
+.btn-danger:hover { background: rgba(224,54,79,0.18); }
+
+.btn-toggle {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  flex: 1;
+}
+
+.btn-toggle.active {
+  background: rgba(255,107,82,0.12);
+  color: var(--color-coral);
+  border-color: var(--color-coral);
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.setup-bloc { margin-bottom: 22px; }
+
+.setup-bloc label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+select {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%), linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 20px) center, calc(100% - 15px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+select:focus-visible,
+.btn:focus-visible {
+  outline: 2px solid var(--color-coral);
+  outline-offset: 2px;
+}
+
+select:disabled,
+input:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 26px;
+}
+.setup-actions .btn-primary { flex: 2; }
+.setup-actions .btn-secondary { flex: 1; }
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+/* --- Mise en place manuelle (écran Créer une partie) --- */
+.case-mise-en-place-manuelle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  font-size: 0.88rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.case-mise-en-place-manuelle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-coral);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.setup-bloc-imbrique {
+  margin-top: 14px;
+  padding: 14px 14px 4px;
+  border-left: 2px solid var(--color-coral);
+  background: rgba(255,107,82,0.05);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.setup-bloc-imbrique[hidden] { display: none; }
+
+.setup-bloc-imbrique select {
+  margin-bottom: 10px;
+}
+
+.label-section {
+  display: block;
+  margin: 18px 0 8px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.liste-technologies-sans-point {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.techno-sans-point-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.techno-sans-point-maison {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.techno-sans-point-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.techno-sans-point-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-coral);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.techno-sans-point-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.techno-sans-point-item-actif {
+  background: rgba(255,107,82,0.14);
+  border-color: var(--color-coral);
+  color: var(--color-coral);
+}
+
+/* --- Résultat de création (temporaire, en attendant l'écran de partie
+   complet — Phase 3/4) --- */
+.resultat-partie-creee {
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+}
+.resultat-partie-creee h3 {
+  font-family: var(--font-display);
+  color: var(--color-coral);
+  margin: 0 0 8px;
+}
+.resultat-partie-creee p {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: 4px 0;
+}
+
+/* Écran Secteurs — tableau minimal (repris de style.html, 11/08/2026,
+   avant plateau visuel) */
+.table-secteurs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.table-secteurs th, .table-secteurs td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.table-secteurs th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+/* Toute la ligne du secteur passe en corail plutôt qu'une colonne
+   "Corrompu" dédiée (gagne de la place sur smartphone). */
+.table-secteurs .ligne-corrompue td {
+  color: var(--color-coral);
+}
