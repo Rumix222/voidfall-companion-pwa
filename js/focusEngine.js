@@ -1,8 +1,29 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 3 — 17/08/2026 (Session 14 suite — action secteur "Déployer des
- * cubes" portée)
+ * Version 4 — 17/08/2026 (Session 14 fin — action secteur "Envahir" portée)
+ *
+ * 17/08/2026 (Session 14 fin) : "envahir"/"envahir_corrompu" retirés de
+ * CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié dans resoudreCle_ qui
+ * délègue à demanderChoix({type:'envahir', corrompu, ...}). La popup (DOM,
+ * strategieService.js) fait la sélection cible/engagement, résout le
+ * combat via CombatService.resoudreInvasion et persiste via
+ * SecteurService.envahirResoudre. Conséquences scalaires (jetonPrime/
+ * jetonLiberation/influence en victoire, cubeActif en défaite) appliquées
+ * ICI sur l'état pur ; le jeton Gloire (array) est persisté DIRECTEMENT
+ * par la popup (hors diff/annulation, même pattern que le clic manuel sur
+ * un emplacement Gloire). HORS PÉRIMÈTRE cette session (journalisé en
+ * avertissement le cas échéant) : défausse d'un jeton Gloire pour un
+ * secteur source abandonné (repris par le Néant) — les jetons Prime/
+ * Libération gagnés restent en revanche de simples compteurs (déjà le cas
+ * pour toute carte via CLES_SIMPLES), pas besoin de popup de résolution
+ * dédiée. C'est la dernière des 3 actions secteur "lourdes" de la Session
+ * 14 — construire_installation/etablir_guilde/rappeler_cube/
+ * retirer_corruption/effet_secteur restent hors périmètre (déjà branchés
+ * en boutons dédiés écran Secteurs pour les 2 premiers, Session 13).
+ *
+ * 17/08/2026 (Session 14 suite — action secteur "Déployer des cubes"
+ * portée) :
  *
  * 17/08/2026 (Session 14 suite) : "deployer_cube_par_chantier"/
  * "deployer_cube"/"deploy_cube"/"deployer_cube_secteur_mere" (Effet
@@ -30,10 +51,10 @@
  * AU MOMENT de la validation — resoudreCle_ ne fait que relayer le résumé
  * renvoyé ({deplacements, detail}) dans le journal. "Annuler" bloque toute
  * l'action (même comportement que "choice"/"choice_repeat" ci-dessous),
- * cohérent avec le popup Envahir du legacy. envahir/envahir_corrompu/
- * rappeler_cube/retirer_corruption/construire_installation/
- * etablir_guilde/effet_secteur restent hors périmètre (inchangé cette
- * session, voir liste ci-dessous).
+ * cohérent avec le popup Envahir du legacy (envahir/envahir_corrompu
+ * portés à leur tour en fin de Session 14, voir plus haut). rappeler_cube/
+ * retirer_corruption/construire_installation/etablir_guilde/effet_secteur
+ * restent hors périmètre (inchangé cette session, voir liste ci-dessous).
  *
  * Extraction PURE (aucun DOM, aucun accès direct à IndexedDB) de la
  * logique appliquerJson_/resoudreCle_/jouerAction_ de strategie.html
@@ -87,11 +108,12 @@
  * CLÉS HORS PÉRIMÈTRE — signalé explicitement (pas d'invention de logique) :
  * Certaines clés dépendent de systèmes qui n'existent PAS ENCORE dans la
  * PWA (voir secteurService.js/gameService.js, en-têtes) :
- *   - Actions sur les secteurs : envahir, envahir_corrompu, rappeler_cube,
- *     retirer_corruption, construire_installation, etablir_guilde,
- *     effet_secteur ("regrouper"/"regroupe" porté depuis la Session 14,
- *     "deployer_cube*" porté depuis la Session 14 suite — voir plus bas,
- *     cas dédiés dans resoudreCle_)
+ *   - Actions sur les secteurs : rappeler_cube, retirer_corruption,
+ *     construire_installation, etablir_guilde, effet_secteur
+ *     ("regrouper"/"regroupe" porté depuis la Session 14, "deployer_cube*"
+ *     porté depuis la Session 14 suite, "envahir"/"envahir_corrompu"
+ *     porté en fin de Session 14 — voir plus bas, cas dédiés dans
+ *     resoudreCle_)
  *     (secteurService.js PWA ne porte QUE l'instanciation/lecture pour les
  *     clés restant ci-dessus — actions hors périmètre, cf. son en-tête)
  *   - Civilisation : avancer_civilisation*, avancer_piste_corrompue
@@ -143,8 +165,7 @@ var FocusEngine = (function () {
 
   var CLES_SECTEUR_HORS_PERIMETRE = [
     'construire_installation', 'installation', 'etablir_guilde', 'guilde',
-    'envahir', 'envahir_corrompu', 'rappeler_cube',
-    'retirer_corruption', 'effet_secteur'
+    'rappeler_cube', 'retirer_corruption', 'effet_secteur'
   ];
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
   var MODE_PAR_CLE_DEPLOYER_CUBE = {
@@ -363,6 +384,48 @@ var FocusEngine = (function () {
       return Promise.resolve(demanderChoix({ type: 'regrouper', source: source, partieId: etat.partieId })).then(function (reponse) {
         if (reponseAnnulee_(reponse)) return false;
         journal.push(source + ' : Regrouper — ' + reponse.deplacements + ' déplacement(s) (' + reponse.detail + ').');
+        return true;
+      });
+    }
+
+    // --- Envahir / Envahir un secteur Corrompu : sélection de la cible
+    // et engagement de sources, combat résolu via
+    // CombatService.resoudreInvasion puis persisté via
+    // SecteurService.envahirResoudre — tout cela dans la popup (DOM, voir
+    // strategieService.js), pas ici (focusEngine reste pur). "Annuler"
+    // bloque toute l'action. Conséquences SCALAIRES (jetonPrime/
+    // jetonLiberation/influence en victoire, cubeActif en défaite,
+    // clampé à NB_CUBES_TOTAL) appliquées ICI sur l'état pur — le jeton
+    // Gloire (array, non diffable par ce moteur au clone JSON) est en
+    // revanche persisté DIRECTEMENT par la popup (même pattern que le
+    // clic manuel sur un emplacement Gloire côté écran Stratégie),
+    // l'Influence gagnée depuis son total étant calculée là-bas et
+    // simplement relayée ici en scalaire. HORS PÉRIMÈTRE cette session
+    // (journalisé en avertissement le cas échéant, à traiter
+    // manuellement) : défausse d'un jeton Gloire pour un secteur source
+    // abandonné (repris par le Néant). PAS hors périmètre en revanche :
+    // les jetons Prime/Libération gagnés restent de simples compteurs
+    // (jetonPrime/jetonLiberation), cohérent avec le reste du moteur où
+    // ce sont déjà des clés simples (CLES_SIMPLES) — leur résolution
+    // immédiate (dépense) n'est pas automatisée, comme n'importe quelle
+    // autre carte à jouer plus tard. ---
+    if (cle === 'envahir' || cle === 'envahir_corrompu') {
+      return Promise.resolve(demanderChoix({
+        type: 'envahir',
+        corrompu: cle === 'envahir_corrompu',
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        if (reponse.victoire) {
+          etat.jetonPrime = (etat.jetonPrime || 0) + (reponse.jetonPrime || 0);
+          etat.jetonLiberation = (etat.jetonLiberation || 0) + (reponse.jetonLiberation || 0);
+          etat.influence = (etat.influence || 0) + (reponse.influenceGagnee || 0);
+        } else {
+          etat.cubeActif = Math.min(NB_CUBES_TOTAL, etat.cubeActif + (reponse.totalEngage || 0));
+        }
+        journal.push(source + ' : ' + reponse.detail);
+        if (reponse.avertissement) journal.push(source + ' : ⚠️ ' + reponse.avertissement);
         return true;
       });
     }

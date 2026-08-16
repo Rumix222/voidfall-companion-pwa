@@ -2,6 +2,12 @@
  * Test fumée — focusEngine.js + annulationService.js
  * Exécution : node focusEngine.test.js
  *
+ * 17/08/2026 (Session 14 fin) : ajout des tests "envahir"/"envahir_corrompu"
+ * (victoire, défaite, annulé) — le témoin "hors périmètre" utilise
+ * désormais "retirer_corruption" (envahir étant porté, il ne peut plus
+ * servir de témoin ; "rappeler_cube" est écarté aussi : son nom contient
+ * "cube" et tombe dans le repli générique dédié aux clés Cube, pas dans
+ * celui des clés secteur).
  * 17/08/2026 (Session 14 suite) : ajout des tests "deployer_cube" (mode
  * libre + coût ressource, mode transmis pour par_chantier/secteur_mere,
  * annulé, et le cas Coût signe<0 qui retombe sur le repli générique
@@ -155,15 +161,77 @@ test('gagner_commerce : bonus choisi résolu récursivement (choice_repeat)', fu
   });
 });
 
-test('clé secteur hors périmètre (envahir) : ne bloque pas, journalisé', function () {
+test('clé secteur hors périmètre (retirer_corruption) : ne bloque pas, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
-  var action = { action: 'Envahir', effet: { envahir: 1 }, cout: { energie: 2 }, texte: '' };
+  var action = { action: 'Retirer', effet: { retirer_corruption: 1 }, cout: { energie: 2 }, texte: '' };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
-    assert.ok(resultat.journal.some(function (l) { return l.indexOf('envahir') !== -1 && l.indexOf('non automatisé') !== -1; }));
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('retirer_corruption') !== -1 && l.indexOf('non automatisé') !== -1; }));
+  });
+});
+
+test('envahir : victoire — jetonPrime/jetonLiberation/influence crédités, journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Envahir', effet: { envahir: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'envahir');
+    assert.strictEqual(contexte.corrompu, false);
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return {
+      victoire: true, jetonPrime: 1, jetonLiberation: 1, influenceGagnee: 3,
+      detail: 'Invasion du secteur 4 (Néant) — VICTOIRE.'
+    };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonLiberation, 1);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 13); // 10 + 3
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('VICTOIRE') !== -1; }));
+  });
+});
+
+test('envahir_corrompu : défaite — cubeActif restauré (clampé à 14), avertissement journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var plateau = Object.assign({}, PLATEAU_BASE, { cubeActif: 12 });
+  var action = { action: 'Envahir', effet: { envahir_corrompu: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.corrompu, true);
+    return {
+      victoire: false, totalEngage: 5,
+      detail: 'Invasion du secteur 7 (Corrompu) — ÉCHEC.',
+      avertissement: 'Secteur(s) 2 repris par le Néant — défaussez un jeton Gloire.'
+    };
+  };
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, 14); // 12 + 5, clampé à 14
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('ÉCHEC') !== -1; }));
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('⚠️') !== -1 && l.indexOf('Gloire') !== -1; }));
+  });
+});
+
+test('envahir : annulé (popup "Annuler") — bloque toute l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Envahir', effet: { envahir: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
   });
 });
 

@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 14 — 2026-08-17
+ * Version 15 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,21 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Session 14 fin — action secteur "Envahir" portée) :
+ * incrémenté suite au portage de "envahir"/"envahir_corrompu" (sélection
+ * cible + engagement multi-sources/multi-types, résolution via
+ * CombatService.resoudreInvasion + SecteurService.envahirResoudre déjà
+ * portés, conséquences Prime/Libération/Influence/Cube actif) :
+ * js/focusEngine.js (v4, reste pur) et js/strategieService.js (v7,
+ * nouveau cas contexte.type === 'envahir' de demanderChoix). Dernière des
+ * 3 actions secteur de la Session 14 (Regrouper, Déployer des cubes,
+ * Envahir) — toutes déclenchées depuis une carte Focus, popups avec
+ * choix, même logique que le legacy. Hors périmètre, journalisé : défausse
+ * de jeton Gloire pour secteur source abandonné, résolution immédiate des
+ * jetons Prime/Libération gagnés (restent de simples compteurs). Aucune
+ * nouvelle classe CSS. Fichiers modifiés, chemins déjà en cache, aucune
+ * nouvelle entrée.
  *
  * 17/08/2026 (Session 14 suite — action secteur "Déployer des cubes"
  * portée) : incrémenté suite au portage de "deployer_cube_par_chantier"/
@@ -157,4 +172,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.17';
+var APP_VERSION = '20260817.18';

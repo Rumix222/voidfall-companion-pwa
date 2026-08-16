@@ -1,10 +1,36 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 6 — 17/08/2026 (Session 14 suite — action secteur "Déployer des
- * cubes" portée)
+ * Version 7 — 17/08/2026 (Session 14 fin — action secteur "Envahir" portée)
  *
- * 17/08/2026 (Session 14 suite) : nouveau cas contexte.type ===
+ * 17/08/2026 (Session 14 fin) : nouveau cas contexte.type === 'envahir'
+ * dans demanderChoix — portage direct de ouvrirModaleEnvahir_
+ * (strategie-2.html GAS, ~l.1931-2170) : sélection de la cible (secteur du
+ * Néant/Maison déchue, ou Corrompu selon contexte.corrompu) parmi les
+ * secteurs adjacents à l'un des vôtres (calculerCiblesEnvahir_ porté),
+ * engagement multi-sources/multi-types avec règle "secteur jamais vide".
+ * Résout le combat via CombatService.resoudreInvasion (déjà porté,
+ * Session 6) puis persiste via SecteurService.envahirResoudre (déjà
+ * porté, Session 12). Portage de VAISSEAU_VERS_CHAMP_COMBAT (nouveau,
+ * mapping clé TYPES_VAISSEAU -> nom de champ Combat). Conséquences :
+ * jetonPrime/jetonLiberation/influence (victoire) et cubeActif (défaite)
+ * relayés en scalaires à focusEngine.js (v4) qui les applique sur l'état
+ * pur ; le jeton Gloire (array) est en revanche persisté DIRECTEMENT ici
+ * via GameService.majPlateauMaison + etatGloire (même module var que
+ * renderGloire_/renderGloireDOM_, Session 10) — même pattern que le clic
+ * manuel sur un emplacement Gloire, volontairement hors du flux
+ * d'annulation. HORS PÉRIMÈTRE cette session (avertissement journalisé) :
+ * défausse d'un jeton Gloire pour un secteur source abandonné (repris par
+ * le Néant, jetonsRetires.secteursAbandonnes) — édité manuellement par le
+ * joueur pour l'instant ; résolution immédiate des jetons Prime/
+ * Libération gagnés (ouvrirModaleResolutionJetons_ côté legacy) non plus
+ * portée : ils restent de simples compteurs, comme n'importe quelle autre
+ * carte via CLES_SIMPLES — pas de popup de dépense dédiée. Dernière des 3
+ * actions secteur "lourdes" de la Session 14 (avec Regrouper et Déployer
+ * des cubes).
+ *
+ * 17/08/2026 (Session 14 suite — action secteur "Déployer des cubes"
+ * portée) : nouveau cas contexte.type ===
  * 'deployer_cube' dans demanderChoix — portage direct de
  * ouvrirModaleDeployerGenerique_ (strategie-2.html GAS, ~l.1354-1587),
  * 3 modes ('par_chantier'/'libre'/'secteur_mere'), types de Flotte limités
@@ -138,6 +164,14 @@ var StrategieService = (function () {
   var COUT_DEPLOIEMENT_PAR_TYPE = {
     cuirasse: { ressource: 'materiel', parCube: 1, label: 'Matériel' },
     porte_vaisseau: { ressource: 'nourriture', parCube: 1, label: 'Nourriture' }
+  };
+
+  // Mapping clé TYPES_VAISSEAU -> nom de champ attendu par
+  // CombatService.resoudreInvasion (aligné sur construireCamp) — seule
+  // "porte_vaisseau" diffère ("portevaisseau", sans underscore).
+  var VAISSEAU_VERS_CHAMP_COMBAT = {
+    corvette: 'corvette', sentinelle: 'sentinelle', destroyer: 'destroyer',
+    cuirasse: 'cuirasse', porte_vaisseau: 'portevaisseau'
   };
 
   function nomsTechnologiesJoueur_(partie) {
@@ -1134,6 +1168,266 @@ var StrategieService = (function () {
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
         }
+
+      } else if (contexte.type === 'envahir') {
+        var corrompu = !!contexte.corrompu;
+        titre.textContent = corrompu ? 'Envahir un secteur Corrompu' : 'Envahir un secteur';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieEnvahir = partieAffichee;
+
+        function maisonDechue_(s) {
+          return (s && s.maisonAssociee) || null;
+        }
+
+        Promise.all([
+          SecteurService.obtenirSecteurs(partieEnvahir.id),
+          SecteurService.obtenirAdjacences(partieEnvahir.scenarioId)
+        ]).then(function (resultats) {
+          var secteurs = resultats[0] || [];
+          var adjacences = resultats[1] || [];
+
+          var adjacenceMap = {};
+          adjacences.forEach(function (a) {
+            adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
+            adjacenceMap[a.numeroA].push(a.numeroB);
+            adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
+            adjacenceMap[a.numeroB].push(a.numeroA);
+          });
+
+          function secteurParNumero_(numero) {
+            return secteurs.filter(function (s) { return s.numero === numero; })[0];
+          }
+
+          function vousAppartientEnvahir_(numero) {
+            var s = secteurParNumero_(numero);
+            if (!s || (s.pnNeant || 0) > 0) return false;
+            return ((s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0)) > 0;
+          }
+
+          // Portage direct de calculerCiblesEnvahir_ : la Corruption est
+          // un attribut INDÉPENDANT de l'appartenance au Néant/Maison
+          // déchue — "envahir" (corrompu=false) ne filtre pas sur
+          // !s.corrompu, seul "envahir_corrompu" exige s.corrompu === true.
+          var ciblesEligibles = secteurs.filter(function (s) {
+            var eligible = corrompu ? !!s.corrompu : ((s.pnNeant || 0) > 0 || !!maisonDechue_(s));
+            return !vousAppartientEnvahir_(s.numero) && eligible && (adjacenceMap[s.numero] || []).some(vousAppartientEnvahir_);
+          });
+
+          if (!ciblesEligibles.length) {
+            contenu.innerHTML = '<p class="hint">Aucun secteur ' + (corrompu ? 'Corrompu' : 'du Néant ou de Maison déchue') + ' adjacent à l\u2019un de vos secteurs actuellement.</p>';
+            return;
+          }
+
+          function totalStockSecteur_(numero) {
+            var s = secteurParNumero_(numero);
+            if (!s) return 0;
+            return (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
+          }
+
+          var contributions = []; // {type, secteur, quantite}
+
+          function stockRestantType_(numero, type) {
+            var s = secteurParNumero_(numero);
+            var champ = CHAMP_PN_PAR_TYPE_VUE[type];
+            var initial = s ? (s[champ] || 0) : 0;
+            var pris = contributions.filter(function (c) { return c.secteur === numero && c.type === type; })
+              .reduce(function (som, c) { return som + c.quantite; }, 0);
+            return initial - pris;
+          }
+
+          function totalContribueSecteur_(numero) {
+            return contributions.filter(function (c) { return c.secteur === numero; })
+              .reduce(function (som, c) { return som + c.quantite; }, 0);
+          }
+
+          function render() {
+            var selectCibleExistant = document.getElementById('envahir-select-cible');
+            var cible = Number((selectCibleExistant && selectCibleExistant.value) || ciblesEligibles[0].numero);
+            var totalEngage = contributions.reduce(function (s, c) { return s + c.quantite; }, 0);
+
+            var listeHTML = contributions.length
+              ? '<ul class="regrouper-liste">' + contributions.map(function (c, i) {
+                  var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === c.type; })[0].label;
+                  return '<li>' + c.quantite + '× ' + labelType + ' : Secteur ' + c.secteur + ' → Secteur ' + cible +
+                    ' <button type="button" class="btn-lien envahir-retirer" data-index="' + i + '">retirer</button></li>';
+                }).join('') + '</ul>'
+              : '<p class="hint">Aucune unité engagée.</p>';
+
+            contenu.innerHTML = '' +
+              '<label class="hint" for="envahir-select-cible">Secteur ' + (corrompu ? 'Corrompu' : 'du Néant') + ' à envahir</label>' +
+              '<select id="envahir-select-cible">' +
+              ciblesEligibles.map(function (s) {
+                var maison = maisonDechue_(s);
+                var etiquette = maison ? ('Maison déchue : ' + maison) : ('Néant : ' + (s.pnNeant || 0));
+                return '<option value="' + s.numero + '"' + (s.numero === cible ? ' selected' : '') + '>Secteur ' + s.numero + ' (' + etiquette + ')</option>';
+              }).join('') +
+              '</select>' +
+              '<p class="hint" style="margin-top:10px;"><strong>' + totalEngage + '</strong> unité(s) de Puissance Navale engagée(s).</p>' +
+              listeHTML +
+              '<div class="regrouper-form">' +
+              '<label class="hint" for="envahir-type">Type</label>' +
+              '<select id="envahir-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+              '<label class="hint" for="envahir-secteur-source" style="margin-top:8px;display:block;">Secteur source (adjacent à la cible, à vous)</label>' +
+              '<select id="envahir-secteur-source"></select>' +
+              '<label class="hint" for="envahir-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
+              '<input type="number" min="1" step="1" value="1" id="envahir-quantite">' +
+              '<button type="button" class="btn btn-secondary" id="envahir-btn-ajouter" style="width:100%;margin-top:10px;">Engager cette unité</button>' +
+              '</div>';
+
+            Array.prototype.forEach.call(contenu.querySelectorAll('.envahir-retirer'), function (btn) {
+              btn.addEventListener('click', function () {
+                contributions.splice(Number(btn.dataset.index), 1);
+                render();
+              });
+            });
+
+            var selectCible = document.getElementById('envahir-select-cible');
+            var selectType = document.getElementById('envahir-type');
+            var selectSource = document.getElementById('envahir-secteur-source');
+            var champQuantite = document.getElementById('envahir-quantite');
+            var btnAjouter = document.getElementById('envahir-btn-ajouter');
+
+            function majSources() {
+              var cibleActuelle = Number(selectCible.value);
+              var type = selectType.value;
+              var options = (adjacenceMap[cibleActuelle] || [])
+                .filter(vousAppartientEnvahir_)
+                .map(function (numero) {
+                  return { numero: numero, stockType: stockRestantType_(numero, type), totalRestant: totalStockSecteur_(numero) - totalContribueSecteur_(numero) };
+                })
+                // "Secteur jamais vide" : il doit rester au moins 1 unité
+                // au total sur le secteur après contribution.
+                .filter(function (o) { return o.stockType > 0 && o.totalRestant > 1; });
+              selectSource.innerHTML = options.length
+                ? options.map(function (o) { return '<option value="' + o.numero + '">Secteur ' + o.numero + ' (' + o.stockType + ' disponible(s), ' + o.totalRestant + ' au total)</option>'; }).join('')
+                : '<option value="">Aucun secteur disponible</option>';
+            }
+
+            // Changer de cible réinitialise les unités déjà engagées : les
+            // secteurs sources adjacents ne sont plus forcément les mêmes.
+            selectCible.addEventListener('change', function () { contributions.length = 0; render(); });
+            selectType.addEventListener('change', majSources);
+            majSources();
+
+            btnAjouter.addEventListener('click', function () {
+              var type = selectType.value;
+              var numeroSource = Number(selectSource.value);
+              var quantite = Math.max(1, Math.floor(Number(champQuantite.value) || 1));
+
+              if (!numeroSource) { window.alert('Choisis un secteur source.'); return; }
+              var dispoType = stockRestantType_(numeroSource, type);
+              if (quantite > dispoType) { window.alert('Seulement ' + dispoType + ' disponible(s) sur ce secteur pour ce type.'); return; }
+              var totalRestantApres = totalStockSecteur_(numeroSource) - totalContribueSecteur_(numeroSource) - quantite;
+              if (totalRestantApres < 1) { window.alert('Impossible : le secteur ' + numeroSource + ' se retrouverait sans Puissance Navale — laisse-en au moins 1.'); return; }
+
+              contributions.push({ type: type, secteur: numeroSource, quantite: quantite });
+              render();
+            });
+
+            btnValider.hidden = contributions.length === 0;
+            btnValider.textContent = 'Lancer l\u2019invasion (' + totalEngage + ' unité(s))';
+            btnValider.onclick = function () {
+              var cibleFinale = Number(selectCible.value);
+              var secteurCible = secteurParNumero_(cibleFinale);
+              if (!secteurCible) { window.alert('Secteur cible introuvable.'); return; }
+
+              var unitesAttaquant = {};
+              contributions.forEach(function (c) {
+                var champ = VAISSEAU_VERS_CHAMP_COMBAT[c.type];
+                unitesAttaquant[champ] = (unitesAttaquant[champ] || 0) + c.quantite;
+              });
+
+              var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible);
+              var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
+
+              var detailContributions = contributions.map(function (c) {
+                var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === c.type; })[0].label;
+                return c.quantite + '× ' + labelType + ' (secteur ' + c.secteur + ')';
+              }).join(', ');
+              var maisonCible = maisonDechue_(secteurCible);
+
+              btnValider.disabled = true;
+              btnValider.textContent = 'Résolution en cours…';
+
+              var sourcesPayload = contributions.map(function (c) {
+                return { type: c.type, secteur: c.secteur, quantite: c.quantite };
+              });
+              var survivantsPayload = {};
+              if (victoire && resultatCombat.survivantsAttaquant) {
+                Object.keys(resultatCombat.survivantsAttaquant).forEach(function (champCombat) {
+                  var cleColonne = champCombat === 'portevaisseau' ? 'porte_vaisseau' : champCombat;
+                  survivantsPayload[cleColonne] = resultatCombat.survivantsAttaquant[champCombat];
+                });
+              }
+
+              SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload)
+                .then(function (jetonsRetires) {
+                  jetonsRetires = jetonsRetires || {};
+
+                  // Jeton Gloire (array, non diffable par focusEngine.js) :
+                  // persisté DIRECTEMENT ici, même pattern que le clic
+                  // manuel sur un emplacement (voir renderGloireDOM_
+                  // ci-dessus) — hors du flux d'annulation, comme lui.
+                  var influenceGagnee = 0;
+                  if (victoire) {
+                    var jetonGloire = jetonsRetires.jetonGloire || 0;
+                    if (jetonGloire > 0) {
+                      var indexLibre = etatGloire.indexOf(null);
+                      if (indexLibre === -1) indexLibre = etatGloire.indexOf(undefined);
+                      if (indexLibre !== -1) {
+                        etatGloire[indexLibre] = jetonGloire;
+                        GameService.majPlateauMaison(partieEnvahir.id, { gloire: etatGloire }).catch(function (e) { window.alert('Échec de l\u2019enregistrement de la Gloire : ' + e.message); });
+                        renderGloireDOM_(partieEnvahir);
+                      }
+                    }
+                    var sommeGloire = etatGloire.reduce(function (s, v) { return s + (v || 0); }, 0);
+                    influenceGagnee = sommeGloire;
+                  }
+
+                  var detail = 'Invasion du secteur ' + cibleFinale +
+                    (corrompu ? ' (Corrompu)' : (maisonCible ? ' (Maison déchue : ' + maisonCible + ')' : ' (Néant)')) +
+                    ' avec ' + totalEngage + ' unité(s) [' + detailContributions + '] — ' +
+                    (victoire
+                      ? 'VICTOIRE (' + resultatCombat.cubesRestants + ' cube(s) déposé(s) sur le secteur' +
+                        (maisonCible ? ', bonus de Maison déchue « ' + maisonCible + ' » non appliqué pour l\u2019instant' : '') + ').'
+                      : 'ÉCHEC — flotte anéantie, unités reversées en Cube actif ; secteur(s) source vidé(s) éventuellement repris par le Néant.');
+
+                  var avertissement = null;
+                  var abandonnes = jetonsRetires.secteursAbandonnes || [];
+                  if (abandonnes.length) {
+                    avertissement = 'Secteur(s) ' + abandonnes.join(', ') + ' repris par le Néant (vidé(s) de Puissance Navale) — défaussez un jeton Gloire de votre choix par secteur, si vous en avez (à faire manuellement, hors périmètre cette session).';
+                  }
+
+                  fermerModale_();
+                  btnValider.disabled = false;
+                  window.alert(resultatCombat.log.join('\n'));
+                  resolve({
+                    victoire: victoire,
+                    jetonPrime: victoire ? (jetonsRetires.jetonPrime || 0) : 0,
+                    jetonLiberation: victoire ? (jetonsRetires.jetonLiberation || 0) : 0,
+                    influenceGagnee: influenceGagnee,
+                    totalEngage: totalEngage,
+                    detail: detail,
+                    avertissement: avertissement
+                  });
+                })
+                .catch(function (erreur) {
+                  btnValider.disabled = false;
+                  btnValider.textContent = 'Lancer l\u2019invasion (' + totalEngage + ' unité(s))';
+                  window.alert('Échec de la résolution : ' + erreur.message);
+                });
+            };
+          }
+
+          render();
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
 
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les
