@@ -2,6 +2,25 @@
  * css/style.css
  * Version 9 — 17/08/2026
  *
+ * 17/08/2026 (Lot 2, révisé — style.html ajouté en Project Knowledge) :
+ * le premier jet du Lot 2 (grille de ressources) avait été écrit SANS
+ * référence CSS legacy disponible ("réécriture fidèle au comportement").
+ * Une fois style.html fourni, toutes les classes concernées (.field-
+ * ressource/.pastille-ressource/.ressource-niveau/.ressource-fleche/
+ * .ressource-revenu/.ressource-input/.ressource-delta/.jeton-champ/
+ * .jeton-input/.ressources-liste/.ressources-jetons) ont été remplacées
+ * par une copie exacte de style.html (mêmes valeurs de grille, tailles,
+ * couleurs, ordre de cascade — .field-ressource déplacé après le bloc
+ * "Écran Fin de partie" pour préserver la même résolution de spécificité
+ * CSS que le legacy face à .field label, à spécificité égale). Noms de
+ * classes déjà corrects dans la version précédente (JS non retouché
+ * ici) — seules les RÈGLES CSS elles-mêmes changent.
+ * Écart assumé et signalé : .ressources-liste redevient une colonne flex
+ * (comme en legacy, où elle est partagée par le bloc ressources
+ * principales ET le bloc Cubes) — #ressources-cubes (toujours en
+ * .ressource-case, non porté en .field-ressource, hors périmètre de ce
+ * lot) passe donc de 3 cartes en grille à 3 cartes empilées verticalement.
+ *
  * 17/08/2026 (Lot 2 — grille de ressources) : réécriture du bloc
  * #ressources-principales (écran Stratégie) — nouvelles classes .field-
  * ressource/.pastille-ressource/.ressource-niveau/.ressource-fleche/
@@ -496,10 +515,10 @@ input:disabled {
 
 /* --- Écran Stratégie : suivi de ressources --- */
 .ressources-liste {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .ressource-case {
   background: var(--color-surface-2);
@@ -521,130 +540,23 @@ input:disabled {
   font-size: 1.25rem;
   color: var(--color-coral);
 }
+/* 17/08/2026 (Lot 2, révisé après ajout de style.html en Project
+   Knowledge) : copiée telle quelle depuis style.html GAS (nowrap +
+   espace réparti, pour garder Commerce/Prime/Libération sur une seule
+   ligne sur smartphone) — remplace la version wrap/gap:10px du premier
+   jet de ce lot, écrite sans référence CSS legacy disponible à l'époque.
+   Détail des .jeton-champ/.jeton-input eux-mêmes : voir plus bas dans ce
+   fichier (après la section "Écran Fin de partie"), placés au même
+   endroit relatif que dans style.html pour préserver l'ordre de cascade
+   avec .field label (voir note à cet endroit). */
 .ressources-jetons {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-/* 17/08/2026 (Lot 2 — grille de ressources) : #ressources-principales
-   n'utilise plus la grille auto-fill de .ressources-liste ci-dessus (cartes
-   carrées) mais une pile verticale de lignes .field-ressource, chacune sa
-   propre grille fixe à 6 colonnes (Libellé | Niveau | → | Revenu | Stock
-   éditable | Delta) — portage du comportement de champRessourceHTML_
-   (strategie.html GAS). Aucun fichier CSS legacy disponible pour cet écran
-   (audit du 17/08/2026) : ce bloc est une réécriture fidèle au
-   COMPORTEMENT du legacy (mêmes couleurs par ressource, RESSOURCES côté
-   JS), pas un copier-coller de règles CSS existantes. Sélecteur scopé à
-   l'ID pour ne pas affecter les autres conteneurs qui gardent
-   .ressources-liste (aucun actuellement, mais évite une régression future
-   si un nouveau bloc l'utilise). */
-#ressources-principales.ressources-liste {
-  display: flex;
-  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: space-between;
   gap: 8px;
-}
-.field-ressource {
-  display: grid;
-  grid-template-columns: 1.5fr 0.55fr 0.35fr 0.7fr 0.95fr 0.65fr;
-  align-items: center;
-  gap: 4px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--couleur-ressource, var(--color-border));
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-}
-.field-ressource label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pastille-ressource {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--couleur-ressource, var(--color-text-muted));
-  flex-shrink: 0;
-}
-.ressource-niveau,
-.ressource-fleche,
-.ressource-revenu {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-.ressource-revenu {
-  color: var(--couleur-ressource, var(--color-text-muted));
-  font-weight: 600;
-}
-.ressource-input {
-  width: 100%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  text-align: center;
-  padding: 5px 2px;
-}
-.ressource-input:focus {
-  outline: none;
-  border-color: var(--couleur-ressource, var(--color-coral));
-}
-.ressource-delta {
-  font-size: 0.72rem;
-  text-align: right;
-  color: var(--color-text-muted);
-}
-
-/* 17/08/2026 (Lot 2 — grille de ressources) : Commerce/Prime/Libération
-   redeviennent éditables (portage direct de champJetonHTML_, strategie.html
-   GAS) — remplace l'ancien affichage lecture seule (.ressource-case),
-   d'où le retrait de la règle ".ressources-jetons .ressource-case"
-   devenue inutile (ce conteneur n'a plus que des .jeton-champ). Pas de
-   pastille de couleur ni de suivi de delta/niveau pour ces 3 jetons,
-   contrairement à la grille principale ci-dessus (fidèle au legacy). */
-.jeton-champ {
-  flex: 1;
-  min-width: 90px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-  text-align: center;
-}
-.jeton-champ label {
-  display: block;
-  font-size: 0.7rem;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  margin-bottom: 4px;
-}
-.jeton-input {
-  width: 100%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-coral);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.1rem;
-  text-align: center;
-  padding: 4px 2px;
-}
-.jeton-input:focus {
-  outline: none;
-  border-color: var(--color-coral);
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  margin-bottom: 12px;
 }
 
 /* 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
@@ -1087,6 +999,103 @@ input[type="number"]:focus-visible {
   outline: 2px solid var(--color-coral);
   outline-offset: 2px;
 }
+
+/* 17/08/2026 (Lot 2 — grille de ressources, révisé après ajout de
+   style.html en Project Knowledge) : classes copiées TELLES QUELLES depuis
+   style.html GAS — grille fixe à 6 colonnes (Libellé | Niveau | → |
+   Revenu | Stock éditable | Delta), portage de champRessourceHTML_
+   (strategie-2.html). Placé ICI (après .field/.form-grid/input[type=number]
+   ci-dessus, avant .total-influence) pour respecter le même ordre de
+   cascade que style.html : .field-ressource label et .field label ont la
+   même spécificité (une classe + un élément) — c'est l'ordre d'apparition
+   dans le fichier qui décide laquelle l'emporte, exactement comme dans le
+   legacy. */
+.field-ressource {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px 10px 26px 40px 28px;
+  align-items: center;
+  column-gap: 5px;
+  margin-bottom: 0;
+}
+.field-ressource label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.field-ressource label span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pastille-ressource {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--couleur-ressource);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.ressource-niveau {
+  text-align: right;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  cursor: help;
+}
+.ressource-fleche {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  text-align: center;
+}
+.ressource-revenu {
+  text-align: right;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--color-coral);
+  cursor: help;
+}
+.field-ressource .ressource-input {
+  border-color: var(--couleur-ressource);
+  width: 100%;
+  padding: 8px 2px;
+  text-align: center;
+  font-size: 0.82rem;
+}
+.ressource-delta {
+  text-align: right;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  cursor: help;
+}
+
+/* Commerce/Prime/Libération (écran Stratégie) — copiées telles quelles
+   depuis style.html GAS, portage de champJetonHTML_. */
+.jeton-champ {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.jeton-champ label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.jeton-champ .jeton-input {
+  width: 34px;
+  flex-shrink: 0;
+  padding: 3px 2px;
+  border: 1px solid var(--color-coral);
+  border-radius: 6px;
+  color: var(--color-coral);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  background: rgba(255, 107, 82, 0.08);
+}
+
 .total-influence {
   text-align: center;
   margin-bottom: 22px;
