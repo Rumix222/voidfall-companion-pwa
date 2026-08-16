@@ -1,7 +1,39 @@
 /**
  * strategieService.js
- * Écran Stratégie — Voidfall Companion PWA
- * Version 10 — 17/08/2026 (Lot C — restructuration Partie)
+ * Écrans Focus (ex-Stratégie) et Plat. maison — Voidfall Companion PWA
+ * Version 12 — 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel)
+ *
+ * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
+ * nouveau bandeau permanent #focus-rappel-ressources (écran Focus, voir
+ * index.html v17) — renderRappelRessources_ (appelée depuis afficher())
+ * affiche les 5 ressources principales + Cube actif en chiffres colorés,
+ * réutilisant couleurCout_/abregeCout_ (déjà présentes, pastilles de coût
+ * des cartes Focus) plutôt qu'une nouvelle palette. Rafraîchi en direct
+ * pour les 5 ressources principales par majRappelRessourceAffiche_,
+ * appelée depuis le listener 'input' de #ressources-principales (écran
+ * Plat. maison, voir renderRessources_) — même mécanisme que
+ * majDeltaAffiche_. Cube actif n'a pas de saisie directe sur cet écran :
+ * rafraîchi seulement à chaque afficher(). Écran Focus réorganisé côté
+ * index.html (Annuler + journal sous "Actions réalisées", cartes Focus
+ * sous "Listes de focus") — aucun changement ici, tout cible toujours les
+ * mêmes ids.
+ *
+ * 17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
+ * aucune fonction de ce fichier n'est modifiée — renderRessources_/
+ * renderCubes_/renderGloire_/renderPistesCivilisation_ ciblent toujours
+ * les mêmes ids (#ressources-principales, #ressources-jetons,
+ * #ressources-gloire, #ressources-cubes, #pistes-civilisation-liste),
+ * simplement déplacés de l'écran Stratégie (renommé "Focus") vers l'écran
+ * Plat. maison dans index.html (v16) — même principe que le déplacement
+ * des Focus héroïques au Lot C ci-dessous (afficher() reste appelée une
+ * seule fois par rendu de partie, indépendamment de l'écran visible).
+ * Restent ciblés dans l'écran Focus : #ressources-journal (renderJournal_)
+ * et #btn-annuler-action/#annulation-compteur (majBoutonAnnuler_,
+ * annulerDerniereAction_) — décision utilisateur, hors périmètre d'un
+ * déplacement. Titre de fichier/module (strategieService.js /
+ * StrategieService) volontairement conservé : aucune autre référence dans
+ * le projet ne dépend du nom de l'écran, seul index.html a changé (ids
+ * nav-strategie/screen-strategie -> nav-focus/screen-focus).
  *
  * 17/08/2026 (Lot C — restructuration Partie) : renderFocusHeroiques_
  * cible désormais #plateau-galactique-focus-heroiques (au lieu de
@@ -474,6 +506,7 @@ var StrategieService = (function () {
         var valeur = Number(input.value) || 0;
         if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.ressources[cle] = valeur;
         majDeltaAffiche_(cle, valeur);
+        majRappelRessourceAffiche_(cle, valeur);
         // Rejoue la jouabilité des cartes Focus (coutSuffisant_ relit
         // partieAffichee.plateauMaison.ressources, déjà à jour ci-dessus) —
         // ne touche pas #ressources-principales, l'input garde le focus.
@@ -483,6 +516,44 @@ var StrategieService = (function () {
     });
 
     renderJetons_(partie);
+  }
+
+  /**
+   * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : bandeau
+   * fixe en bas de l'écran Focus (#focus-rappel-ressources, voir
+   * index.html v17 et css/style.css), 6 chiffres colorés — les 5
+   * ressources principales (Nourriture/Énergie/Matériel/Crédit/Science) +
+   * Cube actif. Réutilise couleurCout_/abregeCout_ (déjà définies plus
+   * bas, portage des pastilles de coût des cartes Focus) pour rester
+   * visuellement cohérent avec le reste de l'écran plutôt que d'introduire
+   * une nouvelle palette. Rendu à chaque afficher() ; les 5 ressources
+   * principales sont en plus rafraîchies en direct par
+   * majRappelRessourceAffiche_ (appelée depuis le listener 'input' de
+   * #ressources-principales, écran Plat. maison — voir renderRessources_
+   * ci-dessus). Cube actif n'a pas de saisie directe sur cet écran
+   * (modifié uniquement via les actions Focus/Secteurs) : seulement
+   * rafraîchi à chaque afficher(), comme le reste de l'écran.
+   */
+  function rappelChipHTML_(cle, valeur) {
+    return '<div class="rappel-chip">' +
+      '<span class="rappel-chip-label">' + abregeCout_(cle) + '</span>' +
+      '<span class="rappel-chip-valeur" id="rappel-' + cle + '" style="color:' + couleurCout_(cle) + '">' + valeur + '</span>' +
+      '</div>';
+  }
+
+  function renderRappelRessources_(partie) {
+    var container = document.getElementById('focus-rappel-ressources');
+    if (!container) return;
+    var pm = partie.plateauMaison || {};
+    var ressources = pm.ressources || {};
+    container.innerHTML = RESSOURCES_PRODUCTION.map(function (cle) {
+      return rappelChipHTML_(cle, ressources[cle] || 0);
+    }).join('') + rappelChipHTML_('cubeActif', pm.cubeActif || 0);
+  }
+
+  function majRappelRessourceAffiche_(cle, valeur) {
+    var el = document.getElementById('rappel-' + cle);
+    if (el) el.textContent = valeur;
   }
 
   /**
@@ -1852,6 +1923,7 @@ var StrategieService = (function () {
     if (nouveauCycle) reinitialiserSoldeDebutCycle_(partie);
     partieAffichee = partie;
     renderRessources_(partie);
+    renderRappelRessources_(partie);
     renderCubes_(partie);
     renderGloire_(partie);
     renderPistesCivilisation_(partie);

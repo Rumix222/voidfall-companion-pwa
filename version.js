@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 18 — 2026-08-17
+ * Version 19 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,31 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : incrémenté
+ * suite à la réorganisation de l'écran Focus (index.html v17) — "Actions
+ * réalisées" (Annuler + journal) puis "Listes de focus" (ex-"Vos Focus") ;
+ * ajout d'un bandeau permanent en bas d'écran (#focus-rappel-ressources,
+ * position fixed) affichant Nourriture/Énergie/Matériel/Crédit/Science/
+ * Cube actif en chiffres colorés, réutilisant la palette des pastilles de
+ * coût des cartes Focus (couleurCout_/abregeCout_) : js/strategieService.js
+ * (v12), css/style.css (v13 — .rappel-ressources-footer/.rappel-chip*,
+ * #screen-focus padding-bottom). Fichiers modifiés, chemins déjà en cache,
+ * aucune nouvelle entrée dans FICHIERS_A_METTRE_EN_CACHE.
+ *
+ * 17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
+ * incrémenté suite au déplacement des sections Ressources / Jetons et
+ * cubes de puissance navale (avec la Gloire) / Pistes de Civilisation de
+ * l'écran Stratégie vers l'écran Plat. maison (ordre : Ressources / Jetons
+ * et cubes de puissance navale / Pistes de Civilisation / Technologies /
+ * Influence), et renommage de l'onglet "Stratégie" en "Focus" (id
+ * nav-strategie -> nav-focus, data-nav strategie -> focus, id
+ * screen-strategie -> screen-focus, seule référence dans tout le projet) :
+ * index.html (v16). Restent dans "Focus" (décision utilisateur) : bouton
+ * Annuler la dernière action + journal. js/strategieService.js (v11) —
+ * aucune fonction modifiée, tout cible toujours les mêmes ids, simplement
+ * déplacés dans le DOM. Fichiers modifiés, chemins déjà en cache, aucune
+ * nouvelle entrée.
  *
  * 17/08/2026 (Lot C — restructuration Partie) : incrémenté suite à
  * index.html (v15 — écran "Partie" renommé "Plat. Galactique",
@@ -228,4 +253,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.23';
+var APP_VERSION = '20260817.24';
