@@ -1,7 +1,26 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 2 — 17/08/2026 (Session 5, Phase 5 — Civilisation)
+ * Version 3 — 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie)
+ *
+ * 17/08/2026 (Session 10) : restauration de blocs d'affichage présents
+ * dans strategie.html (GAS) mais perdus lors du portage initial de cet
+ * écran (Session 4) :
+ * - Influence retirée de renderRessources_ (déménagée sur l'écran Partie,
+ *   voir index.html App.renderEcranGame_ — comportement legacy).
+ * - Ligne jetons restaurée à l'identique : Commerce (longueur de
+ *   plateau_maison.jeton_commerce) + Prime + Libération. Cube actif en
+ *   sort (rejoint la nouvelle ligne Cubes).
+ * - Nouvelle ligne Cube inactif/actif/déployé (renderCubes_, #ressources-
+ *   cubes) — Cube déployé recalculé depuis la Puissance Navale de tous
+ *   les secteurs (SecteurService.obtenirSecteurs), portage direct de
+ *   recalculerNiveauxProduction_ (partie Cube déployé uniquement).
+ * - Nouveau bloc Gloire interactif (renderGloire_/renderGloireDOM_,
+ *   #ressources-gloire) — 5 emplacements cliquables (vide -> 1 -> ... ->
+ *   5 -> vide), persistés via GameService.majPlateauMaison.
+ * Décisions de périmètre validées par l'utilisateur en session (Influence
+ * déménagée, Cube actif sorti des jetons) plutôt que devinées depuis les
+ * deux fichiers de référence fournis (index-2.html / strategie-2.html).
  *
  * 17/08/2026 (Session 5) : Pistes de Civilisation devenues INTERACTIVES —
  * bouton "Avancer" par piste (résout aussi l'effet de la case atteinte),
@@ -97,10 +116,28 @@ var StrategieService = (function () {
   var partieAffichee = null;
   var journal = [];
 
+  // 16/08/2026 (portage legacy strategie.html) : total fixe de cubes de
+  // Puissance Navale (inactif + actif + déployé), identique pour toutes
+  // les maisons — voir strategie.html GAS, NB_CUBES_TOTAL.
+  var NB_CUBES_TOTAL = 14;
+  // État local des 5 emplacements Gloire (null = vide, 1-5 = valeur du
+  // jeton) — reconstruit depuis partie.plateauMaison.gloire à chaque
+  // afficher(), comme les autres blocs de cet écran.
+  var etatGloire = [null, null, null, null, null];
+
   // ------------------------------------------------------------
   // Rendu ressources
   // ------------------------------------------------------------
 
+  /**
+   * 17/08/2026 (Session 10 — restauration IHM) : Influence n'est plus
+   * affichée ici (déménagée sur l'écran Partie, voir index.html
+   * App.renderEcranGame_ — comportement legacy app.html/strategie.html).
+   * Ligne jetons restaurée à l'identique du legacy : Commerce (compteur =
+   * longueur du tableau plateau_maison.jeton_commerce) + Prime +
+   * Libération — Cube actif quitte cette ligne pour la nouvelle ligne
+   * Cubes (voir renderCubes_).
+   */
   function renderRessources_(partie) {
     var pm = partie.plateauMaison || {};
     var ressources = pm.ressources || {};
@@ -109,15 +146,90 @@ var StrategieService = (function () {
     principales.innerHTML = RESSOURCES_PRODUCTION.map(function (cle) {
       return '<div class="ressource-case"><div class="ressource-case-label">' + CHAMP_RESSOURCE[cle].label + '</div>' +
         '<div class="ressource-case-valeur">' + (ressources[cle] || 0) + '</div></div>';
-    }).join('') +
-      '<div class="ressource-case"><div class="ressource-case-label">Influence</div>' +
-      '<div class="ressource-case-valeur">' + (ressources.influence || 0) + '</div></div>';
+    }).join('');
 
+    var nbCommerce = Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0;
     var jetons = document.getElementById('ressources-jetons');
     jetons.innerHTML =
-      '<div class="ressource-case"><div class="ressource-case-label">Cube actif</div><div class="ressource-case-valeur">' + (pm.cubeActif || 0) + '</div></div>' +
+      '<div class="ressource-case"><div class="ressource-case-label">Commerce</div><div class="ressource-case-valeur">' + nbCommerce + '</div></div>' +
       '<div class="ressource-case"><div class="ressource-case-label">Prime</div><div class="ressource-case-valeur">' + (pm.jetonPrime || 0) + '</div></div>' +
       '<div class="ressource-case"><div class="ressource-case-label">Libération</div><div class="ressource-case-valeur">' + (pm.jetonLiberation || 0) + '</div></div>';
+  }
+
+  /**
+   * 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
+   * déployé — portage direct de recalculerNiveauxProduction_ (strategie.html
+   * GAS, partie Cube déployé uniquement ; les niveaux de production
+   * Nourriture/Énergie/etc. par Guilde restent hors périmètre de cette
+   * restauration, non recalculés automatiquement côté PWA). Cube déployé =
+   * somme de la Puissance Navale (pn_corvette/sentinelle/destroyer/
+   * cuirasse/porte_vaisseau) sur tous les secteurs de la partie ; Cube
+   * inactif = total fixe - actif - déployé. Asynchrone (lecture des
+   * secteurs) : rendu séparé de renderRessources_, appelé depuis afficher()
+   * sans bloquer le reste de l'écran ; silencieux en cas d'échec (garde le
+   * dernier rendu plutôt que de bloquer l'écran, même logique que le
+   * legacy).
+   */
+  function renderCubes_(partie) {
+    var pm = partie.plateauMaison || {};
+    var cubeActif = pm.cubeActif || 0;
+    var container = document.getElementById('ressources-cubes');
+
+    SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
+      var totalDeploye = (secteurs || []).reduce(function (somme, s) {
+        return somme + (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
+          (Number(s.pnDestroyer) || 0) + (Number(s.pnCuirasse) || 0) + (Number(s.pnPorteVaisseau) || 0);
+      }, 0);
+      var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - totalDeploye);
+
+      container.innerHTML =
+        '<div class="ressource-case"><div class="ressource-case-label">Cube inactif</div><div class="ressource-case-valeur">' + cubeInactif + '</div></div>' +
+        '<div class="ressource-case"><div class="ressource-case-label">Cube actif</div><div class="ressource-case-valeur">' + cubeActif + '</div></div>' +
+        '<div class="ressource-case"><div class="ressource-case-label">Cube déployé</div><div class="ressource-case-valeur">' + totalDeploye + '</div></div>';
+    }).catch(function () {
+      // Silencieux — garde le dernier rendu plutôt que de bloquer l'écran.
+    });
+  }
+
+  /**
+   * 17/08/2026 (Session 10 — restauration IHM) : Gloire — 5 emplacements,
+   * chacun vide (null) ou valeur 1-5. Portage direct de renderGloire_
+   * (strategie.html GAS) : un clic fait avancer l'emplacement (vide -> 1 ->
+   * 2 -> ... -> 5 -> vide) et persiste immédiatement via
+   * GameService.majPlateauMaison (lecture-fusion-écriture, ne touche que le
+   * champ gloire).
+   */
+  function renderGloire_(partie) {
+    var pm = partie.plateauMaison || {};
+    etatGloire = (Array.isArray(pm.gloire) ? pm.gloire.slice(0, 5) : []);
+    while (etatGloire.length < 5) etatGloire.push(null);
+    renderGloireDOM_(partie);
+  }
+
+  // Ne relit jamais l'état depuis `partie` — s'appuie uniquement sur
+  // etatGloire (état local déjà à jour), pour ne pas écraser un clic tout
+  // juste appliqué par l'ancienne valeur non encore persistée.
+  function renderGloireDOM_(partie) {
+    var container = document.getElementById('ressources-gloire');
+    var emplacements = etatGloire.map(function (valeur, i) {
+      var actif = (valeur !== null && valeur !== undefined);
+      return '<button type="button" class="gloire-jeton' + (actif ? ' actif' : '') +
+        '" data-index="' + i + '" aria-label="Emplacement Gloire ' + (i + 1) + '">' +
+        (actif ? valeur : '') + '</button>';
+    }).join('');
+    container.innerHTML = '<label>GLOIRE</label><div class="gloire-emplacements">' + emplacements + '</div>';
+
+    Array.prototype.forEach.call(container.querySelectorAll('.gloire-jeton'), function (btn) {
+      btn.addEventListener('click', function () {
+        var i = Number(btn.dataset.index);
+        var actuel = etatGloire[i];
+        etatGloire[i] = (actuel === null || actuel === undefined) ? 1 : (actuel >= 5 ? null : actuel + 1);
+        renderGloireDOM_(partie);
+        GameService.majPlateauMaison(partie.id, { gloire: etatGloire }).catch(function (erreur) {
+          window.alert('Échec de l\'enregistrement de la Gloire : ' + erreur.message);
+        });
+      });
+    });
   }
 
   function renderJournal_() {
@@ -554,6 +666,8 @@ var StrategieService = (function () {
     if (!partieAffichee || partieAffichee.id !== partie.id) journal = [];
     partieAffichee = partie;
     renderRessources_(partie);
+    renderCubes_(partie);
+    renderGloire_(partie);
     renderPistesCivilisation_(partie);
     renderFocusJoueur_(partie);
     renderFocusHeroiques_(partie);

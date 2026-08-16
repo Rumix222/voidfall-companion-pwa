@@ -15,6 +15,15 @@
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
  *
+ * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : incrémenté
+ * suite à la restauration de blocs d'affichage perdus lors du portage
+ * initial de l'écran Stratégie (Session 4) : Influence déménagée vers
+ * l'écran Partie, ligne jetons restaurée (Commerce/Prime/Libération),
+ * ligne Cube inactif/actif/déployé et widget Gloire (5 emplacements
+ * cliquables) ajoutés. Fichiers modifiés (chemins déjà en cache, aucune
+ * nouvelle entrée) : index.html (v9), css/style.css (v4),
+ * js/strategieService.js (v3).
+ *
  * 17/08/2026 (Session 9, Phase 7 — Nettoyage) : incrémenté suite à la
  * correction de deux commentaires obsolètes dans gameService.js/
  * index.html (mentionnaient encore Focus non-jouable / Civilisation
@@ -84,4 +93,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.11';
+var APP_VERSION = '20260817.12';

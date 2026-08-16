@@ -177,6 +177,8 @@
     <div class="game-block" id="bloc-ressources">
       <div class="ressources-liste" id="ressources-principales"></div>
       <div class="ressources-jetons" id="ressources-jetons"></div>
+      <div class="ressources-gloire" id="ressources-gloire"></div>
+      <div class="ressources-liste ressources-cubes" id="ressources-cubes"></div>
       <div class="ressources-journal" id="ressources-journal"></div>
     </div>
 
@@ -287,7 +289,14 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 8 — 17/08/2026
+   * Version 9 — 17/08/2026
+   *
+   * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : Influence
+   * déménagée de l'écran Stratégie vers l'écran Partie (bloc
+   * .plateau-influence, losange argenté — comportement legacy app.html),
+   * conteneurs #ressources-gloire / #ressources-cubes ajoutés à l'écran
+   * Stratégie (rendu par js/strategieService.js). Voir aussi css/style.css
+   * et js/strategieService.js (mêmes changements).
    *
    * 17/08/2026 (Session 4, Phase 4 suite — rebranchement DOM) :
    * - screen-partie-creee renommé/étendu en screen-game, devenu l'écran
@@ -355,10 +364,13 @@
     function renderEcranGame_(partie) {
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
+      var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
       document.getElementById('carte-joueur').innerHTML =
         '<div style="font-weight:600;font-size:1.1rem;">' + (joueur.nom || '?') + '</div>' +
         '<p class="hint" style="margin:6px 0 0;">Technologie de départ : ' + (techDepart.nom || '—') +
-        (techDepart.type ? ' <span class="hint-inline">(' + techDepart.type + ')</span>' : '') + '</p>';
+        (techDepart.type ? ' <span class="hint-inline">(' + techDepart.type + ')</span>' : '') + '</p>' +
+        '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
+        '<span class="ressource-case-valeur">' + influence + '</span></div>';
 
       var adversaires = partie.adversaires || [];
       document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
