@@ -15,6 +15,20 @@
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
  *
+ * 17/08/2026 (Lot C — restructuration Partie) : incrémenté suite à
+ * index.html (v15 — écran "Partie" renommé "Plat. Galactique",
+ * Technologies avancées), js/gameService.js (v9 — nouvelle mécanique
+ * Technologies avancées) et js/strategieService.js (v10 — conteneur Focus
+ * héroïques déplacé). js/gameService.js change de chemin cache identique
+ * (déjà dans FICHIERS_A_METTRE_EN_CACHE) — aucune nouvelle entrée requise.
+ *
+ * 17/08/2026 (Lot A/B — restructuration Partie) : incrémenté suite à
+ * index.html (v14 — écran Partie éclaté en 3 écrans nav : Mise en place /
+ * Partie / Plat. maison) et css/style.css (v12 — .champ-technologie-fixe).
+ * Pas de nouvelle entrée dans FICHIERS_A_METTRE_EN_CACHE
+ * (service-worker.js) : les 2 fichiers modifiés restent aux mêmes
+ * chemins déjà en cache.
+ *
  * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
  * 17/08) : incrémenté suite à style.html (désormais disponible) —
  * Pistes de Civilisation : 2 prochaines cases non atteintes (niveau+1 ET
@@ -214,4 +228,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.21';
+var APP_VERSION = '20260817.23';

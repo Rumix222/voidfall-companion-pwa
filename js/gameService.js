@@ -1,7 +1,35 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 8 — 17/08/2026 (Lot 1 — maisons déchues)
+ * Version 9 — 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées)
+ *
+ * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : nouvelle
+ * mécanique confirmée par l'utilisateur (session du 17/08), sans
+ * équivalent legacy (GAS) ni RPC Postgres existante — écrite entièrement
+ * à partir de la règle telle que décrite en session, pas d'un SQL/JS
+ * legacy à porter (contrairement au reste de ce fichier). Ajout de :
+ *   - 2 colonnes dédiées de plateauMaison (jamais dans etatJson, même
+ *     principe que technologiesObtenues) : technologiesAvanceesChoisies
+ *     (les 4 choisies au cycle 1, 4 emplacements) et
+ *     technologiesAvanceesAmeliorees (map {nom: bool}, couvre les 8) ;
+ *   - choisirTechnologieAvancee(partieId, slot, nom) : choix d'une des 4,
+ *     cycle 1 uniquement, rejette les doublons entre emplacements ;
+ *   - definirTechnologieAvanceeAmelioree(partieId, nom, amelioree) :
+ *     rejette si la technologie n'est pas dans le groupe actif du cycle
+ *     en cours ;
+ *   - obtenirTechnologiesAvanceesGroupes(partie) : fonction PURE (pas
+ *     d'accès DB), calcule groupeA (les 4 du cycle 1)/groupeB (le
+ *     complément, actif au cycle 3)/actif (améliorable ce cycle-ci),
+ *     appelée à la fois en interne (definirTechnologieAvanceeAmelioree)
+ *     et par index.html (rendu de l'écran Plat. Galactique) — un seul
+ *     endroit pour cette logique, affichage et persistance ne peuvent
+ *     pas diverger.
+ * Règle du groupe actif (groupeActifTechnologiesAvancees_, privée) :
+ * aucune amélioration possible au cycle 1 ; les 4 choisies au cycle 1
+ * (groupeA) sont améliorables au cycle 2 ; le complément (groupeB, calculé
+ * — jamais choisi manuellement) devient améliorable au cycle 3, à la
+ * place de groupeA (pas en plus). Testé par
+ * gameService_technologies_avancees_test.js (nouveau fichier, 17/08/2026).
  *
  * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
  * ajout du champ "texte" (déjà présent dans la table catalogue
@@ -141,7 +169,7 @@ var GameService = (function () {
     'ressourceCredit', 'ressourceScience', 'influence', 'cubeActif',
     'jetonPrime', 'jetonLiberation', 'jetonCommerce', 'gloire',
     'programme1', 'programme2', 'programme3', 'programme4',
-    'technologiesObtenues'
+    'technologiesObtenues', 'technologiesAvanceesChoisies'
   ];
 
   // ------------------------------------------------------------
@@ -262,6 +290,53 @@ var GameService = (function () {
   }
 
   /**
+   * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : les 8
+   * technologies des 4 maisons déchues (mise en place), toutes maisons
+   * confondues — même liste source que choisirTechnologieObtenue (slots
+   * "Technologies obtenues") et que toutesTechnologiesAdverses_
+   * (index.html/strategieService.js), mais exposée ici en fonction
+   * réutilisable : nécessaire aux deux nouvelles fonctions Technologies
+   * avancées ci-dessous (choix + calcul du groupe actif par cycle).
+   */
+  function technologiesAdversesToutes_(partie) {
+    var toutes = [];
+    (partie.adversaires || []).forEach(function (m) {
+      (m.technologies || []).forEach(function (t) {
+        toutes.push({ nom: t.nom, maison: m.nom, type: t.type || '', sansPoint: !!t.sansPoint });
+      });
+    });
+    return toutes;
+  }
+
+  /**
+   * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : règle
+   * confirmée par l'utilisateur (session du 17/08) — les 4 Technologies
+   * avancées choisies au cycle 1 (partie.technologiesAvanceesChoisies)
+   * sont improvable au cycle 2 ; au cycle 3, ce sont les 4 AUTRES parmi
+   * les 8 (le complément, calculé, jamais choisi manuellement) qui
+   * deviennent improvable. Aucune amélioration possible au cycle 1 (rien
+   * n'est encore "actif"), ni une fois les 4 emplacements du cycle 1
+   * incomplets (retourne [] tant que les 4 ne sont pas tous remplis :
+   * le complément ne serait pas fiable). Retourne un tableau de noms
+   * (string[]), pas d'objets — suffisant pour un test d'appartenance
+   * (indexOf) côté définirTechnologieAvanceeAmelioree.
+   */
+  function groupeActifTechnologiesAvancees_(partie) {
+    var choisies = (partie.technologiesAvanceesChoisies || []).filter(Boolean);
+    if (choisies.length < 4) return [];
+    if (partie.cycleActuel === 2) {
+      return choisies.map(function (t) { return t.nom; });
+    }
+    if (partie.cycleActuel === 3) {
+      var nomsChoisis = choisies.map(function (t) { return t.nom; });
+      return technologiesAdversesToutes_(partie)
+        .filter(function (t) { return nomsChoisis.indexOf(t.nom) === -1; })
+        .map(function (t) { return t.nom; });
+    }
+    return [];
+  }
+
+  /**
    * 17/08/2026 (Session 12 — restauration IHM Partie) : formate un
    * événement galactique — portage direct de formatEvenement_
    * (GameService.js GAS), adapté aux clés camelCase du store IndexedDB
@@ -309,6 +384,14 @@ var GameService = (function () {
       }
     };
     partie.technologiesObtenues = pm.technologiesObtenues || [null, null, null, null, null, null];
+    // 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
+    // technologiesAvanceesChoisies (les 4 choisies au cycle 1, parmi les
+    // 8 des maisons déchues) et technologiesAvanceesAmeliorees (map
+    // {nom: bool}, couvre les 8 — celles du cycle 2 ET celles du cycle
+    // 3) suivent le même principe que technologiesObtenues ci-dessus :
+    // colonnes dédiées de plateauMaison, jamais dans etatJson.
+    partie.technologiesAvanceesChoisies = pm.technologiesAvanceesChoisies || [null, null, null, null];
+    partie.technologiesAvanceesAmeliorees = pm.technologiesAvanceesAmeliorees || {};
 
     if (partie.joueur) {
       partie.joueur = Object.assign({}, partie.joueur, {
@@ -582,7 +665,9 @@ var GameService = (function () {
               programme2: null,
               programme3: null,
               programme4: null,
-              technologiesObtenues: [null, null, null, null, null, null]
+              technologiesObtenues: [null, null, null, null, null, null],
+              technologiesAvanceesChoisies: [null, null, null, null],
+              technologiesAvanceesAmeliorees: {}
             };
 
             var enregistrementPartie = {
@@ -998,6 +1083,125 @@ var GameService = (function () {
           });
         });
       });
+    },
+
+    /**
+     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
+     * enregistre (ou retire, si nomTechnologie est vide) le choix d'une
+     * des 4 Technologies avancées (parmi les 8 des maisons déchues) —
+     * même principe que choisirTechnologieObtenue (recherche dans
+     * partie.adversaires, écriture via majPlateauMaison), mais nouvelle
+     * mécanique confirmée par l'utilisateur (session du 17/08) :
+     *   - le choix ne se fait qu'au cycle 1 (rejette sinon — les 4
+     *     emplacements sont fixés pour le reste de la partie une fois le
+     *     cycle 1 passé) ;
+     *   - une même technologie ne peut occuper qu'un seul des 4
+     *     emplacements à la fois (contrairement à choisirTechnologieObtenue,
+     *     qui ne vérifie pas ce doublon côté serveur — reproduit tel quel
+     *     là-bas, mais gênant ici vu que les 4 NON choisies deviennent le
+     *     groupe du cycle 3, un doublon fausserait ce complément).
+     * L'amélioration (case à cocher) est gérée séparément par
+     * definirTechnologieAvanceeAmelioree, jamais ici.
+     */
+    choisirTechnologieAvancee: function (partieId, slot, nomTechnologie) {
+      slot = Number(slot);
+      if (slot < 0 || slot > 3) return Promise.reject(new Error('Emplacement de technologie avancée invalide.'));
+
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var partie = assemblerPartie_(resultats[0], resultats[1]);
+        if (!partie) throw new Error('Partie introuvable.');
+        if (partie.cycleActuel !== 1) {
+          throw new Error('Les Technologies avancées ne se choisissent qu\'au cycle 1.');
+        }
+
+        var choisies = (partie.technologiesAvanceesChoisies || [null, null, null, null]).slice();
+
+        if (!nomTechnologie) {
+          choisies[slot] = null;
+        } else {
+          var trouvee = technologiesAdversesToutes_(partie).filter(function (t) { return t.nom === nomTechnologie; })[0];
+          if (!trouvee) throw new Error('Technologie avancée introuvable parmi les maisons déchues.');
+          var dejaPriseAilleurs = choisies.some(function (t, i) { return i !== slot && t && t.nom === nomTechnologie; });
+          if (dejaPriseAilleurs) throw new Error('Cette technologie est déjà choisie à un autre emplacement.');
+          choisies[slot] = { nom: trouvee.nom, maison: trouvee.maison };
+        }
+
+        return GameService.majPlateauMaison(partieId, { technologiesAvanceesChoisies: choisies }).then(function () {
+          return ajouterHistorique_(partieId, 'technologie_avancee_slot' + slot, nomTechnologie || '(retirée)');
+        }).then(function () {
+          return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+            return assemblerPartie_(r2[0], r2[1]);
+          });
+        });
+      });
+    },
+
+    /**
+     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : marque
+     * une Technologie avancée (identifiée par son nom, pas un slot — elle
+     * peut appartenir au groupe du cycle 2 ou à celui du cycle 3) comme
+     * améliorée ou non. Écrit directement sur `plateauMaison`, même
+     * pattern que definirTechnologieAmelioree (pas de passage par
+     * majPlateauMaison, cette technique a "sa propre fonction dédiée").
+     * Rejette si la technologie n'est pas dans le groupe actif du cycle en
+     * cours (groupeActifTechnologiesAvancees_) — règle confirmée par
+     * l'utilisateur : le groupe du cycle 1 n'est jamais améliorable, celui
+     * du cycle 2 l'est uniquement au cycle 2, celui du cycle 3
+     * (complément, calculé) uniquement au cycle 3.
+     */
+    definirTechnologieAvanceeAmelioree: function (partieId, nomTechnologie, amelioree) {
+      amelioree = !!amelioree;
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var partie = assemblerPartie_(resultats[0], resultats[1]);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var groupeActif = groupeActifTechnologiesAvancees_(partie);
+        if (groupeActif.indexOf(nomTechnologie) === -1) {
+          throw new Error('Cette technologie avancée n\'est pas améliorable ce cycle-ci.');
+        }
+
+        return DB.get('plateauMaison', partieId).then(function (ligne) {
+          var ameliorees = Object.assign({}, ligne.technologiesAvanceesAmeliorees || {});
+          ameliorees[nomTechnologie] = amelioree;
+          ligne.technologiesAvanceesAmeliorees = ameliorees;
+          return DB.put('plateauMaison', ligne);
+        });
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
+    },
+
+    /**
+     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
+     * fonction PURE (aucun accès DB) exposée pour l'IHM (index.html) —
+     * regroupe la logique d'affichage par cycle (quelles 4 technologies
+     * montrer, lesquelles sont améliorables) au même endroit que la
+     * logique d'écriture ci-dessus (groupeActifTechnologiesAvancees_),
+     * pour éviter toute divergence entre affichage et persistance.
+     *   - toutes : les 8 technologies des maisons déchues (mise en place).
+     *   - groupeA : les 4 choisies au cycle 1 (partie.technologiesAvancees
+     *     Choisies, dans l'ordre des emplacements — peut contenir des null
+     *     tant que le choix du cycle 1 n'est pas terminé).
+     *   - groupeB : le complément des 4 autres parmi les 8 (calculé, jamais
+     *     stocké) — vide tant que groupeA n'a pas ses 4 emplacements remplis.
+     *   - actif : les noms améliorables CE cycle-ci (voir
+     *     groupeActifTechnologiesAvancees_) — [] aux cycles 1 et 'termine'.
+     */
+    obtenirTechnologiesAvanceesGroupes: function (partie) {
+      var toutes = technologiesAdversesToutes_(partie);
+      var choisies = partie.technologiesAvanceesChoisies || [null, null, null, null];
+      var nomsChoisis = choisies.filter(Boolean).map(function (t) { return t.nom; });
+      var groupeB = nomsChoisis.length === 4
+        ? toutes.filter(function (t) { return nomsChoisis.indexOf(t.nom) === -1; })
+        : [];
+      return {
+        toutes: toutes,
+        groupeA: choisies,
+        groupeB: groupeB,
+        actif: groupeActifTechnologiesAvancees_(partie)
+      };
     }
   };
 })();

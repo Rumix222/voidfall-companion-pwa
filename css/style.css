@@ -1,6 +1,20 @@
 /**
  * css/style.css
- * Version 11 — 17/08/2026 (Lot 3 — finitions Stratégie)
+ * Version 13 — 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel)
+ *
+ * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : nouvelles
+ * classes .rappel-ressources-footer/.rappel-chip/-label/-valeur (bandeau
+ * fixe de rappel des ressources, écran Focus) + #screen-focus (padding-
+ * bottom, pour ne pas laisser le bandeau recouvrir le bas du contenu).
+ * Voir index.html (v17) et js/strategieService.js (v12) pour le HTML/
+ * rendu correspondants.
+ *
+ * 17/08/2026 (Lot A/B — restructuration Partie) : ajout de
+ * .champ-technologie-fixe (Technologie de départ en texte fixe, écran
+ * Plat. maison — voir index.html v14). Aucune classe existante modifiée :
+ * les blocs déplacés (carte-joueur, technologies-obtenues-liste,
+ * plateau-influence) sont réutilisés tels quels, seulement changés de
+ * conteneur DOM.
  *
  * 17/08/2026 (Lot 3 — finitions Stratégie) : classes copiées telles
  * quelles depuis style.html — pistes de Civilisation (.piste-civilisation-
@@ -721,6 +735,53 @@ input:disabled {
   white-space: nowrap;
 }
 
+/* 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : bandeau
+   permanent en bas de l'écran Focus (#focus-rappel-ressources, voir
+   index.html/js/strategieService.js), position fixed — pas d'ancêtre
+   avec transform/filter entre lui et le viewport (#app est en position:
+   relative simple, voir plus haut), donc fixed reste bien relatif à
+   l'écran et non à #app. #screen-focus reçoit un padding-bottom dédié
+   pour que le bandeau ne recouvre jamais le bas du contenu (Vos Focus/
+   dernières cartes de la liste). */
+#screen-focus {
+  padding-bottom: 92px;
+}
+.rappel-ressources-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -6px 18px rgba(0,0,0,0.35);
+}
+.rappel-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.rappel-chip-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-muted);
+}
+.rappel-chip-valeur {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
 /* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
    17/08) : classes/valeurs copiées telles quelles depuis style.html GAS —
    remplace la grille de 3 cartes carrées (Session 5, écrite sans
@@ -828,6 +889,18 @@ input:disabled {
 .techno-obtenue-ligne .check-amelioree {
   margin-top: 0;
   flex-shrink: 0;
+}
+/* 17/08/2026 (Lot B — restructuration Partie) : Technologie de départ,
+   écran Plat. maison — remplace le <select> de .techno-obtenue-ligne par
+   un texte fixe (la Technologie de départ n'a jamais été un <select>,
+   choisie une seule fois à la création de partie), même gabarit de ligne
+   (flex:1, comme select ci-dessus) pour un alignement identique avec la
+   case "Améliorée". */
+.champ-technologie-fixe {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  color: var(--color-text);
 }
 .civilisation-actions-globales {
   display: flex;

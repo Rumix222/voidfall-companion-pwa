@@ -1,7 +1,15 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 9 — 17/08/2026 (Lot 3 — finitions Stratégie)
+ * Version 10 — 17/08/2026 (Lot C — restructuration Partie)
+ *
+ * 17/08/2026 (Lot C — restructuration Partie) : renderFocusHeroiques_
+ * cible désormais #plateau-galactique-focus-heroiques (au lieu de
+ * #strategie-focus-heroiques) — le bloc "Focus héroïques — cycle en
+ * cours" quitte l'écran Stratégie pour l'écran Plat. Galactique (voir
+ * index.html v15). Aucun autre changement : même fonction, toujours
+ * appelée depuis afficher() ci-dessous à chaque rendu de partie, qu'importe
+ * l'écran sur lequel vit physiquement son conteneur.
  *
  * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du 17/08,
  * grâce à style.html désormais disponible en Project Knowledge) :
@@ -959,9 +967,16 @@ var StrategieService = (function () {
    * déjà choisi ailleurs (partie.focusHeroiquesPioches) n'apparaît plus
    * dans les options des AUTRES emplacements, sauf celui qui le porte
    * déjà (peut toujours être remis à "— Choisir —" pour le libérer).
+   *
+   * 17/08/2026 (Lot C — restructuration Partie) : conteneur déplacé de
+   * l'écran Stratégie vers l'écran Plat. Galactique —
+   * #strategie-focus-heroiques devient #plateau-galactique-focus-
+   * heroiques (seul changement de cette fonction, toujours appelée
+   * depuis afficher() ci-dessous, qui n'a pas besoin de savoir sur quel
+   * écran vit son conteneur).
    */
   function renderFocusHeroiques_(partie) {
-    var container = document.getElementById('strategie-focus-heroiques');
+    var container = document.getElementById('plateau-galactique-focus-heroiques');
     var cycle = partie.cycleActuel;
     if (!cycle || cycle === 'termine') {
       container.innerHTML = '<p class="hint">Partie terminée.</p>';

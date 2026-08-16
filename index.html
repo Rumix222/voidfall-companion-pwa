@@ -23,11 +23,20 @@
     <h1>Voidfall<span class="topbar-accent">Companion</span></h1>
   </header>
 
-  <!-- Barre visible uniquement pendant une partie ouverte -->
+  <!-- Barre visible uniquement pendant une partie ouverte.
+       17/08/2026 (Lot C — restructuration Partie) : le bouton "Partie"
+       devient "Plat. Galactique" (dernier des 3 écrans annoncés au Lot
+       A/B — remplacement complet de l'ex-écran unique "Partie" terminé).
+       17/08/2026 (Lot A/B — restructuration Partie) : 2 nouveaux boutons,
+       "Mise en place" et "Plat. maison" (voir screen-mise-en-place /
+       screen-plateau-maison plus bas), qui reprennent chacun une partie
+       du contenu de l'ex-écran unique "Partie". -->
   <div id="barre-navigation-partie" class="barre-navigation-partie" hidden>
     <nav id="nav-ecrans" class="nav-ecrans">
-      <button id="nav-partie" class="btn btn-toggle active" data-nav="game">Partie</button>
-      <button id="nav-strategie" class="btn btn-toggle" data-nav="strategie">Stratégie</button>
+      <button id="nav-mise-en-place" class="btn btn-toggle" data-nav="mise-en-place">Mise en place</button>
+      <button id="nav-plateau-galactique" class="btn btn-toggle active" data-nav="plateau-galactique">Plat. Galactique</button>
+      <button id="nav-plateau-maison" class="btn btn-toggle" data-nav="plateau-maison">Plat. maison</button>
+      <button id="nav-focus" class="btn btn-toggle" data-nav="focus">Focus</button>
       <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs">Secteurs</button>
       <button id="nav-combat" class="btn btn-toggle" data-nav="combat">Combat</button>
     </nav>
@@ -102,27 +111,55 @@
     </div>
   </section>
 
-  <!-- Écran Partie : maison, technologie de départ, maisons déchues, cycle.
-       17/08/2026 (Session 4) : ex-écran de confirmation "partie créée",
-       devenu l'écran persistant "Partie" (accessible via la nav tant
-       qu'une partie est ouverte). Volontairement en lecture seule pour
-       technologies obtenues / cycle : leur avancement (choisirTechnologie
-       Obtenue, avancerCycle) dépend de fonctions serveur GAS dont le SQL
-       source n'a jamais été récupéré (hors périmètre, voir gameService.js
-       en-tête) — rien à porter, pas encore réécrit depuis les règles. -->
-  <section id="screen-game" class="screen" hidden>
+  <!-- Écran Mise en place : maisons déchues et leurs technologies (dont
+       celles sans gain d'Influence, badge-sans-point). 17/08/2026 (Lot A
+       — restructuration Partie) : nouvel écran dédié, portage direct du
+       bloc #liste-adversaires qui vivait sur l'écran Partie jusqu'ici
+       (App.renderEcranGame_), aucun changement de logique. Contenu figé
+       à la création de partie (creerPartie est le seul point d'écriture
+       de partie.adversaires) : rendu une seule fois depuis
+       App.ouvrirPartie, jamais rafraîchi ensuite — contrairement à
+       Plat. Galactique/Plat. maison.
+       17/08/2026 (Lot C — restructuration Partie) : ajout de "Votre
+       maison" (carte-joueur, nom + Difficulté) — absente de la demande
+       initiale (qui ne listait que les maisons déchues pour cet écran),
+       ajoutée ici car elle n'a plus d'écran d'accueil depuis que "Partie"
+       devient "Plat. Galactique" (voir plus bas) ; hors périmètre
+       signalé, à retirer si tu préfères qu'elle vive ailleurs. -->
+  <section id="screen-mise-en-place" class="screen" hidden>
     <h2 class="section-title">Votre maison</h2>
     <div class="card card-joueur" id="carte-joueur"></div>
 
     <h2 class="section-title" style="margin-top:22px;">Maisons déchues</h2>
     <div class="card-list" id="liste-adversaires"></div>
+  </section>
 
-    <p class="hint" style="margin-top:18px;">Cycle actuel : <span id="game-cycle-actuel">—</span></p>
+  <!-- Écran Plat. Galactique : cycle, événement galactique, Technologies
+       avancées, Focus héroïques, fin de cycle.
+       17/08/2026 (Lot C — restructuration Partie) : remplace l'ex-écran
+       "Partie" (renommage complet, dernier des 3 écrans annoncés au Lot
+       A/B — voir barre-navigation-partie). Focus héroïques déplacés
+       depuis l'écran Stratégie (#plateau-galactique-focus-heroiques,
+       rendu par js/strategieService.js, renderFocusHeroiques_ — même
+       fonction, seul l'id du conteneur qu'elle cible a changé). Ajout de
+       "Technologies avancées" (#technologies-avancees-liste, nouvelle
+       mécanique, voir gameService.js v9 — 4 des 8 technologies des
+       maisons déchues choisies au cycle 1, améliorables par lot de 4 aux
+       cycles 2/3, voir App.renderTechnologiesAvancees_ plus bas).
+       17/08/2026 (Session 4) : ex-écran de confirmation "partie créée",
+       devenu l'écran persistant "Partie" (accessible via la nav tant
+       qu'une partie est ouverte). Volontairement en lecture seule pour
+       cycle : son avancement (avancerCycle) dépend de fonctions serveur
+       GAS dont le SQL source n'a jamais été récupéré (hors périmètre,
+       voir gameService.js en-tête) — rien à porter, pas encore réécrit
+       depuis les règles. -->
+  <section id="screen-plateau-galactique" class="screen" hidden>
+    <h2 class="section-title">Cycle <span id="plateau-galactique-cycle">—</span></h2>
 
     <!-- 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
          l'événement galactique du cycle en cours — choisirEvenement porté
          (fonction JS pure côté GAS, jamais une RPC), voir gameService.js. -->
-    <div class="game-block" id="bloc-evenement-cycle" style="margin-top:14px;" hidden>
+    <div class="game-block" id="bloc-evenement-cycle" hidden>
       <h3 class="subsection-title">Événement galactique — cycle <span id="evenement-cycle-numero">—</span></h3>
       <select id="select-evenement-cycle">
         <option value="">— Choisir —</option>
@@ -130,9 +167,20 @@
       <p class="hint" id="evenement-cycle-texte" style="margin-top:8px;"></p>
     </div>
 
-    <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:14px;">
-      <h3 class="subsection-title">Technologies obtenues</h3>
-      <div id="technologies-obtenues-liste"></div>
+    <!-- 17/08/2026 (Lot C — Technologies avancées) : 4 emplacements —
+         listes déroulantes au cycle 1 (choix, parmi les 8 technologies
+         des maisons déchues), texte fixe + case Améliorée aux cycles 2
+         (les 4 choisies) et 3 (les 4 autres, complément calculé) — voir
+         App.renderTechnologiesAvancees_ (index.html) et
+         GameService.obtenirTechnologiesAvanceesGroupes (gameService.js). -->
+    <div class="game-block" id="bloc-technologies-avancees" style="margin-top:14px;">
+      <h3 class="subsection-title">Technologies avancées</h3>
+      <div id="technologies-avancees-liste"></div>
+    </div>
+
+    <div class="game-block" style="margin-top:14px;">
+      <h3 class="subsection-title">Focus héroïques — cycle en cours</h3>
+      <div class="card-list" id="plateau-galactique-focus-heroiques" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 
     <button id="btn-fin-cycle" class="btn btn-primary" style="width:100%;margin-top:14px;">Fin du cycle</button>
@@ -140,6 +188,68 @@
 
     <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Terminer la partie</button>
     <button id="btn-retour-accueil-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Retour à l'accueil</button>
+  </section>
+
+  <!-- Écran Plat. maison : Ressources / Jetons et cubes de puissance
+       navale / Pistes de Civilisation / Technologies / Influence, dans
+       cet ordre. 17/08/2026 (Lot D — Ressources/Civilisation vers Plat.
+       maison) : les 3 premières sections arrivent depuis l'ex-écran
+       Stratégie (#bloc-ressources scindé en #bloc-ressources —
+       #ressources-principales seul — et #bloc-jetons-cubes —
+       #ressources-jetons/#ressources-gloire/#ressources-cubes —,
+       #bloc-pistes-civilisation inchangé) ; renommé "Focus" (voir plus
+       bas). Mêmes ids partout, rendus par les mêmes fonctions de
+       js/strategieService.js (afficher() cible par id, indépendamment de
+       l'écran qui contient physiquement chaque conteneur — comme pour
+       les Focus héroïques au Lot C). Restent dans "Focus" : le bouton
+       Annuler la dernière action et le journal (décision utilisateur).
+       Technologies et Influence : inchangés, seulement décalés après les
+       3 nouvelles sections (voir Lot B pour leur historique).
+       17/08/2026 (Lot B — restructuration Partie) : nouvel écran dédié,
+       portage direct des blocs qui vivaient sur l'écran Partie jusqu'ici
+       (carte-joueur pour la Technologie de départ + Influence,
+       #bloc-technologies-obtenues), mêmes ids (#check-amelioree-depart,
+       #technologies-obtenues-liste), mêmes appels GameService, aucun
+       changement de logique/persistance. #technologie-depart-plateau-
+       maison est un texte fixe : la Technologie de départ n'a jamais été
+       un <select> ni en legacy ni dans la PWA (choisie une fois à la
+       création de partie via setupService.js) — seule sa case "Améliorée"
+       est interactive, inchangée. -->
+  <section id="screen-plateau-maison" class="screen" hidden>
+    <h2 class="section-title">Ressources</h2>
+    <div class="game-block" id="bloc-ressources">
+      <div class="ressources-liste" id="ressources-principales"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Jetons et cubes de puissance navale</h2>
+    <div class="game-block" id="bloc-jetons-cubes">
+      <div class="ressources-jetons" id="ressources-jetons"></div>
+      <div class="ressources-gloire" id="ressources-gloire"></div>
+      <div class="ressources-liste ressources-cubes" id="ressources-cubes"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Pistes de Civilisation</h2>
+    <div class="game-block" id="bloc-pistes-civilisation">
+      <div class="pistes-civilisation-liste" id="pistes-civilisation-liste"></div>
+      <div class="civilisation-actions-globales">
+        <button id="btn-avancer-moins-avancee" class="btn btn-secondary">Avancer la moins avancée</button>
+        <button id="btn-avancer-corrompue" class="btn btn-secondary" disabled>Avancer la piste Corrompue</button>
+      </div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Technologies</h2>
+    <div class="game-block" id="bloc-technologie-depart">
+      <div class="techno-obtenue-ligne">
+        <span class="champ-technologie-fixe" id="technologie-depart-plateau-maison">—</span>
+        <label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"> Améliorée</label>
+      </div>
+    </div>
+    <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:10px;">
+      <div id="technologies-obtenues-liste"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Influence</h2>
+    <div class="game-block" id="plateau-influence-bloc"></div>
   </section>
 
   <!-- Écran Fin de partie : score final + calcul de l'Influence du Néant.
@@ -180,45 +290,61 @@
     </div>
   </section>
 
-  <!-- Écran Stratégie : ressources, pistes de Civilisation (interactives
-       depuis la Session 5, voir civilisationService.js), Focus jouables,
-       Focus héroïques (affichage), annulation de la dernière action jouée.
+  <!-- Écran Focus (ex-Stratégie) : Actions réalisées (Annuler + journal) /
+       Listes de focus / bandeau permanent de rappel des ressources.
+       17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
+       - "Actions réalisées" : regroupe le bouton Annuler la dernière
+         action et le journal sous un même titre (hypothèse assumée —
+         la demande listait "Actions réalisées" sans préciser si le
+         bouton Annuler en fait partie ; les deux concernent la dernière
+         action jouée, regroupés ensemble ici, à ajuster si besoin).
+       - "Listes de focus" : ex-"Vos Focus" (h3 promu en h2 pour
+         s'aligner sur les autres titres de section ; le sous-titre "Vos
+         Focus" est retiré, devenu redondant avec le nouveau titre).
+       - #focus-rappel-ressources : bandeau fixe en bas d'écran (position:
+         fixed, voir css/style.css), affiche Nourriture/Énergie/Matériel/
+         Crédit/Science/Cube actif en chiffres colorés (mêmes couleurs que
+         les pastilles de coût des cartes Focus, portage de couleurCout_/
+         abregeCout_, js/strategieService.js). Rendu par
+         renderRappelRessources_, appelée depuis afficher() ; mis à jour en
+         direct par l'input Stock des ressources principales (Plat. maison,
+         #ressources-principales) via majRappelRessourceAffiche_ — même
+         mécanisme que majDeltaAffiche_. Cube actif n'a pas de saisie
+         directe sur cet écran (modifié uniquement par les actions Focus/
+         Secteurs) : rafraîchi seulement à chaque afficher(), comme le
+         reste de l'écran.
+       17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
+       renommage "Stratégie" -> "Focus" (id nav-strategie -> nav-focus,
+       data-nav strategie -> focus, id screen-strategie -> screen-focus —
+       seuls changements d'id, aucune référence ailleurs dans le code, voir
+       audit) ; #bloc-ressources (ressources principales/jetons/gloire/
+       cubes) et Pistes de Civilisation quittent cet écran pour Plat.
+       maison (voir plus haut). Le module js/strategieService.js garde son
+       nom (rendu par id, indépendant de l'écran) — non renommé, hors
+       périmètre de ce lot.
+       17/08/2026 (Lot C — restructuration Partie) : Focus héroïques
+       déplacés vers l'écran Plat. Galactique (#plateau-galactique-focus-
+       heroiques) — voir js/strategieService.js, renderFocusHeroiques_ ne
+       change que l'id du conteneur qu'elle cible, toujours appelée
+       depuis StrategieService.afficher() (inchangé).
        [Nettoyage Session 9] Cette légende disait encore "lecture seule —
        avancement hors périmètre", obsolète depuis la Session 5 : corrigé. -->
-  <section id="screen-strategie" class="screen" hidden>
-    <h2 class="section-title">Stratégie</h2>
-
+  <section id="screen-focus" class="screen" hidden>
+    <h2 class="section-title">Actions réalisées</h2>
     <div class="bloc-annulation">
       <button id="btn-annuler-action" class="btn btn-secondary" disabled>Annuler la dernière action</button>
       <span class="bloc-annulation-compteur" id="annulation-compteur"></span>
     </div>
-
-    <div class="game-block" id="bloc-ressources">
-      <div class="ressources-liste" id="ressources-principales"></div>
-      <div class="ressources-jetons" id="ressources-jetons"></div>
-      <div class="ressources-gloire" id="ressources-gloire"></div>
-      <div class="ressources-liste ressources-cubes" id="ressources-cubes"></div>
+    <div class="game-block" id="bloc-journal" style="margin-top:14px;">
       <div class="ressources-journal" id="ressources-journal"></div>
     </div>
 
-    <div class="game-block" style="margin-top:18px;">
-      <h3 class="subsection-title">Pistes de Civilisation</h3>
-      <div class="pistes-civilisation-liste" id="pistes-civilisation-liste"></div>
-      <div class="civilisation-actions-globales">
-        <button id="btn-avancer-moins-avancee" class="btn btn-secondary">Avancer la moins avancée</button>
-        <button id="btn-avancer-corrompue" class="btn btn-secondary" disabled>Avancer la piste Corrompue</button>
-      </div>
-    </div>
-
-    <div class="game-block" style="margin-top:18px;">
-      <h3 class="subsection-title">Vos Focus</h3>
+    <h2 class="section-title" style="margin-top:22px;">Listes de focus</h2>
+    <div class="game-block" id="bloc-focus-joueur">
       <div class="card-list" id="strategie-focus-joueur" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 
-    <div class="game-block" style="margin-top:18px;">
-      <h3 class="subsection-title">Focus héroïques — cycle en cours</h3>
-      <div class="card-list" id="strategie-focus-heroiques" style="display:flex;flex-direction:column;gap:10px;"></div>
-    </div>
+    <div class="rappel-ressources-footer" id="focus-rappel-ressources"></div>
   </section>
 
   <!-- Écran Secteurs — tableau minimal, pas encore de plateau visuel -->
@@ -331,7 +457,55 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 13 — 17/08/2026 (Lot 1 — maisons déchues)
+   * Version 17 — 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel)
+   *
+   * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
+   * aucune fonction JS de ce script inline modifiée — voir commentaire
+   * HTML de screen-focus ci-dessus pour le détail (réorganisation DOM +
+   * nouveau conteneur #focus-rappel-ressources, rendu entièrement par
+   * js/strategieService.js v12).
+   *
+   * 17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
+   * restructuration purement DOM, aucune fonction JS de ce script inline
+   * modifiée (afficherEcran reste générique par data-nav, App.ouvrirPartie
+   * appelle toujours StrategieService.afficher(partie) une seule fois,
+   * quel que soit l'écran visible — voir commentaires HTML des sections
+   * screen-plateau-maison / screen-focus ci-dessus pour le détail du
+   * déplacement). Seuls ids renommés : nav-strategie -> nav-focus,
+   * data-nav strategie -> focus, screen-strategie -> screen-focus
+   * (aucune référence ailleurs dans ce fichier ni dans les autres fichiers
+   * du projet, vérifié par recherche globale).
+   *
+   * 17/08/2026 (Lot C — restructuration Partie) : dernier des 3 lots
+   * annoncés — l'écran "Partie" (nav) devient "Plat. Galactique" (id
+   * screen-plateau-galactique, ex screen-game). Contenu : titre "Cycle X"
+   * (#plateau-galactique-cycle), Événement galactique (inchangé, déplacé),
+   * nouvelle section "Technologies avancées" (#technologies-avancees-liste
+   * — voir renderTechnologiesAvancees_ plus bas et gameService.js v9),
+   * Focus héroïques (#plateau-galactique-focus-heroiques, déplacés depuis
+   * l'écran Stratégie — voir strategieService.js v10, seule fonction
+   * modifiée là-bas est le conteneur ciblé), Fin de cycle/entretien/
+   * Terminer la partie/Retour à l'accueil (inchangés, déplacés).
+   * renderEcranGame_ renommée renderEcranPlateauGalactique_ ; carte-joueur
+   * (nom + Difficulté) déménage vers l'écran Mise en place (elle n'avait
+   * plus d'écran d'accueil — hors périmètre signalé, voir en-tête de
+   * screen-mise-en-place). afficherEcran('game') -> afficherEcran(
+   * 'plateau-galactique') à l'ouverture d'une partie (seul changement de
+   * comportement : l'écran de départ reste visuellement le même contenu,
+   * seul son nom/emplacement dans la nav change).
+   *
+   * 17/08/2026 (Lot A/B — restructuration Partie) : l'écran unique
+   * "Partie" éclate en 3 écrans distincts dans la nav — "Mise en place"
+   * (maisons déchues + technologies, ex bloc #liste-adversaires),
+   * "Partie" (allégé : carte-joueur nom/Difficulté, cycle, Événement
+   * galactique, Fin de cycle/entretien — inchangé sinon) et
+   * "Plat. maison" (Technologie de départ en texte fixe + case Améliorée,
+   * Technologies obtenues, Influence). renderEcranGame_ éclatée en 3
+   * fonctions (renderEcranGame_/renderEcranMiseEnPlace_/
+   * renderEcranPlateauMaison_, voir plus bas) — aucune logique de calcul
+   * ni appel GameService modifié, uniquement la répartition du DOM entre
+   * écrans. Voir aussi css/style.css (.champ-technologie-fixe, nouvelle
+   * classe, réutilisée telle quelle par Technologies avancées au Lot C).
    *
    * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
    * portage direct de carteMaisonHTML (app-2.html GAS) sur l'écran Partie —
@@ -452,23 +626,182 @@
       return '<span class="' + classe + '" title="' + titre + '">' + t.nom + '</span>';
     }
 
-    function renderEcranGame_(partie) {
+    /**
+     * 17/08/2026 (Lot C — restructuration Partie) : renommée depuis
+     * renderEcranGame_ (l'écran "Partie" devient "Plat. Galactique") —
+     * carte-joueur (nom + Difficulté) retirée d'ici, déplacée dans
+     * renderEcranMiseEnPlace_ ci-dessous (elle n'avait plus d'écran
+     * d'accueil, voir en-tête de screen-mise-en-place). Ajout du titre
+     * "Cycle X" (#plateau-galactique-cycle, remplace l'ancien paragraphe
+     * "Cycle actuel : #game-cycle-actuel") et de
+     * renderTechnologiesAvancees_ (nouvelle mécanique, voir plus bas).
+     */
+    function renderEcranPlateauGalactique_(partie) {
+      champTexte_('plateau-galactique-cycle', String(partie.cycleActuel));
+      renderEvenementCycle_(partie);
+      renderTechnologiesAvancees_(partie);
+      chargerEntretien_(partie);
+    }
+
+    /**
+     * 17/08/2026 (Lot A — restructuration Partie) : écran "Mise en place" —
+     * portage direct du bloc #liste-adversaires qui vivait dans
+     * renderEcranGame_ jusqu'ici (même logique, mêmes classes/badges),
+     * simplement extrait dans sa propre fonction. Voir en-tête de
+     * screen-mise-en-place (index.html) : rendu une seule fois depuis
+     * App.ouvrirPartie, jamais rafraîchi après coup (contenu figé à la
+     * création de partie).
+     *
+     * 17/08/2026 (Lot C — restructuration Partie) : carte-joueur (nom +
+     * Difficulté) rejoint ici — venait de renderEcranGame_/
+     * renderEcranPlateauGalactique_, retirée de cet écran maintenant que
+     * "Partie" devient "Plat. Galactique" (voir en-tête de
+     * screen-mise-en-place, hors périmètre signalé).
+     *
+     * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du
+     * 17/08) : portage direct de carteMaisonHTML (app-2.html GAS, appel
+     * sans options -> technologies affichées, ni Difficulté ni
+     * Technologie de départ pour les maisons déchues). Remplace
+     * l'affichage réduit au seul nom, qui masquait l'information de jeu
+     * la plus utile de cet écran : quelles technologies ne rapportent
+     * pas d'Influence (badge-sans-point).
+     */
+    function renderEcranMiseEnPlace_(partie) {
+      var joueur = partie.joueur || {};
+      document.getElementById('carte-joueur').innerHTML =
+        '<h3>' + (joueur.nom || '?') + '</h3>' +
+        (joueur.complexite ? '<p>Difficulté : ' + joueur.complexite + '</p>' : '');
+
+      var adversaires = partie.adversaires || [];
+      document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
+        var technologies = (m.technologies || []).map(badgeTechnologie_).join('');
+        return '<div class="card"><h3>' + m.nom + '</h3>' +
+          (technologies ? '<div>' + technologies + '</div>' : '') +
+          '</div>';
+      }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
+    }
+
+    /**
+     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
+     * nouvelle mécanique, aucun équivalent legacy — voir gameService.js
+     * v9 (choisirTechnologieAvancee/definirTechnologieAvanceeAmelioree/
+     * obtenirTechnologiesAvanceesGroupes, seule source de vérité pour le
+     * calcul du groupe actif : cette fonction ne fait qu'afficher ce que
+     * GameService.obtenirTechnologiesAvanceesGroupes lui retourne).
+     * Cycle 1 : 4 <select>, choix parmi les 8 technologies des maisons
+     * déchues (un même nom ne peut occuper 2 emplacements — filtré côté
+     * options, revalidé côté GameService). Cycle 2 : les 4 choisies,
+     * texte fixe + case Améliorée. Cycle 3 : les 4 AUTRES (complément,
+     * jamais choisi manuellement), texte fixe + case Améliorée. Cycle
+     * 'termine' : dernier état (complément), case désactivée.
+     */
+    function renderTechnologiesAvancees_(partie) {
+      var container = document.getElementById('technologies-avancees-liste');
+      if (!container) return;
+      var cycle = partie.cycleActuel;
+      var groupes = GameService.obtenirTechnologiesAvanceesGroupes(partie);
+
+      if (cycle === 1) {
+        container.innerHTML = [0, 1, 2, 3].map(function (slot) {
+          var actuel = groupes.groupeA[slot];
+          var prisAilleurs = groupes.groupeA
+            .filter(function (t, i) { return i !== slot && t; })
+            .map(function (t) { return t.nom; });
+          var options = groupes.toutes.filter(function (t) { return prisAilleurs.indexOf(t.nom) === -1; });
+          var optionsHtml = '<option value="">— Choisir —</option>' + options.map(function (t) {
+            return '<option value="' + t.nom + '"' + (actuel && actuel.nom === t.nom ? ' selected' : '') + '>' +
+              t.nom + ' (' + t.maison + ')</option>';
+          }).join('');
+          return '<div class="techno-obtenue-ligne">' +
+            '<select class="select-technologie-avancee" data-slot="' + slot + '">' + optionsHtml + '</select>' +
+            '</div>';
+        }).join('') +
+          '<p class="hint" style="margin-top:6px;">Choix valable pour toute la partie — pas d\'amélioration possible au cycle 1.</p>';
+
+        Array.prototype.forEach.call(container.querySelectorAll('.select-technologie-avancee'), function (select) {
+          select.onchange = function () {
+            var slot = Number(select.dataset.slot);
+            select.disabled = true;
+            GameService.choisirTechnologieAvancee(partie.id, slot, select.value)
+              .then(function (partieMaj) {
+                partieCourante = partieMaj;
+                renderTechnologiesAvancees_(partieMaj);
+              })
+              .catch(function (erreur) {
+                select.disabled = false;
+                window.alert('Échec du choix de la technologie avancée : ' + erreur.message);
+              });
+          };
+        });
+        return;
+      }
+
+      var groupeAffiche = cycle === 2 ? groupes.groupeA : groupes.groupeB;
+      if (!groupeAffiche.filter(Boolean).length) {
+        container.innerHTML = '<p class="hint">Aucune technologie avancée disponible' +
+          (cycle === 3 ? ' (complète les 4 choix du cycle 1 pour les voir apparaître ici).' : '.') + '</p>';
+        return;
+      }
+
+      container.innerHTML = groupeAffiche.map(function (t) {
+        if (!t) return '<div class="techno-obtenue-ligne"><span class="champ-technologie-fixe hint">— non choisi —</span></div>';
+        var amelioree = !!(partie.technologiesAvanceesAmeliorees || {})[t.nom];
+        return '<div class="techno-obtenue-ligne">' +
+          '<span class="champ-technologie-fixe">' + t.nom + ' (' + t.maison + ')</span>' +
+          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-avancee" data-nom="' + t.nom + '"' +
+          (amelioree ? ' checked' : '') + (cycle === 'termine' ? ' disabled' : '') + '> Améliorée</label>' +
+          '</div>';
+      }).join('');
+
+      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-avancee'), function (cb) {
+        cb.onchange = function () {
+          var nom = cb.dataset.nom;
+          var etatDemande = cb.checked;
+          cb.disabled = true;
+          GameService.definirTechnologieAvanceeAmelioree(partie.id, nom, etatDemande)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              cb.disabled = false;
+            })
+            .catch(function (erreur) {
+              cb.checked = !etatDemande;
+              cb.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        };
+      });
+    }
+
+    /**
+     * 17/08/2026 (Lot B — restructuration Partie) : écran "Plat. maison" —
+     * portage direct des blocs Technologie de départ (+ case Améliorée)
+     * et Influence qui vivaient dans le innerHTML de #carte-joueur
+     * (renderEcranGame_) jusqu'ici, aucun changement de logique/
+     * persistance (même appel GameService.definirTechnologieAmelioree).
+     * Seule différence : #check-amelioree-depart est désormais un élément
+     * STATIQUE du DOM (index.html), plus régénéré à chaque rendu comme
+     * avant (il vivait dans un innerHTML recalculé) — d'où le passage de
+     * addEventListener à .onchange (idempotent d'un appel à l'autre,
+     * jamais de listener dupliqué), même pattern que
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
+     */
+    function renderEcranPlateauMaison_(partie) {
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
       var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
-      document.getElementById('carte-joueur').innerHTML =
-        '<h3>' + (joueur.nom || '?') + '</h3>' +
-        (joueur.complexite ? '<p>Difficulté : ' + joueur.complexite + '</p>' : '') +
-        '<p class="hint" style="margin:6px 0 0;">Technologie de départ : ' + (techDepart.nom || '—') +
-        (techDepart.type ? ' <span class="hint-inline">(' + techDepart.type + ')</span>' : '') + '</p>' +
-        (techDepart.nom ? '<label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"' +
-          (techDepart.amelioree ? ' checked' : '') + '> Technologie améliorée</label>' : '') +
+
+      champTexte_('technologie-depart-plateau-maison', techDepart.nom ?
+        techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—');
+
+      document.getElementById('plateau-influence-bloc').innerHTML =
         '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
         '<span class="ressource-case-valeur">' + influence + '</span></div>';
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
-        checkboxDepart.addEventListener('change', function () {
+        checkboxDepart.checked = !!techDepart.amelioree;
+        checkboxDepart.disabled = !techDepart.nom;
+        checkboxDepart.onchange = function () {
           var etatDemande = checkboxDepart.checked;
           checkboxDepart.disabled = true;
           GameService.definirTechnologieAmelioree(partie.id, 'depart', etatDemande)
@@ -481,28 +814,10 @@
               checkboxDepart.disabled = false;
               window.alert('Échec de l\'enregistrement : ' + erreur.message);
             });
-        });
+        };
       }
 
-      // 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du
-      // 17/08) : portage direct de carteMaisonHTML (app-2.html GAS, appel
-      // sans options -> technologies affichées, ni Difficulté ni
-      // Technologie de départ pour les maisons déchues). Remplace
-      // l'affichage réduit au seul nom, qui masquait l'information de jeu
-      // la plus utile de cet écran : quelles technologies ne rapportent
-      // pas d'Influence (badge-sans-point).
-      var adversaires = partie.adversaires || [];
-      document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
-        var technologies = (m.technologies || []).map(badgeTechnologie_).join('');
-        return '<div class="card"><h3>' + m.nom + '</h3>' +
-          (technologies ? '<div>' + technologies + '</div>' : '') +
-          '</div>';
-      }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
-
-      champTexte_('game-cycle-actuel', String(partie.cycleActuel));
-      renderEvenementCycle_(partie);
       renderTechnologiesObtenues_(partie);
-      chargerEntretien_(partie);
     }
 
     /**
@@ -867,16 +1182,18 @@
 
     /**
      * Point d'entrée commun : ouvre une partie (nouvelle ou existante),
-     * affiche la nav, rend les 3 écrans, bascule sur "Partie".
+     * affiche la nav, rend les 4 écrans, bascule sur "Plat. Galactique".
      */
     function ouvrirPartie(partie) {
       partieCourante = partie;
       document.getElementById('barre-navigation-partie').hidden = false;
-      renderEcranGame_(partie);
+      renderEcranMiseEnPlace_(partie);
+      renderEcranPlateauGalactique_(partie);
+      renderEcranPlateauMaison_(partie);
       renderEcranSecteurs_(partie);
       if (typeof StrategieService !== 'undefined') StrategieService.afficher(partie);
       if (typeof CombatVueService !== 'undefined') CombatVueService.afficher(partie);
-      afficherEcran('game');
+      afficherEcran('plateau-galactique');
     }
 
     // Nom conservé pour setupService.js (aucune modification de ce
@@ -981,7 +1298,8 @@
             document.getElementById('btn-terminer-partie').click();
             return;
           }
-          renderEcranGame_(partieMaj);
+          renderEcranPlateauGalactique_(partieMaj);
+          renderEcranPlateauMaison_(partieMaj);
           renderEcranSecteurs_(partieMaj);
           if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
         })
