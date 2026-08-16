@@ -15,6 +15,43 @@
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
  *
+ * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+ * incrémenté suite au branchement du moteur porté en Session 12 sur
+ * l'IHM : bouton "Fin du cycle" + Technologies obtenues + Entretien
+ * (écran Partie), Focus héroïques sélectionnables (écran Stratégie,
+ * js/strategieService.js v4), formulaires Construire/Rappeler un cube +
+ * Retirer corruption (écran Secteurs). index.html (v12), css/style.css
+ * (v7). Envahir/Regrouper/Déployer des cubes restent hors périmètre
+ * (formulaire multi-unités plus complexe, prochaine session). Fichiers
+ * modifiés, chemins déjà en cache, aucune nouvelle entrée.
+ *
+ * 17/08/2026 (Session 12 — SQL RPC récupéré) : incrémenté suite au
+ * portage complet du moteur secteurs/cycle, débloqué par le SQL des RPC
+ * (rpc.json, fourni par l'utilisateur) : avancerCycle,
+ * choisirFocusHeroique, choisirTechnologieObtenue (js/gameService.js v7)
+ * + construire/deployerCube/rappelerCube/retirerCorruption/regrouper/
+ * envahirResoudre/obtenirSecteursEligiblesConstruction/getEntretien
+ * (js/secteurService.js v2). 36 tests fumée au total sur ces deux
+ * fichiers (node --test). Pas encore branché sur l'IHM (formulaires
+ * Construire/Envahir/Regrouper, bouton "Fin du cycle") — prochaine
+ * session. Fichiers modifiés, chemins déjà en cache, aucune nouvelle
+ * entrée.
+ *
+ * 17/08/2026 (Session 12 — restauration IHM Partie) : incrémenté suite au
+ * portage de definirTechnologieAmelioree/choisirEvenement/
+ * getEvenementsParCycle (js/gameService.js v6, ni l'une ni l'autre n'est
+ * une RPC Postgres) et à leur branchement sur l'écran Partie (case
+ * "Technologie de départ améliorée", sélection d'Événement galactique par
+ * cycle) : index.html (v11), css/style.css (v6). Fichiers modifiés,
+ * chemins déjà en cache, aucune nouvelle entrée.
+ *
+ * 17/08/2026 (Session 11 — restauration IHM Secteurs) : incrémenté suite à
+ * la restauration de l'écran Secteurs (colonnes Guildes/Installations/
+ * Flotte/Gardiens, portage direct de secteurs.html GAS) et au passage de
+ * la nav Partie/Stratégie/Secteurs/Combat en scroll horizontal (4 boutons
+ * ne tenaient plus sur smartphone). Fichiers modifiés (chemins déjà en
+ * cache, aucune nouvelle entrée) : index.html (v10), css/style.css (v5).
+ *
  * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : incrémenté
  * suite à la restauration de blocs d'affichage perdus lors du portage
  * initial de l'écran Stratégie (Session 4) : Influence déménagée vers
@@ -93,4 +130,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.12';
+var APP_VERSION = '20260817.15';

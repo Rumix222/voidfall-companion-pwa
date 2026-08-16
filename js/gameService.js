@@ -1,7 +1,29 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 5 — 17/08/2026
+ * Version 7 — 17/08/2026 (Session 12 — SQL RPC récupéré)
+ *
+ * 17/08/2026 (Session 12) : ajout de avancerCycle, choisirFocusHeroique et
+ * choisirTechnologieObtenue — portage ligne à ligne des RPC Postgres
+ * correspondantes (avancer_cycle, choisir_focus_heroique,
+ * choisir_technologie_obtenue), dont le SQL a été fourni par
+ * l'utilisateur (rpc.json). Ces 3 fonctions étaient jusqu'ici hors
+ * périmètre faute de code source. Correctif inclus : cycleActuel (champ
+ * dérivé, jamais stocké) doit être recalculé après mutation de
+ * cycleNum/cycleTermine dans avancerCycle — repéré par le test fumée
+ * dédié (gameService_cycle_focus_technologie.test.js, 12 cas). Voir aussi
+ * secteurService.js (v2, même session — les 8 actions secteur).
+ *
+ * 17/08/2026 (Session 11) : ajout de getEvenementsParCycle, choisirEvenement
+ * et definirTechnologieAmelioree — portage direct de leurs équivalents
+ * GameService.js (GAS). Ni l'une ni l'autre n'est une RPC Postgres
+ * (contrairement à avancerCycle/choisirFocusHeroique/
+ * choisirTechnologieObtenue/secteur_*, qui restent hors périmètre faute de
+ * code SQL récupéré) : ce sont de simples lectures/écritures JS, déjà
+ * visibles dans le code legacy fourni, donc portables sans attendre
+ * l'extraction SQL en cours. Voir aussi index.html (écran Partie —
+ * sélection d'événement galactique par cycle, case "Technologie de départ
+ * améliorée").
  *
  * 17/08/2026 (Session 5, Phase 5 — Civilisation) : ajout de
  * majCivilisation(partieId, champs) — seul changement de cette version.
@@ -217,6 +239,23 @@ var GameService = (function () {
     if (!nom) return null;
     var t = (technologies || []).filter(function (x) { return x.nom === nom; })[0];
     return t ? t.type : null;
+  }
+
+  /**
+   * 17/08/2026 (Session 12 — restauration IHM Partie) : formate un
+   * événement galactique — portage direct de formatEvenement_
+   * (GameService.js GAS), adapté aux clés camelCase du store IndexedDB
+   * `evenements` (CatalogueSync convertit systématiquement les colonnes
+   * Supabase snake_case en camelCase — voir catalogueSync.js — alors que
+   * la version GAS lisait directement des en-têtes Google Sheets tels
+   * quels : e['Nom']/e['Cycle']/e['Texte1']/e['Texte2']).
+   */
+  function formatEvenement_(e) {
+    return {
+      nom: e.nom,
+      cycle: e.cycle,
+      texte: [e.texte1, e.texte2].filter(Boolean).join(' ')
+    };
   }
 
   // ------------------------------------------------------------
@@ -706,6 +745,238 @@ var GameService = (function () {
         if (!ligne) throw new Error('Plateau maison introuvable pour mise à jour (partie ' + partieId + ').');
         Object.keys(filtre).forEach(function (cle) { ligne[cle] = filtre[cle]; });
         return DB.put('plateauMaison', ligne);
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — restauration IHM Partie) : liste des
+     * événements galactiques du catalogue, groupés par cycle (1/2/3) —
+     * portage direct de GameService.getEvenementsParCycle (GAS, fonction
+     * JS pure lisant DataService.getEvenements(), jamais une RPC). Utilisé
+     * pour peupler les menus déroulants de choix d'événement (voir
+     * index.html, écran Partie).
+     */
+    getEvenementsParCycle: function () {
+      return DB.getAll('evenements').then(function (lignes) {
+        var evenements = lignes.map(formatEvenement_);
+        return {
+          cycle1: evenements.filter(function (e) { return String(e.cycle) === '1'; }),
+          cycle2: evenements.filter(function (e) { return String(e.cycle) === '2'; }),
+          cycle3: evenements.filter(function (e) { return String(e.cycle) === '3'; })
+        };
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — restauration IHM Partie) : enregistre le
+     * choix d'un événement galactique pour un cycle donné (1, 2 ou 3) —
+     * portage direct de GameService.choisirEvenement (GAS, fonction JS
+     * pure : recherche l'événement dans le catalogue local + réécrit
+     * partie.evenements.cycleN — jamais une RPC, contrairement à la
+     * plupart des autres actions de l'écran Partie). partie.evenements vit
+     * dans etatJson (pas de colonne dédiée, comme côté GAS) — sauvegarde
+     * via sauvegarderPartie (lecture-fusion-écriture implicite : on relit
+     * la partie complète juste avant de la réécrire).
+     */
+    choisirEvenement: function (partieId, cycle, nomEvenement) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId), DB.getAll('evenements')])
+        .then(function (resultats) {
+          var partie = assemblerPartie_(resultats[0], resultats[1]);
+          if (!partie) throw new Error('Partie introuvable.');
+          var evenement = resultats[2].map(formatEvenement_).filter(function (e) {
+            return e.nom === nomEvenement && String(e.cycle) === String(cycle);
+          })[0];
+          if (!evenement) throw new Error('Événement introuvable pour ce cycle.');
+          partie.evenements = partie.evenements || { cycle1: null, cycle2: null, cycle3: null };
+          partie.evenements['cycle' + cycle] = evenement;
+          return GameService.sauvegarderPartie(partie, 'choix_evenement_cycle' + cycle, nomEvenement);
+        });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — restauration IHM Partie) : marque une
+     * technologie possédée (départ, cible='depart' ; ou l'un des 6
+     * emplacements obtenus, cible=index 0-5) comme améliorée ou non —
+     * portage direct de GameService.definirTechnologieAmelioree (GAS,
+     * PATCH JS direct sur plateau_maison, jamais une RPC). Écrit
+     * directement sur le record `plateauMaison` (et non via
+     * majPlateauMaison, qui exclut volontairement technologieDepart et
+     * technologiesObtenues — "leurs propres fonctions dédiées", voir
+     * commentaire de CHAMPS_PLATEAU_MAISON_AUTORISES).
+     *
+     * [Nettoyage Session 12] choisirTechnologieObtenue EST portée depuis
+     * cette session (voir ci-dessous) — ce commentaire disait le
+     * contraire (rédigé avant, quand le SQL de la RPC n'était pas encore
+     * récupéré) : corrigé, aucune conséquence fonctionnelle.
+     */
+    definirTechnologieAmelioree: function (partieId, cible, amelioree) {
+      amelioree = !!amelioree;
+      return DB.get('plateauMaison', partieId).then(function (ligne) {
+        if (!ligne) throw new Error('Plateau maison introuvable pour mise à jour (partie ' + partieId + ').');
+
+        if (cible === 'depart') {
+          ligne.technologieDepartAmelioree = amelioree;
+          return DB.put('plateauMaison', ligne);
+        }
+
+        var slot = Number(cible);
+        if (slot < 0 || slot > 5) throw new Error('Emplacement de technologie invalide.');
+        var technologiesObtenues = ligne.technologiesObtenues || [null, null, null, null, null, null];
+        if (!technologiesObtenues[slot]) throw new Error('Aucune technologie à cet emplacement.');
+        technologiesObtenues[slot] = Object.assign({}, technologiesObtenues[slot], { amelioree: amelioree });
+        ligne.technologiesObtenues = technologiesObtenues;
+        return DB.put('plateauMaison', ligne);
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+          return assemblerPartie_(resultats[0], resultats[1]);
+        });
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — SQL RPC récupéré) : fait avancer la partie
+     * au cycle suivant (1 -> 2 -> 3 -> 'termine') — portage direct de la
+     * RPC avancer_cycle (rpc.json). cycleActuel n'est jamais stocké tel
+     * quel côté PWA (calculé à la lecture, voir assemblerPartie_) : seule
+     * la partie utile de la RPC compte ici — incrément de cycleNum/
+     * cycleTermine + amorçage de focusHeroiques/focusHeroiquesPioches
+     * pour le nouveau cycle si absents.
+     */
+    avancerCycle: function (partieId) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var partie = assemblerPartie_(resultats[0], resultats[1]);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        if (partie.cycleTermine || partie.cycleNum >= 3) {
+          partie.cycleTermine = true;
+          partie.cycleActuel = 'termine';
+        } else {
+          partie.cycleNum = partie.cycleNum + 1;
+          partie.cycleTermine = false;
+          partie.cycleActuel = partie.cycleNum;
+
+          if (!partie.focusHeroiques) {
+            partie.focusHeroiques = { cycle1: [null, null, null], cycle2: [null, null, null], cycle3: [null, null, null] };
+          }
+          var cle = 'cycle' + partie.cycleNum;
+          if (!partie.focusHeroiques[cle]) partie.focusHeroiques[cle] = [null, null, null];
+          if (!partie.focusHeroiquesPioches) partie.focusHeroiquesPioches = [];
+        }
+
+        return GameService.sauvegarderPartie(partie, 'avancer_cycle', 'cycle suivant');
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — SQL RPC récupéré) : enregistre (ou retire,
+     * si nom est vide) le Focus héroïque choisi manuellement pour un
+     * emplacement (0/1/2) d'un cycle donné — portage direct de la RPC
+     * choisir_focus_heroique (rpc.json). Un même Focus héroïque ne peut
+     * être choisi qu'une fois par partie, tous cycles confondus
+     * (focusHeroiquesPioches) ; remplacer un emplacement déjà occupé
+     * libère l'ancien choix. Construction de la carte (regroupement des
+     * 2-3 actions du catalogue "focus") déléguée à
+     * FocusService.obtenirCarteHeroiqueParNom, déjà porté et testé
+     * (Session 4, focusService.js) — la RPC faisait exactement la même
+     * chose (boucle sur la table focus filtrée type='Héroïque').
+     *
+     * ⚠️ Contrairement à avancerCycle/choisirTechnologieObtenue, la RPC
+     * d'origine n'écrit PAS d'entrée d'historique pour cette action
+     * (supabaseRpc_ simple côté DataService.js GAS, pas
+     * supabaseRpcEtHistorique_) — reproduit ici à l'identique (écriture
+     * directe dans `parties`, sans ajouterHistorique_).
+     */
+    choisirFocusHeroique: function (partieId, cycle, slot, nom) {
+      slot = Number(slot);
+      if (slot < 0 || slot > 2) return Promise.reject(new Error('Emplacement de Focus héroïque invalide.'));
+
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var partie = assemblerPartie_(resultats[0], resultats[1]);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        if (!partie.focusHeroiques) {
+          partie.focusHeroiques = { cycle1: [null, null, null], cycle2: [null, null, null], cycle3: [null, null, null] };
+        }
+        var cle = 'cycle' + cycle;
+        if (!partie.focusHeroiques[cle]) partie.focusHeroiques[cle] = [null, null, null];
+
+        var pioches = (partie.focusHeroiquesPioches || []).slice();
+        var ancienne = partie.focusHeroiques[cle][slot];
+        if (ancienne) {
+          var idxAncienne = pioches.indexOf(ancienne.focus);
+          if (idxAncienne !== -1) pioches.splice(idxAncienne, 1);
+        }
+
+        var suite;
+        if (!nom) {
+          partie.focusHeroiques[cle][slot] = null;
+          suite = Promise.resolve();
+        } else {
+          if (pioches.indexOf(nom) !== -1) {
+            return Promise.reject(new Error('"' + nom + '" a déjà été choisi ce cycle ou lors d\'un cycle précédent.'));
+          }
+          suite = FocusService.obtenirCarteHeroiqueParNom(nom).then(function (carte) {
+            partie.focusHeroiques[cle][slot] = carte;
+            pioches.push(nom);
+          });
+        }
+
+        return suite.then(function () {
+          partie.focusHeroiquesPioches = pioches;
+          var enregistrementPartie = {
+            id: partie.id,
+            dateCreation: partie.dateCreation,
+            archivee: !!partie.archivee,
+            scenarioId: partie.scenarioId || null,
+            cycleNum: partie.cycleNum || 1,
+            cycleTermine: !!partie.cycleTermine,
+            statut: partie.cycleTermine ? 'terminee' : 'en_cours',
+            etatJson: pourEtatJson_(partie)
+          };
+          return DB.put('parties', enregistrementPartie).then(function () { return partie; });
+        });
+      });
+    },
+
+    /**
+     * 17/08/2026 (Session 12 — SQL RPC récupéré) : enregistre (ou retire,
+     * si nomTechnologie est vide) la technologie obtenue dans l'un des 6
+     * emplacements du plateau maison, parmi les technologies des maisons
+     * déchues (partie.adversaires) — portage direct de la RPC
+     * choisir_technologie_obtenue (rpc.json).
+     */
+    choisirTechnologieObtenue: function (partieId, slot, nomTechnologie) {
+      slot = Number(slot);
+      if (slot < 0 || slot > 5) return Promise.reject(new Error('Emplacement de technologie invalide.'));
+
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var partie = assemblerPartie_(resultats[0], resultats[1]);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var technologies = (partie.technologiesObtenues || [null, null, null, null, null, null]).slice();
+
+        if (!nomTechnologie) {
+          technologies[slot] = null;
+        } else {
+          var trouvee = null;
+          (partie.adversaires || []).forEach(function (maison) {
+            (maison.technologies || []).forEach(function (t) {
+              if (t.nom === nomTechnologie) {
+                trouvee = { nom: t.nom, type: t.type || '', sansPoint: !!t.sansPoint, maison: maison.nom };
+              }
+            });
+          });
+          if (!trouvee) throw new Error('Technologie introuvable parmi les maisons déchues.');
+          technologies[slot] = trouvee;
+        }
+
+        return GameService.majPlateauMaison(partieId, { technologiesObtenues: technologies }).then(function () {
+          return ajouterHistorique_(partieId, 'technologie_obtenue_slot' + slot, nomTechnologie || '(retirée)');
+        }).then(function () {
+          return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+            return assemblerPartie_(r2[0], r2[1]);
+          });
+        });
       });
     }
   };

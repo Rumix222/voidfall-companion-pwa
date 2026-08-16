@@ -119,6 +119,25 @@
 
     <p class="hint" style="margin-top:18px;">Cycle actuel : <span id="game-cycle-actuel">—</span></p>
 
+    <!-- 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
+         l'événement galactique du cycle en cours — choisirEvenement porté
+         (fonction JS pure côté GAS, jamais une RPC), voir gameService.js. -->
+    <div class="game-block" id="bloc-evenement-cycle" style="margin-top:14px;" hidden>
+      <h3 class="subsection-title">Événement galactique — cycle <span id="evenement-cycle-numero">—</span></h3>
+      <select id="select-evenement-cycle">
+        <option value="">— Choisir —</option>
+      </select>
+      <p class="hint" id="evenement-cycle-texte" style="margin-top:8px;"></p>
+    </div>
+
+    <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:14px;">
+      <h3 class="subsection-title">Technologies obtenues</h3>
+      <div id="technologies-obtenues-liste"></div>
+    </div>
+
+    <button id="btn-fin-cycle" class="btn btn-primary" style="width:100%;margin-top:14px;">Fin du cycle</button>
+    <p class="hint" id="entretien-secteurs" style="margin-top:8px;"></p>
+
     <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Terminer la partie</button>
     <button id="btn-retour-accueil-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Retour à l'accueil</button>
   </section>
@@ -198,7 +217,6 @@
 
     <div class="game-block" style="margin-top:18px;">
       <h3 class="subsection-title">Focus héroïques — cycle en cours</h3>
-      <p class="hint">Le choix manuel des Focus héroïques n'est pas encore automatisé côté PWA (affichage seul).</p>
       <div class="card-list" id="strategie-focus-heroiques" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
   </section>
@@ -207,6 +225,30 @@
   <section id="screen-secteurs" class="screen" hidden>
     <h2 class="section-title">Plateau des secteurs</h2>
     <div class="game-block" style="overflow-x:auto;" id="secteurs-conteneur"></div>
+
+    <!-- 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+         Construire/Rappeler un cube désormais possibles (SecteurService.
+         construire/rappelerCube portés). Envahir/Regrouper/Déployer des
+         cubes restent hors périmètre de cette session (engagement
+         multi-unités, formulaire plus complexe) — voir résumé de fin de
+         session. -->
+    <div class="game-block" id="bloc-construire" style="margin-top:14px;">
+      <h3 class="subsection-title">Construire</h3>
+      <select id="construire-categorie">
+        <option value="installation">Installation</option>
+        <option value="guilde">Guilde</option>
+      </select>
+      <select id="construire-secteur" style="margin-top:8px;"></select>
+      <select id="construire-type" style="margin-top:8px;"></select>
+      <button id="btn-construire" class="btn btn-primary" style="width:100%;margin-top:10px;">Construire</button>
+    </div>
+
+    <div class="game-block" id="bloc-rappeler-cube" style="margin-top:14px;">
+      <h3 class="subsection-title">Rappeler un cube</h3>
+      <select id="rappel-secteur"></select>
+      <select id="rappel-type" style="margin-top:8px;"></select>
+      <button id="btn-rappeler-cube" class="btn btn-secondary" style="width:100%;margin-top:10px;">Rappeler</button>
+    </div>
   </section>
 
   <!-- Écran Combat : calculateur Envahir/Escarmouche (voir combatService.js
@@ -289,7 +331,37 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 9 — 17/08/2026
+   * Version 12 — 17/08/2026
+   *
+   * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+   * écran Partie — bouton "Fin du cycle" (GameService.avancerCycle +
+   * purge de la pile d'annulation), bloc Entretien dû (informatif,
+   * SecteurService.getEntretien), 6 sélecteurs Technologies obtenues
+   * (GameService.choisirTechnologieObtenue). Écran Secteurs — colonne
+   * Action "Retirer" la corruption + formulaires Construire/Rappeler un
+   * cube. Envahir/Regrouper/Déployer des cubes restent hors périmètre de
+   * cette session (engagement multi-unités, formulaire plus complexe).
+   * Voir aussi js/strategieService.js (Focus héroïques sélectionnables).
+   *
+   * 17/08/2026 (Session 12 — restauration IHM Partie) : case "Technologie
+   * de départ améliorée" (checkbox, branchée sur
+   * GameService.definirTechnologieAmelioree) + bloc sélection de
+   * l'Événement galactique du cycle en cours (select, branché sur
+   * GameService.getEvenementsParCycle/choisirEvenement) ajoutés à l'écran
+   * Partie — portage direct de app-2.html (GAS), aucune des deux
+   * fonctions n'étant une RPC Postgres (contrairement au reste de l'écran
+   * Partie, toujours hors périmètre — voir gameService.js). Voir aussi
+   * css/style.css (.check-amelioree).
+   *
+   * 17/08/2026 (Session 11 — restauration IHM Secteurs) :
+   * renderEcranSecteurs_ restauré à l'identique de secteurs.html (GAS) —
+   * colonnes N°/Pop./Guildes/Installations/Flotte/Gardiens (portage direct
+   * de ligneHTML_/listeNonNulle_), ligne colorée si Corrompu, Néant inclus
+   * dans la colonne Flotte. Colonne "Type" (Secteur-Mère/Déchue/Avant-
+   * poste) et total PN agrégé (introduits au portage initial, absents du
+   * legacy) supprimés — SecteurService.obtenirSecteurMere n'est donc plus
+   * appelé ici (reste disponible dans l'API publique de secteurService.js,
+   * aucun autre appelant). Voir aussi css/style.css (nav scrollable).
    *
    * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : Influence
    * déménagée de l'écran Stratégie vers l'écran Partie (bloc
@@ -369,8 +441,28 @@
         '<div style="font-weight:600;font-size:1.1rem;">' + (joueur.nom || '?') + '</div>' +
         '<p class="hint" style="margin:6px 0 0;">Technologie de départ : ' + (techDepart.nom || '—') +
         (techDepart.type ? ' <span class="hint-inline">(' + techDepart.type + ')</span>' : '') + '</p>' +
+        (techDepart.nom ? '<label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"' +
+          (techDepart.amelioree ? ' checked' : '') + '> Technologie améliorée</label>' : '') +
         '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
         '<span class="ressource-case-valeur">' + influence + '</span></div>';
+
+      var checkboxDepart = document.getElementById('check-amelioree-depart');
+      if (checkboxDepart) {
+        checkboxDepart.addEventListener('change', function () {
+          var etatDemande = checkboxDepart.checked;
+          checkboxDepart.disabled = true;
+          GameService.definirTechnologieAmelioree(partie.id, 'depart', etatDemande)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              checkboxDepart.disabled = false;
+            })
+            .catch(function (erreur) {
+              checkboxDepart.checked = !etatDemande;
+              checkboxDepart.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        });
+      }
 
       var adversaires = partie.adversaires || [];
       document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
@@ -378,40 +470,369 @@
       }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
 
       champTexte_('game-cycle-actuel', String(partie.cycleActuel));
+      renderEvenementCycle_(partie);
+      renderTechnologiesObtenues_(partie);
+      chargerEntretien_(partie);
+    }
+
+    /**
+     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+     * 6 emplacements de technologies obtenues (parmi les 8 des maisons
+     * déchues), chacun avec sa case "Améliorée" — portage direct de
+     * initTechnologiesObtenues (app-2.html GAS). Un même nom de
+     * technologie ne peut apparaître qu'à un seul emplacement à la fois
+     * (retiré des options des 5 autres selects dès qu'il est choisi
+     * quelque part).
+     */
+    function renderTechnologiesObtenues_(partie) {
+      var container = document.getElementById('technologies-obtenues-liste');
+      if (!container) return;
+
+      var toutesLesTechs = [];
+      (partie.adversaires || []).forEach(function (m) {
+        (m.technologies || []).forEach(function (t) { toutesLesTechs.push(t); });
+      });
+      var obtenues = partie.technologiesObtenues || [null, null, null, null, null, null];
+
+      container.innerHTML = obtenues.map(function (tech, slot) {
+        var nomsPrisAilleurs = obtenues
+          .filter(function (_, i) { return i !== slot; })
+          .map(function (t) { return t ? t.nom : null; });
+        var optionsDisponibles = toutesLesTechs.filter(function (t) { return nomsPrisAilleurs.indexOf(t.nom) === -1; });
+        var options = '<option value="">— Aucune —</option>' + optionsDisponibles.map(function (t) {
+          return '<option value="' + t.nom + '"' + (tech && tech.nom === t.nom ? ' selected' : '') + '>' + t.nom +
+            (t.maison ? ' (' + t.maison + ')' : '') + '</option>';
+        }).join('');
+        return '<div class="techno-obtenue-ligne">' +
+          '<select class="select-technologie-obtenue" data-slot="' + slot + '">' + options + '</select>' +
+          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
+          (tech && tech.amelioree ? ' checked' : '') + (tech ? '' : ' disabled') + '> Améliorée</label>' +
+          '</div>';
+      }).join('');
+
+      Array.prototype.forEach.call(container.querySelectorAll('.select-technologie-obtenue'), function (select) {
+        select.addEventListener('change', function () {
+          var slot = Number(select.dataset.slot);
+          select.disabled = true;
+          GameService.choisirTechnologieObtenue(partie.id, slot, select.value)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              renderTechnologiesObtenues_(partieMaj);
+            })
+            .catch(function (erreur) {
+              select.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        });
+      });
+
+      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-obtenue'), function (cb) {
+        cb.addEventListener('change', function () {
+          var slot = Number(cb.dataset.slot);
+          var etatDemande = cb.checked;
+          cb.disabled = true;
+          GameService.definirTechnologieAmelioree(partie.id, slot, etatDemande)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              cb.disabled = false;
+            })
+            .catch(function (erreur) {
+              cb.checked = !etatDemande;
+              cb.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        });
+      });
+    }
+
+    /**
+     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+     * entretien dû (dernier emplacement Installation/Guilde occupé sur le
+     * plateau des secteurs) — portage direct de chargerEntretien_
+     * (app-2.html GAS), purement informatif : rien n'est déduit
+     * automatiquement des ressources.
+     */
+    function chargerEntretien_(partie) {
+      var el = document.getElementById('entretien-secteurs');
+      if (!el) return;
+      SecteurService.getEntretien(partie.id).then(function (unites) {
+        el.textContent = unites
+          ? 'Entretien dû : ' + unites + ' unité(s) — par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.'
+          : 'Entretien dû : aucun.';
+      }).catch(function () {
+        el.textContent = '';
+      });
+    }
+
+    /**
+     * 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
+     * l'événement galactique du cycle en cours — portage direct de
+     * renderCycleActuel (app-2.html GAS), simplifié (pas de gestion de
+     * pool de tirage aléatoire ici, cette partie reste hors périmètre —
+     * seul le choix manuel d'un événement est branché). Masqué si la
+     * partie est terminée (cycleActuel === 'termine').
+     */
+    function renderEvenementCycle_(partie) {
+      var bloc = document.getElementById('bloc-evenement-cycle');
+      var cycle = partie.cycleActuel;
+      if (!cycle || cycle === 'termine') { bloc.hidden = true; return; }
+      bloc.hidden = false;
+      champTexte_('evenement-cycle-numero', String(cycle));
+
+      var select = document.getElementById('select-evenement-cycle');
+      var texte = document.getElementById('evenement-cycle-texte');
+      var evenementActuel = (partie.evenements || {})['cycle' + cycle] || null;
+      texte.textContent = evenementActuel ? evenementActuel.texte : '';
+
+      GameService.getEvenementsParCycle().then(function (groupes) {
+        var options = groupes['cycle' + cycle] || [];
+        select.innerHTML = '<option value="">— Choisir —</option>' +
+          options.map(function (e) {
+            var choisi = evenementActuel && evenementActuel.nom === e.nom;
+            return '<option value="' + e.nom + '"' + (choisi ? ' selected' : '') + '>' + e.nom + '</option>';
+          }).join('');
+
+        select.onchange = function () {
+          if (!select.value) return;
+          select.disabled = true;
+          GameService.choisirEvenement(partie.id, cycle, select.value)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              select.disabled = false;
+              texte.textContent = ((partieMaj.evenements || {})['cycle' + cycle] || {}).texte || '';
+            })
+            .catch(function (erreur) {
+              select.disabled = false;
+              window.alert('Échec du choix de l\'événement : ' + erreur.message);
+            });
+        };
+      }).catch(function () {
+        select.innerHTML = '<option value="">Erreur de chargement</option>';
+      });
+    }
+
+    // Portage direct de secteurs.html (GAS) — labels bruts -> texte lisible,
+    // n'affiche que les valeurs non nulles (gain de place sur smartphone).
+    var LABEL_GUILDE = {
+      guildeFermiers: 'Fermiers', guildeIngenieurs: 'Ingénieurs', guildeMineurs: 'Mineurs',
+      guildeBanquiers: 'Banquiers', guildeScientifiques: 'Scientifiques'
+    };
+    var LABEL_INSTALLATION = {
+      installationChantierNaval: 'Chantier Naval', installationDefenseSecteur: 'Défense Secteur',
+      installationBaseStellaire: 'Base Stellaire'
+    };
+    var LABEL_PN = {
+      pnCorvette: 'Corvette', pnSentinelle: 'Sentinelle', pnDestroyer: 'Destroyer',
+      pnCuirasse: 'Cuirassé', pnPorteVaisseau: 'Porte-Vaisseau'
+    };
+
+    function listeNonNulle_(secteur, dico) {
+      return Object.keys(dico)
+        .filter(function (cle) { return secteur[cle] > 0; })
+        .map(function (cle) { return (secteur[cle] > 1 ? secteur[cle] + '× ' : '') + dico[cle]; })
+        .join(', ');
+    }
+
+    function ligneSecteurHTML_(secteur) {
+      var guildes = listeNonNulle_(secteur, LABEL_GUILDE) || '—';
+      var installations = listeNonNulle_(secteur, LABEL_INSTALLATION) || '—';
+      var flotte = listeNonNulle_(secteur, LABEL_PN);
+      if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Corvette (Néant)';
+      flotte = flotte || '—';
+      var action = secteur.corrompu
+        ? '<button type="button" class="btn btn-secondary btn-retirer-corruption" data-numero="' + secteur.numero + '" style="font-size:0.72rem;padding:4px 8px;">Retirer</button>'
+        : '—';
+
+      return '<tr' + (secteur.corrompu ? ' class="ligne-corrompue"' : '') + '>' +
+        '<td>' + secteur.numero + '</td>' +
+        '<td>' + (secteur.population === null ? '?' : secteur.population) + '</td>' +
+        '<td>' + guildes + '</td>' +
+        '<td>' + installations + '</td>' +
+        '<td>' + flotte + '</td>' +
+        '<td>' + (secteur.nombreGardien || 0) + '</td>' +
+        '<td>' + action + '</td>' +
+        '</tr>';
+    }
+
+    var TYPES_INSTALLATION = [
+      { valeur: 'chantier_naval', label: 'Chantier Naval' },
+      { valeur: 'defense_secteur', label: 'Défense Secteur' },
+      { valeur: 'base_stellaire', label: 'Base Stellaire' }
+    ];
+    var TYPES_GUILDE = [
+      { valeur: 'fermiers', label: 'Fermiers' },
+      { valeur: 'ingenieurs', label: 'Ingénieurs' },
+      { valeur: 'mineurs', label: 'Mineurs' },
+      { valeur: 'banquiers', label: 'Banquiers' },
+      { valeur: 'scientifiques', label: 'Scientifiques' }
+    ];
+    var TYPES_VAISSEAU = [
+      { valeur: 'corvette', label: 'Corvette' },
+      { valeur: 'sentinelle', label: 'Sentinelle' },
+      { valeur: 'destroyer', label: 'Destroyer' },
+      { valeur: 'cuirasse', label: 'Cuirassé' },
+      { valeur: 'porte_vaisseau', label: 'Porte-Vaisseau' }
+    ];
+
+    function optionsHTML_(liste) {
+      return liste.map(function (o) { return '<option value="' + o.valeur + '">' + o.label + '</option>'; }).join('');
+    }
+
+    /**
+     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+     * formulaire "Construire" (secteur éligible + catégorie + type) —
+     * portage simplifié de la partie "construction" de strategie.html GAS
+     * (le formulaire complet gérait aussi Déployer/Envahir/Regrouper dans
+     * le même écran ; ceux-ci restent hors périmètre de cette session,
+     * voir le résumé de fin de session). Le sélecteur de secteur ne liste
+     * que ceux avec au moins un emplacement libre pour la catégorie
+     * choisie (SecteurService.obtenirSecteursEligiblesConstruction).
+     */
+    function renderFormulaireConstruire_(partie) {
+      var selectSecteur = document.getElementById('construire-secteur');
+      var selectCategorie = document.getElementById('construire-categorie');
+      var selectType = document.getElementById('construire-type');
+      if (!selectSecteur) return;
+
+      function rafraichirTypes() {
+        selectType.innerHTML = optionsHTML_(selectCategorie.value === 'installation' ? TYPES_INSTALLATION : TYPES_GUILDE);
+      }
+
+      function rafraichirSecteurs() {
+        selectSecteur.innerHTML = '<option value="">Chargement…</option>';
+        SecteurService.obtenirSecteursEligiblesConstruction(partie.id, selectCategorie.value).then(function (eligibles) {
+          if (!eligibles.length) {
+            selectSecteur.innerHTML = '<option value="">Aucun secteur éligible</option>';
+            return;
+          }
+          selectSecteur.innerHTML = eligibles.map(function (e) {
+            return '<option value="' + e.numero + '">Secteur ' + e.numero + ' (' + e.emplacementsLibres + ' libre(s))</option>';
+          }).join('');
+        }).catch(function () {
+          selectSecteur.innerHTML = '<option value="">Erreur de chargement</option>';
+        });
+      }
+
+      rafraichirTypes();
+      rafraichirSecteurs();
+      selectCategorie.onchange = function () { rafraichirTypes(); rafraichirSecteurs(); };
+
+      document.getElementById('btn-construire').onclick = function () {
+        var numero = Number(selectSecteur.value);
+        if (!numero) { window.alert('Choisis un secteur.'); return; }
+        var btn = document.getElementById('btn-construire');
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        SecteurService.construire(partie.id, numero, selectCategorie.value, selectType.value)
+          .then(function () {
+            renderEcranSecteurs_(partie);
+            rafraichirSecteurs();
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec de la construction : ' + erreur.message);
+          });
+      };
+    }
+
+    /**
+     * 17/08/2026 (Session 13) : formulaire "Rappeler un cube" (secteur +
+     * type de vaisseau) — portage simplifié, même remarque de périmètre
+     * que renderFormulaireConstruire_ ci-dessus.
+     */
+    function renderFormulaireRappelerCube_(partie) {
+      var selectSecteur = document.getElementById('rappel-secteur');
+      if (!selectSecteur) return;
+      document.getElementById('rappel-type').innerHTML = optionsHTML_(TYPES_VAISSEAU);
+
+      SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
+        var possedes = secteurs.filter(function (s) {
+          return s.pnNeant === 0 && (s.pnCorvette + s.pnSentinelle + s.pnDestroyer + s.pnCuirasse + s.pnPorteVaisseau) > 0;
+        });
+        selectSecteur.innerHTML = possedes.length
+          ? possedes.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('')
+          : '<option value="">Aucun secteur possédé</option>';
+      });
+
+      document.getElementById('btn-rappeler-cube').onclick = function () {
+        var numero = Number(selectSecteur.value);
+        if (!numero) { window.alert('Choisis un secteur.'); return; }
+        var type = document.getElementById('rappel-type').value;
+        var btn = document.getElementById('btn-rappeler-cube');
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        SecteurService.rappelerCube(partie.id, numero, type)
+          .then(function () {
+            renderEcranSecteurs_(partie);
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec du rappel : ' + erreur.message);
+          });
+      };
     }
 
     /**
      * Reprise directe de l'ancienne App.afficherSecteurs_ (index.html v7),
      * simplement redirigée vers le conteneur de screen-secteurs.
+     *
+     * 17/08/2026 (Session 11 — restauration IHM) : colonnes restaurées à
+     * l'identique de secteurs.html (GAS) — N°/Pop./Guildes/Installations/
+     * Flotte/Gardiens (portage direct, voir ligneSecteurHTML_ ci-dessus).
+     * La colonne "Type" (Secteur-Mère/Déchue/Avant-poste) et le total PN
+     * agrégé introduits lors du portage initial n'existaient pas dans le
+     * legacy — supprimés (le Secteur-Mère et le Corrompu restent visibles
+     * autrement : ligne colorée pour Corrompu, Guildes/Installations pour
+     * distinguer visuellement le Secteur-Mère).
+     *
+     * 17/08/2026 (Session 13) : colonne Action (bouton "Retirer" la
+     * corruption) + branchement des formulaires Construire/Rappeler un
+     * cube, désormais possibles (SecteurService.construire/rappelerCube
+     * portés, voir secteurService.js v2).
      */
     function renderEcranSecteurs_(partie) {
       var conteneur = document.getElementById('secteurs-conteneur');
       conteneur.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
 
-      Promise.all([
-        SecteurService.obtenirSecteurs(partie.id),
-        SecteurService.obtenirSecteurMere(partie.scenarioId)
-      ]).then(function (resultats) {
-        var secteurs = resultats[0];
-        var numeroMere = resultats[1];
-
+      SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
         if (!secteurs.length) {
           conteneur.innerHTML = '<p class="hint">Aucun secteur instancié (scénario "' + partie.scenarioId + '" introuvable dans le catalogue — resynchronise si besoin).</p>';
           return;
         }
 
-        var lignes = secteurs.map(function (s) {
-          var pnTotal = (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
-          var type = s.numero === numeroMere ? 'Secteur-Mère' : (s.maisonAssociee ? 'Déchue : ' + s.maisonAssociee : 'Avant-poste');
-          return '<tr class="' + (s.corrompu ? 'ligne-corrompue' : '') + '">' +
-            '<td>' + s.numero + '</td><td>' + type + '</td><td>' + (s.population == null ? '—' : s.population) + '</td><td>' + pnTotal + '</td>' +
-            '</tr>';
-        }).join('');
+        var lignes = secteurs.map(ligneSecteurHTML_).join('');
+        conteneur.innerHTML = '<table class="table-secteurs"><thead><tr>' +
+          '<th>N°</th><th>Pop.</th><th>Guildes</th><th>Installations</th><th>Flotte</th><th>Gardiens</th><th>Action</th>' +
+          '</tr></thead><tbody>' + lignes + '</tbody></table>';
 
-        conteneur.innerHTML = '<table class="table-secteurs"><thead><tr><th>N°</th><th>Type</th><th>Pop.</th><th>PN</th></tr></thead><tbody>' + lignes + '</tbody></table>';
+        Array.prototype.forEach.call(conteneur.querySelectorAll('.btn-retirer-corruption'), function (btn) {
+          btn.addEventListener('click', function () {
+            var numero = Number(btn.dataset.numero);
+            btn.disabled = true;
+            SecteurService.retirerCorruption(partie.id, numero)
+              .then(function () { renderEcranSecteurs_(partie); })
+              .catch(function (erreur) {
+                btn.disabled = false;
+                window.alert('Échec : ' + erreur.message);
+              });
+          });
+        });
       }).catch(function (erreur) {
         conteneur.innerHTML = '<p class="hint">Erreur de chargement des secteurs : ' + erreur.message + '</p>';
       });
+
+      renderFormulaireConstruire_(partie);
+      renderFormulaireRappelerCube_(partie);
     }
 
     /**
@@ -500,6 +921,47 @@
     // (n'existe plus, screen-partie-creee a disparu) — déclenche l'événement
     // partagé voidfall:retour-accueil, réutilisé aussi par scoreVueService.js
     // après l'enregistrement d'une fin de partie.
+    // 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+    // avancerCycle est désormais porté (voir gameService.js v7) — bouton
+    // "Fin du cycle" simplifié par rapport au legacy (pas de modale
+    // "Phase C" : la résolution d'escarmouche et le paiement de
+    // l'entretien restent manuels pour l'instant, l'entretien dû est
+    // affiché juste au-dessus à titre indicatif). La pile d'annulation
+    // est entièrement vidée à chaque cycle (règle tranchée dès la Session
+    // 4, voir annulationService.js en-tête — jusqu'ici jamais appelée,
+    // faute d'avancerCycle porté).
+    document.getElementById('btn-fin-cycle').addEventListener('click', function () {
+      var partie = App.getPartieCourante();
+      if (!partie) return;
+      var btn = document.getElementById('btn-fin-cycle');
+      if (btn.disabled) return;
+      var texteOriginal = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Passage en cours…';
+
+      GameService.avancerCycle(partie.id)
+        .then(function (partieMaj) {
+          return AnnulationService.viderPile(partie.id).then(function () { return partieMaj; });
+        })
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          btn.disabled = false;
+          btn.textContent = texteOriginal;
+          if (partieMaj.cycleActuel === 'termine') {
+            document.getElementById('btn-terminer-partie').click();
+            return;
+          }
+          renderEcranGame_(partieMaj);
+          renderEcranSecteurs_(partieMaj);
+          if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          btn.disabled = false;
+          btn.textContent = texteOriginal;
+          window.alert('Échec du passage au cycle suivant : ' + erreur.message);
+        });
+    });
+
     document.getElementById('btn-retour-accueil-partie').addEventListener('click', function () {
       document.dispatchEvent(new Event('voidfall:retour-accueil'));
     });

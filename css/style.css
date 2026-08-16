@@ -1,6 +1,22 @@
 /**
  * css/style.css
- * Version 4 — 17/08/2026
+ * Version 7 — 17/08/2026
+ *
+ * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+ * ajout de .techno-obtenue-ligne (écran Partie — select + case Améliorée
+ * par emplacement de technologie obtenue).
+ *
+ * 17/08/2026 (Session 12 — restauration IHM Partie) : ajout de
+ * .check-amelioree (case "Technologie de départ améliorée", écran
+ * Partie) — même pattern que .piste-civilisation-corrompue. Voir aussi
+ * index.html et js/gameService.js.
+ *
+ * 17/08/2026 (Session 11 — restauration IHM Secteurs) : .nav-ecrans passe
+ * en scroll horizontal (overflow-x:auto, boutons flex-shrink:0) — 4
+ * boutons (Partie/Stratégie/Secteurs/Combat) ne tenaient plus sur une
+ * largeur de smartphone depuis l'ajout de "Combat". Demande explicite de
+ * l'utilisateur (le nouveau bouton "Combat" est accepté à condition que le
+ * menu reste utilisable).
  *
  * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : ajout de
  * .ressources-cubes (séparateur), .ressources-gloire/.gloire-emplacements/
@@ -425,14 +441,29 @@ input:disabled {
   color: var(--color-coral);
 }
 
-/* --- Nav Partie/Stratégie/Secteurs (visible seulement partie active) --- */
+/* --- Nav Partie/Stratégie/Secteurs/Combat (visible seulement partie
+   active) --- */
 .barre-navigation-partie {
   margin-bottom: 22px;
 }
 .barre-navigation-partie[hidden] { display: none; }
+/* 17/08/2026 (Session 11 — restauration IHM) : 4 boutons (ajout "Combat")
+   ne tiennent plus sur une largeur de smartphone — scroll horizontal
+   plutôt que compression/débordement des boutons. -webkit-overflow-
+   scrolling pour un scroll fluide sur iOS Safari ; scrollbar masquée
+   (cohérent avec le reste de l'app, pas de scrollbar visible ailleurs). */
 .nav-ecrans {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.nav-ecrans::-webkit-scrollbar { display: none; }
+.nav-ecrans .btn-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* --- Cartes "parties enregistrées" (accueil) : bouton Continuer --- */
@@ -645,6 +676,39 @@ input:disabled {
   width: 15px;
   height: 15px;
   accent-color: var(--color-coral);
+}
+/* 17/08/2026 (Session 12 — restauration IHM Partie) : case "Technologie
+   améliorée" (écran Partie) — même pattern que .piste-civilisation-
+   corrompue. */
+.check-amelioree {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.check-amelioree input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-coral);
+}
+/* 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+   ligne Technologie obtenue (écran Partie) — select + case Améliorée. */
+.techno-obtenue-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.techno-obtenue-ligne select {
+  flex: 1;
+  min-width: 0;
+}
+.techno-obtenue-ligne .check-amelioree {
+  margin-top: 0;
+  flex-shrink: 0;
 }
 .civilisation-actions-globales {
   display: flex;

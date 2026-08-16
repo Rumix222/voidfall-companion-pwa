@@ -1,7 +1,15 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 3 — 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie)
+ * Version 4 — 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM)
+ *
+ * 17/08/2026 (Session 13) : Focus héroïques sélectionnables (select par
+ * emplacement, portage direct de renderFocusHeroiquesCycleActuel,
+ * app-2.html GAS) — GameService.choisirFocusHeroique porté (v7, SQL de la
+ * RPC fourni par l'utilisateur). Remplace l'affichage seul des sessions
+ * précédentes.
+ *
+ * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie)
  *
  * 17/08/2026 (Session 10) : restauration de blocs d'affichage présents
  * dans strategie.html (GAS) mais perdus lors du portage initial de cet
@@ -39,9 +47,10 @@
  * PÉRIMÈTRE VOLONTAIREMENT RÉDUIT (cohérent avec l'état réel de
  * gameService.js/secteurService.js — rien à porter faute de RPC source
  * côté GAS) :
- *   - Focus héroïques : AFFICHAGE SEUL (choisirFocusHeroique hors
- *     périmètre côté gameService.js — les 3 emplacements du cycle restent
- *     toujours à null pour l'instant, rien à sélectionner).
+ *   - [Nettoyage Session 13] Focus héroïques : SÉLECTIONNABLES depuis
+ *     cette session (choisirFocusHeroique porté, voir gameService.js v7 —
+ *     SQL de la RPC fourni par l'utilisateur). Ce commentaire disait
+ *     encore "affichage seul" : corrigé, voir renderFocusHeroiques_.
  *   - Scratchpad manuel (édition directe des ressources par l'utilisateur,
  *     indépendante des actions Focus, présent dans strategie.html GAS) :
  *     toujours pas porté — hors sujet des sessions Focus/Civilisation.
@@ -460,25 +469,70 @@ var StrategieService = (function () {
     });
   }
 
+  /**
+   * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
+   * chaque emplacement gagne un select (portage direct de
+   * renderFocusHeroiquesCycleActuel, app-2.html GAS) — remplace
+   * l'affichage seul des sessions précédentes (choisirFocusHeroique était
+   * hors périmètre jusqu'ici, voir gameService.js). Un Focus héroïque
+   * déjà choisi ailleurs (partie.focusHeroiquesPioches) n'apparaît plus
+   * dans les options des AUTRES emplacements, sauf celui qui le porte
+   * déjà (peut toujours être remis à "— Choisir —" pour le libérer).
+   */
   function renderFocusHeroiques_(partie) {
     var container = document.getElementById('strategie-focus-heroiques');
     var cycle = partie.cycleActuel;
-    var cartes = [];
-    if (partie.focusHeroiques) {
-      cartes = (cycle === 'termine') ? (partie.focusHeroiques.cycle3 || []) : (partie.focusHeroiques['cycle' + cycle] || []);
+    if (!cycle || cycle === 'termine') {
+      container.innerHTML = '<p class="hint">Partie terminée.</p>';
+      return;
     }
+    var cle = 'cycle' + cycle;
+    var cartes = (partie.focusHeroiques && partie.focusHeroiques[cle]) || [null, null, null];
+    var pioches = partie.focusHeroiquesPioches || [];
 
-    container.innerHTML = cartes.map(function (carte, i) {
-      if (!carte) {
-        return '<div class="card"><p class="hint" style="margin:0;">Emplacement ' + (i + 1) + ' : non choisi.</p></div>';
-      }
-      return '<div class="card">' + badgeType_(carte.type) +
-        '<div style="font-weight:600;">' + carte.focus + '</div>' +
-        (carte.actions || []).map(function (a) {
-          return '<div class="hint" style="margin:4px 0 0;">' + (a.action || '—') + (a.texte ? ' — ' + a.texte : '') + '</div>';
-        }).join('') +
-        '</div>';
-    }).join('') || '<p class="hint">Aucun emplacement pour ce cycle.</p>';
+    FocusService.obtenirNomsPoolHeroique().then(function (noms) {
+      container.innerHTML = [0, 1, 2].map(function (slot) {
+        var carte = cartes[slot];
+        var valeurActuelle = carte ? carte.focus : '';
+        var exclus = pioches.filter(function (nom) { return nom !== valeurActuelle; });
+        var optionsDisponibles = noms.filter(function (nom) { return exclus.indexOf(nom) === -1; });
+        var options = '<option value="">— Choisir —</option>' + optionsDisponibles.map(function (nom) {
+          return '<option value="' + nom + '"' + (nom === valeurActuelle ? ' selected' : '') + '>' + nom + '</option>';
+        }).join('');
+
+        var detail = carte
+          ? badgeType_(carte.type) + '<div style="font-weight:600;margin-top:6px;">' + carte.focus + '</div>' +
+            (carte.actions || []).map(function (a) {
+              return '<div class="hint" style="margin:4px 0 0;">' + (a.action || '—') + (a.texte ? ' — ' + a.texte : '') + '</div>';
+            }).join('')
+          : '<p class="hint" style="margin:6px 0 0;">Emplacement ' + (slot + 1) + ' : non choisi.</p>';
+
+        return '<div class="card">' +
+          '<select class="select-focus-heroique" data-slot="' + slot + '">' + options + '</select>' +
+          detail +
+          '</div>';
+      }).join('');
+
+      Array.prototype.forEach.call(container.querySelectorAll('.select-focus-heroique'), function (select) {
+        select.addEventListener('change', function () {
+          var slot = Number(select.dataset.slot);
+          select.disabled = true;
+          GameService.choisirFocusHeroique(partie.id, cycle, slot, select.value)
+            .then(function () {
+              return App.rafraichirPartieCourante();
+            })
+            .then(function (partieFraiche) {
+              afficher(partieFraiche);
+            })
+            .catch(function (erreur) {
+              select.disabled = false;
+              window.alert('Échec du choix du Focus héroïque : ' + erreur.message);
+            });
+        });
+      });
+    }).catch(function () {
+      container.innerHTML = '<p class="hint">Erreur de chargement du pool de Focus héroïques.</p>';
+    });
   }
 
   // ------------------------------------------------------------
