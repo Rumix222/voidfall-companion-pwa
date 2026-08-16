@@ -112,10 +112,10 @@
        en-tête) — rien à porter, pas encore réécrit depuis les règles. -->
   <section id="screen-game" class="screen" hidden>
     <h2 class="section-title">Votre maison</h2>
-    <div class="card" id="carte-joueur"></div>
+    <div class="card card-joueur" id="carte-joueur"></div>
 
     <h2 class="section-title" style="margin-top:22px;">Maisons déchues</h2>
-    <div class="card-list" id="liste-adversaires" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div class="card-list" id="liste-adversaires"></div>
 
     <p class="hint" style="margin-top:18px;">Cycle actuel : <span id="game-cycle-actuel">—</span></p>
 
@@ -331,7 +331,20 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 12 — 17/08/2026
+   * Version 13 — 17/08/2026 (Lot 1 — maisons déchues)
+   *
+   * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
+   * portage direct de carteMaisonHTML (app-2.html GAS) sur l'écran Partie —
+   * carte joueur : ligne "Difficulté" ajoutée (joueur.complexite, absente
+   * depuis toujours côté PWA), nom en <h3> (au lieu d'un div stylé inline,
+   * pour hériter de .card h3 — voir css/style.css). Cartes maisons déchues :
+   * technologies affichées en badges (.badge/.badge-sans-point, tooltip =
+   * texte de règle), remplace l'affichage réduit au seul nom qui masquait
+   * l'info la plus utile de cet écran (quelles technologies ne rapportent
+   * pas d'Influence). #liste-adversaires perd son style inline flex-column
+   * au profit de .card-list (grille auto-fill, voir css/style.css) —
+   * portage du comportement responsive du legacy. Dépend de
+   * js/gameService.js (v8, champ "texte" ajouté aux technologies).
    *
    * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
    * écran Partie — bouton "Fin du cycle" (GameService.avancerCycle +
@@ -433,12 +446,19 @@
       if (el) el.textContent = texte;
     }
 
+    function badgeTechnologie_(t) {
+      var classe = 'badge' + (t.sansPoint ? ' badge-sans-point' : '');
+      var titre = (t.texte || '').replace(/"/g, '&quot;');
+      return '<span class="' + classe + '" title="' + titre + '">' + t.nom + '</span>';
+    }
+
     function renderEcranGame_(partie) {
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
       var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
       document.getElementById('carte-joueur').innerHTML =
-        '<div style="font-weight:600;font-size:1.1rem;">' + (joueur.nom || '?') + '</div>' +
+        '<h3>' + (joueur.nom || '?') + '</h3>' +
+        (joueur.complexite ? '<p>Difficulté : ' + joueur.complexite + '</p>' : '') +
         '<p class="hint" style="margin:6px 0 0;">Technologie de départ : ' + (techDepart.nom || '—') +
         (techDepart.type ? ' <span class="hint-inline">(' + techDepart.type + ')</span>' : '') + '</p>' +
         (techDepart.nom ? '<label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"' +
@@ -464,9 +484,19 @@
         });
       }
 
+      // 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du
+      // 17/08) : portage direct de carteMaisonHTML (app-2.html GAS, appel
+      // sans options -> technologies affichées, ni Difficulté ni
+      // Technologie de départ pour les maisons déchues). Remplace
+      // l'affichage réduit au seul nom, qui masquait l'information de jeu
+      // la plus utile de cet écran : quelles technologies ne rapportent
+      // pas d'Influence (badge-sans-point).
       var adversaires = partie.adversaires || [];
       document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
-        return '<div class="card">' + m.nom + '</div>';
+        var technologies = (m.technologies || []).map(badgeTechnologie_).join('');
+        return '<div class="card"><h3>' + m.nom + '</h3>' +
+          (technologies ? '<div>' + technologies + '</div>' : '') +
+          '</div>';
       }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
 
       champTexte_('game-cycle-actuel', String(partie.cycleActuel));

@@ -1,7 +1,23 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 7 — 17/08/2026 (Session 12 — SQL RPC récupéré)
+ * Version 8 — 17/08/2026 (Lot 1 — maisons déchues)
+ *
+ * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
+ * ajout du champ "texte" (déjà présent dans la table catalogue
+ * "technologies", jusqu'ici jamais remonté) sur les technologies de
+ * obtenirMaisonsCatalogue_/formatMaison_ — nécessaire au tooltip des
+ * badges technologie sur l'écran Partie (portage de carteMaisonHTML,
+ * app-2.html GAS). Changement additif (nouvelle clé sur des objets déjà
+ * en place) : n'affecte pas les parties déjà créées (technologies
+ * stockées telles quelles à la création, "texte" restera vide pour elles
+ * — pas de migration nécessaire) ; les 18 tests fumée existants
+ * (gameService_cycle_focus_technologie_test.js/
+ * gameService_evenements_technologie_test.js) passent sans modification,
+ * aucun des deux ne construit ses fixtures via obtenirMaisonsCatalogue_/
+ * formatMaison_.
+ *
+ * 17/08/2026 (Session 12 — SQL RPC récupéré)
  *
  * 17/08/2026 (Session 12) : ajout de avancerCycle, choisirFocusHeroique et
  * choisirTechnologieObtenue — portage ligne à ligne des RPC Postgres
@@ -151,7 +167,7 @@ var GameService = (function () {
       nom: maison.nom,
       complexite: maison.complexite,
       technologies: maison.technologies.map(function (t) {
-        return { nom: t.nom, type: t.type || '' };
+        return { nom: t.nom, type: t.type || '', texte: t.texte || '' };
       })
     };
   }
@@ -198,7 +214,11 @@ var GameService = (function () {
 
   /**
    * Jointure maisons + technologies (clés catalogue camelCase, voir
-   * catalogueSync.js) -> [{ nom, complexite, technologies: [{nom, type}] }].
+   * catalogueSync.js) -> [{ nom, complexite, technologies: [{nom, type,
+   * texte}] }]. 17/08/2026 (Lot 1 — maisons déchues) : "texte" ajouté (déjà
+   * présent dans la table catalogue "technologies", jusqu'ici jamais
+   * remonté) — nécessaire au tooltip des badges technologie sur l'écran
+   * Partie (title="...", portage de carteMaisonHTML, app-2.html GAS).
    */
   function obtenirMaisonsCatalogue_() {
     return Promise.all([DB.getAll('maisons'), DB.getAll('technologies')]).then(function (resultats) {
@@ -211,7 +231,7 @@ var GameService = (function () {
         var nomsTech = [m.technologie1, m.technologie2].filter(Boolean);
         var technologiesMaison = nomsTech.map(function (nomTech) {
           var t = techParNom[nomTech];
-          return { nom: nomTech, type: t ? (t.type || '') : '' };
+          return { nom: nomTech, type: t ? (t.type || '') : '', texte: t ? (t.texte || '') : '' };
         });
         return { nom: m.nom, complexite: m.complexite, technologies: technologiesMaison };
       });

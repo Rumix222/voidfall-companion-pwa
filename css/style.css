@@ -1,6 +1,13 @@
 /**
  * css/style.css
- * Version 9 — 17/08/2026
+ * Version 10 — 17/08/2026 (Lot 1 — maisons déchues)
+ *
+ * 17/08/2026 (Lot 1 — maisons déchues) : .badge/.badge-type-* remplacées
+ * par les valeurs exactes de style.html (même situation que le Lot 2 —
+ * écrites sans référence CSS legacy la première fois) ; ajout de
+ * .card-joueur/.card-list/.card h3/.card p (absentes jusqu'ici),
+ * copiées telles quelles. Voir index.html (v13) pour le rendu
+ * correspondant (carte joueur + maisons déchues, écran Partie).
  *
  * 17/08/2026 (Lot 2, révisé — style.html ajouté en Project Knowledge) :
  * le premier jet du Lot 2 (grille de ressources) avait été écrit SANS
@@ -333,6 +340,38 @@ input:disabled {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 16px 18px;
+}
+
+/* 17/08/2026 (Lot 1 — maisons déchues) : copiées telles quelles depuis
+   style.html GAS — jusqu'ici absentes de la PWA. .card-joueur (bordure
+   corail, cf. #carte-joueur, index.html) et .card-list (grille auto-fill,
+   cf. #liste-adversaires — remplace l'ancien style inline
+   "display:flex;flex-direction:column" qui empilait les maisons déchues
+   en une seule colonne pleine largeur) redonnent à l'écran Partie son
+   agencement legacy. .card h3/.card p uniformisent la typographie des
+   cartes maison (nom + lignes de détail) ; sans effet sur les autres
+   usages de .card (cartes Focus, résultat de combat) qui n'imbriquent
+   pas de <h3>/<p> nus. */
+.card-joueur {
+  border-color: var(--color-coral);
+  box-shadow: 0 0 0 1px rgba(255, 107, 82, 0.15), 0 8px 28px -10px rgba(255, 107, 82, 0.35);
+}
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.card h3 {
+  font-family: var(--font-display);
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.card p {
+  margin: 4px 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 /* --- Mise en place manuelle (écran Créer une partie) --- */
@@ -805,20 +844,31 @@ input:disabled {
 .focus-action-insuffisant .btn-jouer-action {
   opacity: 0.5;
 }
+/* 17/08/2026 (Lot 1 — maisons déchues, prérequis) : .badge/.badge-type-*
+   remplacées par les valeurs exactes de style.html GAS — la version
+   précédente (uppercase, pill 999px, sans fond) avait été écrite sans
+   référence CSS legacy disponible (même situation que le Lot 2). .badge
+   est PARTAGÉE par le type de carte Focus (badge-type-*, écran
+   Stratégie) et par les badges technologie (badge-sans-point, écrans
+   Partie/Historique) — un seul .badge dans le legacy, comme ici. Effet de
+   bord assumé et attendu : les badges de type sur les cartes Focus
+   (Stratégie) changent d'apparence en même temps (fond plein au lieu de
+   juste une bordure) — c'est le même correctif de fidélité, pas une
+   régression. */
 .badge {
   display: inline-block;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 2px 8px;
-  border-radius: 999px;
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  margin-bottom: 6px;
+  color: var(--color-text);
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin: 2px 4px 0 0;
+  cursor: default;
 }
-.badge-type-standard { border-color: var(--color-text-muted); }
-.badge-type-heroique { border-color: var(--color-coral); color: var(--color-coral); }
-.badge-type-maison { border-color: #06afe5; color: #06afe5; }
+.badge-type-standard { background: var(--color-surface-2); }
+.badge-type-heroique { background: rgba(255, 107, 82, 0.14); border: 1px solid var(--color-coral); color: var(--color-coral); }
+.badge-type-maison { background: rgba(76, 29, 149, 0.25); border: 1px solid var(--color-nebula-1); }
 
 /* --- Modale de choix générique (demanderChoix, coûts/effets Focus) --- */
 .modal-overlay {

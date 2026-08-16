@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 16 — 2026-08-17
+ * Version 17 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,22 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
+ * incrémenté suite au portage de carteMaisonHTML (app-2.html GAS) sur
+ * l'écran Partie — carte joueur : ligne "Difficulté" ajoutée ; cartes
+ * maisons déchues : technologies affichées en badges (.badge/.badge-
+ * sans-point, tooltip = texte de règle) au lieu du seul nom de maison.
+ * Prérequis CSS corrigés au passage (.badge/.badge-type-* écrites sans
+ * référence legacy lors d'une session précédente, effet de bord assumé
+ * sur les cartes Focus de l'écran Stratégie) + .card-joueur/.card-list/
+ * .card h3/.card p ajoutées (absentes jusqu'ici) : js/gameService.js
+ * (v8 — champ "texte" ajouté aux technologies), index.html (v13),
+ * css/style.css (v10). Fichiers modifiés, chemins déjà en cache, aucune
+ * nouvelle entrée. Hors périmètre, signalé : le texte de règle complet
+ * de la Technologie de départ du joueur (legacy l'affiche, la PWA
+ * n'affiche que le type) — nécessite un accès aux données non trivial
+ * depuis ce point du modèle actuel, reporté à un lot séparé.
  *
  * 17/08/2026 (Lot 2 — grille de ressources, suite à l'audit UI/UX du même
  * jour) : incrémenté suite à la réécriture de la grille de ressources
@@ -182,4 +198,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.19';
+var APP_VERSION = '20260817.20';
