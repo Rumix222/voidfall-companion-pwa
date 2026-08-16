@@ -1,7 +1,40 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 4 — 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM)
+ * Version 6 — 17/08/2026 (Session 14 suite — action secteur "Déployer des
+ * cubes" portée)
+ *
+ * 17/08/2026 (Session 14 suite) : nouveau cas contexte.type ===
+ * 'deployer_cube' dans demanderChoix — portage direct de
+ * ouvrirModaleDeployerGenerique_ (strategie-2.html GAS, ~l.1354-1587),
+ * 3 modes ('par_chantier'/'libre'/'secteur_mere'), types de Flotte limités
+ * aux Technologies débloquées (typesVaisseauDeployables_/TECH_VAISSEAU,
+ * portés tels quels) et coût en ressources par type
+ * (COUT_DEPLOIEMENT_PAR_TYPE — Cuirassé/Matériel, Porte-Vaisseau/
+ * Nourriture, portés tels quels). Différence assumée avec le legacy :
+ * cette popup ne fait QUE le placement sur les secteurs
+ * (SecteurService.deployerCube, un appel par ligne) — elle ne touche PAS
+ * cubeActif/ressources de plateauMaison (c'est focusEngine.js qui s'en
+ * charge après coup, sur l'état pur, voir son en-tête v3). Le legacy
+ * écrivait plateau_maison directement depuis la popup (Api.majPlateauMaison),
+ * hors du flux normal d'annulation — corrigé ici.
+ *
+ * 17/08/2026 (Session 14 — action secteur "Regrouper" portée) : nouveau
+ * cas contexte.type === 'regrouper' dans demanderChoix — portage direct de
+ * ouvrirModaleRegrouper_ (strategie-2.html
+ * GAS, ~l.901-1059) : liste dynamique de mouvements de Puissance Navale
+ * entre secteurs ADJACENTS qui appartiennent tous deux au joueur, 5
+ * déplacements max au total, validation en direct des quantités
+ * disponibles (mêmes règles que côté serveur, revérifiées par
+ * SecteurService.regrouper). Appelé depuis focusEngine.js quand une carte
+ * Focus a un effet/coût "regrouper"/"regroupe" (voir focusEngine.js v2).
+ * Différence avec le legacy : Api.getSecteurs/Api.getScenarioAdjacences/
+ * Api.secteurRegrouper (google.script.run) remplacés par
+ * SecteurService.obtenirSecteurs/obtenirAdjacences/regrouper (appel
+ * direct, IndexedDB) ; champs snake_case (pn_corvette, numero_a/numero_b)
+ * remplacés par les champs camelCase du store secteursPartie (pnCorvette,
+ * numeroA/numeroB). SecteurService.regrouper est appelé ICI (DOM), pas
+ * dans focusEngine.js, qui reste pur — voir son en-tête.
  *
  * 17/08/2026 (Session 13) : Focus héroïques sélectionnables (select par
  * emplacement, portage direct de renderFocusHeroiquesCycleActuel,
@@ -82,6 +115,48 @@ var StrategieService = (function () {
     science: { champ: 'science', label: 'Science' }
   };
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+
+  // Portage direct de TYPES_VAISSEAU (strategie-2.html GAS) — pour le
+  // formulaire Regrouper. Les clés correspondent aux colonnes pn_* de
+  // secteursPartie via SecteurService.CHAMP_PN_PAR_TYPE (pnCorvette,
+  // pnSentinelle, pnDestroyer, pnCuirasse, pnPorteVaisseau).
+  var TYPES_VAISSEAU = [
+    { cle: 'corvette', label: 'Corvette' },
+    { cle: 'sentinelle', label: 'Sentinelle' },
+    { cle: 'destroyer', label: 'Destroyer' },
+    { cle: 'cuirasse', label: 'Cuirasse' },
+    { cle: 'porte_vaisseau', label: 'Porte-Vaisseau' }
+  ];
+  var CHAMP_PN_PAR_TYPE_VUE = {
+    corvette: 'pnCorvette', sentinelle: 'pnSentinelle', destroyer: 'pnDestroyer',
+    cuirasse: 'pnCuirasse', porte_vaisseau: 'pnPorteVaisseau'
+  };
+
+  // --- Portage direct depuis strategie-2.html GAS, pour le formulaire
+  // "Déployer des cubes" (Session 14 suite) ---
+  var TECH_VAISSEAU = { sentinelle: 'sentinelles', destroyer: 'destroyers', cuirasse: 'cuirassés', porte_vaisseau: 'porte-vaisseaux' };
+  var COUT_DEPLOIEMENT_PAR_TYPE = {
+    cuirasse: { ressource: 'materiel', parCube: 1, label: 'Matériel' },
+    porte_vaisseau: { ressource: 'nourriture', parCube: 1, label: 'Nourriture' }
+  };
+
+  function nomsTechnologiesJoueur_(partie) {
+    var noms = [];
+    if (partie.joueur && partie.joueur.technologieDepart) noms.push(partie.joueur.technologieDepart.nom);
+    (partie.technologiesObtenues || []).forEach(function (t) { if (t) noms.push(t.nom); });
+    return noms.map(function (n) { return (n || '').trim().toLowerCase(); });
+  }
+
+  // Corvette toujours disponible, les autres types nécessitent la
+  // Technologie de même nom (voir TECH_VAISSEAU).
+  function typesVaisseauDeployables_(partie) {
+    var noms = nomsTechnologiesJoueur_(partie);
+    return TYPES_VAISSEAU.filter(function (t) {
+      if (t.cle === 'corvette') return true;
+      var techNom = TECH_VAISSEAU[t.cle];
+      return techNom && noms.indexOf(techNom) !== -1;
+    });
+  }
 
   var LABEL_PISTE = { societe: 'Société', gouvernement: 'Gouvernement', economie: 'Économie' };
   var PISTES_ORDRE = ['societe', 'gouvernement', 'economie'];
@@ -698,6 +773,367 @@ var StrategieService = (function () {
           });
         });
         btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+      } else if (contexte.type === 'regrouper') {
+        titre.textContent = 'Regrouper';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partie = partieAffichee;
+        Promise.all([
+          SecteurService.obtenirSecteurs(partie.id),
+          SecteurService.obtenirAdjacences(partie.scenarioId)
+        ]).then(function (resultats) {
+          var secteurs = resultats[0] || [];
+          var adjacences = resultats[1] || [];
+
+          var adjacenceMap = {};
+          adjacences.forEach(function (a) {
+            adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
+            adjacenceMap[a.numeroA].push(a.numeroB);
+            adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
+            adjacenceMap[a.numeroB].push(a.numeroA);
+          });
+
+          var mouvements = []; // état local à cette ouverture de popup
+
+          function secteurParNumero_(numero) {
+            return secteurs.filter(function (s) { return s.numero === numero; })[0];
+          }
+
+          function stockRestant_(numero, type) {
+            var secteur = secteurParNumero_(numero);
+            var champ = CHAMP_PN_PAR_TYPE_VUE[type];
+            var stockInitial = secteur ? (secteur[champ] || 0) : 0;
+            var dejaPris = mouvements
+              .filter(function (m) { return m.depart === numero && m.type === type; })
+              .reduce(function (somme, m) { return somme + m.quantite; }, 0);
+            return stockInitial - dejaPris;
+          }
+
+          // Même critère "vous appartient" que Construire/Rappeler un cube :
+          // pas de Néant sur le secteur, au moins une unité de Puissance
+          // Navale à vous déjà présente.
+          function vousAppartient_(numero) {
+            var secteur = secteurParNumero_(numero);
+            if (!secteur || (secteur.pnNeant || 0) > 0) return false;
+            return ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0)
+              + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0)) > 0;
+          }
+
+          function render() {
+            var total = mouvements.reduce(function (s, m) { return s + m.quantite; }, 0);
+
+            var listeHTML = mouvements.length
+              ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+                  var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === m.type; })[0].label;
+                  return '<li>' + m.quantite + '× ' + labelType + ' : Secteur ' + m.depart + ' → Secteur ' + m.arrivee +
+                    ' <button type="button" class="btn-lien regrouper-retirer" data-index="' + i + '">retirer</button></li>';
+                }).join('') + '</ul>'
+              : '<p class="hint">Aucun déplacement ajouté.</p>';
+
+            contenu.innerHTML = '' +
+              '<p class="hint">Déplacements utilisés : <strong>' + total + ' / 5</strong></p>' +
+              listeHTML +
+              '<div class="regrouper-form">' +
+              '<label class="hint" for="regrouper-type">Type</label>' +
+              '<select id="regrouper-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+              '<label class="hint" for="regrouper-depart" style="margin-top:8px;display:block;">Départ</label>' +
+              '<select id="regrouper-depart"></select>' +
+              '<label class="hint" for="regrouper-arrivee" style="margin-top:8px;display:block;">Arrivée (secteur adjacent)</label>' +
+              '<select id="regrouper-arrivee"></select>' +
+              '<label class="hint" for="regrouper-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
+              '<input type="number" min="1" step="1" value="1" id="regrouper-quantite">' +
+              '<button type="button" class="btn btn-secondary" id="regrouper-btn-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+              '</div>';
+
+            Array.prototype.forEach.call(contenu.querySelectorAll('.regrouper-retirer'), function (btn) {
+              btn.addEventListener('click', function () {
+                mouvements.splice(Number(btn.dataset.index), 1);
+                render();
+              });
+            });
+
+            var selectType = document.getElementById('regrouper-type');
+            var selectDepart = document.getElementById('regrouper-depart');
+            var selectArrivee = document.getElementById('regrouper-arrivee');
+            var champQuantite = document.getElementById('regrouper-quantite');
+            var btnAjouter = document.getElementById('regrouper-btn-ajouter');
+
+            function majDepart() {
+              var type = selectType.value;
+              var options = secteurs
+                .filter(function (s) { return vousAppartient_(s.numero); })
+                .map(function (s) { return { numero: s.numero, stock: stockRestant_(s.numero, type) }; })
+                .filter(function (o) { return o.stock > 0; });
+              selectDepart.innerHTML = options.length
+                ? options.map(function (o) { return '<option value="' + o.numero + '">Secteur ' + o.numero + ' (' + o.stock + ' disponible(s))</option>'; }).join('')
+                : '<option value="">Aucun secteur disponible</option>';
+              majArrivee();
+            }
+
+            function majArrivee() {
+              var depart = Number(selectDepart.value);
+              var voisins = (adjacenceMap[depart] || []).filter(vousAppartient_);
+              selectArrivee.innerHTML = voisins.length
+                ? voisins.map(function (n) { return '<option value="' + n + '">Secteur ' + n + '</option>'; }).join('')
+                : '<option value="">Aucun secteur adjacent vous appartenant</option>';
+            }
+
+            selectType.addEventListener('change', majDepart);
+            selectDepart.addEventListener('change', majArrivee);
+            majDepart();
+
+            btnAjouter.addEventListener('click', function () {
+              var type = selectType.value;
+              var depart = Number(selectDepart.value);
+              var arrivee = Number(selectArrivee.value);
+              var quantite = Math.max(1, Math.floor(Number(champQuantite.value) || 1));
+
+              if (!depart || !arrivee) { window.alert('Choisis un secteur de départ et d\'arrivée.'); return; }
+              var dispo = stockRestant_(depart, type);
+              if (quantite > dispo) { window.alert('Seulement ' + dispo + ' disponible(s) sur ce secteur pour ce type.'); return; }
+              if (total + quantite > 5) { window.alert('Il ne reste que ' + (5 - total) + ' déplacement(s) sur les 5 autorisés.'); return; }
+
+              mouvements.push({ type: type, depart: depart, arrivee: arrivee, quantite: quantite });
+              render();
+            });
+
+            btnValider.hidden = mouvements.length === 0;
+            btnValider.textContent = 'Valider (' + total + ' déplacement(s))';
+            btnValider.onclick = function () {
+              btnValider.disabled = true;
+              btnValider.textContent = 'Passage en cours…';
+              SecteurService.regrouper(partie.id, mouvements)
+                .then(function () {
+                  var detail = mouvements.map(function (m) {
+                    var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === m.type; })[0].label;
+                    return m.quantite + '× ' + labelType + ' ' + m.depart + '→' + m.arrivee;
+                  }).join(', ');
+                  fermerModale_();
+                  btnValider.disabled = false;
+                  resolve({ deplacements: total, detail: detail, mouvements: mouvements });
+                })
+                .catch(function (erreur) {
+                  btnValider.disabled = false;
+                  btnValider.textContent = 'Valider (' + total + ' déplacement(s))';
+                  window.alert('Échec du regroupement : ' + erreur.message);
+                });
+            };
+          }
+
+          render();
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
+
+      } else if (contexte.type === 'deployer_cube') {
+        titre.textContent = 'Déployer des cubes';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieDeploiement = partieAffichee;
+        var typesDeployables = typesVaisseauDeployables_(partieDeploiement);
+        var etatRessourcesLocal = {
+          cubeActif: contexte.cubeActif,
+          materiel: contexte.ressourceMateriel,
+          nourriture: contexte.ressourceNourriture
+        };
+
+        function vousAppartientDeploiement_(secteurs) {
+          return function (numero) {
+            var secteur = secteurs.filter(function (s) { return s.numero === numero; })[0];
+            if (!secteur || (secteur.pnNeant || 0) > 0) return false;
+            return ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0)
+              + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0)) > 0;
+          };
+        }
+
+        function demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale) {
+          var deploiements = []; // {numero, type, quantite}
+
+          function totalEngage_() {
+            return deploiements.reduce(function (s, d) { return s + d.quantite; }, 0);
+          }
+
+          function renderListe_() {
+            var liste = document.getElementById('deployer-liste');
+            liste.innerHTML = deploiements.length
+              ? deploiements.map(function (d, i) {
+                  var label = typesDeployables.filter(function (t) { return t.cle === d.type; })[0].label;
+                  return '<li>' + d.quantite + '× ' + label + ' → Secteur ' + d.numero +
+                    ' <button type="button" class="btn-lien deployer-retirer" data-index="' + i + '">retirer</button></li>';
+                }).join('')
+              : '<p class="hint">Aucun cube engagé.</p>';
+            Array.prototype.forEach.call(liste.querySelectorAll('.deployer-retirer'), function (btn) {
+              btn.addEventListener('click', function () {
+                deploiements.splice(Number(btn.dataset.index), 1);
+                renderListe_();
+                majCompteurEtBouton_();
+              });
+            });
+          }
+
+          function majCompteurEtBouton_() {
+            var engage = totalEngage_();
+            var restant = quantiteMaxGlobale - engage;
+            document.getElementById('deployer-compteur').textContent =
+              engage + ' / ' + quantiteMaxGlobale + ' cube(s) engagé(s)' + (restant > 0 ? ' (' + restant + ' au choix, si Cube actif suffisant)' : '');
+            btnValider.hidden = deploiements.length === 0;
+            btnValider.textContent = 'Déployer (' + engage + ' cube(s))';
+          }
+
+          contenu.innerHTML =
+            '<p class="hint" id="deployer-compteur"></p>' +
+            '<ul class="regrouper-liste" id="deployer-liste"></ul>' +
+            '<div class="regrouper-form">' +
+            '<select id="deployer-select-type">' + typesDeployables.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+            (cibles.length > 1
+              ? '<select id="deployer-select-secteur" style="margin-top:6px;">' +
+                cibles.map(function (c) { return '<option value="' + c.numero + '">Secteur ' + c.numero + (c.maxCubes < Infinity ? ' (' + c.maxCubes + ' max)' : '') + '</option>'; }).join('') +
+                '</select>'
+              : '') +
+            '<input type="number" min="1" step="1" value="1" id="deployer-quantite" style="margin-top:6px;">' +
+            '<button type="button" class="btn btn-secondary" id="deployer-ajouter" style="width:100%;margin-top:8px;">Ajouter ce déploiement</button>' +
+            '</div>';
+
+          renderListe_();
+          majCompteurEtBouton_();
+
+          document.getElementById('deployer-ajouter').addEventListener('click', function () {
+            var type = document.getElementById('deployer-select-type').value;
+            var selectSecteur = document.getElementById('deployer-select-secteur');
+            var numero = selectSecteur ? Number(selectSecteur.value) : cibles[0].numero;
+            var quantite = Math.max(1, Math.floor(Number(document.getElementById('deployer-quantite').value) || 1));
+
+            var restantGlobal = quantiteMaxGlobale - totalEngage_();
+            if (quantite > restantGlobal) {
+              window.alert('Cet effet permet de déployer au maximum ' + quantiteMaxGlobale + ' cube(s) au total (indépendamment de ton stock de Cube actif).' +
+                (totalEngage_() > 0 ? ' Tu as déjà engagé ' + totalEngage_() + ' cube(s) — il en reste ' + restantGlobal + '.' : ''));
+              return;
+            }
+
+            var cible = cibles.filter(function (c) { return c.numero === numero; })[0];
+            if (cible && cible.maxCubes < Infinity) {
+              var dejaSurCeSecteur = deploiements.filter(function (d) { return d.numero === numero; }).reduce(function (s, d) { return s + d.quantite; }, 0);
+              if (dejaSurCeSecteur + quantite > cible.maxCubes) {
+                window.alert('Ce secteur ne peut recevoir que ' + cible.maxCubes + ' cube(s) via cet effet.');
+                return;
+              }
+            }
+
+            var dejaEngageTotal = totalEngage_();
+            if (dejaEngageTotal + quantite > etatRessourcesLocal.cubeActif) {
+              window.alert('Pas assez de Cube actif : ' + etatRessourcesLocal.cubeActif + ' disponible(s), ' + dejaEngageTotal + ' déjà prévu(s).');
+              return;
+            }
+
+            var cout = COUT_DEPLOIEMENT_PAR_TYPE[type];
+            if (cout) {
+              var dejaEngageCoutant = deploiements.filter(function (d) { return d.type === type; }).reduce(function (s, d) { return s + d.quantite; }, 0);
+              var coutTotal = (dejaEngageCoutant + quantite) * cout.parCube;
+              if (coutTotal > etatRessourcesLocal[cout.ressource]) {
+                window.alert('Pas assez de ' + cout.label + ' (' + cout.parCube + ' par cube) : ' + etatRessourcesLocal[cout.ressource] + ' disponible(s).');
+                return;
+              }
+            }
+
+            deploiements.push({ numero: numero, type: type, quantite: quantite });
+            renderListe_();
+            majCompteurEtBouton_();
+          });
+
+          btnValider.onclick = function () {
+            if (!deploiements.length) return;
+
+            var coutParRessource = {};
+            deploiements.forEach(function (d) {
+              var cout = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
+              if (cout) coutParRessource[cout.ressource] = (coutParRessource[cout.ressource] || 0) + cout.parCube * d.quantite;
+            });
+            var ressourceInsuffisante = Object.keys(coutParRessource).some(function (r) { return coutParRessource[r] > etatRessourcesLocal[r]; });
+            var totalCubes = totalEngage_();
+            if (ressourceInsuffisante || totalCubes > etatRessourcesLocal.cubeActif) {
+              window.alert('Ressources ou Cube actif insuffisant(s) pour ce déploiement.');
+              return;
+            }
+
+            btnValider.disabled = true;
+            btnValider.textContent = 'Passage en cours…';
+
+            Promise.all(deploiements.map(function (d) {
+              return SecteurService.deployerCube(partieDeploiement.id, d.numero, d.type, d.quantite);
+            })).then(function () {
+              var detail = deploiements.map(function (d) {
+                var label = typesDeployables.filter(function (t) { return t.cle === d.type; })[0].label;
+                return d.quantite + '× ' + label + ' → secteur ' + d.numero;
+              }).join(', ');
+              fermerModale_();
+              btnValider.disabled = false;
+              // Ne persiste PAS cubeActif/ressources ici : focusEngine.js
+              // s'en charge (état pur, diffable/annulable) — voir son
+              // en-tête. Cette popup ne fait que le placement secteur.
+              resolve({ totalCubes: totalCubes, coutParRessource: coutParRessource, detail: detail, mouvements: deploiements });
+            }).catch(function (erreur) {
+              btnValider.disabled = false;
+              btnValider.textContent = 'Déployer (' + totalCubes + ' cube(s))';
+              window.alert('Échec du déploiement : ' + erreur.message);
+            });
+          };
+        }
+
+        if (contexte.mode === 'par_chantier') {
+          SecteurService.obtenirSecteurs(partieDeploiement.id).then(function (secteurs) {
+            var vousAppartient = vousAppartientDeploiement_(secteurs);
+            var cibles = secteurs
+              .filter(function (s) { return vousAppartient(s.numero) && (s.installationChantierNaval || 0) > 0; })
+              .map(function (s) { return { numero: s.numero, maxCubes: (s.installationChantierNaval || 0) * contexte.quantiteDemandee }; });
+
+            if (!cibles.length) {
+              contenu.innerHTML = '<p class="hint">Aucun Chantier Naval en votre possession.</p>';
+              return;
+            }
+            var quantiteMaxGlobale = cibles.reduce(function (s, c) { return s + c.maxCubes; }, 0);
+            demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale);
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+        } else if (contexte.mode === 'secteur_mere') {
+          SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId).then(function (numeroMere) {
+            if (!numeroMere) {
+              contenu.innerHTML = '<p class="hint">Secteur-Mère introuvable.</p>';
+              return;
+            }
+            demarrerAvecCiblesDeploiement_([{ numero: numeroMere, maxCubes: Infinity }], contexte.quantiteDemandee);
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement du Secteur-Mère : ' + erreur.message);
+          });
+
+        } else { // 'libre'
+          SecteurService.obtenirSecteurs(partieDeploiement.id).then(function (secteurs) {
+            var vousAppartient = vousAppartientDeploiement_(secteurs);
+            var cibles = secteurs
+              .filter(function (s) { return vousAppartient(s.numero); })
+              .map(function (s) { return { numero: s.numero, maxCubes: Infinity }; });
+
+            if (!cibles.length) {
+              contenu.innerHTML = '<p class="hint">Aucun secteur vous appartenant.</p>';
+              return;
+            }
+            demarrerAvecCiblesDeploiement_(cibles, contexte.quantiteDemandee);
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+        }
 
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les

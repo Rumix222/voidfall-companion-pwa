@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 12 — 2026-08-17
+ * Version 14 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,33 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Session 14 suite — action secteur "Déployer des cubes"
+ * portée) : incrémenté suite au portage de "deployer_cube_par_chantier"/
+ * "deployer_cube"/"deploy_cube"/"deployer_cube_secteur_mere" (3 modes,
+ * types de Flotte limités aux Technologies débloquées, coût en ressources
+ * par type), déclenché depuis une carte Focus (Effet uniquement) :
+ * js/focusEngine.js (v3, reste pur — débite cubeActif/coût ressource sur
+ * l'état, contrairement au legacy qui écrivait plateau_maison depuis la
+ * popup) et js/strategieService.js (v6, nouveau cas contexte.type ===
+ * 'deployer_cube' de demanderChoix, appelle SecteurService.deployerCube).
+ * Aucune nouvelle classe CSS (réutilise .regrouper-liste/.btn-lien/
+ * .regrouper-form ajoutées pour Regrouper). Envahir reste hors périmètre
+ * (prochaine session — le plus lourd, nécessite CombatService +
+ * SecteurService.envahirResoudre). Fichiers modifiés, chemins déjà en
+ * cache, aucune nouvelle entrée.
+ *
+ * 17/08/2026 (Session 14 — action secteur "Regrouper" portée) : incrémenté
+ * suite au portage de l'action "Regrouper" (déplacement de Puissance
+ * Navale entre secteurs adjacents, jusqu'à 5 déplacements), déclenchée
+ * depuis une carte Focus (effet/coût "regrouper"/"regroupe") : nouveau cas
+ * dédié dans js/focusEngine.js (v2, reste pur) qui délègue à une popup
+ * portée depuis strategie.html (GAS) dans js/strategieService.js (v5,
+ * nouveau cas contexte.type === 'regrouper' de demanderChoix, appelle
+ * directement SecteurService.regrouper). css/style.css (v8 — styles
+ * .regrouper-liste/.btn-lien/.regrouper-form). Envahir/Déployer des cubes
+ * restent hors périmètre (prochaine session). Fichiers modifiés, chemins
+ * déjà en cache, aucune nouvelle entrée.
  *
  * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
  * incrémenté suite au branchement du moteur porté en Session 12 sur
@@ -130,4 +157,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.15';
+var APP_VERSION = '20260817.17';

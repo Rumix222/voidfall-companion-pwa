@@ -1,7 +1,39 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 4, Phase 4 suite)
+ * Version 3 — 17/08/2026 (Session 14 suite — action secteur "Déployer des
+ * cubes" portée)
+ *
+ * 17/08/2026 (Session 14 suite) : "deployer_cube_par_chantier"/
+ * "deployer_cube"/"deploy_cube"/"deployer_cube_secteur_mere" (Effet
+ * UNIQUEMENT, signe > 0 — comme le legacy) ouvrent désormais une popup
+ * dédiée (voir MODE_PAR_CLE_DEPLOYER_CUBE et le nouveau cas
+ * contexte.type === 'deployer_cube' de strategieService.js) qui choisit
+ * secteur(s)/type(s) de Flotte (limités aux Technologies débloquées)/
+ * quantité(s), sur les 3 modes du livret : 'par_chantier' (N cube(s) PAR
+ * Chantier Naval possédé, dans son secteur), 'libre' (N cube(s) au choix
+ * sur n'importe quel secteur possédé), 'secteur_mere' (N cube(s) dans le
+ * Secteur-Mère uniquement). Différence assumée avec le legacy : la popup
+ * (DOM) ne fait QUE persister le placement sur les secteurs
+ * (SecteurService.deployerCube) — c'est resoudreCle_ ICI qui débite Cube
+ * actif et le coût en ressources (Cuirassé → Matériel, Porte-Vaisseau →
+ * Nourriture, voir COUT_DEPLOIEMENT_PAR_TYPE côté strategieService.js) sur
+ * l'état pur, pour que ces mutations restent diffables/annulables comme
+ * le reste du moteur (le legacy les écrivait directement depuis la popup
+ * via un PATCH séparé, hors du flux normal d'annulation).
+ *
+ * 17/08/2026 (Session 14) : "regrouper"/"regroupe" retirés de
+ * CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié dans resoudreCle_ qui
+ * délègue à demanderChoix({type:'regrouper', ...}). Le moteur reste PUR :
+ * c'est la popup (implémentation DOM, voir strategieService.js) qui
+ * appelle directement SecteurService.regrouper et persiste en IndexedDB
+ * AU MOMENT de la validation — resoudreCle_ ne fait que relayer le résumé
+ * renvoyé ({deplacements, detail}) dans le journal. "Annuler" bloque toute
+ * l'action (même comportement que "choice"/"choice_repeat" ci-dessous),
+ * cohérent avec le popup Envahir du legacy. envahir/envahir_corrompu/
+ * rappeler_cube/retirer_corruption/construire_installation/
+ * etablir_guilde/effet_secteur restent hors périmètre (inchangé cette
+ * session, voir liste ci-dessous).
  *
  * Extraction PURE (aucun DOM, aucun accès direct à IndexedDB) de la
  * logique appliquerJson_/resoudreCle_/jouerAction_ de strategie.html
@@ -55,11 +87,13 @@
  * CLÉS HORS PÉRIMÈTRE — signalé explicitement (pas d'invention de logique) :
  * Certaines clés dépendent de systèmes qui n'existent PAS ENCORE dans la
  * PWA (voir secteurService.js/gameService.js, en-têtes) :
- *   - Actions sur les secteurs : envahir, envahir_corrompu, regrouper,
- *     rappeler_cube, retirer_corruption, construire_installation,
- *     etablir_guilde, effet_secteur, deployer_cube*
- *     (secteurService.js PWA ne porte QUE l'instanciation/lecture — les
- *     actions sont hors périmètre, cf. son en-tête)
+ *   - Actions sur les secteurs : envahir, envahir_corrompu, rappeler_cube,
+ *     retirer_corruption, construire_installation, etablir_guilde,
+ *     effet_secteur ("regrouper"/"regroupe" porté depuis la Session 14,
+ *     "deployer_cube*" porté depuis la Session 14 suite — voir plus bas,
+ *     cas dédiés dans resoudreCle_)
+ *     (secteurService.js PWA ne porte QUE l'instanciation/lecture pour les
+ *     clés restant ci-dessus — actions hors périmètre, cf. son en-tête)
  *   - Civilisation : avancer_civilisation*, avancer_piste_corrompue
  *     (CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js exclut
  *     explicitement civSociete/civGouvernement/civEconomie — "leurs
@@ -109,10 +143,16 @@ var FocusEngine = (function () {
 
   var CLES_SECTEUR_HORS_PERIMETRE = [
     'construire_installation', 'installation', 'etablir_guilde', 'guilde',
-    'regrouper', 'regroupe', 'envahir', 'envahir_corrompu', 'rappeler_cube',
+    'envahir', 'envahir_corrompu', 'rappeler_cube',
     'retirer_corruption', 'effet_secteur'
   ];
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
+  var MODE_PAR_CLE_DEPLOYER_CUBE = {
+    deployer_cube_par_chantier: 'par_chantier',
+    deployer_cube: 'libre',
+    deploy_cube: 'libre',
+    deployer_cube_secteur_mere: 'secteur_mere'
+  };
   var CLES_CIVILISATION_HORS_PERIMETRE = [
     'avancer_civilisation_societe', 'avancer_civilisation_gouvernement', 'avancer_civilisation_economie',
     'avancer_civilisation', 'avance_rapide', 'avancer_civilisation_moins_avancee', 'avancer_piste_corrompue'
@@ -179,11 +219,42 @@ var FocusEngine = (function () {
       return Promise.resolve(true);
     }
 
-    // --- Déploiement de cube (nécessite un placement sur un secteur —
-    // hors périmètre tant que les actions secteur ne sont pas portées) ---
-    if (CLES_DEPLOYER_CUBE.indexOf(cle) !== -1) {
-      journal.push(source + ' : ⚠️ "' + cle + '" non automatisé — déployez le cube manuellement sur le plateau des secteurs.');
-      return Promise.resolve(true);
+    // --- Déploiement de cube (Effet UNIQUEMENT — signe > 0, comme le
+    // legacy : côté Coût, ces clés retombent sur le traitement générique
+    // "cube" ci-dessous, cas non prévu par le livret). Ouvre une popup
+    // dédiée (mode selon la clé — voir MODE_PAR_CLE_DEPLOYER_CUBE) qui
+    // choisit secteur(s)/type(s)/quantité(s) et persiste via
+    // SecteurService.deployerCube (un appel par ligne engagée, fait CÔTÉ
+    // POPUP — DOM, voir strategieService.js). La consommation de Cube
+    // actif et le coût en ressources (Cuirassé/Porte-Vaisseau) sont en
+    // revanche appliqués ICI, sur l'état pur, pour rester cohérents avec
+    // le reste du moteur (diff/annulation) — amélioration par rapport au
+    // legacy, où la popup écrivait elle-même plateau_maison. ---
+    if (CLES_DEPLOYER_CUBE.indexOf(cle) !== -1 && typeof valeur === 'number' && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'deployer_cube',
+        mode: MODE_PAR_CLE_DEPLOYER_CUBE[cle],
+        quantiteDemandee: valeur,
+        source: source,
+        partieId: etat.partieId,
+        cubeActif: etat.cubeActif,
+        ressourceMateriel: etat.ressourceMateriel,
+        ressourceNourriture: etat.ressourceNourriture
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        var totalCubes = Number(reponse.totalCubes) || 0;
+        etat.cubeActif = Math.max(0, etat.cubeActif - totalCubes);
+        var coutParRessource = reponse.coutParRessource || {};
+        Object.keys(coutParRessource).forEach(function (r) {
+          var champRessource = CHAMP_PAR_CLE[r];
+          if (champRessource) etat[champRessource] = Math.max(0, etat[champRessource] - coutParRessource[r]);
+        });
+        journal.push(source + ' : Déployer — ' + reponse.detail +
+          (Object.keys(coutParRessource).length
+            ? ' (coût : ' + Object.keys(coutParRessource).map(function (r) { return coutParRessource[r] + ' ' + r; }).join(', ') + ')'
+            : '') + '.');
+        return true;
+      });
     }
 
     // --- Toute autre clé contenant "cube" (ex. activer_cube, cube) :
@@ -277,6 +348,22 @@ var FocusEngine = (function () {
         if (reponseAnnulee_(reponse)) return false;
         var bonus = BONUS_COMMERCE[reponse.indexChoisi];
         return resoudreJsonInterne_(bonus.effet, signe, source + ' (Bonus Commerce)', bonus.label, etat, journal, demanderChoix);
+      });
+    }
+
+    // --- Regrouper : déplacement de Puissance Navale entre secteurs
+    // adjacents (jusqu'à 5 déplacements au total). SecteurService.regrouper
+    // persiste directement en IndexedDB — appelé par la popup elle-même
+    // (implémentation DOM de demanderChoix, voir strategieService.js) au
+    // moment de la validation, PAS ici (focusEngine reste pur, aucun accès
+    // DB). resoudreCle_ se contente de relayer le résumé dans le journal.
+    // "Annuler" bloque toute l'action (même règle que "choice"/
+    // "choice_repeat" ci-dessus, cohérent avec le popup Envahir legacy). ---
+    if (cle === 'regrouper' || cle === 'regroupe') {
+      return Promise.resolve(demanderChoix({ type: 'regrouper', source: source, partieId: etat.partieId })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : Regrouper — ' + reponse.deplacements + ' déplacement(s) (' + reponse.detail + ').');
+        return true;
       });
     }
 

@@ -1,6 +1,11 @@
 /**
  * css/style.css
- * Version 7 — 17/08/2026
+ * Version 8 — 17/08/2026
+ *
+ * 17/08/2026 (Session 14 — action secteur "Regrouper" portée) : ajout de
+ * .regrouper-liste/.btn-lien/.regrouper-form (popup Regrouper, écran
+ * Stratégie — voir js/strategieService.js), portées telles quelles depuis
+ * style.html (GAS).
  *
  * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
  * ajout de .techno-obtenue-ligne (écran Partie — select + case Améliorée
@@ -840,6 +845,39 @@ input:disabled {
 }
 .modal-actions .btn { flex: 1; }
 .modal-actions .btn[hidden] { display: none; }
+
+/* --- Popup "Regrouper" (déplacement de Puissance Navale), portée telle
+   quelle depuis strategie.html (GAS) — 17/08/2026 (Session 14) --- */
+.regrouper-liste {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.regrouper-liste li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+.regrouper-liste li:last-child {
+  border-bottom: none;
+}
+.btn-lien {
+  background: none;
+  border: none;
+  color: var(--color-coral);
+  font-size: 0.8rem;
+  padding: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.regrouper-form select,
+.regrouper-form input {
+  width: 100%;
+}
 
 /* --- Simulation combat (Envahir/Escarmouche) --- */
 .combat-colonnes {

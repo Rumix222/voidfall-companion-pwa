@@ -2,6 +2,14 @@
  * Test fumée — focusEngine.js + annulationService.js
  * Exécution : node focusEngine.test.js
  *
+ * 17/08/2026 (Session 14 suite) : ajout des tests "deployer_cube" (mode
+ * libre + coût ressource, mode transmis pour par_chantier/secteur_mere,
+ * annulé, et le cas Coût signe<0 qui retombe sur le repli générique
+ * "cube").
+ * 17/08/2026 (Session 14) : ajout des tests "regrouper" (succès + annulé)
+ * — le cas hors périmètre "envahir" reste inchangé et sert toujours de
+ * témoin pour les clés secteur NON portées cette session.
+ *
  * Simule un DB en mémoire (même forme que DB : get/getAll/put/supprimer)
  * pour ne dépendre ni du navigateur ni d'IndexedDB réel. Charge les
  * fichiers réels via vm, comme le reste de la suite du projet.
@@ -156,6 +164,112 @@ test('clé secteur hors périmètre (envahir) : ne bloque pas, journalisé', fun
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('envahir') !== -1 && l.indexOf('non automatisé') !== -1; }));
+  });
+});
+
+test('regrouper : succès — délègue à demanderChoix({type:"regrouper"}), journalisé, coût débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Regrouper', effet: { regrouper: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'regrouper');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { deplacements: 3, detail: '3× Corvette 1→2' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Regrouper') !== -1 && l.indexOf('3 déplacement(s)') !== -1; }));
+  });
+});
+
+test('regrouper : annulé (popup "Annuler") — bloque toute l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Regrouper', effet: { regrouper: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+test('deployer_cube (mode libre) : succès — cubeActif ET coût ressource débités, journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Déployer', effet: { deployer_cube: 2 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'deployer_cube');
+    assert.strictEqual(contexte.mode, 'libre');
+    assert.strictEqual(contexte.quantiteDemandee, 2);
+    assert.strictEqual(contexte.cubeActif, PLATEAU_BASE.cubeActif);
+    assert.strictEqual(contexte.ressourceMateriel, PLATEAU_BASE.ressourceMateriel);
+    // 1 Corvette (gratuite) + 1 Cuirassé (1 Matériel/cube, voir
+    // COUT_DEPLOIEMENT_PAR_TYPE côté strategieService.js)
+    return { totalCubes: 2, coutParRessource: { materiel: 1 }, detail: '1× Corvette → secteur 3, 1× Cuirasse → secteur 3' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, 0); // 2 - 2
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 4); // 5 - 1
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Déployer') !== -1 && l.indexOf('coût : 1 materiel') !== -1; }));
+  });
+});
+
+test('deployer_cube_par_chantier : mode transmis, "deployer_cube_secteur_mere" idem', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+
+  var actionChantier = { action: 'Déployer', effet: { deployer_cube_par_chantier: 1 }, cout: {}, texte: '' };
+  var demanderChoixChantier = function (contexte) {
+    assert.strictEqual(contexte.mode, 'par_chantier');
+    return { totalCubes: 1, coutParRessource: {}, detail: '1× Corvette → secteur 5' };
+  };
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, actionChantier, demanderChoixChantier).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+
+    var actionMere = { action: 'Déployer', effet: { deployer_cube_secteur_mere: 1 }, cout: {}, texte: '' };
+    var demanderChoixMere = function (contexte) {
+      assert.strictEqual(contexte.mode, 'secteur_mere');
+      return { totalCubes: 1, coutParRessource: {}, detail: '1× Corvette → secteur 1' };
+    };
+    return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, actionMere, demanderChoixMere);
+  }).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+  });
+});
+
+test('deployer_cube : annulé (popup "Annuler") — bloque toute l\u2019action, rien débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Déployer', effet: { deployer_cube: 2 }, cout: { energie: 1 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+test('deployer_cube côté Coût (signe < 0, cas non prévu par le livret) : retombe sur le traitement générique "cube"', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Test', effet: {}, cout: { deployer_cube: 1 }, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    // Pas de popup ouverte (demanderChoixSansPopup_ jetterait) : la clé
+    // est traitée par le repli générique "cube" (consomme cubeActif).
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, PLATEAU_BASE.cubeActif - 1);
   });
 });
 
