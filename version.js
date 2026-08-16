@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 15 — 2026-08-17
+ * Version 16 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,16 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot 2 — grille de ressources, suite à l'audit UI/UX du même
+ * jour) : incrémenté suite à la réécriture de la grille de ressources
+ * principales (écran Stratégie) — niveau/flèche/revenu/stock éditable/
+ * delta par ressource + niveaux de production recalculés depuis les
+ * secteurs, Commerce/Prime/Libération redevenus éditables :
+ * js/strategieService.js (v8), css/style.css (v9). Décision utilisateur :
+ * les boutons d'avancement manuel des pistes de Civilisation (Session 5,
+ * sans équivalent legacy) sont conservés. Fichiers modifiés, chemins déjà
+ * en cache, aucune nouvelle entrée.
  *
  * 17/08/2026 (Session 14 fin — action secteur "Envahir" portée) :
  * incrémenté suite au portage de "envahir"/"envahir_corrompu" (sélection
@@ -172,4 +182,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.18';
+var APP_VERSION = '20260817.19';

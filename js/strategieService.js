@@ -1,7 +1,35 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 7 — 17/08/2026 (Session 14 fin — action secteur "Envahir" portée)
+ * Version 8 — 17/08/2026 (Lot 2 — grille de ressources)
+ *
+ * 17/08/2026 (Lot 2 — grille de ressources, suite à l'audit UI/UX du même
+ * jour) : réécriture de la grille Nourriture/Énergie/Matériel/Crédit/
+ * Science, portage fidèle de champRessourceHTML_ (strategie-2.html GAS) —
+ * remplace l'affichage lecture seule (.ressource-case) par 6 cellules
+ * fixes par ressource (pastille colorée, Niveau de production, →, Revenu,
+ * Stock ÉDITABLE, Delta depuis le début du cycle). Ajouts associés :
+ * - Niveau de production recalculé depuis les secteurs (population ×
+ *   Guildes, + bonus d'origine "bonusProd" éventuel) — portage de
+ *   recalculerNiveauxProduction_, fondu dans renderCubes_ (déjà asynchrone,
+ *   même lecture de secteurs) plutôt qu'une fonction séparée.
+ * - Commerce/Prime/Libération redeviennent éditables (.jeton-champ/
+ *   .jeton-input, portage de champJetonHTML_), persistés au 'change'.
+ * - Sauvegarde différée (debounce 600 ms) des champs simples, portage de
+ *   sauvegarderPlateauMaisonDifferee_.
+ * - soldeDebutCycle (baseline du delta) réinitialisé par afficher() quand
+ *   partie.id ou partie.cycleActuel change — la PWA n'a pas de modale
+ *   "Phase C" (point de reset legacy), c'est le point de reset le plus
+ *   proche disponible côté PWA (bouton "Fin du cycle", index.html, qui
+ *   rappelle afficher() avec un cycleActuel différent).
+ * Décision utilisateur : les boutons "Avancer"/"Avancer la moins avancée"/
+ * "Avancer la piste Corrompue" (Session 5, sans équivalent legacy) sont
+ * CONSERVÉS — écart assumé, pas une régression à corriger.
+ * Aucun fichier CSS legacy disponible pour cet écran (voir audit) : les
+ * nouvelles classes CSS (css/style.css) sont une réécriture fidèle au
+ * comportement du legacy, pas un copier-coller de règles existantes.
+ *
+ * 17/08/2026 (Session 14 fin — action secteur "Envahir" portée)
  *
  * 17/08/2026 (Session 14 fin) : nouveau cas contexte.type === 'envahir'
  * dans demanderChoix — portage direct de ouvrirModaleEnvahir_
@@ -133,14 +161,91 @@
 var StrategieService = (function () {
   'use strict';
 
+  // 17/08/2026 (Lot 2 — grille de ressources) : couleur ajoutée par
+  // ressource (portage direct de RESSOURCES, strategie.html GAS — mêmes
+  // valeurs hexadécimales, identité visuelle du plateau physique) ; .champ
+  // (jamais lu) retiré au passage.
   var CHAMP_RESSOURCE = {
-    nourriture: { champ: 'nourriture', label: 'Nourriture' },
-    energie: { champ: 'energie', label: 'Énergie' },
-    materiel: { champ: 'materiel', label: 'Matériel' },
-    credit: { champ: 'credit', label: 'Crédit' },
-    science: { champ: 'science', label: 'Science' }
+    nourriture: { label: 'Nourriture', couleur: '#49b867' },
+    energie: { label: 'Énergie', couleur: '#f8a21b' },
+    materiel: { label: 'Matériel', couleur: '#ec0d69' },
+    credit: { label: 'Crédit', couleur: '#d1a671' },
+    science: { label: 'Science', couleur: '#06afe5' }
   };
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+
+  // Colonne Stock -> champ plateauMaison correspondant, pour la persistance
+  // directe d'une saisie manuelle (portage de CHAMP_DB_RESSOURCE_SIMPLE_,
+  // strategie.html GAS — noms de colonnes adaptés au camelCase de
+  // gameService.js : CHAMPS_PLATEAU_MAISON_AUTORISES).
+  var CHAMP_DB_RESSOURCE_SIMPLE_ = {
+    nourriture: 'ressourceNourriture',
+    energie: 'ressourceEnergie',
+    materiel: 'ressourceMateriel',
+    credit: 'ressourceCredit',
+    science: 'ressourceScience'
+  };
+
+  // Table Niveau -> Production (0 à 13, plafonnée au-delà) — portage direct
+  // de PRODUCTION_NEMS/PRODUCTION_CREDIT (strategie.html GAS). Même courbe
+  // pour Nourriture/Énergie/Matériel/Science, courbe distincte pour Crédit.
+  var PRODUCTION_NEMS = [0, 1, 1, 2, 3, 3, 4, 4, 5, 6, 8, 10, 12, 15];
+  var PRODUCTION_CREDIT = [0, 1, 1, 1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 8];
+
+  function calculerProduction_(cle, niveau) {
+    niveau = Math.max(0, Math.min(13, Math.floor(Number(niveau) || 0)));
+    var table = (cle === 'credit') ? PRODUCTION_CREDIT : PRODUCTION_NEMS;
+    return table[niveau];
+  }
+
+  // Guilde -> ressource produite (portage direct de GUILDE_VERS_RESSOURCE,
+  // strategie.html GAS), clés alignées sur secteurService.js (guildeFermiers
+  // etc., déjà camelCase côté store secteursPartie).
+  var GUILDE_VERS_RESSOURCE = {
+    guildeFermiers: 'nourriture',
+    guildeIngenieurs: 'energie',
+    guildeMineurs: 'materiel',
+    guildeBanquiers: 'credit',
+    guildeScientifiques: 'science'
+  };
+
+  // Niveaux de production courants (Population × Guildes, + bonus d'origine
+  // éventuel), recalculés par recalculerNiveauxEtCubes_ — voir plus bas.
+  var niveauxProduction = {};
+
+  // Snapshot des ressources au début du cycle en cours, pour le delta
+  // affiché sur chaque ligne (portage de soldeDebutCycle, strategie.html
+  // GAS). Réinitialisé par afficher() dès qu'une nouvelle partie s'ouvre ou
+  // que le cycle change (voir reinitialiserSoldeDebutCycle_) — la PWA n'a
+  // pas de modale "Phase C" (entretien non automatisé), donc pas d'autre
+  // point de validation possible pour ce reset.
+  var soldeDebutCycle = {};
+
+  function reinitialiserSoldeDebutCycle_(partie) {
+    var ressources = (partie.plateauMaison || {}).ressources || {};
+    soldeDebutCycle = {};
+    RESSOURCES_PRODUCTION.forEach(function (cle) { soldeDebutCycle[cle] = ressources[cle] || 0; });
+  }
+
+  // Sauvegarde différée (debounce 600 ms, fusion des champs en attente) —
+  // portage direct de sauvegarderPlateauMaisonDifferee_ (strategie.html
+  // GAS), pour ne pas écrire à chaque frappe sur un champ ressource/jeton.
+  var champsPlateauMaisonEnAttente_ = {};
+  var minuteurSauvegardePlateauMaison_ = null;
+
+  function sauvegarderPlateauMaisonDifferee_(champs) {
+    Object.assign(champsPlateauMaisonEnAttente_, champs);
+    clearTimeout(minuteurSauvegardePlateauMaison_);
+    minuteurSauvegardePlateauMaison_ = setTimeout(function () {
+      var partie = App.getPartieCourante();
+      var aEnvoyer = champsPlateauMaisonEnAttente_;
+      champsPlateauMaisonEnAttente_ = {};
+      if (!partie || !Object.keys(aEnvoyer).length) return;
+      GameService.majPlateauMaison(partie.id, aEnvoyer).catch(function (erreur) {
+        window.alert('Échec de l\'enregistrement : ' + erreur.message);
+      });
+    }, 600);
+  }
 
   // Portage direct de TYPES_VAISSEAU (strategie-2.html GAS) — pour le
   // formulaire Regrouper. Les clés correspondent aux colonnes pn_* de
@@ -256,48 +361,180 @@ var StrategieService = (function () {
    * Libération — Cube actif quitte cette ligne pour la nouvelle ligne
    * Cubes (voir renderCubes_).
    */
+  /**
+   * 17/08/2026 (Lot 2 — grille de ressources) : une ligne = 6 cellules
+   * fixes (Libellé | Niveau | → | Revenu | Stock éditable | Delta),
+   * portage direct de champRessourceHTML_ (strategie.html GAS). Niveau/
+   * Revenu affichent la dernière valeur connue de niveauxProduction (mise
+   * à jour de façon asynchrone par recalculerNiveauxEtCubes_ juste après —
+   * voir majNiveauxAffiches_, qui corrige les spans "niveau-X" et
+   * "revenu-X" sans reconstruire toute la grille).
+   */
+  function champRessourceHTML_(cle, ressources) {
+    var niveau = niveauxProduction[cle] || 0;
+    var revenu = calculerProduction_(cle, niveau);
+    var valeur = ressources[cle] || 0;
+    var delta = valeur - (soldeDebutCycle[cle] || 0);
+    var deltaTexte = delta > 0 ? ('+' + delta) : String(delta);
+
+    return '' +
+      '<div class="field field-ressource" style="--couleur-ressource:' + CHAMP_RESSOURCE[cle].couleur + '">' +
+      '<label for="ressource-' + cle + '"><span class="pastille-ressource"></span>' + CHAMP_RESSOURCE[cle].label + '</label>' +
+      '<span class="ressource-niveau" id="niveau-' + cle + '" title="Niveau de production (Population × Guildes)">' + niveau + '</span>' +
+      '<span class="ressource-fleche">→</span>' +
+      '<span class="ressource-revenu" id="revenu-' + cle + '" title="Revenu ajouté à la ressource lors d\'une action Produire">+' + revenu + '</span>' +
+      '<input type="number" step="1" id="ressource-' + cle + '" class="ressource-input" data-ressource="' + cle + '" value="' + valeur + '">' +
+      '<span class="ressource-delta" id="delta-' + cle + '" title="Depuis le début du cycle">' + deltaTexte + '</span>' +
+      '</div>';
+  }
+
+  function majDeltaAffiche_(cle, valeur) {
+    var badge = document.getElementById('delta-' + cle);
+    if (!badge) return;
+    var delta = valeur - (soldeDebutCycle[cle] || 0);
+    badge.textContent = delta > 0 ? ('+' + delta) : String(delta);
+  }
+
+  function persisterRessourceSimple_(cle, valeur) {
+    var champDb = CHAMP_DB_RESSOURCE_SIMPLE_[cle];
+    if (!champDb) return;
+    var champs = {};
+    champs[champDb] = valeur;
+    sauvegarderPlateauMaisonDifferee_(champs);
+  }
+
   function renderRessources_(partie) {
     var pm = partie.plateauMaison || {};
     var ressources = pm.ressources || {};
 
     var principales = document.getElementById('ressources-principales');
     principales.innerHTML = RESSOURCES_PRODUCTION.map(function (cle) {
-      return '<div class="ressource-case"><div class="ressource-case-label">' + CHAMP_RESSOURCE[cle].label + '</div>' +
-        '<div class="ressource-case-valeur">' + (ressources[cle] || 0) + '</div></div>';
+      return champRessourceHTML_(cle, ressources);
     }).join('');
 
-    var nbCommerce = Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0;
-    var jetons = document.getElementById('ressources-jetons');
-    jetons.innerHTML =
-      '<div class="ressource-case"><div class="ressource-case-label">Commerce</div><div class="ressource-case-valeur">' + nbCommerce + '</div></div>' +
-      '<div class="ressource-case"><div class="ressource-case-label">Prime</div><div class="ressource-case-valeur">' + (pm.jetonPrime || 0) + '</div></div>' +
-      '<div class="ressource-case"><div class="ressource-case-label">Libération</div><div class="ressource-case-valeur">' + (pm.jetonLiberation || 0) + '</div></div>';
+    Array.prototype.forEach.call(principales.querySelectorAll('.ressource-input'), function (input) {
+      input.addEventListener('input', function () {
+        var cle = input.dataset.ressource;
+        var valeur = Number(input.value) || 0;
+        if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.ressources[cle] = valeur;
+        majDeltaAffiche_(cle, valeur);
+        // Rejoue la jouabilité des cartes Focus (coutSuffisant_ relit
+        // partieAffichee.plateauMaison.ressources, déjà à jour ci-dessus) —
+        // ne touche pas #ressources-principales, l'input garde le focus.
+        renderFocusJoueur_(partieAffichee);
+        persisterRessourceSimple_(cle, valeur);
+      });
+    });
+
+    renderJetons_(partie);
   }
 
   /**
-   * 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
-   * déployé — portage direct de recalculerNiveauxProduction_ (strategie.html
-   * GAS, partie Cube déployé uniquement ; les niveaux de production
-   * Nourriture/Énergie/etc. par Guilde restent hors périmètre de cette
-   * restauration, non recalculés automatiquement côté PWA). Cube déployé =
-   * somme de la Puissance Navale (pn_corvette/sentinelle/destroyer/
-   * cuirasse/porte_vaisseau) sur tous les secteurs de la partie ; Cube
-   * inactif = total fixe - actif - déployé. Asynchrone (lecture des
-   * secteurs) : rendu séparé de renderRessources_, appelé depuis afficher()
-   * sans bloquer le reste de l'écran ; silencieux en cas d'échec (garde le
-   * dernier rendu plutôt que de bloquer l'écran, même logique que le
-   * legacy).
+   * 17/08/2026 (Lot 2 — grille de ressources) : Commerce/Prime/Libération
+   * redeviennent éditables (portage direct de champJetonHTML_, strategie.html
+   * GAS — pas de pastille de couleur ni de suivi de delta/niveau pour ces
+   * 3 jetons, contrairement à la grille principale). Persisté au 'change'
+   * (pas à chaque frappe, comme le legacy). Commerce est stocké en base
+   * comme un tableau de jetons 'disponible' (voir schéma jetonCommerce) —
+   * la distinction 'programme' n'est pas câblée côté UI, comme en legacy.
+   */
+  function jetonInputHTML_(cle, label, valeur) {
+    return '<div class="jeton-champ" data-jeton="' + cle + '">' +
+      '<label>' + label + '</label>' +
+      '<input type="number" step="1" min="0" class="jeton-input" id="jeton-valeur-' + cle + '" data-jeton="' + cle + '" value="' + valeur + '">' +
+      '</div>';
+  }
+
+  function persisterJeton_(cle, valeurBrute) {
+    var n = Math.max(0, Number(valeurBrute) || 0);
+    var champs = {};
+    if (cle === 'commerce') {
+      var tokens = [];
+      for (var i = 0; i < n; i++) tokens.push('disponible');
+      champs.jetonCommerce = tokens;
+      if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.jetonCommerce = tokens;
+    } else if (cle === 'prime') {
+      champs.jetonPrime = n;
+      if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.jetonPrime = n;
+    } else if (cle === 'liberation') {
+      champs.jetonLiberation = n;
+      if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.jetonLiberation = n;
+    } else {
+      return;
+    }
+    sauvegarderPlateauMaisonDifferee_(champs);
+  }
+
+  function renderJetons_(partie) {
+    var pm = partie.plateauMaison || {};
+    var nbCommerce = Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0;
+    var jetons = document.getElementById('ressources-jetons');
+    jetons.innerHTML =
+      jetonInputHTML_('commerce', 'Commerce', nbCommerce) +
+      jetonInputHTML_('prime', 'Prime', pm.jetonPrime || 0) +
+      jetonInputHTML_('liberation', 'Libération', pm.jetonLiberation || 0);
+
+    Array.prototype.forEach.call(jetons.querySelectorAll('.jeton-input'), function (input) {
+      input.addEventListener('change', function () {
+        persisterJeton_(input.dataset.jeton, input.value);
+      });
+    });
+  }
+
+  /**
+   * 17/08/2026 (Session 10, étendue Lot 2 — grille de ressources) : ligne
+   * Cube inactif/actif/déployé (inchangée) + niveaux de production
+   * Nourriture/Énergie/Matériel/Crédit/Science (nouveau — portage direct de
+   * recalculerNiveauxProduction_, strategie.html GAS, jusqu'ici hors
+   * périmètre). Niveau = somme, sur tous les secteurs de la partie, de
+   * (population du secteur × nombre de Guildes de ce type), + 1 sur la
+   * ressource nommée par originesMaison.bonusProd le cas échéant (même
+   * hypothèse de correspondance Guilde -> Ressource qu'en legacy, non
+   * reconfirmée ici). Cube déployé = somme de la Puissance Navale
+   * (pnCorvette/Sentinelle/Destroyer/Cuirasse/PorteVaisseau) sur tous les
+   * secteurs ; Cube inactif = total fixe − actif − déployé. Asynchrone
+   * (lecture des secteurs + du catalogue originesMaison) : rendu séparé de
+   * renderRessources_, appelé depuis afficher() sans bloquer le reste de
+   * l'écran ; met à jour les spans "niveau-X" et "revenu-X" déjà présents
+   * dans la grille (voir majNiveauxAffiches_) plutôt que de la reconstruire.
+   * Silencieux en cas d'échec (garde le dernier rendu plutôt que de
+   * bloquer l'écran, même logique que le legacy).
    */
   function renderCubes_(partie) {
     var pm = partie.plateauMaison || {};
     var cubeActif = pm.cubeActif || 0;
     var container = document.getElementById('ressources-cubes');
+    var nomMaison = partie.joueur ? partie.joueur.nom : null;
+    var nomTechDepart = (partie.joueur && partie.joueur.technologieDepart) ? partie.joueur.technologieDepart.nom : null;
 
-    SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
-      var totalDeploye = (secteurs || []).reduce(function (somme, s) {
-        return somme + (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
+    Promise.all([
+      SecteurService.obtenirSecteurs(partie.id),
+      DB.getAll('originesMaison')
+    ]).then(function (resultats) {
+      var secteurs = resultats[0] || [];
+      var origines = resultats[1] || [];
+      var origine = origines.filter(function (o) {
+        return o.maison === nomMaison && o.technologie === nomTechDepart;
+      })[0] || null;
+
+      var totaux = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
+      var totalDeploye = 0;
+      secteurs.forEach(function (s) {
+        var population = Number(s.population) || 0;
+        Object.keys(GUILDE_VERS_RESSOURCE).forEach(function (cleGuilde) {
+          totaux[GUILDE_VERS_RESSOURCE[cleGuilde]] += population * (Number(s[cleGuilde]) || 0);
+        });
+        totalDeploye += (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
           (Number(s.pnDestroyer) || 0) + (Number(s.pnCuirasse) || 0) + (Number(s.pnPorteVaisseau) || 0);
-      }, 0);
+      });
+
+      if (origine && origine.bonusProd && totaux.hasOwnProperty(origine.bonusProd)) {
+        totaux[origine.bonusProd] += 1;
+      }
+
+      RESSOURCES_PRODUCTION.forEach(function (cle) { niveauxProduction[cle] = totaux[cle]; });
+      majNiveauxAffiches_();
+
       var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - totalDeploye);
 
       container.innerHTML =
@@ -306,6 +543,17 @@ var StrategieService = (function () {
         '<div class="ressource-case"><div class="ressource-case-label">Cube déployé</div><div class="ressource-case-valeur">' + totalDeploye + '</div></div>';
     }).catch(function () {
       // Silencieux — garde le dernier rendu plutôt que de bloquer l'écran.
+    });
+  }
+
+  function majNiveauxAffiches_() {
+    RESSOURCES_PRODUCTION.forEach(function (cle) {
+      var niveau = niveauxProduction[cle] || 0;
+      var revenu = calculerProduction_(cle, niveau);
+      var elNiveau = document.getElementById('niveau-' + cle);
+      var elRevenu = document.getElementById('revenu-' + cle);
+      if (elNiveau) elNiveau.textContent = niveau;
+      if (elRevenu) elRevenu.textContent = '+' + revenu;
     });
   }
 
@@ -1447,7 +1695,22 @@ var StrategieService = (function () {
   // ------------------------------------------------------------
 
   function afficher(partie) {
-    if (!partieAffichee || partieAffichee.id !== partie.id) journal = [];
+    var nouvellePartie = !partieAffichee || partieAffichee.id !== partie.id;
+    // 17/08/2026 (Lot 2 — grille de ressources) : la PWA n'a pas de modale
+    // "Phase C" (voir en-tête de soldeDebutCycle) — le passage au cycle
+    // suivant (bouton "Fin du cycle", index.html) rappelle afficher() avec
+    // le même partie.id mais un cycleActuel différent, seul point de
+    // détection disponible ici pour réinitialiser le delta "depuis le
+    // début du cycle".
+    var nouveauCycle = nouvellePartie || partieAffichee.cycleActuel !== partie.cycleActuel;
+    if (nouvellePartie) {
+      journal = [];
+      // Évite d'afficher un instant les niveaux de production de la
+      // partie précédemment ouverte avant que renderCubes_ (asynchrone)
+      // ne les recalcule pour celle-ci.
+      niveauxProduction = {};
+    }
+    if (nouveauCycle) reinitialiserSoldeDebutCycle_(partie);
     partieAffichee = partie;
     renderRessources_(partie);
     renderCubes_(partie);

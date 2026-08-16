@@ -1,6 +1,18 @@
 /**
  * css/style.css
- * Version 8 — 17/08/2026
+ * Version 9 — 17/08/2026
+ *
+ * 17/08/2026 (Lot 2 — grille de ressources) : réécriture du bloc
+ * #ressources-principales (écran Stratégie) — nouvelles classes .field-
+ * ressource/.pastille-ressource/.ressource-niveau/.ressource-fleche/
+ * .ressource-revenu/.ressource-input/.ressource-delta (grille fixe à 6
+ * colonnes par ressource, portage de champRessourceHTML_) et .jeton-champ/
+ * .jeton-input (Commerce/Prime/Libération éditables, portage de
+ * champJetonHTML_) qui remplacent l'usage de .ressource-case sur ces deux
+ * conteneurs (règle ".ressources-jetons .ressource-case" retirée, devenue
+ * inutile ; .ressource-case reste utilisée telle quelle pour Cube inactif/
+ * actif/déployé, inchangé). Voir js/strategieService.js (v8) pour le
+ * rendu correspondant.
  *
  * 17/08/2026 (Session 14 — action secteur "Regrouper" portée) : ajout de
  * .regrouper-liste/.btn-lien/.regrouper-form (popup Regrouper, écran
@@ -515,7 +527,125 @@ input:disabled {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
-.ressources-jetons .ressource-case { flex: 1; min-width: 90px; }
+
+/* 17/08/2026 (Lot 2 — grille de ressources) : #ressources-principales
+   n'utilise plus la grille auto-fill de .ressources-liste ci-dessus (cartes
+   carrées) mais une pile verticale de lignes .field-ressource, chacune sa
+   propre grille fixe à 6 colonnes (Libellé | Niveau | → | Revenu | Stock
+   éditable | Delta) — portage du comportement de champRessourceHTML_
+   (strategie.html GAS). Aucun fichier CSS legacy disponible pour cet écran
+   (audit du 17/08/2026) : ce bloc est une réécriture fidèle au
+   COMPORTEMENT du legacy (mêmes couleurs par ressource, RESSOURCES côté
+   JS), pas un copier-coller de règles CSS existantes. Sélecteur scopé à
+   l'ID pour ne pas affecter les autres conteneurs qui gardent
+   .ressources-liste (aucun actuellement, mais évite une régression future
+   si un nouveau bloc l'utilise). */
+#ressources-principales.ressources-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field-ressource {
+  display: grid;
+  grid-template-columns: 1.5fr 0.55fr 0.35fr 0.7fr 0.95fr 0.65fr;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--couleur-ressource, var(--color-border));
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+}
+.field-ressource label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pastille-ressource {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--couleur-ressource, var(--color-text-muted));
+  flex-shrink: 0;
+}
+.ressource-niveau,
+.ressource-fleche,
+.ressource-revenu {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.ressource-revenu {
+  color: var(--couleur-ressource, var(--color-text-muted));
+  font-weight: 600;
+}
+.ressource-input {
+  width: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 5px 2px;
+}
+.ressource-input:focus {
+  outline: none;
+  border-color: var(--couleur-ressource, var(--color-coral));
+}
+.ressource-delta {
+  font-size: 0.72rem;
+  text-align: right;
+  color: var(--color-text-muted);
+}
+
+/* 17/08/2026 (Lot 2 — grille de ressources) : Commerce/Prime/Libération
+   redeviennent éditables (portage direct de champJetonHTML_, strategie.html
+   GAS) — remplace l'ancien affichage lecture seule (.ressource-case),
+   d'où le retrait de la règle ".ressources-jetons .ressource-case"
+   devenue inutile (ce conteneur n'a plus que des .jeton-champ). Pas de
+   pastille de couleur ni de suivi de delta/niveau pour ces 3 jetons,
+   contrairement à la grille principale ci-dessus (fidèle au legacy). */
+.jeton-champ {
+  flex: 1;
+  min-width: 90px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  text-align: center;
+}
+.jeton-champ label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.jeton-input {
+  width: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-coral);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 4px 2px;
+}
+.jeton-input:focus {
+  outline: none;
+  border-color: var(--color-coral);
+}
 
 /* 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
    déployé — même séparateur visuel que .ressources-jetons (bordure du
