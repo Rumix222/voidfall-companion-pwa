@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 17 — 2026-08-17
+ * Version 18 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,22 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
+ * 17/08) : incrémenté suite à style.html (désormais disponible) —
+ * Pistes de Civilisation : 2 prochaines cases non atteintes (niveau+1 ET
+ * +2) au lieu d'une seule, structure/classes alignées sur le legacy
+ * (liste verticale au lieu d'une grille de 3 cartes). Cartes Focus
+ * (joueur) : gabarit .focus-card/.focus-id/.focus-action-corps/
+ * .focus-action-side (texte à gauche, pastilles de coût + bouton rond
+ * "▶" à droite) au lieu d'un bouton "Jouer cette action" pleine largeur ;
+ * pastilles de coût désormais colorées et abrégées comme en legacy :
+ * js/strategieService.js (v9), css/style.css (v11). Décision utilisateur
+ * confirmée : bouton "Avancer" par piste + les 2 boutons globaux
+ * d'avancement (sans équivalent legacy) restent en place. Non traité,
+ * signalé : affichage des Focus héroïques, pas de gabarit .focus-card
+ * équivalent côté legacy à cet endroit. Fichiers modifiés, chemins déjà
+ * en cache, aucune nouvelle entrée.
  *
  * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
  * incrémenté suite au portage de carteMaisonHTML (app-2.html GAS) sur
@@ -198,4 +214,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.20';
+var APP_VERSION = '20260817.21';

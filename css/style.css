@@ -1,6 +1,14 @@
 /**
  * css/style.css
- * Version 10 — 17/08/2026 (Lot 1 — maisons déchues)
+ * Version 11 — 17/08/2026 (Lot 3 — finitions Stratégie)
+ *
+ * 17/08/2026 (Lot 3 — finitions Stratégie) : classes copiées telles
+ * quelles depuis style.html — pistes de Civilisation (.piste-civilisation-
+ * bloc/-item/-label/-prochaines/-prochaine, liste verticale au lieu
+ * d'une grille de cartes) et cartes Focus (.focus-card/.focus-id/
+ * .focus-action-corps/.focus-action-side/.focus-action-nom, au lieu d'un
+ * bouton "Jouer cette action" pleine largeur). Voir js/strategieService.js
+ * (v9) pour le rendu correspondant.
  *
  * 17/08/2026 (Lot 1 — maisons déchues) : .badge/.badge-type-* remplacées
  * par les valeurs exactes de style.html (même situation que le Lot 2 —
@@ -713,55 +721,80 @@ input:disabled {
   white-space: nowrap;
 }
 
-/* --- Pistes de Civilisation (lecture seule cette session) --- */
+/* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
+   17/08) : classes/valeurs copiées telles quelles depuis style.html GAS —
+   remplace la grille de 3 cartes carrées (Session 5, écrite sans
+   référence legacy) par une liste verticale de lignes horizontales.
+   .btn-avancer-piste (bouton "Avancer" par piste) n'a pas d'équivalent
+   legacy — décision utilisateur : conservé, inséré dans .piste-
+   civilisation-item qui reste en flex-wrap, donc passe à la ligne
+   proprement sur petit écran plutôt que de casser la mise en page. */
 .pistes-civilisation-liste {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.piste-civilisation-case {
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 10px 8px;
-  text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
-.piste-civilisation-nom {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-muted);
+.piste-civilisation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+}
+.piste-civilisation-label {
+  font-size: 0.92rem;
+  color: var(--color-text);
+  flex: 1;
 }
 .piste-civilisation-niveau {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-.piste-civilisation-texte-prochaine {
-  font-size: 0.72rem;
-  line-height: 1.3;
-  min-height: 2.6em;
+  font-weight: 600;
+  color: var(--color-coral);
+  font-size: 0.92rem;
 }
 .btn-avancer-piste {
-  padding: 8px 6px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
   font-size: 0.78rem;
 }
 .piste-civilisation-corrompue {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  font-size: 0.72rem;
   color: var(--color-text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .piste-civilisation-corrompue input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--color-coral);
+  cursor: pointer;
+}
+.piste-civilisation-bloc { margin-bottom: 8px; }
+.piste-civilisation-bloc .piste-civilisation-item { margin-bottom: 0; }
+.piste-civilisation-prochaines {
+  margin: 6px 0 0;
+  padding: 8px 12px 2px 14px;
+  border-left: 2px solid var(--color-border);
+}
+.piste-civilisation-prochaine {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+.piste-civilisation-prochaine strong {
+  font-family: var(--font-display);
+  color: var(--color-coral);
+  font-weight: 600;
 }
 /* 17/08/2026 (Session 12 — restauration IHM Partie) : case "Technologie
    améliorée" (écran Partie) — même pattern que .piste-civilisation-
@@ -807,42 +840,104 @@ input:disabled {
   padding: 10px 8px;
 }
 
-/* --- Cartes Focus jouables --- */
-.focus-action {
-  padding: 10px 0;
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-.focus-action:first-child { border-top: none; padding-top: 0; }
-.focus-action-titre {
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-.focus-action-texte {
+/* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
+   17/08) : classes copiées telles quelles depuis style.html GAS —
+   remplace le bouton "Jouer cette action" pleine largeur (Session 4,
+   écrit sans référence legacy) par le gabarit .focus-action-corps/-side
+   (texte à gauche, pastilles de coût + bouton rond "▶" à droite). Voir
+   js/strategieService.js pour le rendu correspondant.
+   17/08) : copiées telles quelles depuis style.html GAS — remplace la
+   version précédente (Session 4, écrite sans référence legacy) qui
+   empilait tout verticalement avec un bouton "Jouer cette action" pleine
+   largeur. Structure legacy : .focus-action-corps (texte, à gauche) +
+   .focus-action-side (pastilles de coût + bouton rond "▶", à droite,
+   empilés). Voir js/strategieService.js pour le rendu correspondant
+   (carteFocusJoueurHTML_/pastillesCoutHTML_). */
+.focus-card { position: relative; }
+.focus-id {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 8px;
+  margin: -4px 0 8px;
+}
+.focus-action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.focus-action:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 8px;
+}
+.focus-action-corps {
+  flex: 1;
+  min-width: 0;
+}
+.focus-action-nom {
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 1.02rem;
+  margin: 0 0 4px;
+}
+.focus-action-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 .focus-action-cout {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  justify-content: flex-end;
 }
 .pastille-cout {
-  background: var(--couleur-pastille, var(--color-surface-2));
-  color: #1a0f0a;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 13px;
+  background: var(--couleur-pastille);
+  color: #0a0813;
+  font-size: 0.84rem;
   font-weight: 700;
+  cursor: default;
 }
 .btn-jouer-action {
-  width: 100%;
-  padding: 10px 14px;
-  font-size: 0.88rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-coral);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  touch-action: manipulation;
 }
+.btn-jouer-action:active { transform: scale(0.95); }
+.focus-action-insuffisant { opacity: 0.5; }
 .focus-action-insuffisant .btn-jouer-action {
-  opacity: 0.5;
+  border-color: #e0364f;
+  color: #e0364f;
+}
+.focus-action-insuffisant .pastille-cout {
+  outline: 2px solid #e0364f;
+  outline-offset: 1px;
 }
 /* 17/08/2026 (Lot 1 — maisons déchues, prérequis) : .badge/.badge-type-*
    remplacées par les valeurs exactes de style.html GAS — la version

@@ -1,7 +1,34 @@
 /**
  * strategieService.js
  * Écran Stratégie — Voidfall Companion PWA
- * Version 8 — 17/08/2026 (Lot 2 — grille de ressources)
+ * Version 9 — 17/08/2026 (Lot 3 — finitions Stratégie)
+ *
+ * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du 17/08,
+ * grâce à style.html désormais disponible en Project Knowledge) :
+ * - Pistes de Civilisation : affiche les 2 prochaines cases non atteintes
+ *   (niveau+1 ET +2) au lieu d'une seule — portage de
+ *   texteProchainesCasesHTML_ (strategie-2.html GAS). Structure/classes
+ *   alignées sur le legacy (.piste-civilisation-bloc/-item/-label/
+ *   -prochaines/-prochaine, liste verticale de lignes horizontales) au
+ *   lieu de la grille de 3 cartes carrées (Session 5, écrite sans
+ *   référence legacy). Piste au maximum -> plus de message "Piste au
+ *   maximum." (retiré, legacy n'affiche simplement rien).
+ * - Cartes Focus (joueur) : markup aligné sur carteFocusHTML_ — .card.
+ *   focus-card, id de la carte affiché (.focus-id, jamais montré),
+ *   actions en 2 colonnes (.focus-action-corps/-side : texte à gauche,
+ *   pastilles de coût + bouton rond "▶" à droite) au lieu d'un
+ *   empilement vertical avec bouton pleine largeur "Jouer cette action".
+ * - pastillesCoutHTML_ : couleurCout_/abregeCout_ ajoutées (portage
+ *   direct) — pastilles désormais colorées par ressource et abrégées
+ *   comme en legacy (3 caractères depuis RESSOURCES_TOUTES, au lieu de
+ *   LIBELLES_OPTIONS tronqué à 12 caractères).
+ * Écarts assumés et CONSERVÉS (décision utilisateur, hors périmètre de ce
+ * lot) : bouton "Avancer" par piste + les 2 boutons globaux "Avancer la
+ * moins avancée"/"Avancer la piste Corrompue" (Session 5, sans équivalent
+ * legacy — avancement uniquement via une action Focus côté GAS). Non
+ * traité : affichage des Focus héroïques (renderFocusHeroiques_) — pas de
+ * gabarit .focus-card équivalent côté legacy à cet endroit (app.html GAS
+ * n'affiche qu'un simple menu déroulant, sans détail des actions).
  *
  * 17/08/2026 (Lot 2 — grille de ressources, suite à l'audit UI/UX du même
  * jour) : réécriture de la grille Nourriture/Énergie/Matériel/Crédit/
@@ -173,6 +200,27 @@ var StrategieService = (function () {
     science: { label: 'Science', couleur: '#06afe5' }
   };
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+
+  // 17/08/2026 (Lot 3 — finitions Stratégie) : palette complète, portage
+  // direct de RESSOURCES (strategie-2.html GAS) — couvre aussi Influence/
+  // Commerce/Prime/Libération/Cubes, absents de CHAMP_RESSOURCE (limité
+  // aux 5 ressources de la grille "principales", Lot 2). Utilisée
+  // uniquement par couleurCout_/abregeCout_ (pastilles de coût des cartes
+  // Focus) — ne pas fusionner avec CHAMP_RESSOURCE, portées différentes.
+  var RESSOURCES_TOUTES = {
+    nourriture: { label: 'Nourriture', couleur: '#49b867' },
+    energie: { label: 'Énergie', couleur: '#f8a21b' },
+    materiel: { label: 'Matériel', couleur: '#ec0d69' },
+    credit: { label: 'Crédit', couleur: '#d1a671' },
+    science: { label: 'Science', couleur: '#06afe5' },
+    influence: { label: 'Influence', couleur: '#c0257a' },
+    commerce: { label: 'Commerce', couleur: '#e0b34d' },
+    prime: { label: 'Prime', couleur: '#e0b34d' },
+    liberation: { label: 'Libération', couleur: '#e0b34d' },
+    cubeInactif: { label: 'Cube inactif', couleur: '#4a4360' },
+    cubeActif: { label: 'Cube actif', couleur: '#9a90b3' },
+    cubeDeploye: { label: 'Cube déployé', couleur: '#6b6285' }
+  };
 
   // Colonne Stock -> champ plateauMaison correspondant, pour la persistance
   // directe d'une saisie manuelle (portage de CHAMP_DB_RESSOURCE_SIMPLE_,
@@ -613,10 +661,22 @@ var StrategieService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 5, Phase 5 — Civilisation) : chaque piste gagne un
-   * bouton "Avancer" (résout aussi l'effet de la case atteinte, via
-   * CivilisationService.avancerPiste) et une case "Corrompue" — remplace
-   * l'affichage lecture-seule de la session précédente.
+   * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
+   * 17/08) : structure/classes alignées sur renderPistesCivilisation_ et
+   * texteProchainesCasesHTML_ (strategie-2.html GAS, désormais disponible
+   * via style.html) — remplace la grille de 3 cartes carrées (Session 5,
+   * écrite sans référence legacy) par une liste verticale de lignes
+   * horizontales (.piste-civilisation-bloc/-item/-label), et affiche les
+   * 2 prochaines cases non atteintes (niveau+1 ET +2, comme en legacy) au
+   * lieu d'une seule. Piste au maximum -> aucune case affichée (comme en
+   * legacy, sans message de repli — l'ancien "Piste au maximum." est
+   * retiré pour coller exactement au comportement legacy).
+   * Écart assumé et CONSERVÉ (décision utilisateur) : le bouton "Avancer"
+   * par piste (résout l'effet de la case via CivilisationService.
+   * avancerPiste) et les 2 boutons globaux "Avancer la moins avancée"/
+   * "Avancer la piste Corrompue" (index.html) n'ont pas d'équivalent
+   * legacy (avancement uniquement via une action Focus, côté GAS) — pas
+   * une régression à corriger.
    */
   function renderPistesCivilisation_(partie) {
     var civ = partie.civilisation || { societe: 0, gouvernement: 0, economie: 0, corrompues: {} };
@@ -627,12 +687,15 @@ var StrategieService = (function () {
     container.innerHTML = PISTES_ORDRE.map(function (piste) {
       var niveau = civ[piste] || 0;
       var auMax = niveau >= CivilisationService.NIVEAU_MAX;
-      return '<div class="piste-civilisation-case">' +
-        '<div class="piste-civilisation-nom">' + LABEL_PISTE[piste] + '</div>' +
-        '<div class="piste-civilisation-niveau">' + niveau + ' / ' + CivilisationService.NIVEAU_MAX + '</div>' +
-        '<p class="hint piste-civilisation-texte-prochaine" id="piste-texte-' + piste + '" style="margin:4px 0;"></p>' +
-        '<button class="btn btn-secondary btn-avancer-piste" data-piste="' + piste + '"' + (auMax ? ' disabled' : '') + '>Avancer</button>' +
+      return '' +
+        '<div class="piste-civilisation-bloc">' +
+        '<div class="piste-civilisation-item">' +
+        '<span class="piste-civilisation-label">' + LABEL_PISTE[piste] + '</span>' +
+        '<span class="piste-civilisation-niveau">' + niveau + ' / ' + CivilisationService.NIVEAU_MAX + '</span>' +
+        '<button type="button" class="btn btn-secondary btn-avancer-piste" data-piste="' + piste + '"' + (auMax ? ' disabled' : '') + '>Avancer</button>' +
         '<label class="piste-civilisation-corrompue"><input type="checkbox" class="check-corrompue" data-piste="' + piste + '"' + (corrompues[piste] ? ' checked' : '') + '> Corrompue</label>' +
+        '</div>' +
+        '<div id="piste-prochaines-' + piste + '"></div>' +
         '</div>';
     }).join('');
 
@@ -649,16 +712,36 @@ var StrategieService = (function () {
       obtenirDetailPistesCache_(nomMaison).then(function (detail) {
         PISTES_ORDRE.forEach(function (piste) {
           var niveau = civ[piste] || 0;
-          var el = document.getElementById('piste-texte-' + piste);
+          var el = document.getElementById('piste-prochaines-' + piste);
           if (!el) return; // l'écran a pu être re-rendu entre-temps
-          if (niveau >= CivilisationService.NIVEAU_MAX) { el.textContent = 'Piste au maximum.'; return; }
-          var prochaine = (detail[piste] || [])[niveau]; // case niveau+1, index 0-based
-          el.textContent = prochaine ? ('Prochaine case : ' + prochaine.texte) : '';
+          el.innerHTML = texteProchainesCasesHTML_(detail[piste], niveau);
         });
       }).catch(function (erreur) {
         console.warn('StrategieService : détail des pistes indisponible :', erreur);
       });
     }
+  }
+
+  /**
+   * Texte des 1-2 prochaines cases non atteintes d'une piste (case
+   * niveau+1 et +2, si elles existent) — portage direct de
+   * texteProchainesCasesHTML_ (strategie-2.html GAS). `cases` : 7 entrées
+   * {case, texte} pour cette piste (index 0 = case 1), issues de
+   * CivilisationService.obtenirDetailPistes.
+   */
+  function texteProchainesCasesHTML_(cases, niveau) {
+    if (!cases) return '';
+    var prochaines = [];
+    for (var c = niveau + 1; c <= Math.min(CivilisationService.NIVEAU_MAX, niveau + 2); c++) {
+      var entree = cases[c - 1];
+      if (entree) prochaines.push(entree);
+    }
+    if (!prochaines.length) return '';
+    return '<div class="piste-civilisation-prochaines">' +
+      prochaines.map(function (e) {
+        return '<p class="piste-civilisation-prochaine"><strong>Case ' + e.case + '</strong> — ' + (e.texte || '(aucun texte)') + '</p>';
+      }).join('') +
+      '</div>';
   }
 
   function obtenirDetailPistesCache_(nomMaison) {
@@ -767,14 +850,39 @@ var StrategieService = (function () {
     return '<span class="' + classe + '">' + (type || '?') + '</span>';
   }
 
+  /**
+   * 17/08/2026 (Lot 3 — finitions Stratégie) : couleurCout_/abregeCout_
+   * ajoutées (portage direct, strategie-2.html GAS) — pastillesCoutHTML_
+   * n'abrégeait auparavant le libellé des clés non numériques qu'via
+   * LIBELLES_OPTIONS (vocabulaire des popups de choix, tronqué à 12
+   * caractères), ce qui ne correspondait pas au rendu legacy (abrégé à 3
+   * caractères depuis RESSOURCES_TOUTES.label, ou "Choix"/"Cube"/6
+   * caractères en repli). Chaque pastille reprend aussi la couleur de la
+   * ressource concernée (--couleur-pastille), absente jusqu'ici.
+   */
+  function couleurCout_(cle) {
+    var trouve = RESSOURCES_TOUTES[cle];
+    if (trouve) return trouve.couleur;
+    if (cle.toLowerCase().indexOf('cube') !== -1) return '#9a90b3';
+    return '#6b6285';
+  }
+
+  function abregeCout_(cle) {
+    var trouve = RESSOURCES_TOUTES[cle];
+    if (trouve) return trouve.label.slice(0, 3);
+    if (cle === 'ressource_choix') return 'Choix';
+    if (cle.toLowerCase().indexOf('cube') !== -1) return 'Cube';
+    return cle.slice(0, 6);
+  }
+
   function pastillesCoutHTML_(cout) {
     if (!cout || typeof cout !== 'object' || cout.brut) return '';
     var cles = Object.keys(cout);
     if (!cles.length) return '';
     return '<div class="focus-action-cout">' + cles.map(function (cle) {
       var valeur = cout[cle];
-      var texte = (typeof valeur === 'number') ? valeur : (LIBELLES_OPTIONS[cle] || cle).slice(0, 12);
-      return '<span class="pastille-cout" title="' + cle + (typeof valeur === 'number' ? ' : ' + valeur : '') + '">' + texte + '</span>';
+      var texte = (typeof valeur === 'number') ? valeur : abregeCout_(cle);
+      return '<span class="pastille-cout" style="--couleur-pastille:' + couleurCout_(cle) + '" title="' + cle + (typeof valeur === 'number' ? ' : ' + valeur : '') + '">' + texte + '</span>';
     }).join('') + '</div>';
   }
 
@@ -789,21 +897,37 @@ var StrategieService = (function () {
     return suffisant;
   }
 
+  /**
+   * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
+   * 17/08) : markup aligné sur carteFocusHTML_ (strategie-2.html GAS,
+   * désormais disponible via style.html) — .card.focus-card (au lieu de
+   * .card seul), <h3> nom + badge (au lieu d'un badge suivi d'un div
+   * stylé inline), id de la carte affiché (.focus-id, jamais montré
+   * jusqu'ici), et actions en 2 colonnes (.focus-action-corps texte à
+   * gauche, .focus-action-side pastilles de coût + bouton rond "▶" à
+   * droite) au lieu d'un empilement vertical avec bouton pleine largeur
+   * "Jouer cette action". Comportement inchangé (coutSuffisant_/
+   * focus-action-insuffisant, écoute du clic) — seul le markup change.
+   */
   function carteFocusJoueurHTML_(carte, carteIndex) {
     var ressources = (partieAffichee.plateauMaison || {}).ressources || {};
     var actionsHtml = carte.actions.map(function (action, actionIndex) {
       var jouable = coutSuffisant_(action.cout, ressources);
       return '<div class="focus-action' + (jouable ? '' : ' focus-action-insuffisant') + '">' +
-        '<div class="focus-action-titre">' + (action.action || 'Action') + '</div>' +
-        (action.texte ? '<div class="focus-action-texte">' + action.texte + '</div>' : '') +
+        '<div class="focus-action-corps">' +
+        '<p class="focus-action-nom">' + (action.action || '(action)') + '</p>' +
+        (action.texte ? '<p>' + action.texte + '</p>' : '') +
+        '</div>' +
+        '<div class="focus-action-side">' +
         pastillesCoutHTML_(action.cout) +
-        '<button class="btn btn-primary btn-jouer-action" data-carte="' + carteIndex + '" data-action="' + actionIndex + '">Jouer cette action</button>' +
+        '<button class="btn-jouer-action" data-carte="' + carteIndex + '" data-action="' + actionIndex + '" title="Jouer cette action" aria-label="Jouer cette action">▶</button>' +
+        '</div>' +
         '</div>';
     }).join('');
 
-    return '<div class="card">' +
-      badgeType_(carte.type) +
-      '<div style="font-weight:600;margin-bottom:4px;">' + carte.focus + '</div>' +
+    return '<div class="card focus-card">' +
+      '<h3>' + carte.focus + ' ' + badgeType_(carte.type) + '</h3>' +
+      (carte.id ? '<p class="focus-id">' + carte.id + '</p>' : '') +
       actionsHtml +
       '</div>';
   }
