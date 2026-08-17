@@ -1,6 +1,12 @@
 /**
  * css/style.css
- * Version 13 — 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel)
+ * Version 14 — 17/08/2026 (Lot F — corrections mineures)
+ *
+ * 17/08/2026 (Lot F — corrections mineures) : nouvelles classes
+ * .ligne-cubes/-titre/-item (ligne Cube inactif/actif/déployé compactée
+ * sur une seule ligne, écran Plat. maison — voir js/strategieService.js
+ * v13, renderCubes_). .civilisation-actions-globales retirée (n'habillait
+ * plus que les 2 boutons globaux retirés du DOM, voir index.html v18).
  *
  * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : nouvelles
  * classes .rappel-ressources-footer/.rappel-chip/-label/-valeur (bandeau
@@ -622,10 +628,34 @@ input:disabled {
 
 /* 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
    déployé — même séparateur visuel que .ressources-jetons (bordure du
-   haut), portage direct de style.html GAS. */
+   haut), portage direct de style.html GAS.
+   17/08/2026 (Lot F — corrections mineures) : contenu (.ligne-cubes)
+   compacté sur une seule ligne, "Cube" affiché une seule fois — voir
+   renderCubes_, js/strategieService.js. Le conteneur garde .ressources-liste
+   (display:flex column, un seul enfant désormais donc sans effet visible)
+   pour ne pas toucher le HTML (id="ressources-cubes"). */
 .ressources-cubes {
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
+}
+.ligne-cubes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.ligne-cubes-titre {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.ligne-cubes-item strong {
+  color: var(--color-coral);
+  font-weight: 700;
 }
 
 /* 17/08/2026 (Session 10 — restauration IHM) : Gloire — 5 emplacements,
@@ -902,16 +932,10 @@ input:disabled {
   font-size: 0.92rem;
   color: var(--color-text);
 }
-.civilisation-actions-globales {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
-.civilisation-actions-globales .btn {
-  flex: 1;
-  font-size: 0.82rem;
-  padding: 10px 8px;
-}
+/* 17/08/2026 (Lot F — corrections mineures) : .civilisation-actions-globales
+   retirée — n'habillait plus que les 2 boutons globaux "Avancer la moins
+   avancée"/"Avancer la piste Corrompue", retirés du DOM (voir index.html
+   et js/strategieService.js), devenue inutile. */
 
 /* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
    17/08) : classes copiées telles quelles depuis style.html GAS —

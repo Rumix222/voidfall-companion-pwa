@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 19 — 2026-08-17
+ * Version 20 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,24 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot F — corrections mineures) : incrémenté suite à un lot de
+ * petites corrections/simplifications sur Plat. Galactique/Plat. maison/
+ * Focus/Secteurs : correctif du bouton "Fin du cycle" (ne fonctionnait
+ * plus, ReferenceError silencieuse — App expose désormais ses fonctions
+ * de rendu d'écran), #btn-fin-cycle relabellisé "Terminer la partie" au
+ * cycle 3 (remplace #btn-terminer-partie, désormais toujours caché),
+ * suffixes de titres superflus retirés (Focus héroïques, Événement
+ * galactique), noms de maison retirés des Technologies avancées, ligne
+ * Cube compactée, libellé "Corrompue" -> "COR.", boutons globaux de
+ * civilisation retirés (fonctions conservées pour un futur usage par une
+ * action), Technologies obtenues 6 -> 5 emplacements, cartes Focus (type
+ * + numéro retirés du titre) et nouvel affichage du détail des Focus
+ * héroïques du cycle sur l'écran Focus, en-tête de colonne Secteurs
+ * "Gardiens" -> "Gard." : index.html (v18), js/strategieService.js
+ * (v13), js/gameService.js (v10), css/style.css (v14). Fichiers modifiés,
+ * chemins déjà en cache, aucune nouvelle entrée dans
+ * FICHIERS_A_METTRE_EN_CACHE.
  *
  * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : incrémenté
  * suite à la réorganisation de l'écran Focus (index.html v17) — "Actions
@@ -253,4 +271,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.24';
+var APP_VERSION = '20260817.25';

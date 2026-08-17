@@ -1,7 +1,15 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 9 — 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées)
+ * Version 10 — 17/08/2026 (Lot F — corrections mineures)
+ *
+ * 17/08/2026 (Lot F — corrections mineures) : technologiesObtenues passe
+ * de 6 à 5 emplacements (les 3 occurrences du tableau par défaut) — avec
+ * la Technologie de départ (fixe), cela fait 6 technologies maximum au
+ * total (décision utilisateur, voir index.html/renderTechnologiesObtenues_).
+ * Une partie déjà en cours avec une technologie au 6e emplacement (index
+ * 5) la conserve en base (colonne dédiée, jamais tronquée ici) — seul
+ * index.html limite l'affichage/l'édition à 5, hors périmètre signalé.
  *
  * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : nouvelle
  * mécanique confirmée par l'utilisateur (session du 17/08), sans
@@ -383,7 +391,7 @@ var GameService = (function () {
         economie: !!pm.civCorrompueEconomie
       }
     };
-    partie.technologiesObtenues = pm.technologiesObtenues || [null, null, null, null, null, null];
+    partie.technologiesObtenues = pm.technologiesObtenues || [null, null, null, null, null];
     // 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
     // technologiesAvanceesChoisies (les 4 choisies au cycle 1, parmi les
     // 8 des maisons déchues) et technologiesAvanceesAmeliorees (map
@@ -621,7 +629,7 @@ var GameService = (function () {
               adversaires: adversaires,
               evenements: { cycle1: null, cycle2: null, cycle3: null },
               technologiesAcquises: [maisonJoueur.technologieDepart],
-              technologiesObtenues: [null, null, null, null, null, null],
+              technologiesObtenues: [null, null, null, null, null],
               civilisation: {
                 societe: civilisationDepart.societe,
                 gouvernement: civilisationDepart.gouvernement,
@@ -665,7 +673,7 @@ var GameService = (function () {
               programme2: null,
               programme3: null,
               programme4: null,
-              technologiesObtenues: [null, null, null, null, null, null],
+              technologiesObtenues: [null, null, null, null, null],
               technologiesAvanceesChoisies: [null, null, null, null],
               technologiesAvanceesAmeliorees: {}
             };
@@ -900,8 +908,8 @@ var GameService = (function () {
 
     /**
      * 17/08/2026 (Session 12 — restauration IHM Partie) : marque une
-     * technologie possédée (départ, cible='depart' ; ou l'un des 6
-     * emplacements obtenus, cible=index 0-5) comme améliorée ou non —
+     * technologie possédée (départ, cible='depart' ; ou l'un des 5
+     * emplacements obtenus, cible=index 0-4) comme améliorée ou non —
      * portage direct de GameService.definirTechnologieAmelioree (GAS,
      * PATCH JS direct sur plateau_maison, jamais une RPC). Écrit
      * directement sur le record `plateauMaison` (et non via
@@ -925,8 +933,8 @@ var GameService = (function () {
         }
 
         var slot = Number(cible);
-        if (slot < 0 || slot > 5) throw new Error('Emplacement de technologie invalide.');
-        var technologiesObtenues = ligne.technologiesObtenues || [null, null, null, null, null, null];
+        if (slot < 0 || slot > 4) throw new Error('Emplacement de technologie invalide.');
+        var technologiesObtenues = ligne.technologiesObtenues || [null, null, null, null, null];
         if (!technologiesObtenues[slot]) throw new Error('Aucune technologie à cet emplacement.');
         technologiesObtenues[slot] = Object.assign({}, technologiesObtenues[slot], { amelioree: amelioree });
         ligne.technologiesObtenues = technologiesObtenues;
@@ -1045,20 +1053,20 @@ var GameService = (function () {
 
     /**
      * 17/08/2026 (Session 12 — SQL RPC récupéré) : enregistre (ou retire,
-     * si nomTechnologie est vide) la technologie obtenue dans l'un des 6
+     * si nomTechnologie est vide) la technologie obtenue dans l'un des 5
      * emplacements du plateau maison, parmi les technologies des maisons
      * déchues (partie.adversaires) — portage direct de la RPC
      * choisir_technologie_obtenue (rpc.json).
      */
     choisirTechnologieObtenue: function (partieId, slot, nomTechnologie) {
       slot = Number(slot);
-      if (slot < 0 || slot > 5) return Promise.reject(new Error('Emplacement de technologie invalide.'));
+      if (slot < 0 || slot > 4) return Promise.reject(new Error('Emplacement de technologie invalide.'));
 
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
         var partie = assemblerPartie_(resultats[0], resultats[1]);
         if (!partie) throw new Error('Partie introuvable.');
 
-        var technologies = (partie.technologiesObtenues || [null, null, null, null, null, null]).slice();
+        var technologies = (partie.technologiesObtenues || [null, null, null, null, null]).slice();
 
         if (!nomTechnologie) {
           technologies[slot] = null;
