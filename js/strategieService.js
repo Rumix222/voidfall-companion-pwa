@@ -1,7 +1,31 @@
 /**
  * strategieService.js
- * Écrans Focus (ex-Stratégie) et Plat. maison — Voidfall Companion PWA
- * Version 12 — 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel)
+ * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
+ * Version 13 — 17/08/2026 (Lot F — corrections mineures)
+ *
+ * 17/08/2026 (Lot F — corrections mineures) :
+ * - Focus (joueur ET héroïques, carteFocusJoueurHTML_) : type de Focus
+ *   (badge) et numéro de carte (.focus-id) retirés du titre. badgeType_
+ *   (devenue inutile) supprimée.
+ * - Nouveau : renderFocusHeroiquesJoueur_ (#focus-heroiques-joueur, écran
+ *   Focus, voir index.html) — affiche le détail jouable des Focus
+ *   héroïques choisis pour le cycle en cours (partie.focusHeroiques),
+ *   réutilise carteFocusJoueurHTML_ avec source='heroique'. jouerAction_
+ *   généralisée (nouveau paramètre `source`, voir resoudreCarteSource_)
+ *   pour lire la carte dans focusJoueur OU focusHeroiques selon l'origine
+ *   du clic (data-source sur le bouton ▶).
+ * - renderFocusHeroiques_ (écran Plat. Galactique, les <select> de choix) :
+ *   détail de carte (badge + actions) retiré — décision utilisateur, le
+ *   nom dans le <select> suffit ici, le détail vit désormais sur l'écran
+ *   Focus (renderFocusHeroiquesJoueur_ ci-dessus).
+ * - renderCubes_ : Inactif/Actif/Déployé compactés sur une seule ligne
+ *   (.ligne-cubes, css/style.css), "Cube" affiché une seule fois.
+ * - renderPistesCivilisation_ : libellé "Corrompue" -> "COR." (gain de
+ *   place). Boutons globaux "Avancer la moins avancée"/"Avancer la piste
+ *   Corrompue" retirés du DOM (voir index.html) — liaisons en null-safe,
+ *   avancerMoinsAvancee_/avancerCorrompue_ (et les fonctions
+ *   CivilisationService qu'elles enveloppent) restent définies pour un
+ *   futur pont Focus -> Civilisation.
  *
  * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
  * nouveau bandeau permanent #focus-rappel-ressources (écran Focus, voir
@@ -626,6 +650,11 @@ var StrategieService = (function () {
    * dans la grille (voir majNiveauxAffiches_) plutôt que de la reconstruire.
    * Silencieux en cas d'échec (garde le dernier rendu plutôt que de
    * bloquer l'écran, même logique que le legacy).
+   *
+   * 17/08/2026 (Lot F — corrections mineures) : les 3 valeurs (Inactif/
+   * Actif/Déployé) tiennent désormais sur une seule ligne compacte
+   * (.ligne-cubes, voir css/style.css), le mot "Cube" n'apparaît plus
+   * qu'une fois au lieu de 3 (une case par valeur auparavant).
    */
   function renderCubes_(partie) {
     var pm = partie.plateauMaison || {};
@@ -665,9 +694,12 @@ var StrategieService = (function () {
       var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - totalDeploye);
 
       container.innerHTML =
-        '<div class="ressource-case"><div class="ressource-case-label">Cube inactif</div><div class="ressource-case-valeur">' + cubeInactif + '</div></div>' +
-        '<div class="ressource-case"><div class="ressource-case-label">Cube actif</div><div class="ressource-case-valeur">' + cubeActif + '</div></div>' +
-        '<div class="ressource-case"><div class="ressource-case-label">Cube déployé</div><div class="ressource-case-valeur">' + totalDeploye + '</div></div>';
+        '<div class="ligne-cubes">' +
+        '<span class="ligne-cubes-titre">Cube</span>' +
+        '<span class="ligne-cubes-item">Inactif <strong>' + cubeInactif + '</strong></span>' +
+        '<span class="ligne-cubes-item">Actif <strong>' + cubeActif + '</strong></span>' +
+        '<span class="ligne-cubes-item">Déployé <strong>' + totalDeploye + '</strong></span>' +
+        '</div>';
     }).catch(function () {
       // Silencieux — garde le dernier rendu plutôt que de bloquer l'écran.
     });
@@ -772,7 +804,7 @@ var StrategieService = (function () {
         '<span class="piste-civilisation-label">' + LABEL_PISTE[piste] + '</span>' +
         '<span class="piste-civilisation-niveau">' + niveau + ' / ' + CivilisationService.NIVEAU_MAX + '</span>' +
         '<button type="button" class="btn btn-secondary btn-avancer-piste" data-piste="' + piste + '"' + (auMax ? ' disabled' : '') + '>Avancer</button>' +
-        '<label class="piste-civilisation-corrompue"><input type="checkbox" class="check-corrompue" data-piste="' + piste + '"' + (corrompues[piste] ? ' checked' : '') + '> Corrompue</label>' +
+        '<label class="piste-civilisation-corrompue"><input type="checkbox" class="check-corrompue" data-piste="' + piste + '"' + (corrompues[piste] ? ' checked' : '') + '> COR.</label>' +
         '</div>' +
         '<div id="piste-prochaines-' + piste + '"></div>' +
         '</div>';
@@ -785,7 +817,13 @@ var StrategieService = (function () {
       cb.addEventListener('change', function () { toggleCorruption_(cb.dataset.piste, cb.checked, cb); });
     });
 
-    document.getElementById('btn-avancer-corrompue').disabled = !PISTES_ORDRE.some(function (p) { return corrompues[p]; });
+    // 17/08/2026 (Lot F — corrections mineures) : #btn-avancer-corrompue
+    // n'est plus dans le DOM (bouton global retiré, voir index.html) —
+    // gardé en null-safe plutôt que supprimé, la fonction CivilisationService
+    // sous-jacente (avancerPisteCorrompue) reste appelable par un futur
+    // pont Focus -> Civilisation (voir avancerCorrompue_ ci-dessous).
+    var btnAvancerCorrompue = document.getElementById('btn-avancer-corrompue');
+    if (btnAvancerCorrompue) btnAvancerCorrompue.disabled = !PISTES_ORDRE.some(function (p) { return corrompues[p]; });
 
     if (nomMaison) {
       obtenirDetailPistesCache_(nomMaison).then(function (detail) {
@@ -921,14 +959,6 @@ var StrategieService = (function () {
   // Rendu cartes Focus (joueur + héroïques)
   // ------------------------------------------------------------
 
-  function badgeType_(type) {
-    var classe = 'badge';
-    if (type === 'Standard') classe += ' badge-type-standard';
-    else if (type === 'Héroïque') classe += ' badge-type-heroique';
-    else classe += ' badge-type-maison';
-    return '<span class="' + classe + '">' + (type || '?') + '</span>';
-  }
-
   /**
    * 17/08/2026 (Lot 3 — finitions Stratégie) : couleurCout_/abregeCout_
    * ajoutées (portage direct, strategie-2.html GAS) — pastillesCoutHTML_
@@ -980,15 +1010,24 @@ var StrategieService = (function () {
    * 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
    * 17/08) : markup aligné sur carteFocusHTML_ (strategie-2.html GAS,
    * désormais disponible via style.html) — .card.focus-card (au lieu de
-   * .card seul), <h3> nom + badge (au lieu d'un badge suivi d'un div
-   * stylé inline), id de la carte affiché (.focus-id, jamais montré
-   * jusqu'ici), et actions en 2 colonnes (.focus-action-corps texte à
+   * .card seul), actions en 2 colonnes (.focus-action-corps texte à
    * gauche, .focus-action-side pastilles de coût + bouton rond "▶" à
    * droite) au lieu d'un empilement vertical avec bouton pleine largeur
    * "Jouer cette action". Comportement inchangé (coutSuffisant_/
    * focus-action-insuffisant, écoute du clic) — seul le markup change.
+   *
+   * 17/08/2026 (Lot F — corrections mineures) : type de Focus (badge) et
+   * numéro de carte (.focus-id) retirés du titre — décision utilisateur
+   * (n'apportaient rien : le type est toujours "Héroïque" sur l'écran
+   * Plat. Galactique, jamais montré ici, et le numéro est un identifiant
+   * interne au catalogue, pas une info de jeu). Paramètre `source`
+   * ajouté (data-source sur le bouton ▶, 'joueur' par défaut) — permet à
+   * jouerAction_ de savoir dans quel tableau de la partie relire la carte
+   * (partie.focusJoueur ou partie.focusHeroiques[cycle]) : voir
+   * renderFocusHeroiquesJoueur_ ci-dessous, qui réutilise cette même
+   * fonction pour les Focus héroïques du cycle en cours.
    */
-  function carteFocusJoueurHTML_(carte, carteIndex) {
+  function carteFocusJoueurHTML_(carte, carteIndex, source) {
     var ressources = (partieAffichee.plateauMaison || {}).ressources || {};
     var actionsHtml = carte.actions.map(function (action, actionIndex) {
       var jouable = coutSuffisant_(action.cout, ressources);
@@ -999,16 +1038,23 @@ var StrategieService = (function () {
         '</div>' +
         '<div class="focus-action-side">' +
         pastillesCoutHTML_(action.cout) +
-        '<button class="btn-jouer-action" data-carte="' + carteIndex + '" data-action="' + actionIndex + '" title="Jouer cette action" aria-label="Jouer cette action">▶</button>' +
+        '<button class="btn-jouer-action" data-source="' + (source || 'joueur') + '" data-carte="' + carteIndex + '" data-action="' + actionIndex + '" title="Jouer cette action" aria-label="Jouer cette action">▶</button>' +
         '</div>' +
         '</div>';
     }).join('');
 
     return '<div class="card focus-card">' +
-      '<h3>' + carte.focus + ' ' + badgeType_(carte.type) + '</h3>' +
-      (carte.id ? '<p class="focus-id">' + carte.id + '</p>' : '') +
+      '<h3>' + carte.focus + '</h3>' +
       actionsHtml +
       '</div>';
+  }
+
+  function activerBoutonsJouerAction_(container) {
+    Array.prototype.forEach.call(container.querySelectorAll('.btn-jouer-action'), function (btn) {
+      btn.addEventListener('click', function () {
+        jouerAction_(btn.dataset.source || 'joueur', Number(btn.dataset.carte), Number(btn.dataset.action), btn);
+      });
+    });
   }
 
   function renderFocusJoueur_(partie) {
@@ -1020,13 +1066,38 @@ var StrategieService = (function () {
       return;
     }
 
-    container.innerHTML = cartes.map(function (c, i) { return carteFocusJoueurHTML_(c, i); }).join('');
+    container.innerHTML = cartes.map(function (c, i) { return carteFocusJoueurHTML_(c, i, 'joueur'); }).join('');
+    activerBoutonsJouerAction_(container);
+  }
 
-    Array.prototype.forEach.call(container.querySelectorAll('.btn-jouer-action'), function (btn) {
-      btn.addEventListener('click', function () {
-        jouerAction_(Number(btn.dataset.carte), Number(btn.dataset.action), btn);
-      });
-    });
+  /**
+   * 17/08/2026 (Lot F — corrections mineures) : affiche, sur l'écran
+   * Focus, le détail jouable (actions/coûts) des Focus héroïques choisis
+   * pour le cycle en cours (partie.focusHeroiques['cycle' + cycleActuel],
+   * choix fait sur l'écran Plat. Galactique — voir renderFocusHeroiques_
+   * ci-dessous, désormais réduit à la seule sélection). Réutilise
+   * carteFocusJoueurHTML_ telle quelle (même structure de carte que les
+   * Focus joueur), avec source='heroique' pour que jouerAction_ relise
+   * la bonne carte. #focus-heroiques-joueur (index.html) — masqué si
+   * aucun Focus héroïque n'est encore choisi pour ce cycle (état initial
+   * ou partie terminée).
+   */
+  function renderFocusHeroiquesJoueur_(partie) {
+    var bloc = document.getElementById('bloc-focus-heroiques-joueur');
+    var container = document.getElementById('focus-heroiques-joueur');
+    if (!bloc || !container) return;
+    var cycle = partie.cycleActuel;
+    if (!cycle || cycle === 'termine') { bloc.hidden = true; container.innerHTML = ''; return; }
+    var cartes = (partie.focusHeroiques && partie.focusHeroiques['cycle' + cycle]) || [null, null, null];
+    var cartesChoisies = cartes.map(function (c, i) { return { carte: c, slot: i }; }).filter(function (x) { return x.carte; });
+
+    if (!cartesChoisies.length) { bloc.hidden = true; container.innerHTML = ''; return; }
+
+    bloc.hidden = false;
+    container.innerHTML = cartesChoisies.map(function (x) {
+      return carteFocusJoueurHTML_(x.carte, x.slot, 'heroique');
+    }).join('');
+    activerBoutonsJouerAction_(container);
   }
 
   /**
@@ -1045,6 +1116,16 @@ var StrategieService = (function () {
    * heroiques (seul changement de cette fonction, toujours appelée
    * depuis afficher() ci-dessous, qui n'a pas besoin de savoir sur quel
    * écran vit son conteneur).
+   *
+   * 17/08/2026 (Lot F — corrections mineures) : le détail de la carte
+   * (badge type + liste des actions) est retiré d'ici — décision
+   * utilisateur, le <select> du nom suffit sur cet écran, le détail
+   * jouable est désormais sur l'écran Focus (voir
+   * renderFocusHeroiquesJoueur_ ci-dessus, basé sur le même
+   * partie.focusHeroiques['cycle' + cycleActuel]). Le type n'est de
+   * toute façon jamais utile ici : tous les Focus choisis sur cet écran
+   * sont "Héroïque" par construction (FocusService.obtenirNomsPoolHeroique
+   * ne liste que ce pool).
    */
   function renderFocusHeroiques_(partie) {
     var container = document.getElementById('plateau-galactique-focus-heroiques');
@@ -1067,16 +1148,8 @@ var StrategieService = (function () {
           return '<option value="' + nom + '"' + (nom === valeurActuelle ? ' selected' : '') + '>' + nom + '</option>';
         }).join('');
 
-        var detail = carte
-          ? badgeType_(carte.type) + '<div style="font-weight:600;margin-top:6px;">' + carte.focus + '</div>' +
-            (carte.actions || []).map(function (a) {
-              return '<div class="hint" style="margin:4px 0 0;">' + (a.action || '—') + (a.texte ? ' — ' + a.texte : '') + '</div>';
-            }).join('')
-          : '<p class="hint" style="margin:6px 0 0;">Emplacement ' + (slot + 1) + ' : non choisi.</p>';
-
         return '<div class="card">' +
           '<select class="select-focus-heroique" data-slot="' + slot + '">' + options + '</select>' +
-          detail +
           '</div>';
       }).join('');
 
@@ -1106,10 +1179,30 @@ var StrategieService = (function () {
   // Jouer une action Focus
   // ------------------------------------------------------------
 
-  function jouerAction_(carteIndex, actionIndex, btn) {
+  /**
+   * 17/08/2026 (Lot F — corrections mineures) : `source` ajouté
+   * ('joueur' ou 'heroique') — indique dans quel tableau de la partie
+   * relire la carte avant de la jouer (partie.focusJoueur[carteIndex] ou
+   * partie.focusHeroiques['cycle' + cycleActuel][carteIndex], ce dernier
+   * indexé par emplacement 0/1/2, cohérent avec carteIndex passé par
+   * renderFocusHeroiquesJoueur_). FocusEngine.jouerActionEtPersister ne
+   * dépend pas de l'origine de la carte (juste carte + action), aucun
+   * changement nécessaire côté focusEngine.js.
+   */
+  function resoudreCarteSource_(source, carteIndex) {
+    var partie = partieAffichee;
+    if (source === 'heroique') {
+      var cycle = partie.cycleActuel;
+      if (!cycle || cycle === 'termine') return null;
+      return ((partie.focusHeroiques && partie.focusHeroiques['cycle' + cycle]) || [])[carteIndex] || null;
+    }
+    return (partie.focusJoueur || [])[carteIndex] || null;
+  }
+
+  function jouerAction_(source, carteIndex, actionIndex, btn) {
     if (btn.disabled) return; // sécurité anti double-clic
     var partie = partieAffichee;
-    var carte = (partie.focusJoueur || [])[carteIndex];
+    var carte = resoudreCarteSource_(source, carteIndex);
     var action = carte ? carte.actions[actionIndex] : null;
     if (!carte || !action) return;
 
@@ -1928,14 +2021,22 @@ var StrategieService = (function () {
     renderGloire_(partie);
     renderPistesCivilisation_(partie);
     renderFocusJoueur_(partie);
+    renderFocusHeroiquesJoueur_(partie);
     renderFocusHeroiques_(partie);
     renderJournal_();
     majBoutonAnnuler_(partie.id);
   }
 
   document.getElementById('btn-annuler-action').addEventListener('click', annulerDerniereAction_);
-  document.getElementById('btn-avancer-moins-avancee').addEventListener('click', avancerMoinsAvancee_);
-  document.getElementById('btn-avancer-corrompue').addEventListener('click', avancerCorrompue_);
+  // 17/08/2026 (Lot F — corrections mineures) : boutons globaux
+  // "Avancer la moins avancée"/"Avancer la piste Corrompue" retirés du
+  // DOM (décision utilisateur, voir index.html) — liaisons en null-safe.
+  // avancerMoinsAvancee_/avancerCorrompue_ restent définies, prêtes pour
+  // un futur appel depuis une action Focus plutôt que depuis un bouton.
+  var btnAvancerMoinsAvanceeGlobal = document.getElementById('btn-avancer-moins-avancee');
+  if (btnAvancerMoinsAvanceeGlobal) btnAvancerMoinsAvanceeGlobal.addEventListener('click', avancerMoinsAvancee_);
+  var btnAvancerCorrompueGlobal = document.getElementById('btn-avancer-corrompue');
+  if (btnAvancerCorrompueGlobal) btnAvancerCorrompueGlobal.addEventListener('click', avancerCorrompue_);
 
   return {
     afficher: afficher,
