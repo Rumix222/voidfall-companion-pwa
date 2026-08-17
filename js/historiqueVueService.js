@@ -1,7 +1,15 @@
 /**
  * historiqueVueService.js
  * Écran Historique — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 8, Phase 6 — Historique)
+ * Version 2 — 17/08/2026 (Lot G — corrections mineures, suite)
+ *
+ * 17/08/2026 (Lot G — corrections mineures, suite) : libellé du bouton
+ * "Archiver (protéger du « Tout supprimer »)" simplifié en "Archiver"
+ * (3 occurrences — rendu initial + les 2 bascules de texte après clic) ;
+ * "Technologies disponibles (maisons déchues)" -> "Technologies
+ * disponibles" (le "(maisons déchues)" était redondant, la seule source
+ * de Technologies disponibles étant justement les maisons déchues).
+ * Décisions purement textuelles, aucun changement de comportement.
  *
  * Portage DOM du bloc "Historique" de score.html (GAS) —
  * carteHistoriqueHTML/ouvrirHistorique/init (partie reprendre/archiver/
@@ -49,7 +57,7 @@ var HistoriqueVueService = (function () {
     var badges = technologies.map(function (t) {
       return '<span class="badge' + (t.sansPoint ? ' badge-sans-point' : '') + '">' + t.nom + '</span>';
     }).join('');
-    return '<p class="historique-souscategorie">Technologies disponibles (maisons déchues)</p><div class="historique-badges">' + badges + '</div>';
+    return '<p class="historique-souscategorie">Technologies disponibles</p><div class="historique-badges">' + badges + '</div>';
   }
 
   function blocTechnologiesAcquisesHTML_(technologies) {
@@ -80,7 +88,7 @@ var HistoriqueVueService = (function () {
 
     var boutonArchiver = item.archivee
       ? '<button class="btn btn-secondary btn-archiver-partie" data-id="' + item.id + '" data-archivee="1" style="width:100%;margin-top:8px;">Désarchiver</button>'
-      : '<button class="btn btn-secondary btn-archiver-partie" data-id="' + item.id + '" data-archivee="0" style="width:100%;margin-top:8px;">Archiver (protéger du « Tout supprimer »)</button>';
+      : '<button class="btn btn-secondary btn-archiver-partie" data-id="' + item.id + '" data-archivee="0" style="width:100%;margin-top:8px;">Archiver</button>';
 
     var badgeArchivee = item.archivee ? '<span class="badge badge-tag">Archivée</span>' : '';
 
@@ -119,7 +127,7 @@ var HistoriqueVueService = (function () {
         GameService.archiverPartie(btn.dataset.id, archiverMaintenant)
           .then(function () {
             btn.dataset.archivee = archiverMaintenant ? '1' : '0';
-            btn.textContent = archiverMaintenant ? 'Désarchiver' : 'Archiver (protéger du « Tout supprimer »)';
+            btn.textContent = archiverMaintenant ? 'Désarchiver' : 'Archiver';
             btn.disabled = false;
             var carte = btn.closest('.historique-item');
             carte.dataset.archivee = archiverMaintenant ? '1' : '0';
@@ -133,7 +141,7 @@ var HistoriqueVueService = (function () {
           .catch(function (erreur) {
             window.alert('Échec : ' + erreur.message);
             btn.disabled = false;
-            btn.textContent = archiverMaintenant ? 'Archiver (protéger du « Tout supprimer »)' : 'Désarchiver';
+            btn.textContent = archiverMaintenant ? 'Archiver' : 'Désarchiver';
           });
       });
     });

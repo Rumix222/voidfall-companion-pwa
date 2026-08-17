@@ -188,10 +188,14 @@
 
     <!-- 17/08/2026 (Lot C — Technologies avancées) : 4 emplacements —
          listes déroulantes au cycle 1 (choix, parmi les 8 technologies
-         des maisons déchues), texte fixe + case Améliorée aux cycles 2
-         (les 4 choisies) et 3 (les 4 autres, complément calculé) — voir
+         des maisons déchues), texte fixe aux cycles 2 (les 4 choisies) et
+         3 (les 4 autres, complément calculé) — voir
          App.renderTechnologiesAvancees_ (index.html) et
-         GameService.obtenirTechnologiesAvanceesGroupes (gameService.js). -->
+         GameService.obtenirTechnologiesAvanceesGroupes (gameService.js).
+         17/08/2026 (Lot G — corrections mineures) : case "Améliorée"
+         retirée d'ici (lecture seule désormais), déplacée vers l'écran
+         Plat. maison — voir #technologies-avancees-ameliorees-liste,
+         screen-plateau-maison. -->
     <div class="game-block" id="bloc-technologies-avancees" style="margin-top:14px;">
       <h3 class="subsection-title">Technologies avancées</h3>
       <div id="technologies-avancees-liste"></div>
@@ -271,6 +275,19 @@
     </div>
     <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:10px;">
       <div id="technologies-obtenues-liste"></div>
+    </div>
+    <!-- 17/08/2026 (Lot G — corrections mineures) : les 8 technologies
+         avancées des maisons déchues (choix fait au cycle 1 sur l'écran
+         Plat. Galactique) — case "Améliorée" déplacée ici depuis Plat.
+         Galactique (voir renderTechnologiesAvanceesAmeliorees_ plus bas).
+         Verrouillée pour toutes au cycle 1 (rien n'est encore actif),
+         déverrouillée uniquement pour le groupe actif du cycle en cours
+         (4 au cycle 2, les 4 autres au cycle 3) — même
+         GameService.obtenirTechnologiesAvanceesGroupes que sur Plat.
+         Galactique. -->
+    <div class="game-block" id="bloc-technologies-avancees-ameliorees" style="margin-top:10px;">
+      <h3 class="subsection-title">Technologies avancées</h3>
+      <div id="technologies-avancees-ameliorees-liste"></div>
     </div>
 
     <h2 class="section-title" style="margin-top:22px;">Influence</h2>
@@ -494,7 +511,27 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 18 — 17/08/2026 (Lot F — corrections mineures)
+   * Version 20 — 17/08/2026 (Lot H — corrections mineures, tableau Secteurs)
+   *
+   * 17/08/2026 (Lot H — corrections mineures, tableau Secteurs) : dans le
+   * tableau de l'écran Secteurs uniquement (ligneSecteurHTML_) — Guildes
+   * réduites aux 3 premières lettres + point (LABEL_GUILDE : Fer./Ing./
+   * Min./Ban./Sci.), "Chantier"/"Défense" abrégés en "Ch."/"Def."
+   * (LABEL_INSTALLATION : "Ch. Naval"/"Def. Secteur" — TYPES_INSTALLATION,
+   * qui alimente le <select> du formulaire Construire, reste avec les
+   * noms complets, hors périmètre de la demande "tableau secteur").
+   * "Corvette (Néant)" -> "Cube néant" dans la colonne Flotte.
+   *
+   * 17/08/2026 (Lot G — corrections mineures, suite) : case "Améliorée"
+   * retirée des Technologies avancées sur Plat. Galactique (redevient
+   * lecture seule) — déplacée sur Plat. maison (nouveau bloc
+   * #technologies-avancees-ameliorees-liste, renderTechnologiesAvanceesAmeliorees_,
+   * appelée depuis renderEcranPlateauMaison_), qui liste en permanence
+   * les 8 technologies et verrouille les cases hors du groupe actif du
+   * cycle en cours (tout verrouillé au cycle 1 et à l'état 'termine', le
+   * groupe A déverrouillé au cycle 2, le groupe B au cycle 3 — même
+   * GameService.obtenirTechnologiesAvanceesGroupes que source de vérité
+   * du groupe actif, inchangée).
    *
    * 17/08/2026 (Lot F — corrections mineures) :
    * - Correctif : "Fin du cycle" ne fonctionnait plus (ReferenceError
@@ -760,9 +797,18 @@
      * Cycle 1 : 4 <select>, choix parmi les 8 technologies des maisons
      * déchues (un même nom ne peut occuper 2 emplacements — filtré côté
      * options, revalidé côté GameService). Cycle 2 : les 4 choisies,
-     * texte fixe + case Améliorée. Cycle 3 : les 4 AUTRES (complément,
-     * jamais choisi manuellement), texte fixe + case Améliorée. Cycle
-     * 'termine' : dernier état (complément), case désactivée.
+     * texte fixe. Cycle 3 : les 4 AUTRES (complément, jamais choisi
+     * manuellement), texte fixe.
+     *
+     * 17/08/2026 (Lot G — corrections mineures, suite) : case "Améliorée"
+     * retirée d'ici (décision utilisateur) — cet écran ne fait plus que
+     * lister les noms (choix au cycle 1, lecture seule aux cycles 2/3).
+     * La case "Améliorée" vit désormais exclusivement sur l'écran Plat.
+     * maison (voir renderTechnologiesAvanceesAmeliorees_ plus bas), qui
+     * liste les 8 technologies en permanence et déverrouille les cases du
+     * groupe actif du cycle en cours (même
+     * GameService.obtenirTechnologiesAvanceesGroupes que source de vérité
+     * du groupe actif, appelée indépendamment par les 2 fonctions).
      */
     function renderTechnologiesAvancees_(partie) {
       var container = document.getElementById('technologies-avancees-liste');
@@ -813,15 +859,59 @@
 
       container.innerHTML = groupeAffiche.map(function (t) {
         if (!t) return '<div class="techno-obtenue-ligne"><span class="champ-technologie-fixe hint">— non choisi —</span></div>';
-        var amelioree = !!(partie.technologiesAvanceesAmeliorees || {})[t.nom];
         return '<div class="techno-obtenue-ligne">' +
           '<span class="champ-technologie-fixe">' + t.nom + '</span>' +
-          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-avancee" data-nom="' + t.nom + '"' +
-          (amelioree ? ' checked' : '') + (cycle === 'termine' ? ' disabled' : '') + '> Améliorée</label>' +
+          '</div>';
+      }).join('');
+    }
+
+    /**
+     * 17/08/2026 (Lot G — corrections mineures) : liste permanente des 8
+     * technologies avancées (partie.adversaires, mêmes 8 technologies que
+     * groupes.toutes de GameService.obtenirTechnologiesAvanceesGroupes),
+     * chacune avec sa case "Améliorée" — reprend exactement le markup/
+     * appel GameService.definirTechnologieAvanceeAmelioree qui vivait sur
+     * Plat. Galactique (renderTechnologiesAvancees_ ci-dessus, désormais
+     * lecture seule). Verrouillage :
+     *   - cycle 1 : tout verrouillé (aucun groupe encore actif — le choix
+     *     des 4 emplacements de groupeA est en cours sur Plat. Galactique) ;
+     *   - cycle 2 : déverrouillé uniquement pour groupeA (les 4 choisies) ;
+     *   - cycle 3 : déverrouillé uniquement pour groupeB (les 4 autres) ;
+     *   - 'termine' : tout reverrouillé (dernier état figé).
+     * Avant que les 4 choix du cycle 1 soient complets, groupeB est vide
+     * (GameService.obtenirTechnologiesAvanceesGroupes) : les technologies
+     * qui ne sont ni dans groupeA ni dans groupeB (pas encore choisies)
+     * restent verrouillées par défaut à tous les cycles tant qu'elles
+     * n'ont pas été choisies dans un des 4 emplacements du cycle 1.
+     */
+    function renderTechnologiesAvanceesAmeliorees_(partie) {
+      var container = document.getElementById('technologies-avancees-ameliorees-liste');
+      if (!container) return;
+      var cycle = partie.cycleActuel;
+      var groupes = GameService.obtenirTechnologiesAvanceesGroupes(partie);
+      var toutes = groupes.toutes;
+
+      if (!toutes.length) {
+        container.innerHTML = '<p class="hint">Aucune maison déchue enregistrée.</p>';
+        return;
+      }
+
+      var nomsGroupeActif = [];
+      if (cycle === 2) nomsGroupeActif = groupes.groupeA.filter(Boolean).map(function (t) { return t.nom; });
+      else if (cycle === 3) nomsGroupeActif = groupes.groupeB.filter(Boolean).map(function (t) { return t.nom; });
+      // cycle 1 et 'termine' : nomsGroupeActif reste vide, tout verrouillé.
+
+      container.innerHTML = toutes.map(function (t) {
+        var amelioree = !!(partie.technologiesAvanceesAmeliorees || {})[t.nom];
+        var deverrouille = nomsGroupeActif.indexOf(t.nom) !== -1;
+        return '<div class="techno-obtenue-ligne">' +
+          '<span class="champ-technologie-fixe">' + t.nom + '</span>' +
+          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-avancee-pm" data-nom="' + t.nom + '"' +
+          (amelioree ? ' checked' : '') + (deverrouille ? '' : ' disabled') + '> Améliorée</label>' +
           '</div>';
       }).join('');
 
-      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-avancee'), function (cb) {
+      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-avancee-pm'), function (cb) {
         cb.onchange = function () {
           var nom = cb.dataset.nom;
           var etatDemande = cb.checked;
@@ -886,6 +976,7 @@
       }
 
       renderTechnologiesObtenues_(partie);
+      renderTechnologiesAvanceesAmeliorees_(partie);
     }
 
     /**
@@ -1033,12 +1124,20 @@
 
     // Portage direct de secteurs.html (GAS) — labels bruts -> texte lisible,
     // n'affiche que les valeurs non nulles (gain de place sur smartphone).
+    //
+    // 17/08/2026 (Lot G — corrections mineures, suite) : labels compactés
+    // pour le tableau Secteurs (gain de place supplémentaire, décision
+    // utilisateur) — Guildes réduites aux 3 premières lettres + point
+    // (Fer./Ing./Min./Ban./Sci.), "Chantier"/"Défense" abrégés en "Ch."/
+    // "Def." dans LABEL_INSTALLATION (uniquement la colonne du tableau —
+    // TYPES_INSTALLATION plus bas, qui alimente le <select> du formulaire
+    // Construire, reste inchangé avec les noms complets).
     var LABEL_GUILDE = {
-      guildeFermiers: 'Fermiers', guildeIngenieurs: 'Ingénieurs', guildeMineurs: 'Mineurs',
-      guildeBanquiers: 'Banquiers', guildeScientifiques: 'Scientifiques'
+      guildeFermiers: 'Fer.', guildeIngenieurs: 'Ing.', guildeMineurs: 'Min.',
+      guildeBanquiers: 'Ban.', guildeScientifiques: 'Sci.'
     };
     var LABEL_INSTALLATION = {
-      installationChantierNaval: 'Chantier Naval', installationDefenseSecteur: 'Défense Secteur',
+      installationChantierNaval: 'Ch. Naval', installationDefenseSecteur: 'Def. Secteur',
       installationBaseStellaire: 'Base Stellaire'
     };
     var LABEL_PN = {
@@ -1057,7 +1156,7 @@
       var guildes = listeNonNulle_(secteur, LABEL_GUILDE) || '—';
       var installations = listeNonNulle_(secteur, LABEL_INSTALLATION) || '—';
       var flotte = listeNonNulle_(secteur, LABEL_PN);
-      if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Corvette (Néant)';
+      if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Cube néant';
       flotte = flotte || '—';
       var action = secteur.corrompu
         ? '<button type="button" class="btn btn-secondary btn-retirer-corruption" data-numero="' + secteur.numero + '" style="font-size:0.72rem;padding:4px 8px;">Retirer</button>'
