@@ -193,9 +193,18 @@
          App.renderTechnologiesAvancees_ (index.html) et
          GameService.obtenirTechnologiesAvanceesGroupes (gameService.js).
          17/08/2026 (Lot G — corrections mineures) : case "Améliorée"
-         retirée d'ici (lecture seule désormais), déplacée vers l'écran
-         Plat. maison — voir #technologies-avancees-ameliorees-liste,
-         screen-plateau-maison. -->
+         retirée d'ici (lecture seule désormais).
+         17/08/2026 (Lot I — corrections mineures, technologies avancées) :
+         la tentative du Lot G de déplacer la case "Améliorée" vers une
+         section dédiée sur Plat. maison (#technologies-avancees-ameliorees-liste)
+         est retirée (retour arrière demandé par l'utilisateur — mauvaise
+         approche). La bonne mécanique : la case "Améliorée" de la section
+         "Technologies obtenues" existante sur Plat. maison (5 ddl, voir
+         #technologies-obtenues-liste ci-dessous) n'est cochable que si la
+         technologie choisie dans la ddl fait partie du groupe actif du
+         cycle en cours (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif,
+         déjà calculé et exposé — aucun changement côté gameService.js) —
+         voir renderTechnologiesObtenues_ plus bas. -->
     <div class="game-block" id="bloc-technologies-avancees" style="margin-top:14px;">
       <h3 class="subsection-title">Technologies avancées</h3>
       <div id="technologies-avancees-liste"></div>
@@ -275,19 +284,6 @@
     </div>
     <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:10px;">
       <div id="technologies-obtenues-liste"></div>
-    </div>
-    <!-- 17/08/2026 (Lot G — corrections mineures) : les 8 technologies
-         avancées des maisons déchues (choix fait au cycle 1 sur l'écran
-         Plat. Galactique) — case "Améliorée" déplacée ici depuis Plat.
-         Galactique (voir renderTechnologiesAvanceesAmeliorees_ plus bas).
-         Verrouillée pour toutes au cycle 1 (rien n'est encore actif),
-         déverrouillée uniquement pour le groupe actif du cycle en cours
-         (4 au cycle 2, les 4 autres au cycle 3) — même
-         GameService.obtenirTechnologiesAvanceesGroupes que sur Plat.
-         Galactique. -->
-    <div class="game-block" id="bloc-technologies-avancees-ameliorees" style="margin-top:10px;">
-      <h3 class="subsection-title">Technologies avancées</h3>
-      <div id="technologies-avancees-ameliorees-liste"></div>
     </div>
 
     <h2 class="section-title" style="margin-top:22px;">Influence</h2>
@@ -511,7 +507,22 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 20 — 17/08/2026 (Lot H — corrections mineures, tableau Secteurs)
+   * Version 21 — 17/08/2026 (Lot I — corrections mineures, technologies avancées)
+   *
+   * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
+   * retour arrière sur le Lot G — la section dédiée "Technologies
+   * avancées" ajoutée sur Plat. maison (#technologies-avancees-ameliorees-liste,
+   * renderTechnologiesAvanceesAmeliorees_) est supprimée (décision
+   * utilisateur : mauvaise approche). À la place : la case "Améliorée"
+   * déjà existante dans "Technologies obtenues" (Plat. maison, 5 ddl,
+   * renderTechnologiesObtenues_) n'est désormais cochable que si la
+   * technologie choisie dans sa ddl fait partie du groupe actif du cycle
+   * en cours (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif
+   * — déjà calculé côté gameService.js, aucun changement nécessaire) ;
+   * verrouillée si aucune technologie choisie (inchangé) ou si la
+   * technologie choisie n'est pas améliorable ce cycle (nouveau). Plat.
+   * Galactique inchangé par rapport au Lot G (Technologies avancées
+   * toujours en lecture seule là-bas).
    *
    * 17/08/2026 (Lot H — corrections mineures, tableau Secteurs) : dans le
    * tableau de l'écran Secteurs uniquement (ligneSecteurHTML_) — Guildes
@@ -522,7 +533,8 @@
    * noms complets, hors périmètre de la demande "tableau secteur").
    * "Corvette (Néant)" -> "Cube néant" dans la colonne Flotte.
    *
-   * 17/08/2026 (Lot G — corrections mineures, suite) : case "Améliorée"
+   * 17/08/2026 (Lot G — corrections mineures, suite) [SUPERSEDÉ PAR LE LOT
+   * I CI-DESSUS] : case "Améliorée"
    * retirée des Technologies avancées sur Plat. Galactique (redevient
    * lecture seule) — déplacée sur Plat. maison (nouveau bloc
    * #technologies-avancees-ameliorees-liste, renderTechnologiesAvanceesAmeliorees_,
@@ -803,12 +815,17 @@
      * 17/08/2026 (Lot G — corrections mineures, suite) : case "Améliorée"
      * retirée d'ici (décision utilisateur) — cet écran ne fait plus que
      * lister les noms (choix au cycle 1, lecture seule aux cycles 2/3).
-     * La case "Améliorée" vit désormais exclusivement sur l'écran Plat.
-     * maison (voir renderTechnologiesAvanceesAmeliorees_ plus bas), qui
-     * liste les 8 technologies en permanence et déverrouille les cases du
-     * groupe actif du cycle en cours (même
-     * GameService.obtenirTechnologiesAvanceesGroupes que source de vérité
-     * du groupe actif, appelée indépendamment par les 2 fonctions).
+     *
+     * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
+     * la case "Améliorée" ne revient PAS ici et ne va PAS non plus dans
+     * une section dédiée sur Plat. maison (retour arrière sur le Lot G,
+     * voir commentaire ci-dessus dans le HTML de screen-plateau-galactique).
+     * Elle vit sur la case "Améliorée" déjà existante de la section
+     * "Technologies obtenues" (Plat. maison, 5 ddl) — voir
+     * renderTechnologiesObtenues_ plus bas, qui relit
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (même
+     * source de vérité que cette fonction) pour savoir si la technologie
+     * choisie dans chaque ddl est actuellement améliorable.
      */
     function renderTechnologiesAvancees_(partie) {
       var container = document.getElementById('technologies-avancees-liste');
@@ -866,71 +883,6 @@
     }
 
     /**
-     * 17/08/2026 (Lot G — corrections mineures) : liste permanente des 8
-     * technologies avancées (partie.adversaires, mêmes 8 technologies que
-     * groupes.toutes de GameService.obtenirTechnologiesAvanceesGroupes),
-     * chacune avec sa case "Améliorée" — reprend exactement le markup/
-     * appel GameService.definirTechnologieAvanceeAmelioree qui vivait sur
-     * Plat. Galactique (renderTechnologiesAvancees_ ci-dessus, désormais
-     * lecture seule). Verrouillage :
-     *   - cycle 1 : tout verrouillé (aucun groupe encore actif — le choix
-     *     des 4 emplacements de groupeA est en cours sur Plat. Galactique) ;
-     *   - cycle 2 : déverrouillé uniquement pour groupeA (les 4 choisies) ;
-     *   - cycle 3 : déverrouillé uniquement pour groupeB (les 4 autres) ;
-     *   - 'termine' : tout reverrouillé (dernier état figé).
-     * Avant que les 4 choix du cycle 1 soient complets, groupeB est vide
-     * (GameService.obtenirTechnologiesAvanceesGroupes) : les technologies
-     * qui ne sont ni dans groupeA ni dans groupeB (pas encore choisies)
-     * restent verrouillées par défaut à tous les cycles tant qu'elles
-     * n'ont pas été choisies dans un des 4 emplacements du cycle 1.
-     */
-    function renderTechnologiesAvanceesAmeliorees_(partie) {
-      var container = document.getElementById('technologies-avancees-ameliorees-liste');
-      if (!container) return;
-      var cycle = partie.cycleActuel;
-      var groupes = GameService.obtenirTechnologiesAvanceesGroupes(partie);
-      var toutes = groupes.toutes;
-
-      if (!toutes.length) {
-        container.innerHTML = '<p class="hint">Aucune maison déchue enregistrée.</p>';
-        return;
-      }
-
-      var nomsGroupeActif = [];
-      if (cycle === 2) nomsGroupeActif = groupes.groupeA.filter(Boolean).map(function (t) { return t.nom; });
-      else if (cycle === 3) nomsGroupeActif = groupes.groupeB.filter(Boolean).map(function (t) { return t.nom; });
-      // cycle 1 et 'termine' : nomsGroupeActif reste vide, tout verrouillé.
-
-      container.innerHTML = toutes.map(function (t) {
-        var amelioree = !!(partie.technologiesAvanceesAmeliorees || {})[t.nom];
-        var deverrouille = nomsGroupeActif.indexOf(t.nom) !== -1;
-        return '<div class="techno-obtenue-ligne">' +
-          '<span class="champ-technologie-fixe">' + t.nom + '</span>' +
-          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-avancee-pm" data-nom="' + t.nom + '"' +
-          (amelioree ? ' checked' : '') + (deverrouille ? '' : ' disabled') + '> Améliorée</label>' +
-          '</div>';
-      }).join('');
-
-      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-avancee-pm'), function (cb) {
-        cb.onchange = function () {
-          var nom = cb.dataset.nom;
-          var etatDemande = cb.checked;
-          cb.disabled = true;
-          GameService.definirTechnologieAvanceeAmelioree(partie.id, nom, etatDemande)
-            .then(function (partieMaj) {
-              partieCourante = partieMaj;
-              cb.disabled = false;
-            })
-            .catch(function (erreur) {
-              cb.checked = !etatDemande;
-              cb.disabled = false;
-              window.alert('Échec de l\'enregistrement : ' + erreur.message);
-            });
-        };
-      });
-    }
-
-    /**
      * 17/08/2026 (Lot B — restructuration Partie) : écran "Plat. maison" —
      * portage direct des blocs Technologie de départ (+ case Améliorée)
      * et Influence qui vivaient dans le innerHTML de #carte-joueur
@@ -976,7 +928,6 @@
       }
 
       renderTechnologiesObtenues_(partie);
-      renderTechnologiesAvanceesAmeliorees_(partie);
     }
 
     /**
@@ -995,6 +946,21 @@
      * standard vu le nombre de maisons déchues), elle n'est plus affichée
      * ici (donnée conservée en base, simplement plus éditable depuis cet
      * écran) — hors périmètre signalé, aucun cas connu en pratique.
+     *
+     * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
+     * case "Améliorée" désormais verrouillée/déverrouillée selon
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (liste
+     * de noms — les 4 technologies choisies au cycle 1 pendant le cycle 2,
+     * les 4 autres pendant le cycle 3, aucune au cycle 1 ni à l'état
+     * 'termine' — même source de vérité que Plat. Galactique,
+     * renderTechnologiesAvancees_ ci-dessus, aucun changement côté
+     * gameService.js). Retour arrière sur le Lot G, qui avait ajouté une
+     * section dédiée sur cet écran — décision utilisateur : pas de section
+     * séparée, seule la case déjà existante ici doit refléter
+     * l'améliorabilité de la technologie choisie dans sa ddl. Verrouillée
+     * dans tous les cas si aucune technologie n'est choisie dans la ddl
+     * (inchangé) OU si la technologie choisie n'est pas dans le groupe
+     * actif du cycle en cours (nouveau).
      */
     function renderTechnologiesObtenues_(partie) {
       var container = document.getElementById('technologies-obtenues-liste');
@@ -1005,6 +971,7 @@
         (m.technologies || []).forEach(function (t) { toutesLesTechs.push(t); });
       });
       var obtenues = (partie.technologiesObtenues || [null, null, null, null, null]).slice(0, 5);
+      var nomsAmeliorables = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
 
       container.innerHTML = obtenues.map(function (tech, slot) {
         var nomsPrisAilleurs = obtenues
@@ -1015,10 +982,11 @@
           return '<option value="' + t.nom + '"' + (tech && tech.nom === t.nom ? ' selected' : '') + '>' + t.nom +
             (t.maison ? ' (' + t.maison + ')' : '') + '</option>';
         }).join('');
+        var verrouillee = !tech || nomsAmeliorables.indexOf(tech.nom) === -1;
         return '<div class="techno-obtenue-ligne">' +
           '<select class="select-technologie-obtenue" data-slot="' + slot + '">' + options + '</select>' +
           '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
-          (tech && tech.amelioree ? ' checked' : '') + (tech ? '' : ' disabled') + '> Améliorée</label>' +
+          (tech && tech.amelioree ? ' checked' : '') + (verrouillee ? ' disabled' : '') + '> Améliorée</label>' +
           '</div>';
       }).join('');
 

@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 22 — 2026-08-17
+ * Version 23 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,18 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
+ * incrémenté suite à un retour arrière sur le Lot G — la section dédiée
+ * "Technologies avancées" ajoutée sur Plat. maison est supprimée
+ * (mauvaise approche, décision utilisateur). À la place, la case
+ * "Améliorée" déjà existante dans "Technologies obtenues" (Plat. maison)
+ * n'est cochable que si la technologie choisie dans sa ddl fait partie du
+ * groupe actif du cycle en cours (même
+ * GameService.obtenirTechnologiesAvanceesGroupes que Plat. Galactique,
+ * aucun changement côté gameService.js) : index.html (v21). Fichier
+ * modifié, chemin déjà en cache, aucune nouvelle entrée dans
+ * FICHIERS_A_METTRE_EN_CACHE.
  *
  * 17/08/2026 (Lot H — corrections mineures, tableau Secteurs) : incrémenté
  * suite à un lot de petites corrections textuelles : tableau Secteurs
@@ -290,4 +302,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.27';
+var APP_VERSION = '20260817.28';
