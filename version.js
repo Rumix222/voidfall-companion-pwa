@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 23 — 2026-08-17
+ * Version 24 — 2026-08-17
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,14 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 17/08/2026 (Lot J — corrections mineures, écran Combat) : incrémenté
+ * suite à un correctif sur l'écran Combat — les vaisseaux disponibles
+ * (CombatService.vaisseauxDebloques) se rafraîchissent désormais dès le
+ * clic sur l'onglet Combat (App.afficherEcran appelle désormais
+ * CombatVueService.afficher()), plus seulement au bascule Envahir/
+ * Escarmouche : index.html (v22). Fichier modifié, chemin déjà en cache,
+ * aucune nouvelle entrée dans FICHIERS_A_METTRE_EN_CACHE.
  *
  * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
  * incrémenté suite à un retour arrière sur le Lot G — la section dédiée
@@ -302,4 +310,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.28';
+var APP_VERSION = '20260817.29';

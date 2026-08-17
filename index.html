@@ -507,7 +507,12 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 21 — 17/08/2026 (Lot I — corrections mineures, technologies avancées)
+   * Version 22 — 17/08/2026 (Lot J — corrections mineures, écran Combat)
+   *
+   * 17/08/2026 (Lot J — corrections mineures, écran Combat) : voir
+   * commentaire de App.afficherEcran ci-dessous — les vaisseaux
+   * disponibles de l'écran Combat se rafraîchissent désormais dès le clic
+   * sur l'onglet Combat, plus seulement au bascule Envahir/Escarmouche.
    *
    * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
    * retour arrière sur le Lot G — la section dédiée "Technologies
@@ -693,6 +698,20 @@
   var App = (function () {
     var partieCourante = null;
 
+    /**
+     * 17/08/2026 (Lot J — corrections mineures, écran Combat) : l'écran
+     * Combat n'était rafraîchi (vaisseaux disponibles, via
+     * CombatService.vaisseauxDebloques) qu'au bascule Envahir/Escarmouche
+     * (CombatVueService.setMode_ -> render_) — jamais au simple clic sur
+     * l'onglet Combat depuis un autre écran, laissant afficher une liste
+     * de vaisseaux périmée si elle avait changé entretemps (technologie/
+     * déploiement). App.getPartieCourante() est déjà tenu à jour en
+     * mémoire par ailleurs (toute action qui la modifie appelle
+     * rafraichirPartieCourante) — CombatVueService.afficher() n'avait
+     * simplement jamais l'occasion d'être rappelée. Corrigé ici : rappel
+     * de CombatVueService.afficher() (état 'combat', partie déjà ouverte)
+     * à chaque clic sur l'onglet Combat.
+     */
     function afficherEcran(nom) {
       document.querySelectorAll('.screen').forEach(function (ecran) {
         ecran.hidden = (ecran.id !== 'screen-' + nom);
@@ -701,6 +720,9 @@
       boutonsNav.forEach(function (btn) {
         btn.classList.toggle('active', btn.dataset.nav === nom);
       });
+      if (nom === 'combat' && partieCourante && typeof CombatVueService !== 'undefined') {
+        CombatVueService.afficher(partieCourante);
+      }
     }
 
     function getPartieCourante() { return partieCourante; }
