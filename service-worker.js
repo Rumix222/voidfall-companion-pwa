@@ -1,6 +1,11 @@
 /**
  * service-worker.js
- * Version 12 — 2026-08-17
+ * Version 13 — 2026-08-18
+ * 18/08/2026 (Migration catalogue Supabase -> JSON local) : ajout des 12
+ * fichiers data/catalogue/*.json à FICHIERS_A_METTRE_EN_CACHE (le
+ * catalogue est désormais bundlé dans l'app, plus d'appel réseau externe
+ * — voir js/catalogueSync.js v2). js/catalogueSync.js a aussi changé mais
+ * reste au même chemin.
  * 17/08/2026 (Session 8, Phase 6 — Historique) : ajout de
  * js/historiqueVueService.js à FICHIERS_A_METTRE_EN_CACHE. index.html
  * (liste accueil retirée, bouton "Historique des parties" ajouté) et
@@ -87,6 +92,18 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/combatVueService.js',
   './js/scoreVueService.js',
   './js/historiqueVueService.js',
+  './data/catalogue/maisons.json',
+  './data/catalogue/technologies.json',
+  './data/catalogue/focus.json',
+  './data/catalogue/evenements.json',
+  './data/catalogue/pistesCivilisation.json',
+  './data/catalogue/programmes.json',
+  './data/catalogue/scenarios.json',
+  './data/catalogue/scenarioSecteurs.json',
+  './data/catalogue/scenarioAdjacences.json',
+  './data/catalogue/scenarioTrousDeVer.json',
+  './data/catalogue/typesSecteur.json',
+  './data/catalogue/originesMaison.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

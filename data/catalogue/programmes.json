@@ -1,0 +1,290 @@
+[
+  {
+    "code": "D1",
+    "nom": "Haute Société",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si vous contrôlez au moins un secteur Pur avec une Population de 6 ou plus.",
+    "objectif2": "Gagnez 4/8/12/16 Influence si votre Civilisation Société Pure est au Niveau 1/2/3/4.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Programme équilibré orienté Population et développement social."
+  },
+  {
+    "code": "D2",
+    "nom": "Syndicat Commercial",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si vous contrôlez au moins quatre secteurs Purs avec une Population de 3 ou plus.",
+    "objectif2": "Gagnez 4/8/12/16 Influence si votre Civilisation Économie Pure est au Niveau 1/2/3/4.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Bonne synergie avec économie et expansion."
+  },
+  {
+    "code": "D3",
+    "nom": "Autorité Fédérale",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si vous contrôlez au moins deux secteurs Purs avec une Population de 5 ou plus.",
+    "objectif2": "Gagnez 4/8/12/16 Influence si votre Civilisation Gouvernement Pure est au Niveau 1/2/3/4.",
+    "ajustementPropose": "Objectif 1 augmenté de 4 à 5 Influence",
+    "commentaire": "Alignement avec D1 et D2, difficulté comparable."
+  },
+  {
+    "code": "D4",
+    "nom": "Gouvernance Mercantile",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si votre Civilisation Gouvernement Pure est au Niveau 2 ou supérieur.",
+    "objectif2": "Gagnez 1 Influence toutes les 2 ressources parmi Nourriture, Énergie et Matériel dans votre réserve.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif flexible et polyvalent."
+  },
+  {
+    "code": "D5",
+    "nom": "Luxe Durable",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si votre Civilisation Société Pure est au Niveau 2 ou supérieur.",
+    "objectif2": "Gagnez 5 Influence pour chaque secteur Pur avec au moins 2 Entretien.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Récompense une économie développée."
+  },
+  {
+    "code": "D6",
+    "nom": "Bien-être Progressif",
+    "type": "Domination",
+    "objectif1": "Gagnez 5 Influence si votre Civilisation Économie Pure est au Niveau 2 ou supérieur.",
+    "objectif2": "Gagnez 4 Influence pour chaque secteur Pur avec au moins 4 Population.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Plus accessible que D5."
+  },
+  {
+    "code": "D7",
+    "nom": "Nation Éclairée",
+    "type": "Domination",
+    "objectif1": "Gagnez 4 Influence si vous avez atteint le Niveau 3 ou supérieur sur au moins une piste de Civilisation Pure.",
+    "objectif2": "Gagnez 3 Influence pour chaque secteur Pur avec au moins 3 Population.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Programme généraliste efficace."
+  },
+  {
+    "code": "D8",
+    "nom": "Colonisation Interplanétaire",
+    "type": "Domination",
+    "objectif1": "Gagnez 4 Influence si votre Population Pure totale est de 10 ou plus.",
+    "objectif2": "Pour chaque piste de Civilisation Pure, gagnez 2/4/6/8 Influence si vous avez atteint le Niveau 1/2/3/4.",
+    "ajustementPropose": "Niveau 4 augmenté de 6 à 8 Influence",
+    "commentaire": "Récompense mieux l’investissement maximal."
+  },
+  {
+    "code": "M1",
+    "nom": "Consortium Minier",
+    "type": "Force",
+    "objectif1": "Gagnez 5 Influence si votre Revenu de Matériel est de 8 ou plus.",
+    "objectif2": "Gagnez 5 Influence pour chacun de vos secteurs Purs avec au moins 2 cubes de Puissance Navale.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Programme orienté flotte et production."
+  },
+  {
+    "code": "M2",
+    "nom": "Sources d'Énergie Multiples",
+    "type": "Force",
+    "objectif1": "Gagnez 5 Influence si votre Revenu d'Énergie est de 8 ou plus.",
+    "objectif2": "Gagnez 2 Influence pour chaque cube présent dans vos secteurs Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Très accessible avec une stratégie militaire."
+  },
+  {
+    "code": "M3",
+    "nom": "Militarisation Intensive",
+    "type": "Force",
+    "objectif1": "Gagnez 6 Influence si vous avez au moins trois Chantiers Navals ou Bases Stellaires Purs.",
+    "objectif2": "Gagnez 7 Influence pour chacun de vos secteurs Purs avec au moins 3 cubes de Puissance Navale.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif puissant mais nécessitant un fort investissement."
+  },
+  {
+    "code": "M4",
+    "nom": "Système Monétaire Central",
+    "type": "Force",
+    "objectif1": "Gagnez 7 Influence si votre Revenu de Crédits est de 4 ou plus.",
+    "objectif2": "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval ou une Base Stellaire.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Bon équilibre économie/militaire."
+  },
+  {
+    "code": "M5",
+    "nom": "Politique de Sauvegarde",
+    "type": "Force",
+    "objectif1": "Gagnez 5 Influence si vous avez au moins trois Défenses de Secteur ou Bases Stellaires Pures.",
+    "objectif2": "Gagnez 2 Influence pour chaque cube présent dans vos secteurs Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif défensif cohérent."
+  },
+  {
+    "code": "M6",
+    "nom": "Nourriture Industrielle",
+    "type": "Force",
+    "objectif1": "Gagnez 7 Influence si votre Revenu de Nourriture est de 8 ou plus.",
+    "objectif2": "Gagnez 2 Influence pour chacun de vos Chantiers Navals et Bases Stellaires Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Encourage une économie militaire complète."
+  },
+  {
+    "code": "M7",
+    "nom": "Archives de Recherche",
+    "type": "Force",
+    "objectif1": "Gagnez 7 Influence si vous avez au moins 8 Science en réserve.",
+    "objectif2": "Gagnez 6 Influence pour chacun de vos secteurs Purs avec au moins trois Installations.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif recherche/développement."
+  },
+  {
+    "code": "M8",
+    "nom": "Éducation Exhaustive",
+    "type": "Force",
+    "objectif1": "Gagnez 5 Influence si votre Revenu de Science est de 8 ou plus.",
+    "objectif2": "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur ou Base Stellaire.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Programme équilibré entre science et défense."
+  },
+  {
+    "code": "S1",
+    "nom": "Le Projet du Salut",
+    "type": "Soutien",
+    "objectif1": "Gagnez 7 Influence si tous vos secteurs sont Purs.",
+    "objectif2": "Gagnez 4 Influence pour chacun de vos secteurs Purs sans emplacement de Guilde vide. Les emplacements apportés par Vaisseaux-Arches ne comptent pas.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif très exigeant mais cohérent avec une stratégie de purification."
+  },
+  {
+    "code": "S2",
+    "nom": "Institut de Contrôle du Danger",
+    "type": "Soutien",
+    "objectif1": "Gagnez 6 Influence si votre Entretien total est de 10 ou plus.",
+    "objectif2": "Gagnez 5 Influence pour chacun de vos secteurs Purs avec au moins trois Guildes différentes.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Récompense le développement interne."
+  },
+  {
+    "code": "S3",
+    "nom": "Syndicats Agricoles",
+    "type": "Soutien",
+    "objectif1": "Gagnez 7 Influence si vous avez au moins trois Guildes de Fermiers Pures.",
+    "objectif2": "Gagnez 4 Influence pour chacun de vos secteurs Purs avec au moins une Guilde de Scientifiques.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Bonne combinaison production/recherche."
+  },
+  {
+    "code": "S4",
+    "nom": "Industrie Lourde",
+    "type": "Soutien",
+    "objectif1": "Gagnez 6 Influence si vous avez au moins deux Guildes d'Ingénieurs Pures et au moins deux Guildes de Mineurs Pures.",
+    "objectif2": "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins une Guilde de Banquiers.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif spécialisé mais puissant."
+  },
+  {
+    "code": "S5",
+    "nom": "Exploitation Environnementale",
+    "type": "Soutien",
+    "objectif1": "Gagnez 7 Influence si au moins une de vos pistes de Civilisation est Corrompue.",
+    "objectif2": "Gagnez 5 Influence pour chaque paire de Guildes de Mineurs de vos secteurs Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Valorise la corruption contrôlée et l'industrie."
+  },
+  {
+    "code": "S6",
+    "nom": "L'Initiative Source",
+    "type": "Soutien",
+    "objectif1": "Gagnez 6 Influence s'il n'y a pas plus d'une Corruption sur votre fiche Maison et vos secteurs. La Corruption des Chambres de Décontamination ne compte pas.",
+    "objectif2": "Gagnez 5 Influence pour chaque paire de Guildes de Fermiers de vos secteurs Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif purification/production équilibré."
+  },
+  {
+    "code": "S7",
+    "nom": "Réserve d'Énergie Optimisée",
+    "type": "Soutien",
+    "objectif1": "Gagnez 5 Influence si votre Entretien total est de 6 ou moins.",
+    "objectif2": "Gagnez 5 Influence pour chaque paire de Guildes d'Ingénieurs de vos secteurs Purs.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Encourage une civilisation efficace."
+  },
+  {
+    "code": "W1",
+    "nom": "Monopole Commercial",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins deux jetons Commerce.",
+    "objectif2": "Gagnez 3 Influence pour chacun de vos secteurs Purs sans aucun Entretien.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif économie/optimisation."
+  },
+  {
+    "code": "S8",
+    "nom": "Richesse Armada Augmentée",
+    "type": "Soutien",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins deux types de Flotte différents déployés dans vos secteurs Purs.",
+    "objectif2": "Gagnez 2 Influence pour chacun de vos jetons Libération.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif polyvalent mais légèrement moins puissant."
+  },
+  {
+    "code": "W2",
+    "nom": "La Directive",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins deux jetons Libération.",
+    "objectif2": "Gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Bon lien entre objectifs militaires et prestige."
+  },
+  {
+    "code": "W3",
+    "nom": "Rédemption",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins trois jetons Gloire quelle que soit leur valeur.",
+    "objectif2": "Gagnez 4 Influence pour chaque série de 3 Crédits dans votre réserve.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif économique flexible."
+  },
+  {
+    "code": "W4",
+    "nom": "Campagne Autogérée",
+    "type": "Richesse",
+    "objectif1": "Gagnez 6 Influence si vous avez au moins un jeton Gloire de valeur 5.",
+    "objectif2": "Gagnez 4 Influence pour chacune de vos Technologies améliorées.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Récompense le développement avancé."
+  },
+  {
+    "code": "W5",
+    "nom": "Pointe de la Technologie",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins quatre secteurs Purs.",
+    "objectif2": "Gagnez 2 Influence pour chacune de vos Technologies de base et 3 Influence pour chacune de vos Technologies améliorées.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Très bon objectif de progression technologique."
+  },
+  {
+    "code": "W6",
+    "nom": "Suprématie Intellectuelle",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins deux Technologies améliorées.",
+    "objectif2": "Gagnez 3 Influence pour chaque paire de jetons Prime en votre possession.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif science/recherche."
+  },
+  {
+    "code": "W7",
+    "nom": "Bond Quantique",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence si vous avez au moins quatre Technologies de base ou améliorées.",
+    "objectif2": "Gagnez 5 Influence pour chaque paire de secteurs Purs en votre possession.",
+    "ajustementPropose": "Aucun",
+    "commentaire": "Objectif expansion et technologie."
+  },
+  {
+    "code": "W8",
+    "nom": "Singularité Technologique",
+    "type": "Richesse",
+    "objectif1": "Gagnez 4 Influence pour chacune de vos Technologies améliorées.",
+    "objectif2": "Gagnez 2 Influence pour chacun de vos jetons Commerce et/ou jetons Prime (selon la formulation retenue).",
+    "ajustementPropose": "Ajuster la formulation finale pour éviter l'ambiguïté",
+    "commentaire": "Programme de fin de partie très puissant."
+  }
+]

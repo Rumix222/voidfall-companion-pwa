@@ -1,0 +1,887 @@
+[
+  {
+    "nom": "Nacelles",
+    "idSheet": 2,
+    "maison": "Valnis",
+    "type": "Combat",
+    "permanent": {
+      "can": {
+        "recall_to_mother_sector": true
+      },
+      "limit": {
+        "extra_commerce_storage": 1
+      }
+    },
+    "immediat": {
+      "gain": {
+        "commerce_token": 1
+      },
+      "activate_cube": 1
+    },
+    "ameliore": {
+      "can": {
+        "replace_all_recall_with_return": true
+      }
+    },
+    "texte": "Une fois par Combat, au lieu de rappeler 1 cube, vous pouvez le déplacer sur votre Secteur-Mère. Vous pouvez avoir 1 jeton Commerce supplémentaire.",
+    "texteAmeliore": "Chaque fois que vous devez rappeler 1 cube en Combat, vous pouvez le déplacer sur votre Secteur-Mère."
+  },
+  {
+    "nom": "Boucliers",
+    "idSheet": 1,
+    "maison": "Valnis",
+    "type": "Combat",
+    "permanent": {
+      "bonus": {
+        "absorb_salve": 1
+      },
+      "condition": {
+        "min": 1,
+        "unit": "corvette",
+        "zone": "combat"
+      }
+    },
+    "immediat": {
+      "deploy": {
+        "unit": "corvette",
+        "quantity": 1,
+        "destination": "secteur_mere"
+      }
+    },
+    "ameliore": {
+      "bonus": {
+        "absorb_salve": 1,
+        "absorb_approche": 1
+      },
+      "condition": {
+        "min": 1,
+        "unit": "corvette",
+        "zone": "combat"
+      },
+      "restriction": {
+        "corvette_lost_during_approche": true
+      }
+    },
+    "texte": "Au Combat, gagnez 1 Absorption de Salve si vous avez au moins 1 cube de Corvette dans le secteur.",
+    "texteAmeliore": "Dans cette version, gagnez 1 Absorption d’Approche et 1 Absorption de Salve si vous avez au moins 1 cube de Corvette dans le secteur."
+  },
+  {
+    "nom": "Ciblage",
+    "idSheet": 3,
+    "maison": "Belitan",
+    "type": "Combat",
+    "permanent": {
+      "bonus": {
+        "initiative": 5
+      },
+      "condition": {
+        "min": 1,
+        "unit": "corvette",
+        "zone": "combat"
+      }
+    },
+    "immediat": {
+      "gain": {
+        "energie": 2
+      },
+      "deploy": {
+        "unit": "corvette",
+        "quantity": 1,
+        "destination": "secteur_mere"
+      }
+    },
+    "ameliore": {
+      "rule": {
+        "restriction": {
+          "defender_only_sentinelles_no_damage": true
+        },
+        "always_first_damage": true,
+        "ignore_corvette_requirement": true
+      }
+    },
+    "texte": "Au Combat, gagnez +5 Initiative si vous avez au moins 1 cube de Corvette dans le secteur.",
+    "texteAmeliore": "Gagnez toujours l'initiative pour infliger les dégâts en premier."
+  },
+  {
+    "nom": "Collecte de données",
+    "idSheet": 4,
+    "maison": "Belitan",
+    "type": "Production",
+    "permanent": {
+      "production": {
+        "science_per_banker_guild": 2
+      }
+    },
+    "immediat": {
+      "gain": {
+        "credit": 2,
+        "science": 2
+      }
+    },
+    "ameliore": {
+      "evaluation": {
+        "maintenance_credit_ratio": 2
+      }
+    },
+    "texte": "Chacune de vos Guildes de Banquiers augmente votre Niveau de Production de Science de 2.",
+    "texteAmeliore": "Lors de l’Évaluation, dépensez des Crédits pour satisfaire 2 unités d’Entretien par Crédit."
+  },
+  {
+    "nom": "Quais orbitaux",
+    "idSheet": 5,
+    "maison": "Dunlork",
+    "type": "Déploiement",
+    "permanent": {
+      "deployment": {
+        "extra_shipyard": 1,
+        "equivalent_shipyard": true
+      }
+    },
+    "immediat": {
+      "build": {
+        "quantity": 1,
+        "structure": "chantier_naval"
+      },
+      "activate_cube": 1
+    },
+    "ameliore": {
+      "production": {
+        "credit_per_shipyard": 2
+      }
+    },
+    "texte": "Chaque secteur avec un Chantier Naval compte comme ayant un Chantier Naval supplémentaire lors du déploiement.",
+    "texteAmeliore": "Chaque Chantier Naval augmente votre Niveau de Production de Crédits de 2."
+  },
+  {
+    "nom": "Cellules énergétiques",
+    "idSheet": 6,
+    "maison": "Dunlork",
+    "type": "Combat",
+    "permanent": {
+      "bonus": {
+        "degat_approche": 1
+      },
+      "condition": {
+        "role": "defenseur",
+        "min_damage": 1,
+        "damage_type": "approche"
+      }
+    },
+    "immediat": {
+      "cost": {
+        "energie": 2
+      },
+      "activate": {
+        "puissance_navale": 2
+      }
+    },
+    "ameliore": {
+      "evaluation": {
+        "free_sector_maintenance": true
+      }
+    },
+    "texte": "Si vous infligez au moins 1 Dégât d’Approche en tant que Défenseur, infligez 1 Dégât supplémentaire.",
+    "texteAmeliore": "Lors de l’Évaluation, l’Entretien de vos secteurs est satisfait gratuitement."
+  },
+  {
+    "nom": "Torpilles",
+    "idSheet": 7,
+    "maison": "Cortozaar",
+    "type": "Combat",
+    "permanent": {
+      "bonus": {
+        "salve_step": "premiere",
+        "degat_salve": 1
+      },
+      "condition": {
+        "min": 1,
+        "unit": "corvette",
+        "zone": "combat"
+      }
+    },
+    "immediat": {
+      "gain": {
+        "materiel": 2
+      },
+      "deploy": {
+        "unit": "corvette",
+        "quantity": 1,
+        "destination": "secteur_mere"
+      }
+    },
+    "ameliore": {
+      "bonus": {
+        "salve_step": "toutes",
+        "degat_salve": 1
+      },
+      "condition": {
+        "min": 1,
+        "unit": "corvette",
+        "zone": "combat"
+      }
+    },
+    "texte": "Inflige 1 Dégât supplémentaire lors de la première étape de Salve si vous avez une Corvette.",
+    "texteAmeliore": "Inflige 1 Dégât supplémentaire lors de chaque étape de Salve si vous avez une Corvette."
+  },
+  {
+    "nom": "Bases Stellaires",
+    "idSheet": 8,
+    "maison": "Cortozaar",
+    "type": "Déploiement",
+    "permanent": {
+      "limit": {
+        "base_stellaire_par_secteur": 1
+      },
+      "combat": {
+        "defender_base_damage_approche": 1
+      },
+      "enable": {
+        "base_stellaire": true
+      }
+    },
+    "immediat": {
+      "build": {
+        "quantity": 1,
+        "structure": "base_stellaire"
+      }
+    },
+    "ameliore": {
+      "limit": {
+        "base_stellaire_par_secteur": 2
+      },
+      "corruption": {
+        "remove_instead_population": true
+      }
+    },
+    "texte": "Chaque Base Stellaire inflige 1 Dégât d’Approche en tant que Défenseur.",
+    "texteAmeliore": "Vous pouvez construire jusqu’à deux Bases Stellaires par secteur."
+  },
+  {
+    "nom": "Destroyers",
+    "idSheet": 9,
+    "maison": "Zenor",
+    "type": "Combat",
+    "permanent": {
+      "enable": {
+        "destroyer": true
+      },
+      "destroyer_mode": "superieur"
+    },
+    "immediat": {
+      "deploy": {
+        "unit": "destroyer",
+        "quantity": 1,
+        "destination": "secteur_mere"
+      }
+    },
+    "ameliore": {
+      "destroyer_mode": "complet"
+    },
+    "texte": "Vous pouvez utiliser les capacités supérieures de la tuile Destroyer.",
+    "texteAmeliore": "Vous pouvez utiliser toutes les capacités de la tuile Destroyer."
+  },
+  {
+    "nom": "Clonage",
+    "idSheet": 10,
+    "maison": "Zenor",
+    "type": "Civilisation",
+    "permanent": {},
+    "immediat": {
+      "choice": {
+        "credit": 1,
+        "activate_cube": 1
+      }
+    },
+    "ameliore": {
+      "civilisation": {
+        "keep_power_cubes": true
+      }
+    },
+    "texte": "Gagnez 1 Crédit ou activez 1 cube lorsque vous augmentez une Population Pure.",
+    "texteAmeliore": "Ne désactivez pas les cubes requis lors des niveaux 3 et 4 de Civilisation."
+  },
+  {
+    "nom": "Terraformation",
+    "idSheet": 11,
+    "maison": "Thegwyn",
+    "type": "Développement",
+    "permanent": {
+      "can": {
+        "focus_prosperite": true,
+        "focus_developpement": true
+      },
+      "cost": {
+        "materiel": 1
+      },
+      "effect": {
+        "population_pure": 1
+      }
+    },
+    "immediat": {
+      "choice": {
+        "materiel": 2,
+        "population_pure": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "focus_innovation": true,
+        "focus_prosperite": true,
+        "focus_developpement": true
+      },
+      "effect": {
+        "population_pure": 1
+      }
+    },
+    "texte": "Vous pouvez dépenser 1 Matériel lors d’un Focus Développement ou Prospérité pour augmenter 1 Population Pure.",
+    "texteAmeliore": "Augmentez une Population Pure lors d’un Focus Développement, Prospérité ou Innovation."
+  },
+  {
+    "nom": "Matrice neuronale",
+    "idSheet": 12,
+    "maison": "Thegwyn",
+    "type": "Production",
+    "permanent": {
+      "bonus": {
+        "credit_before_production": 2
+      }
+    },
+    "immediat": {
+      "build": {
+        "quantity": 1,
+        "structure": "guilde_banquier"
+      }
+    },
+    "ameliore": {
+      "can": {
+        "focus_production_credit": true,
+        "focus_innovation_influence": true
+      },
+      "bonus": {
+        "influence_per_banker_guild": 1
+      }
+    },
+    "texte": "Vous pouvez gagner 2 Crédits supplémentaires avant de produire des Crédits.",
+    "texteAmeliore": "Produisez des Crédits avec Focus Production et gagnez de l’Influence avec Focus Innovation."
+  },
+  {
+    "nom": "Cuirassés",
+    "idSheet": 13,
+    "maison": "Shiveus",
+    "type": "Combat",
+    "permanent": {
+      "cost": {
+        "materiel_per_cube": 1
+      },
+      "limit": {
+        "cube_par_flotte": 1
+      },
+      "enable": {
+        "cuirasse": true
+      }
+    },
+    "immediat": {
+      "cost": {
+        "materiel": 1
+      },
+      "deploy": {
+        "unit": "cuirasse",
+        "quantity": 1,
+        "destination": "secteur_mere"
+      }
+    },
+    "ameliore": {
+      "limit": {
+        "cube_par_flotte": 3
+      }
+    },
+    "texte": "Vous pouvez déployer des cubes de Puissance Navale sur des Flottes de Cuirassés.",
+    "texteAmeliore": "Vous pouvez avoir jusqu’à 3 cubes dans une Flotte de Cuirassés."
+  },
+  {
+    "nom": "Chambres de décontamination",
+    "idSheet": 14,
+    "maison": "Shiveus",
+    "type": "Corruption",
+    "permanent": {
+      "can": {
+        "store_corruption": true,
+        "remove_corruption": true
+      },
+      "ignore": {
+        "corruption_for_neant_power": true
+      },
+      "storage": {
+        "corruption_max": 2
+      }
+    },
+    "immediat": {
+      "move": {
+        "corruption": 1
+      }
+    },
+    "ameliore": {
+      "remove": {
+        "extra_corruption": 1
+      },
+      "storage": {
+        "corruption_max": 3
+      }
+    },
+    "texte": "Vous pouvez stocker jusqu’à 2 Corruptions sur cette Technologie.",
+    "texteAmeliore": "Vous pouvez stocker jusqu’à 3 Corruptions et retirer une Corruption supplémentaire."
+  },
+  {
+    "nom": "Hyperpropulsion",
+    "idSheet": 15,
+    "maison": "Yarvek",
+    "type": "Mouvement",
+    "permanent": {
+      "can": {
+        "focus_conquete_energy": true,
+        "regroup_before_invasion": true
+      }
+    },
+    "immediat": {
+      "gain": {
+        "prime_token": 3
+      }
+    },
+    "ameliore": {
+      "movement": {
+        "ignore_tempete_neant": true,
+        "invasion_range_bonus": 1
+      }
+    },
+    "texte": "Vous pouvez regrouper avant d’envahir un secteur.",
+    "texteAmeliore": "Gagne la possibilité d’ignorer les Tempêtes du Néant ou d’envahir plus loin."
+  },
+  {
+    "nom": "Transports tactiques",
+    "idSheet": 16,
+    "maison": "Yarvek",
+    "type": "Action",
+    "permanent": {
+      "can": {
+        "focus_prosperite_recall_cube_population": true,
+        "focus_conquete_reduce_population_activate": true
+      }
+    },
+    "immediat": {
+      "choice": {
+        "deploy_cube": 1,
+        "population_pure": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "focus_prefere_action_transport": true
+      },
+      "limit": {
+        "focus_conquete_no_double_action": true,
+        "focus_prosperite_no_double_action": true
+      }
+    },
+    "texte": "Vous pouvez rappeler un cube ou diminuer une Population selon le Focus joué.",
+    "texteAmeliore": "Choisissez une des actions avec un Focus préféré."
+  },
+  {
+    "nom": "Robotique",
+    "idSheet": 17,
+    "maison": "Nervo",
+    "type": "Action",
+    "permanent": {
+      "can": {
+        "focus_developpement_double_action": true
+      },
+      "cost_multiplier": 2,
+      "effect_multiplier": 2
+    },
+    "immediat": {
+      "gain": {
+        "materiel": 2
+      }
+    },
+    "ameliore": {
+      "can": {
+        "focus_prefere_double_action": true
+      },
+      "cost_multiplier": 2,
+      "effect_multiplier": 2
+    },
+    "texte": "Double le coût et l’effet d’une action d’un Focus Développement.",
+    "texteAmeliore": "Double le coût et l’effet d’une action d’un Focus préféré."
+  },
+  {
+    "nom": "Vaisseaux-Arches",
+    "idSheet": 18,
+    "maison": "Nervo",
+    "type": "Développement",
+    "permanent": {
+      "limit": {
+        "guilde_secteur_mere_hors_emplacement": 2
+      }
+    },
+    "immediat": {
+      "choice": {
+        "guilde": 1,
+        "population_pure": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "focus_renfort_population": true
+      },
+      "limit": {
+        "guilde_secteur_mere_hors_emplacement": 4
+      }
+    },
+    "texte": "Vous pouvez établir jusqu’à deux Guildes supplémentaires dans votre Secteur-Mère.",
+    "texteAmeliore": "Vous pouvez établir jusqu’à quatre Guildes supplémentaires et augmenter la Population du Secteur-Mère avec Focus Renfort."
+  },
+  {
+    "nom": "Missiles longue portée",
+    "idSheet": 19,
+    "maison": "Astoran",
+    "type": "Combat",
+    "permanent": {
+      "can": {
+        "extra_approach_damage": true
+      },
+      "cost": {
+        "energie": 1
+      },
+      "effect": {
+        "degat_approche": 1
+      },
+      "condition": {
+        "adjacent_sector": {
+          "structure": [
+            "chantier_naval",
+            "base_stellaire"
+          ]
+        }
+      }
+    },
+    "immediat": {
+      "choice": {
+        "energie": 2,
+        "build_chantier_naval": 1
+      }
+    },
+    "ameliore": {
+      "combat": {
+        "max": 2,
+        "degat_approche_per_adjacent_structure": 1
+      }
+    },
+    "texte": "Lorsque vous envahissez un secteur, vous pouvez dépenser 1 Énergie pour infliger 1 Dégât d’Approche supplémentaire si vous avez un Chantier Naval ou une Base Stellaire adjacent.",
+    "texteAmeliore": "Infligez 1 Dégât d’Approche par secteur adjacent avec Chantier Naval ou Base Stellaire (maximum 2)."
+  },
+  {
+    "nom": "Sentinelles",
+    "idSheet": 20,
+    "maison": "Astoran",
+    "type": "Combat",
+    "permanent": {
+      "can": {
+        "replace_installation_build_with_sentinelle": true
+      },
+      "enable": {
+        "sentinelle": true
+      }
+    },
+    "immediat": {
+      "choice": {
+        "deploy": {
+          "unit": "sentinelle",
+          "quantity": 1,
+          "destination": "secteur_mere"
+        },
+        "build_defense_secteur": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "deploy_without_building": true,
+        "build_and_deploy_sentinelle": true
+      }
+    },
+    "texte": "Vous pouvez déployer de la Puissance Navale sur des Flottes de Sentinelles et remplacer une construction d’Installation par un déploiement.",
+    "texteAmeliore": "Vous pouvez construire une Installation et déployer une Sentinelle dans le même secteur ou déployer sans construire."
+  },
+  {
+    "nom": "Porte-Vaisseaux",
+    "idSheet": 21,
+    "maison": "Fenrax",
+    "type": "Combat",
+    "permanent": {
+      "cost": {
+        "nourriture_per_cube": 1
+      },
+      "rule": {
+        "portevaisseau_as_shipyard": true
+      },
+      "limit": {
+        "cube_par_flotte": 1
+      },
+      "enable": {
+        "portevaisseau": true
+      }
+    },
+    "immediat": {
+      "cost": {
+        "nourriture": 1
+      },
+      "choice": {
+        "deploy": {
+          "unit": "portevaisseau",
+          "quantity": 1,
+          "destination": "secteur_mere"
+        },
+        "activate_cube": 1
+      }
+    },
+    "ameliore": {
+      "limit": {
+        "cube_par_flotte": 3
+      }
+    },
+    "texte": "Vous pouvez déployer des cubes de Puissance Navale sur des Flottes de Porte-Vaisseaux.",
+    "texteAmeliore": "Votre Flotte de Porte-Vaisseaux peut contenir jusqu’à 3 cubes."
+  },
+  {
+    "nom": "Surveillance centrale",
+    "idSheet": 22,
+    "maison": "Fenrax",
+    "type": "Politique",
+    "permanent": {
+      "can": {
+        "focus_politique_reduce_population": true
+      },
+      "effect": {
+        "programme": 1,
+        "gloire_upgrade": 1
+      }
+    },
+    "immediat": {
+      "upgrade": {
+        "gloire": 1
+      }
+    },
+    "ameliore": {
+      "rule": {
+        "programme_unique_type": true
+      },
+      "limit": {
+        "programme_max": 5
+      }
+    },
+    "texte": "Diminuez une Population Pure pour gagner un Programme ou améliorer un jeton Gloire.",
+    "texteAmeliore": "Vous pouvez avoir un cinquième Programme en jeu, chacun d’un type différent."
+  },
+  {
+    "nom": "Scanner de récupération",
+    "idSheet": 23,
+    "maison": "Kradmor",
+    "type": "Invasion",
+    "permanent": {
+      "can": {
+        "place_liberation_token": true
+      },
+      "condition": {
+        "sector_type": "neant"
+      }
+    },
+    "immediat": {
+      "choice": {
+        "deploy_cube": 1,
+        "activate_cube": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "place_liberation_token": true
+      },
+      "effect": {
+        "remove_corruption_after_invasion": 1
+      },
+      "condition": {
+        "sector_type": [
+          "corrompu",
+          "neant"
+        ]
+      }
+    },
+    "texte": "Placez un jeton Libération sur un secteur du Néant avant le Combat.",
+    "texteAmeliore": "Placez un jeton Libération sur un secteur Corrompu ou du Néant et retirez une Corruption après invasion réussie."
+  },
+  {
+    "nom": "Purificateur",
+    "idSheet": 24,
+    "maison": "Kradmor",
+    "type": "Corruption",
+    "permanent": {
+      "can": {
+        "focus_tentation_remove_corruption": true
+      },
+      "cost": {
+        "science": 1
+      },
+      "effect": {
+        "remove_corruption": 1
+      }
+    },
+    "immediat": {
+      "cost": {
+        "science": 1
+      },
+      "remove_corruption": 1
+    },
+    "ameliore": {
+      "can": {
+        "focus_tentation_remove_corruption": true
+      },
+      "limit": {
+        "corruption_removed_by_focus": 2
+      },
+      "replace": {
+        "deploy_cube_with_remove_corruption": true
+      }
+    },
+    "texte": "Vous pouvez dépenser 1 Science avec Focus Tentation pour retirer une Corruption.",
+    "texteAmeliore": "Vous pouvez retirer jusqu’à deux Corruptions et remplacer certains déploiements de cubes par des retraits."
+  },
+  {
+    "nom": "Drones autonomes",
+    "idSheet": 25,
+    "maison": "Marqualos",
+    "type": "Combat",
+    "permanent": {
+      "can": {
+        "commerce_for_absorption": true
+      },
+      "cost": {
+        "commerce_token": 1
+      },
+      "effect": {
+        "absorb_salve": 1,
+        "absorb_approche": 1
+      },
+      "condition": {
+        "action": "invasion"
+      },
+      "evaluation": {
+        "commerce_for_defense": true
+      }
+    },
+    "immediat": {
+      "gain": {
+        "commerce_token": 1
+      },
+      "choice": {
+        "deploy_cube": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "commerce_for_absorption": true
+      },
+      "effect": {
+        "absorb_salve": 2,
+        "absorb_approche": 1
+      },
+      "evaluation": {
+        "auto_defense_escarmouche": true
+      }
+    },
+    "texte": "Lorsque vous envahissez un secteur, vous pouvez remettre un jeton Commerce pour gagner 1 Absorption d’Approche et 1 Absorption de Salve.",
+    "texteAmeliore": "Vous gagnez 1 Absorption d’Approche et 2 Absorptions de Salve et réussissez automatiquement vos défenses contre les Escarmouches."
+  },
+  {
+    "nom": "Nexus de commerce",
+    "idSheet": 26,
+    "maison": "Marqualos",
+    "type": "Commerce",
+    "permanent": {
+      "can": {
+        "choose_commerce_bonus_lower": true
+      }
+    },
+    "immediat": {
+      "choice": {
+        "nourriture": 2,
+        "commerce_token": 1
+      }
+    },
+    "ameliore": {
+      "can": {
+        "first_overproduction_bonus": true
+      },
+      "choice": {
+        "influence": 3,
+        "commerce_without_bonus": 1
+      }
+    },
+    "texte": "Lorsque vous remettez un jeton Commerce, vous pouvez choisir le bonus Commerce adjacent ou inférieur.",
+    "texteAmeliore": "Lors de votre première surproduction, gagnez 3 Influence ou un jeton Commerce sans bonus."
+  },
+  {
+    "nom": "Réplicateurs de combat",
+    "idSheet": 27,
+    "maison": "Novaris",
+    "type": "Combat",
+    "permanent": {
+      "after": {
+        "successful_invasion": {
+          "gain_prime": 1,
+          "keep_installations": true,
+          "keep_base_stellaire": true
+        }
+      }
+    },
+    "immediat": {
+      "activate_cube": 1
+    },
+    "ameliore": {
+      "after": {
+        "combat_as_invader_tie": {
+          "deploy_cube": 1,
+          "win_after_deploy": true
+        },
+        "combat_as_invader_win": {
+          "deploy_cube": 1
+        }
+      }
+    },
+    "texte": "Après une invasion réussie, vous pouvez gagner un jeton Prime et conserver les Installations du secteur.",
+    "texteAmeliore": "Après un Combat gagné ou égalité en tant qu’Envahisseur, vous pouvez déployer un cube dans le secteur."
+  },
+  {
+    "nom": "Cybernétique",
+    "idSheet": 28,
+    "maison": "Novaris",
+    "type": "Production",
+    "permanent": {
+      "can": {
+        "guild_gain_resource": true
+      },
+      "effect": {
+        "resource_per_guild": 2
+      }
+    },
+    "immediat": {
+      "build": {
+        "quantity": 1,
+        "structure": "guilde"
+      }
+    },
+    "ameliore": {
+      "population_pure": {
+        "resource_per_guild_sector": 2
+      }
+    },
+    "texte": "Lorsque vous établissez une Guilde, vous pouvez gagner 2 ressources correspondant au type de la Guilde.",
+    "texteAmeliore": "Lorsque vous augmentez une Population Pure, gagnez les ressources correspondant aux Guildes du secteur."
+  }
+]

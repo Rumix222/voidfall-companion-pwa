@@ -1,0 +1,92 @@
+[
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 1,
+    "numeroB": 11
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 1,
+    "numeroB": 12
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 11,
+    "numeroB": 12
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 11,
+    "numeroB": 21
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 11,
+    "numeroB": 22
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 12,
+    "numeroB": 22
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 12,
+    "numeroB": 23
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 12,
+    "numeroB": 24
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 21,
+    "numeroB": 22
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 21,
+    "numeroB": 31
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 22,
+    "numeroB": 23
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 22,
+    "numeroB": 31
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 22,
+    "numeroB": 32
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 23,
+    "numeroB": 24
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 23,
+    "numeroB": 32
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 31,
+    "numeroB": 32
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 31,
+    "numeroB": 40
+  },
+  {
+    "scenarioId": "solo_1",
+    "numeroA": 32,
+    "numeroB": 40
+  }
+]

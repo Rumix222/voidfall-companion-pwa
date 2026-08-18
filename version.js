@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 24 — 2026-08-17
+ * Version 25 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,13 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Migration catalogue Supabase -> JSON local) : le catalogue
+ * n'est plus lu depuis Supabase (js/catalogueSync.js réécrit, plus de
+ * clé/URL Supabase dans le code) mais depuis 12 fichiers JSON bundlés
+ * sous data/catalogue/*.json, ajoutés à FICHIERS_A_METTRE_EN_CACHE
+ * (service-worker.js). Incrémenté pour forcer la réinstallation du
+ * Service Worker et la mise en cache de ces nouveaux fichiers.
  *
  * 17/08/2026 (Lot K — corrections mineures, technologies avancées) :
  * incrémenté suite à un correctif sur Plat. maison — la case "Améliorée"
@@ -322,4 +329,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.30';
+var APP_VERSION = '20260818.1';

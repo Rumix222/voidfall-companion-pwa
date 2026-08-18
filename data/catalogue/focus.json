@@ -1,0 +1,2140 @@
+[
+  {
+    "id": 6,
+    "codeFamille": "DEVE_STA",
+    "focus": "Développement",
+    "action": "Harmoniser",
+    "type": "Standard",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    },
+    "texte": "Augmentez une Population Pure ou retirez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 7,
+    "codeFamille": "INNO_STA",
+    "focus": "Innovation",
+    "action": "Rechercher",
+    "type": "Standard",
+    "cout": {
+      "nourriture": 2
+    },
+    "effet": {
+      "choice": [
+        {
+          "produire_credit": 1,
+          "produire_science": 1
+        },
+        {
+          "influence_par_guilde": [
+            "scientifique_pur",
+            "banquier_pur"
+          ]
+        }
+      ]
+    },
+    "texte": "Produisez de la Science et des Crédits et/ou gagnez 1 Influence pour chacune de vos Guildes Pures de Scientifiques et de Banquiers.",
+    "commentaire": null
+  },
+  {
+    "id": 8,
+    "codeFamille": "INNO_STA",
+    "focus": "Innovation",
+    "action": "Inventer",
+    "type": "Standard",
+    "cout": {
+      "science": 2
+    },
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    },
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "commentaire": null
+  },
+  {
+    "id": 9,
+    "codeFamille": "INNO_STA",
+    "focus": "Innovation",
+    "action": "Consolider",
+    "type": "Standard",
+    "cout": {
+      "energie": 1,
+      "materiel": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "gagner_programme": 1
+    },
+    "texte": "Gagnez un Programme.",
+    "commentaire": null
+  },
+  {
+    "id": 10,
+    "codeFamille": "POLI_STA",
+    "focus": "Politique",
+    "action": "Inspirer",
+    "type": "Standard",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "avancer_civilisation_gouvernement": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Gouvernement.",
+    "commentaire": null
+  },
+  {
+    "id": 11,
+    "codeFamille": "POLI_STA",
+    "focus": "Politique",
+    "action": "S’imposer",
+    "type": "Standard",
+    "cout": {
+      "credit": 1,
+      "energie": 2
+    },
+    "effet": {
+      "choice": [
+        "ameliorer_gloire",
+        "envahir"
+      ]
+    },
+    "texte": "Améliorez un jeton Gloire et/ou envahissez un secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 12,
+    "codeFamille": "POLI_STA",
+    "focus": "Politique",
+    "action": "Contrôler",
+    "type": "Standard",
+    "cout": {
+      "credit": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "deplacer_corruption"
+      ]
+    },
+    "texte": "Gagnez un jeton Commerce et/ou déplacez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 13,
+    "codeFamille": "PROD_STA",
+    "focus": "Production",
+    "action": "S’épanouir",
+    "type": "Standard",
+    "cout": {},
+    "effet": {
+      "avancer_civilisation_societe": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Société.",
+    "commentaire": null
+  },
+  {
+    "id": 14,
+    "codeFamille": "PROD_STA",
+    "focus": "Production",
+    "action": "Ravitailler",
+    "type": "Standard",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "produire_energie": 1,
+          "produire_materiel": 1,
+          "produire_nourriture": 1
+        },
+        {
+          "influence_par_guilde": [
+            "fermier_pur",
+            "mineur_pur",
+            "ingenieur_pur"
+          ]
+        }
+      ]
+    },
+    "texte": "Produisez de la Nourriture, de l’Énergie et du Matériel et/ou gagnez 1 Influence pour chacune de vos Guildes Pures de Fermiers, Mineurs et Ingénieurs.",
+    "commentaire": null
+  },
+  {
+    "id": 15,
+    "codeFamille": "PROD_STA",
+    "focus": "Production",
+    "action": "Optimiser",
+    "type": "Standard",
+    "cout": {
+      "energie": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        "regrouper"
+      ]
+    },
+    "texte": "Retirez une Corruption et/ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 16,
+    "codeFamille": "PROG_STA",
+    "focus": "Progrès",
+    "action": "Expérimenter",
+    "type": "Standard",
+    "cout": {},
+    "effet": {
+      "choice": [
+        "produire_science",
+        "guilde_scientifique"
+      ]
+    },
+    "texte": "Produisez de la Science ou établissez une Guilde de Scientifiques.",
+    "commentaire": null
+  },
+  {
+    "id": 17,
+    "codeFamille": "PROG_STA",
+    "focus": "Progrès",
+    "action": "Inventer",
+    "type": "Standard",
+    "cout": {
+      "science": 2
+    },
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    },
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "commentaire": null
+  },
+  {
+    "id": 18,
+    "codeFamille": "PROG_STA",
+    "focus": "Progrès",
+    "action": "Restaurer",
+    "type": "Standard",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "effet_secteur": [
+        "retirer_corruption",
+        "regrouper"
+      ]
+    },
+    "texte": "Dans le secteur d’où vous avez rappelé le cube : retirez une Corruption et/ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 19,
+    "codeFamille": "PROS_STA",
+    "focus": "Prospérité",
+    "action": "Prospérer",
+    "type": "Standard",
+    "cout": {
+      "materiel": 1
+    },
+    "effet": {
+      "avancer_civilisation_economie": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Économie.",
+    "commentaire": null
+  },
+  {
+    "id": 20,
+    "codeFamille": "PROS_STA",
+    "focus": "Prospérité",
+    "action": "Stocker",
+    "type": "Standard",
+    "cout": {},
+    "effet": {
+      "choice": [
+        "produire_ressource",
+        {
+          "ressource_choix": 2
+        }
+      ]
+    },
+    "texte": "Produisez un type de ressource et/ou gagnez 2 ressources de votre choix.",
+    "commentaire": null
+  },
+  {
+    "id": 21,
+    "codeFamille": "PROS_STA",
+    "focus": "Prospérité",
+    "action": "Organiser",
+    "type": "Standard",
+    "cout": {
+      "energie": 1,
+      "materiel": 1,
+      "desactiver_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "installation"
+      ]
+    },
+    "texte": "Gagnez un Programme et/ou construisez une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 22,
+    "codeFamille": "RENF_STA",
+    "focus": "Renfort",
+    "action": "Accélérer",
+    "type": "Standard",
+    "cout": {
+      "desactiver_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "avancer_civilisation",
+        "defense_secteur"
+      ]
+    },
+    "texte": "Avancez sur une piste de Civilisation et/ou construisez une Défense de Secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 23,
+    "codeFamille": "RENF_STA",
+    "focus": "Renfort",
+    "action": "Rassembler",
+    "type": "Standard",
+    "cout": {
+      "materiel": 2
+    },
+    "effet": {
+      "deployer_cube_par_chantier": 1
+    },
+    "texte": "Déployez 1 cube pour chacun de vos Chantiers Navals, dans le secteur de ce Chantier Naval.",
+    "commentaire": null
+  },
+  {
+    "id": 24,
+    "codeFamille": "RENF_STA",
+    "focus": "Renfort",
+    "action": "Mobiliser",
+    "type": "Standard",
+    "cout": {
+      "energie": 1
+    },
+    "effet": {
+      "choice": [
+        "regrouper",
+        "defense_secteur"
+      ]
+    },
+    "texte": "Regroupez et/ou construisez une Défense de Secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 25,
+    "codeFamille": "TENT_STA",
+    "focus": "Tentation",
+    "action": "Exploiter",
+    "type": "Standard",
+    "cout": {},
+    "effet": {
+      "action_focus_prefere": {
+        "origine": "focus_prefere",
+        "payer_cout": true,
+        "emplacement": [
+          "main",
+          "defausse"
+        ]
+      }
+    },
+    "texte": "Faites une action d’un Focus préféré de votre main ou défausse (en payant son coût et en résolvant ses effets).",
+    "commentaire": null
+  },
+  {
+    "id": 26,
+    "codeFamille": "TENT_STA",
+    "focus": "Tentation",
+    "action": "Conspirer",
+    "type": "Standard",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "avancer_civilisation": 1
+        },
+        {
+          "consulter_evenements": {
+            "nombre": 2,
+            "placer_dessus": 1,
+            "placer_dessous": 1
+          }
+        }
+      ]
+    },
+    "texte": "Gagnez une Corruption. Avancez sur une piste de Civilisation et/ou consultez les deux premières cartes Événement du prochain Cycle.",
+    "commentaire": null
+  },
+  {
+    "id": 27,
+    "codeFamille": "TENT_STA",
+    "focus": "Tentation",
+    "action": "Exercer",
+    "type": "Standard",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "deployer_cube_secteur_mere",
+        {
+          "produire_deux_ressources": 1
+        }
+      ]
+    },
+    "texte": "Gagnez une Corruption. Activez 1 cube et/ou déployez 1 cube dans votre Secteur-Mère et/ou produisez deux types de ressources différents.",
+    "commentaire": null
+  },
+  {
+    "id": 28,
+    "codeFamille": "CONQ_AST",
+    "focus": "Conquête",
+    "action": "Assiéger",
+    "type": "Astoran",
+    "cout": {
+      "energie": 3
+    },
+    "effet": {
+      "choice": [
+        "envahir",
+        "installation"
+      ]
+    },
+    "texte": "Envahissez un secteur et/ou construisez une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 29,
+    "codeFamille": "CONQ_AST",
+    "focus": "Conquête",
+    "action": "Récolter",
+    "type": "Astoran",
+    "cout": {
+      "credit": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "nourriture_par_secteur_pur": 1
+        },
+        "deplacer_corruption"
+      ]
+    },
+    "texte": "Gagnez 1 Nourriture pour chacun de vos secteurs Purs et/ou déplacez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 30,
+    "codeFamille": "CONQ_AST",
+    "focus": "Conquête",
+    "action": "Soutenir",
+    "type": "Astoran",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "par_secteur_pur_avec_installation": {
+        "credit": 1,
+        "influence": 1
+      }
+    },
+    "texte": "Gagnez 1 Influence et 1 Crédit pour chacun de vos secteurs Purs avec au moins une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 31,
+    "codeFamille": "PROS_AST",
+    "focus": "Prospérité",
+    "action": "Parader",
+    "type": "Astoran",
+    "cout": {
+      "nourriture": 1,
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "installation",
+        {
+          "avancer_civilisation_economie": 1
+        }
+      ]
+    },
+    "texte": "Construisez une Installation et/ou avancez sur la piste de Civilisation Économie.",
+    "commentaire": null
+  },
+  {
+    "id": 32,
+    "codeFamille": "PROS_AST",
+    "focus": "Prospérité",
+    "action": "Réguler",
+    "type": "Astoran",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "programme_force",
+        "programme_richesse"
+      ]
+    },
+    "texte": "Gagnez un Programme Force ou Richesse.",
+    "commentaire": null
+  },
+  {
+    "id": 33,
+    "codeFamille": "PROS_AST",
+    "focus": "Prospérité",
+    "action": "Reconstruire",
+    "type": "Astoran",
+    "cout": {
+      "exclude": "secteur_mere",
+      "detruire": {
+        "installation": 1
+      }
+    },
+    "effet": {
+      "choice": [
+        "etablir_guilde_meme_secteur",
+        "retirer_corruption"
+      ]
+    },
+    "texte": "Établissez une Guilde dans le secteur où vous avez détruit l'Installation et/ou retirez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 34,
+    "codeFamille": "DEVE_FEN",
+    "focus": "Développement",
+    "action": "Installer",
+    "type": "Fenrax",
+    "cout": {
+      "credit": 1,
+      "materiel": 1
+    },
+    "effet": {
+      "choice": [
+        "etablir_guilde_meme_secteur",
+        "construire_installation_meme_secteur"
+      ]
+    },
+    "texte": "Établissez une Guilde et/ou construisez une Installation dans le même secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 35,
+    "codeFamille": "DEVE_FEN",
+    "focus": "Développement",
+    "action": "Coloniser",
+    "type": "Fenrax",
+    "cout": {
+      "exclude": "secteur_mere",
+      "materiel": 1,
+      "diminuer_population_pure": 1
+    },
+    "effet": {
+      "restriction": "secteur_non_diminue",
+      "etablir_guilde_up_to": 2
+    },
+    "texte": "Établissez jusqu'à deux Guildes, sauf dans le secteur dont vous venez de diminuer la Population.",
+    "commentaire": null
+  },
+  {
+    "id": 36,
+    "codeFamille": "DEVE_FEN",
+    "focus": "Développement",
+    "action": "Recruter",
+    "type": "Fenrax",
+    "cout": {
+      "science": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "choice": [
+        "deployer_cube",
+        "augmenter_population"
+      ],
+      "meme_secteur": true
+    },
+    "texte": "Déployez 1 cube et/ou augmentez une Population Pure dans le même secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 37,
+    "codeFamille": "DISP_FEN",
+    "focus": "Dispersion",
+    "action": "Reprendre",
+    "type": "Fenrax",
+    "cout": {
+      "exclude": "secteur_mere",
+      "science": 1,
+      "detruire": {
+        "installation": 1
+      }
+    },
+    "effet": {
+      "choice": [
+        "construire_installation_autre_secteur",
+        "retirer_corruption"
+      ]
+    },
+    "texte": "Construisez une Installation, sauf dans le secteur où vous venez d'en détruire une, et/ou retirez une Corruption. Les Installations peuvent être de types différents.",
+    "commentaire": null
+  },
+  {
+    "id": 38,
+    "codeFamille": "DISP_FEN",
+    "focus": "Dispersion",
+    "action": "Rassembler",
+    "type": "Fenrax",
+    "cout": {
+      "credit": 1,
+      "materiel": 1
+    },
+    "effet": {
+      "deployer_cube_par_chantier": 1
+    },
+    "texte": "Déployez 1 cube pour chacun de vos Chantiers Navals dans le secteur de ce Chantier Naval.",
+    "commentaire": null
+  },
+  {
+    "id": 39,
+    "codeFamille": "DISP_FEN",
+    "focus": "Dispersion",
+    "action": "Disperser",
+    "type": "Fenrax",
+    "cout": {
+      "energie": 1,
+      "exclude": "secteur_mere",
+      "diminuer_population_pure": 1
+    },
+    "effet": {
+      "restriction": "secteur_non_diminue",
+      "augmenter_population_up_to": 2
+    },
+    "texte": "Augmentez la Population Pure de jusqu'à deux secteurs différents, sauf dans le secteur dont vous venez de diminuer la Population.",
+    "commentaire": null
+  },
+  {
+    "id": 40,
+    "codeFamille": "TENT_KRA",
+    "focus": "Tentation",
+    "action": "Surmonter",
+    "type": "Kradmor",
+    "cout": {
+      "credit": 1,
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "augmenter_population": 1
+        },
+        {
+          "action_focus_prefere": {
+            "origine": "focus_prefere",
+            "payer_cout": true,
+            "emplacement": [
+              "main",
+              "defausse"
+            ]
+          }
+        }
+      ]
+    },
+    "texte": "Augmentez une Population Pure et/ou faites une action d'un Focus préféré de votre main ou défausse (en payant son coût et en résolvant ses effets).",
+    "commentaire": null
+  },
+  {
+    "id": 41,
+    "codeFamille": "TENT_KRA",
+    "focus": "Tentation",
+    "action": "Prévoir",
+    "type": "Kradmor",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "avancer_civilisation_moins_avancee": 1
+        },
+        {
+          "consulter_evenements": {
+            "nombre": 2,
+            "placer_dessus": 1,
+            "placer_dessous": 1
+          }
+        }
+      ]
+    },
+    "texte": "Avancez sur votre piste de Civilisation la moins avancée et/ou consultez les deux premières cartes Événement galactique du prochain Cycle. Placez-en une au sommet de la pile et l'autre en dessous.",
+    "commentaire": null
+  },
+  {
+    "id": 42,
+    "codeFamille": "TENT_KRA",
+    "focus": "Tentation",
+    "action": "Exercer",
+    "type": "Kradmor",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "deployer_cube_secteur_mere",
+        {
+          "produire_ressource": 1
+        }
+      ]
+    },
+    "texte": "Activez 1 cube et/ou déployez 1 cube dans votre Secteur-Mère et/ou produisez un type de ressource.",
+    "commentaire": null
+  },
+  {
+    "id": 43,
+    "codeFamille": "PROD_KRA",
+    "focus": "Production",
+    "action": "Pousser",
+    "type": "Kradmor",
+    "cout": {
+      "materiel": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        {
+          "produire_energie": 1
+        }
+      ]
+    },
+    "texte": "Retirez une Corruption et/ou produisez de l'Énergie.",
+    "commentaire": null
+  },
+  {
+    "id": 44,
+    "codeFamille": "PROD_KRA",
+    "focus": "Production",
+    "action": "Amplifier",
+    "type": "Kradmor",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "produire_materiel": 1,
+          "produire_nourriture": 1
+        },
+        {
+          "avancer_civilisation_economie": 1
+        }
+      ]
+    },
+    "texte": "Produisez de la Nourriture et du Matériel ou avancez sur la piste de Civilisation Économie.",
+    "commentaire": null
+  },
+  {
+    "id": 45,
+    "codeFamille": "PROD_KRA",
+    "focus": "Production",
+    "action": "Éclore",
+    "type": "Kradmor",
+    "cout": {
+      "energie": 1,
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        "guilde",
+        {
+          "avancer_civilisation_societe": 1
+        }
+      ]
+    },
+    "texte": "Établissez une Guilde et/ou avancez sur la piste de Civilisation Société.",
+    "commentaire": null
+  },
+  {
+    "id": 46,
+    "codeFamille": "RUSE_MAR",
+    "focus": "Ruse",
+    "action": "Obtenir",
+    "type": "Marqualos",
+    "cout": {
+      "credit": 1,
+      "science": 1
+    },
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    },
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "commentaire": null
+  },
+  {
+    "id": 47,
+    "codeFamille": "RUSE_MAR",
+    "focus": "Ruse",
+    "action": "Transférer",
+    "type": "Marqualos",
+    "cout": {
+      "retirer_programme": {
+        "exclude": "programme_depart"
+      }
+    },
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        {
+          "produire_deux_ressources": 1
+        }
+      ]
+    },
+    "texte": "Gagnez un jeton Commerce et/ou produisez deux types de ressources différents.",
+    "commentaire": null
+  },
+  {
+    "id": 48,
+    "codeFamille": "RUSE_MAR",
+    "focus": "Ruse",
+    "action": "Diriger",
+    "type": "Marqualos",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "gagner_prime"
+      ]
+    },
+    "texte": "Gagnez un Programme et/ou un jeton Prime.",
+    "commentaire": null
+  },
+  {
+    "id": 49,
+    "codeFamille": "PROD_NER",
+    "focus": "Production",
+    "action": "Industrialiser",
+    "type": "Nervo",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "avancer_civilisation_economie": 1
+        },
+        {
+          "produire_materiel": 1
+        }
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation Économie et/ou produisez du Matériel.",
+    "commentaire": null
+  },
+  {
+    "id": 50,
+    "codeFamille": "PROD_NER",
+    "focus": "Production",
+    "action": "Mécaniser",
+    "type": "Nervo",
+    "cout": {
+      "materiel": 2
+    },
+    "effet": {
+      "choice": [
+        {
+          "avancer_civilisation_gouvernement": 1
+        },
+        {
+          "produire_energie": 1,
+          "produire_nourriture": 1
+        }
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation Gouvernement et/ou produisez de la Nourriture et de l'Énergie.",
+    "commentaire": null
+  },
+  {
+    "id": 52,
+    "codeFamille": "EXAL_NER",
+    "focus": "Exaltation",
+    "action": "Bombarder",
+    "type": "Nervo",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "envahir": 1,
+      "bonus_combat": {
+        "type": [
+          "absorption_approche",
+          "absorption_salve"
+        ],
+        "par_materiel": 3
+      }
+    },
+    "texte": "Envahissez un secteur : lors de ce Combat, gagnez 1 Absorption d'Approche ou de Salve pour chaque série de 3 Matériel que vous dépensez.",
+    "commentaire": null
+  },
+  {
+    "id": 53,
+    "codeFamille": "EXAL_NER",
+    "focus": "Exaltation",
+    "action": "Analyser",
+    "type": "Nervo",
+    "cout": {
+      "credit": 1
+    },
+    "effet": {
+      "gagner_programme": 1
+    },
+    "texte": "Gagnez un Programme.",
+    "commentaire": null
+  },
+  {
+    "id": 54,
+    "codeFamille": "EXAL_NER",
+    "focus": "Exaltation",
+    "action": "Régénérer",
+    "type": "Nervo",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        {
+          "produire_credit": 1
+        }
+      ]
+    },
+    "texte": "Retirez une Corruption et/ou produisez des Crédits.",
+    "commentaire": null
+  },
+  {
+    "id": 55,
+    "codeFamille": "PROG_NOV",
+    "focus": "Progrès",
+    "action": "Embrasser",
+    "type": "Novaris",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "gain": {
+        "technologie": [
+          "base",
+          "amelioree"
+        ]
+      }
+    },
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "commentaire": null
+  },
+  {
+    "id": 57,
+    "codeFamille": "PROG_NOV",
+    "focus": "Progrès",
+    "action": "Piéger",
+    "type": "Novaris",
+    "cout": {
+      "energie": 2,
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "regrouper",
+        "invade_corrupted_sector"
+      ]
+    },
+    "texte": "Regroupez et/ou envahissez un secteur Corrompu.",
+    "commentaire": null
+  },
+  {
+    "id": 58,
+    "codeFamille": "RENF_NOV",
+    "focus": "Renfort",
+    "action": "Adapter",
+    "type": "Novaris",
+    "cout": {
+      "energie": 1,
+      "materiel": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "activer_cube": 1,
+      "retirer_corruption_fiche": 1
+    },
+    "texte": "Activez 1 cube et/ou retirez une Corruption de votre fiche Maison.",
+    "commentaire": null
+  },
+  {
+    "id": 59,
+    "codeFamille": "RENF_NOV",
+    "focus": "Renfort",
+    "action": "Rassembler",
+    "type": "Novaris",
+    "cout": {
+      "energie": 1,
+      "materiel": 1
+    },
+    "effet": {
+      "deployer_cube_par_chantier": 1
+    },
+    "texte": "Déployez 1 cube pour chacun de vos Chantiers Navals, dans le secteur de ce Chantier Naval.",
+    "commentaire": null
+  },
+  {
+    "id": 60,
+    "codeFamille": "RENF_NOV",
+    "focus": "Renfort",
+    "action": "Accélérer",
+    "type": "Novaris",
+    "cout": {
+      "energie": 1,
+      "materiel": 1
+    },
+    "effet": {
+      "regrouper": 1,
+      "avancer_civilisation": 1
+    },
+    "texte": "Avancez sur une piste de Civilisation et/ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 56,
+    "codeFamille": "PROG_NOV",
+    "focus": "Progrès",
+    "action": "Expérimenter",
+    "type": "Novaris",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "programme": 1
+    },
+    "texte": "Gagnez un Programme.",
+    "commentaire": null
+  },
+  {
+    "id": 61,
+    "codeFamille": "CROI_SHI",
+    "focus": "Croisade",
+    "action": "Endoctriner",
+    "type": "Shiveus",
+    "cout": {
+      "energie": 1,
+      "materiel": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "choice": [
+        "deployer_cube_par_chantier",
+        "augmenter_population"
+      ]
+    },
+    "texte": "Pour chacun de vos Chantiers Navals, déployez 1 cube dans le secteur de ce Chantier Naval et/ou augmentez une Population Pure.",
+    "commentaire": null
+  },
+  {
+    "id": 62,
+    "codeFamille": "CROI_SHI",
+    "focus": "Croisade",
+    "action": "Exterminer",
+    "type": "Shiveus",
+    "cout": {
+      "credit": 1,
+      "energie": 1
+    },
+    "effet": {
+      "envahir_corrompu": 1,
+      "influence_par_cube_neant": 2
+    },
+    "texte": "Envahissez un secteur Corrompu et gagnez 2 Influence pour chaque cube du Néant retiré dans ce Combat. Vous devez envahir un secteur pour gagner de l’Influence de cette façon.",
+    "commentaire": null
+  },
+  {
+    "id": 63,
+    "codeFamille": "CROI_SHI",
+    "focus": "Croisade",
+    "action": "Illuminer",
+    "type": "Shiveus",
+    "cout": {
+      "science": 2,
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption_secteur_rappel",
+        "avancer_civilisation"
+      ]
+    },
+    "texte": "Retirez une Corruption dans le secteur d'où vous avez rappelé le cube et/ou avancez sur une piste de Civilisation.",
+    "commentaire": null
+  },
+  {
+    "id": 64,
+    "codeFamille": "POLI_SHI",
+    "focus": "Politique",
+    "action": "Exalter",
+    "type": "Shiveus",
+    "cout": {
+      "nourriture": 2
+    },
+    "effet": {
+      "choice": [
+        "avancer_civilisation_gouvernement",
+        "ameliorer_gloire"
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation Gouvernement et/ou améliorez un jeton Gloire.",
+    "commentaire": null
+  },
+  {
+    "id": 65,
+    "codeFamille": "POLI_SHI",
+    "focus": "Politique",
+    "action": "Riposter",
+    "type": "Shiveus",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "envahir_corrompu": 1
+    },
+    "texte": "Envahissez un secteur Corrompu.",
+    "commentaire": null
+  },
+  {
+    "id": 66,
+    "codeFamille": "POLI_SHI",
+    "focus": "Politique",
+    "action": "Brandir",
+    "type": "Shiveus",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "produire_ressource"
+      ]
+    },
+    "texte": "Gagnez un jeton Commerce et/ou produisez un type de ressource.",
+    "commentaire": null
+  },
+  {
+    "id": 67,
+    "codeFamille": "PROD_THE",
+    "focus": "Production",
+    "action": "S'épanouir",
+    "type": "Thegwyn",
+    "cout": {},
+    "effet": {
+      "avancer_civilisation_societe": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Société.",
+    "commentaire": null
+  },
+  {
+    "id": 68,
+    "codeFamille": "PROD_THE",
+    "focus": "Production",
+    "action": "Élever",
+    "type": "Thegwyn",
+    "cout": {
+      "materiel": 1,
+      "nourriture": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        "avancer_civilisation_gouvernement"
+      ]
+    },
+    "texte": "Retirez une Corruption ou avancez sur la piste de Civilisation Gouvernement.",
+    "commentaire": null
+  },
+  {
+    "id": 69,
+    "codeFamille": "PROD_THE",
+    "focus": "Production",
+    "action": "Accumuler",
+    "type": "Thegwyn",
+    "cout": {},
+    "effet": {
+      "produire_energie": 1,
+      "produire_science": 1,
+      "produire_materiel": 1,
+      "produire_nourriture": 1
+    },
+    "texte": "Produisez de la Nourriture, de l'Énergie, du Matériel et de la Science.",
+    "commentaire": null
+  },
+  {
+    "id": 70,
+    "codeFamille": "CONQ_YAR",
+    "focus": "Conquête",
+    "action": "Engager",
+    "type": "Yarvek",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "choice": [
+        "envahir",
+        "regrouper"
+      ]
+    },
+    "texte": "Envahissez un secteur ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 71,
+    "codeFamille": "CONQ_YAR",
+    "focus": "Conquête",
+    "action": "Rallier",
+    "type": "Yarvek",
+    "cout": {
+      "credit": 1,
+      "defausser_prime": 1
+    },
+    "effet": {
+      "gagner_programme": 1
+    },
+    "texte": "Gagnez un Programme.",
+    "commentaire": null
+  },
+  {
+    "id": 72,
+    "codeFamille": "CONQ_YAR",
+    "focus": "Conquête",
+    "action": "Recycler",
+    "type": "Yarvek",
+    "cout": {
+      "materiel": 2,
+      "defausser_liberation": 1
+    },
+    "effet": {
+      "choice_repeat": {
+        "times": 2,
+        "options": [
+          "retirer_corruption_secteur",
+          "activer_cube"
+        ]
+      }
+    },
+    "texte": "Choisissez deux fois : retirez une Corruption d'un secteur ou activez 1 cube.",
+    "commentaire": null
+  },
+  {
+    "id": 73,
+    "codeFamille": "RAID_YAR",
+    "focus": "Raid",
+    "action": "Liberer",
+    "type": "Yarvek",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "envahir": 1,
+      "influence_population_secteur": 1
+    },
+    "texte": "Envahissez un secteur et gagnez autant d'Influence que la Population de ce secteur. Vous devez envahir un secteur pour gagner de l'Influence de cette façon.",
+    "commentaire": null
+  },
+  {
+    "id": 74,
+    "codeFamille": "RAID_YAR",
+    "focus": "Raid",
+    "action": "Consulter",
+    "type": "Yarvek",
+    "cout": {
+      "science": 1,
+      "defausser_prime": 1
+    },
+    "effet": {
+      "gagner_technologie": "base"
+    },
+    "texte": "Gagnez une Technologie de base.",
+    "commentaire": null
+  },
+  {
+    "id": 75,
+    "codeFamille": "RAID_YAR",
+    "focus": "Raid",
+    "action": "Negocier",
+    "type": "Yarvek",
+    "cout": {
+      "credit": 1,
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_prime",
+        "gagner_commerce"
+      ]
+    },
+    "texte": "Gagnez un jeton Prime et/ou un jeton Commerce.",
+    "commentaire": null
+  },
+  {
+    "id": 76,
+    "codeFamille": "CONQ_ZEN",
+    "focus": "Conquête",
+    "action": "Engager",
+    "type": "Zenor",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "choice": [
+        "envahir",
+        "regrouper"
+      ]
+    },
+    "texte": "Envahissez un secteur ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 77,
+    "codeFamille": "CONQ_ZEN",
+    "focus": "Conquête",
+    "action": "Investir",
+    "type": "Zenor",
+    "cout": {
+      "credit": 3
+    },
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "gagner_commerce"
+      ]
+    },
+    "texte": "Gagnez un Programme et/ou un jeton Commerce.",
+    "commentaire": null
+  },
+  {
+    "id": 78,
+    "codeFamille": "CONQ_ZEN",
+    "focus": "Conquête",
+    "action": "Expérimenter",
+    "type": "Zenor",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "produire_science": 1
+        },
+        {
+          "gagner_technologie": "base"
+        }
+      ]
+    },
+    "texte": "Produisez de la Science et/ou gagnez une Technologie de base.",
+    "commentaire": null
+  },
+  {
+    "id": 79,
+    "codeFamille": "POLI_ZEN",
+    "focus": "Politique",
+    "action": "Inspirer",
+    "type": "Zenor",
+    "cout": {
+      "science": 2
+    },
+    "effet": {
+      "avancer_civilisation_gouvernement": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Gouvernement.",
+    "commentaire": null
+  },
+  {
+    "id": 80,
+    "codeFamille": "POLI_ZEN",
+    "focus": "Politique",
+    "action": "Diviser",
+    "type": "Zenor",
+    "cout": {
+      "energie": 1,
+      "science": 1,
+      "materiel": 1
+    },
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "envahir"
+      ]
+    },
+    "texte": "Activez 1 cube et/ou envahissez un secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 81,
+    "codeFamille": "POLI_ZEN",
+    "focus": "Politique",
+    "action": "Répliquer",
+    "type": "Zenor",
+    "cout": {
+      "energie": 1,
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "deplacer_corruption",
+        "augmenter_population"
+      ]
+    },
+    "texte": "Déplacez une Corruption et/ou augmentez une Population Pure.",
+    "commentaire": null
+  },
+  {
+    "id": 82,
+    "codeFamille": "CONQ_HER",
+    "focus": "Conquête",
+    "action": "Annihiler",
+    "type": "Héroïque",
+    "cout": {
+      "energie": 2,
+      "nourriture": 1
+    },
+    "effet": {
+      "envahir": 1,
+      "retirer_corruption_secteur_combat": 1
+    },
+    "texte": "Envahissez un secteur et retirez une Corruption du secteur de Combat si possible.",
+    "commentaire": null
+  },
+  {
+    "id": 84,
+    "codeFamille": "CONQ_HER",
+    "focus": "Conquête",
+    "action": "Préparer",
+    "type": "Héroïque",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "activer_cube": 2
+        },
+        "ameliorer_gloire"
+      ]
+    },
+    "texte": "Activez 2 cubes et/ou améliorez un jeton Gloire.",
+    "commentaire": null
+  },
+  {
+    "id": 85,
+    "codeFamille": "DEVE_HER",
+    "focus": "Développement",
+    "action": "Développer",
+    "type": "Héroïque",
+    "cout": {
+      "materiel": 2
+    },
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "augmenter_population"
+      ],
+      "same_sector": true
+    },
+    "texte": "Établissez une Guilde et/ou augmentez une Population Pure dans le même secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 86,
+    "codeFamille": "DEVE_HER",
+    "focus": "Développement",
+    "action": "Croître",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 3
+    },
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        {
+          "ressource_choix": 4
+        }
+      ]
+    },
+    "texte": "Établissez une Guilde et/ou gagnez 4 ressources de votre choix.",
+    "commentaire": null
+  },
+  {
+    "id": 87,
+    "codeFamille": "DEVE_HER",
+    "focus": "Développement",
+    "action": "Harmoniser",
+    "type": "Héroïque",
+    "cout": {
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption_secteur",
+        "construire_installation"
+      ],
+      "same_sector": true
+    },
+    "texte": "Retirez une Corruption d'un secteur et/ou construisez une Installation dans le même secteur.",
+    "commentaire": null
+  },
+  {
+    "id": 88,
+    "codeFamille": "INNO_HER",
+    "focus": "Innovation",
+    "action": "Rechercher",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 4
+    },
+    "effet": {
+      "choice": [
+        {
+          "gagner_technologie": "base"
+        },
+        {
+          "produire_credit": 1,
+          "produire_science": 1
+        }
+      ]
+    },
+    "texte": "Gagnez une Technologie de base et/ou produisez de la Science et des Crédits.",
+    "commentaire": "Règle de famille (Innovation Héroïque) : ce Focus est défaussé au Cycle 1."
+  },
+  {
+    "id": 51,
+    "codeFamille": "PROD_NER",
+    "focus": "Production",
+    "action": "S’épanouir",
+    "type": "Nervo",
+    "cout": {
+      "materiel": 1
+    },
+    "effet": {
+      "avancer_civilisation_societe": 1
+    },
+    "texte": "Avancez sur la piste de Civilisation Société.",
+    "commentaire": null
+  },
+  {
+    "id": 89,
+    "codeFamille": "INNO_HER",
+    "focus": "Innovation",
+    "action": "Expérimenter",
+    "type": "Héroïque",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "gagner_technologie": "amelioree"
+        },
+        {
+          "retirer_cube_neant_secteur_adjacent": 1
+        }
+      ]
+    },
+    "texte": "Gagnez une Technologie améliorée et/ou retirez un cube du Néant d'un secteur adjacent. Si vous retirez le dernier cube d'un secteur, celui-ci est abandonné et le Néant s'en empare (voir Règles p.24).",
+    "commentaire": null
+  },
+  {
+    "id": 90,
+    "codeFamille": "INNO_HER",
+    "focus": "Innovation",
+    "action": "Consolider",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 2
+    },
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "defausser_crise"
+      ]
+    },
+    "texte": "Gagnez un Programme et/ou défaussez une Crise.",
+    "commentaire": null
+  },
+  {
+    "id": 91,
+    "codeFamille": "COMM_HER",
+    "focus": "Commandement",
+    "action": "S'élever",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 4
+    },
+    "effet": {
+      "choice": [
+        "construire_refuge_niveau",
+        "influence_valeur_gloire"
+      ]
+    },
+    "texte": "Construisez un niveau de Refuge (placez 1 cube inactif sur une tuile Refuge) ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "commentaire": "Règle de famille (Commandement Héroïque) : cette carte compte comme n'importe quel type de Focus pour jouer un Programme ou résoudre une Crise, mais ne compte pas comme un Focus préféré."
+  },
+  {
+    "id": 92,
+    "codeFamille": "COMM_HER",
+    "focus": "Commandement",
+    "action": "Utiliser",
+    "type": "Héroïque",
+    "cout": {
+      "defausser_gloire": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        {
+          "copy_action": {
+            "source": "focus_preferred",
+            "location": [
+              "hand",
+              "discard"
+            ],
+            "pay_cost": true
+          }
+        }
+      ]
+    },
+    "texte": "Retirez une Corruption et/ou faites une action de Focus préféré de votre main ou défausse (en payant son coût et en résolvant ses effets).",
+    "commentaire": null
+  },
+  {
+    "id": 93,
+    "codeFamille": "COMM_HER",
+    "focus": "Commandement",
+    "action": "Repousser",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_gardien",
+        "defausser_crise"
+      ]
+    },
+    "texte": "Retirez un Gardien ou défaussez une Crise.",
+    "commentaire": null
+  },
+  {
+    "id": 94,
+    "codeFamille": "POLI_HER",
+    "focus": "Politique",
+    "action": "Inspirer",
+    "type": "Héroïque",
+    "cout": {
+      "credit": 2,
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "avancer_civilisation_gouvernement",
+        "gagner_commerce"
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation Gouvernement et/ou gagnez un jeton Commerce.",
+    "commentaire": null
+  },
+  {
+    "id": 95,
+    "codeFamille": "POLI_HER",
+    "focus": "Politique",
+    "action": "S'imposer",
+    "type": "Héroïque",
+    "cout": {
+      "energie": 2,
+      "science": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_cube_neant_secteur_adjacent",
+        "envahir"
+      ]
+    },
+    "texte": "Retirez un cube du Néant d'un secteur adjacent et/ou envahissez un secteur. Si vous retirez le dernier cube d'un secteur, celui-ci est abandonné et le Néant s'en empare (voir Règles p.24).",
+    "commentaire": null
+  },
+  {
+    "id": 96,
+    "codeFamille": "POLI_HER",
+    "focus": "Politique",
+    "action": "Renverser",
+    "type": "Héroïque",
+    "cout": {
+      "destroy": {
+        "installation": 1
+      },
+      "exclude": "secteur_mere"
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption_secteur",
+        "retirer_gardien"
+      ]
+    },
+    "texte": "Retirez une Corruption d'un secteur et/ou retirez un Gardien.",
+    "commentaire": null
+  },
+  {
+    "id": 97,
+    "codeFamille": "PROD_HER",
+    "focus": "Production",
+    "action": "S'épanouir",
+    "type": "Héroïque",
+    "cout": {
+      "remettre_commerce": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "influence_par_guilde_pure": 3
+        },
+        "retirer_gardien"
+      ]
+    },
+    "texte": "Gagnez 3 Influence pour chacune de vos Guildes Pures et/ou retirez un Gardien.",
+    "commentaire": null
+  },
+  {
+    "id": 98,
+    "codeFamille": "PROD_HER",
+    "focus": "Production",
+    "action": "Ravitailler",
+    "type": "Héroïque",
+    "cout": {},
+    "effet": {
+      "choice": [
+        {
+          "produire_energie": 1,
+          "produire_materiel": 1,
+          "produire_nourriture": 1
+        },
+        {
+          "augmenter_population_up_to": 2
+        }
+      ]
+    },
+    "texte": "Produisez de la Nourriture, de l'Énergie et du Matériel ou augmentez la Population Pure jusqu'à deux fois (dans le même secteur ou deux secteurs différents).",
+    "commentaire": null
+  },
+  {
+    "id": 99,
+    "codeFamille": "PROD_HER",
+    "focus": "Production",
+    "action": "Optimiser",
+    "type": "Héroïque",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "choice": [
+        "retirer_corruption",
+        "avancer_civilisation_societe"
+      ]
+    },
+    "texte": "Retirez une Corruption et/ou avancez sur la piste de Civilisation Société.",
+    "commentaire": null
+  },
+  {
+    "id": 100,
+    "codeFamille": "PROG_HER",
+    "focus": "Progrès",
+    "action": "Expérimenter",
+    "type": "Héroïque",
+    "cout": {},
+    "effet": {
+      "choice": [
+        "etablir_guilde_scientifique",
+        "produire_science"
+      ]
+    },
+    "texte": "Établissez une Guilde de Scientifiques et/ou produisez de la Science.",
+    "commentaire": null
+  },
+  {
+    "id": 101,
+    "codeFamille": "PROG_HER",
+    "focus": "Progrès",
+    "action": "Inventer",
+    "type": "Héroïque",
+    "cout": {
+      "nourriture": 1,
+      "desactiver_cube": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "gagner_technologie": [
+            "base",
+            "amelioree"
+          ]
+        },
+        "retirer_corruption"
+      ]
+    },
+    "texte": "Gagnez une Technologie de base ou améliorée et/ou retirez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 102,
+    "codeFamille": "PROG_HER",
+    "focus": "Progrès",
+    "action": "Restaurer",
+    "type": "Héroïque",
+    "cout": {
+      "defausser_gloire": 1
+    },
+    "effet": {
+      "choice": [
+        "deployer_cube",
+        "regrouper",
+        {
+          "retirer_crise": [
+            "economique",
+            "generale"
+          ]
+        }
+      ]
+    },
+    "texte": "Déployez 1 cube et/ou regroupez et/ou retirez une Crise économique ou générale.",
+    "commentaire": null
+  },
+  {
+    "id": 103,
+    "codeFamille": "PROS_HER",
+    "focus": "Prospérité",
+    "action": "Prospérer",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 2
+    },
+    "effet": {
+      "choice": [
+        "avancer_civilisation_economie",
+        {
+          "ressource_choix": 4
+        }
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation Économie et/ou gagnez 4 ressources de votre choix.",
+    "commentaire": null
+  },
+  {
+    "id": 104,
+    "codeFamille": "PROS_HER",
+    "focus": "Prospérité",
+    "action": "Révolter",
+    "type": "Héroïque",
+    "cout": {
+      "destroy": {
+        "guilde": 1
+      },
+      "exclude": "secteur_mere"
+    },
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "retirer_gardien"
+      ]
+    },
+    "texte": "Gagnez un jeton Commerce et/ou retirez un Gardien.",
+    "commentaire": null
+  },
+  {
+    "id": 105,
+    "codeFamille": "PROS_HER",
+    "focus": "Prospérité",
+    "action": "Organiser",
+    "type": "Héroïque",
+    "cout": {},
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "construire_installation"
+      ]
+    },
+    "texte": "Gagnez un Programme ou construisez une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 106,
+    "codeFamille": "RENF_HER",
+    "focus": "Renfort",
+    "action": "Accélérer",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 4
+    },
+    "effet": {
+      "choice": [
+        "regrouper",
+        {
+          "ressource_choix": 4
+        },
+        {
+          "tie_break": "au_choix",
+          "avancer_civilisation_moins_avancee": 1
+        }
+      ]
+    },
+    "texte": "Regroupez et/ou gagnez 4 ressources de votre choix et/ou avancez sur votre piste de Civilisation la moins avancée (au choix si égalité).",
+    "commentaire": null
+  },
+  {
+    "id": 1,
+    "codeFamille": "CONQ_STA",
+    "focus": "Conquête",
+    "action": "Engager",
+    "type": "Standard",
+    "cout": {
+      "energie": 2
+    },
+    "effet": {
+      "choice": [
+        "envahir",
+        "regrouper"
+      ]
+    },
+    "texte": "Envahissez un secteur ou regroupez.",
+    "commentaire": null
+  },
+  {
+    "id": 2,
+    "codeFamille": "CONQ_STA",
+    "focus": "Conquête",
+    "action": "Planifier",
+    "type": "Standard",
+    "cout": {
+      "credit": 1,
+      "energie": 1
+    },
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "deplacer_corruption"
+      ]
+    },
+    "texte": "Gagnez un Programme et/ou déplacez une Corruption.",
+    "commentaire": null
+  },
+  {
+    "id": 3,
+    "codeFamille": "CONQ_STA",
+    "focus": "Conquête",
+    "action": "Préparer",
+    "type": "Standard",
+    "cout": {
+      "materiel": 3
+    },
+    "effet": {
+      "activer_cube": 2
+    },
+    "texte": "Activez 2 cubes.",
+    "commentaire": null
+  },
+  {
+    "id": 4,
+    "codeFamille": "DEVE_STA",
+    "focus": "Développement",
+    "action": "Croître",
+    "type": "Standard",
+    "cout": {
+      "materiel": 1
+    },
+    "effet": {
+      "choice": [
+        "guilde",
+        "installation"
+      ]
+    },
+    "texte": "Établissez une Guilde ou construisez une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 5,
+    "codeFamille": "DEVE_STA",
+    "focus": "Développement",
+    "action": "Installer",
+    "type": "Standard",
+    "cout": {
+      "rappeler_cube": 1
+    },
+    "effet": {
+      "effet_secteur": [
+        "guilde",
+        "installation"
+      ]
+    },
+    "texte": "Dans le secteur d’où vous avez rappelé le cube : établissez une Guilde et/ou construisez une Installation.",
+    "commentaire": null
+  },
+  {
+    "id": 83,
+    "codeFamille": "CONQ_HER",
+    "focus": "Conquête",
+    "action": "Planifier",
+    "type": "Héroïque",
+    "cout": {
+      "credit": 1,
+      "energie": 1
+    },
+    "effet": {
+      "choice": [
+        "regrouper",
+        "gagner_programme"
+      ]
+    },
+    "texte": "Regroupez et/ou gagnez un Programme.",
+    "commentaire": null
+  },
+  {
+    "id": 107,
+    "codeFamille": "RENF_HER",
+    "focus": "Renfort",
+    "action": "Rassembler",
+    "type": "Héroïque",
+    "cout": {
+      "materiel": 4
+    },
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "deployer_cube_par_chantier"
+      ]
+    },
+    "texte": "Activez 1 cube et/ou déployez 1 cube pour chacun de vos Chantiers Navals, dans le secteur de ce Chantier Naval.",
+    "commentaire": null
+  },
+  {
+    "id": 108,
+    "codeFamille": "RENF_HER",
+    "focus": "Renfort",
+    "action": "Résister",
+    "type": "Héroïque",
+    "cout": {
+      "gain_corruption": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "construire_installation_up_to": 2
+        },
+        {
+          "defausser_crise": [
+            "militaire",
+            "generale"
+          ]
+        }
+      ]
+    },
+    "texte": "Construisez jusqu'à deux Installations (dans le même secteur ou des secteurs différents) ou défaussez une Crise militaire ou générale.",
+    "commentaire": null
+  },
+  {
+    "id": 109,
+    "codeFamille": "TENT_HER",
+    "focus": "Tentation",
+    "action": "Exploiter",
+    "type": "Héroïque",
+    "cout": {
+      "ressource_choix": 4
+    },
+    "effet": {
+      "choice": [
+        {
+          "copy_action": {
+            "source": "focus_preferred",
+            "location": [
+              "hand",
+              "discard"
+            ],
+            "pay_cost": true
+          }
+        },
+        {
+          "ressource_choix": 4
+        }
+      ]
+    },
+    "texte": "Faites une action d'un Focus préféré de votre main ou défausse (en payant son coût et en résolvant ses effets) et/ou gagnez 4 ressources de votre choix.",
+    "commentaire": null
+  },
+  {
+    "id": 110,
+    "codeFamille": "TENT_HER",
+    "focus": "Tentation",
+    "action": "S'atteler",
+    "type": "Héroïque",
+    "cout": {
+      "corruption_piste_civilisation": 1
+    },
+    "effet": {
+      "choice": [
+        {
+          "sans_benefice_case": true,
+          "avancer_piste_corrompue": 1
+        },
+        "avancer_civilisation"
+      ]
+    },
+    "texte": "Avancez sur la piste de Civilisation qui vient d'être Corrompue (sans gagner le bénéfice de la case) et/ou avancez sur une piste de Civilisation.",
+    "commentaire": null
+  },
+  {
+    "id": 111,
+    "codeFamille": "TENT_HER",
+    "focus": "Tentation",
+    "action": "Exercer",
+    "type": "Héroïque",
+    "cout": {
+      "retirer_programme": {
+        "exclude": "programme_depart"
+      }
+    },
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "deployer_cube_secteur_mere",
+        {
+          "produire_deux_ressources": 1
+        }
+      ]
+    },
+    "texte": "Activez 1 cube et/ou déployez 1 cube dans votre Secteur-Mère et/ou produisez deux types de ressources différents.",
+    "commentaire": null
+  }
+]

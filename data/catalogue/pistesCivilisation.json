@@ -1,0 +1,2302 @@
+[
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme.",
+    "effet": {
+      "gagner_programme": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Améliorez un jeton Gloire et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        "ameliorer_gloire",
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Évaluez et gagnez l'Influence d'un Programme Pur (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_influence_programme_pur": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme.",
+    "effet": {
+      "gagner_programme": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Établissez une Guilde et/ou gagnez un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 2 Influence pour chacune de vos Guildes Pures.",
+    "effet": {
+      "influence_par_guilde_pure": 2
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Augmentez une Population Pure et/ou construisez une Installation.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "construire_installation"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure et/ou construisez une Installation.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "construire_installation"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 25 Influence.",
+    "effet": {
+      "influence": 25
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Gagnez un Programme Soutien.",
+    "effet": {
+      "gagner_programme": "soutien"
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Construisez une Installation et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme Domination et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        {
+          "gagner_programme": "domination"
+        },
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 2 Influence pour chacune de vos Installations Pures.",
+    "effet": {
+      "influence_par_installation_pure": 2
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez 1 ressource de chaque type.",
+    "effet": {
+      "credit": 1,
+      "energie": 1,
+      "science": 1,
+      "materiel": 1,
+      "nourriture": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme.",
+    "effet": {
+      "gagner_programme": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Produisez deux types de ressources différents.",
+    "effet": {
+      "produire_deux_ressources": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez 1 Influence pour chaque cube de vos secteurs Purs.",
+    "effet": {
+      "influence_par_cube_secteur_pur": 1
+    }
+  },
+  {
+    "type": "Astoran",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 15 Influence.",
+    "effet": {
+      "influence": 15
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure et/ou établissez une Guilde.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "etablir_guilde"
+      ]
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Gagnez 1 Influence pour chaque cube de vos secteurs Purs.",
+    "effet": {
+      "influence_par_cube_secteur_pur": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 2 Influence pour chaque cube de vos secteurs Purs et de la zone active de votre fiche Maison.",
+    "effet": {
+      "influence_par_cube_secteur_pur_et_fiche": 2
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Déployez 1 cube par Chantier Naval dans le secteur de ce Chantier Naval.",
+    "effet": {
+      "deployer_cube_par_chantier": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Déployez 1 cube par Chantier Naval dans le secteur de ce Chantier Naval.",
+    "effet": {
+      "deployer_cube_par_chantier": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez 1 Crédit et 1 Science.",
+    "effet": {
+      "credit": 1,
+      "science": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez une Technologie de base.",
+    "effet": {
+      "gagner_technologie": "base"
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez un jeton Commerce et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 18 Influence.",
+    "effet": {
+      "influence": 18
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Construisez une Installation.",
+    "effet": {
+      "construire_installation": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Construisez une Installation et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Construisez une Installation et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Construisez une Installation et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez un Programme Richesse.",
+    "effet": {
+      "gagner_programme": "richesse"
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Produisez deux types de ressources différents.",
+    "effet": {
+      "produire_deux_ressources": 1
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme et/ou un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Kradmor",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Gagnez 2 Nourriture, 2 Crédits et 2 Science.",
+    "effet": {
+      "credit": 2,
+      "science": 2,
+      "nourriture": 2
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_objectifs_programme_pur": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Gagnez une Technologie de base.",
+    "effet": {
+      "gagner_technologie": "base"
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme Soutien.",
+    "effet": {
+      "gagner_programme": "soutien"
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Activez 1 cube et/ou gagnez un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez 8 Influence et/ou regroupez.",
+    "effet": {
+      "choice": [
+        {
+          "influence": 8
+        },
+        "regrouper"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Améliorez un jeton Gloire et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        "ameliorer_gloire",
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme et/ou un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "gagner_programme",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Marqualos",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Évaluez et gagnez l'Influence d'un Programme Pur (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_influence_programme_pur": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Augmentez une Population Pure jusqu'à deux fois (dans le même secteur ou deux secteurs différents).",
+    "effet": {
+      "augmenter_population_up_to": 2
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 8 Influence pour chacun de vos secteurs Purs avec une Population de 6.",
+    "effet": {
+      "influence_par_secteur_pur_population_6": 8
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Construisez une Installation et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Activez 1 cube et/ou déployez 1 cube.",
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "deployer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme Soutien.",
+    "effet": {
+      "gagner_programme": "soutien"
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 6 Influence pour chacune de vos Technologies améliorées.",
+    "effet": {
+      "influence_par_technologie_amelioree": 6
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez 2 Crédits.",
+    "effet": {
+      "credit": 2
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme Richesse et/ou un jeton Commerce.",
+    "effet": {
+      "choice": [
+        {
+          "gagner_programme": "richesse"
+        },
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez un jeton Commerce et/ou produisez un type de ressource.",
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "produire_ressource"
+      ]
+    }
+  },
+  {
+    "type": "Nervo",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 15 Influence.",
+    "effet": {
+      "influence": 15
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde d'Ingénieurs.",
+    "effet": {
+      "etablir_guilde_ingenieurs": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 22 Influence.",
+    "effet": {
+      "influence": 22
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Gagnez un Programme Soutien.",
+    "effet": {
+      "gagner_programme": "soutien"
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Gagnez une Technologie de base.",
+    "effet": {
+      "gagner_technologie": "base"
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Activez 1 cube et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "activer_cube",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 24 Influence.",
+    "effet": {
+      "influence": 24
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez 1 Énergie et 1 Matériel.",
+    "effet": {
+      "energie": 1,
+      "materiel": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme.",
+    "effet": {
+      "gagner_programme": 1
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Établissez une Guilde et/ou regroupez.",
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "regrouper"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Établissez une Guilde et/ou gagnez un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Novaris",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 22 Influence.",
+    "effet": {
+      "influence": 22
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Augmentez une Population Pure et/ou construisez une Installation.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "construire_installation"
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Gagnez un jeton Commerce et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou gagnez 3 Nourriture.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        {
+          "nourriture": 3
+        }
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Activez jusqu'à 2 cubes.",
+    "effet": {
+      "activer_cube_up_to": 2
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Déployez jusqu'à 2 cubes.",
+    "effet": {
+      "deployer_cube_up_to": 2
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Gagnez une Technologie de base.",
+    "effet": {
+      "gagner_technologie": "base"
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme Domination et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        {
+          "gagner_programme": "domination"
+        },
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 2 Influence pour chacun de vos secteurs Purs.",
+    "effet": {
+      "influence_par_secteur_pur": 2
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez 2 Crédits.",
+    "effet": {
+      "credit": 2
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez un jeton Commerce et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "gagner_commerce",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Produisez un type de ressource.",
+    "effet": {
+      "produire_ressource": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme Richesse.",
+    "effet": {
+      "gagner_programme": "richesse"
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme Domination.",
+    "effet": {
+      "gagner_programme": "domination"
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez 1 Influence pour chacune de vos Guildes Pures.",
+    "effet": {
+      "influence_par_guilde_pure": 1
+    }
+  },
+  {
+    "type": "Shiveus",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 18 Influence.",
+    "effet": {
+      "influence": 18
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Gagnez une Technologie de base.",
+    "effet": {
+      "gagner_technologie": "base"
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 20 Influence.",
+    "effet": {
+      "influence": 20
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde de Fermiers.",
+    "effet": {
+      "etablir_guilde_fermiers": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Activez 2 cubes.",
+    "effet": {
+      "activer_cube": 2
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme Soutien.",
+    "effet": {
+      "gagner_programme": "soutien"
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Déployez 1 cube pour chacun de vos Chantiers Navals et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        "deployer_cube_par_chantier",
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+    "effet": {
+      "influence_par_secteur_pur": 3
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez un jeton Commerce.",
+    "effet": {
+      "gagner_commerce": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Produisez un type de ressource.",
+    "effet": {
+      "produire_ressource": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un Programme Richesse.",
+    "effet": {
+      "gagner_programme": "richesse"
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_objectifs_programme_pur": 1
+    }
+  },
+  {
+    "type": "Thegwyn",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 2 Influence pour chacune de vos Guildes Pures.",
+    "effet": {
+      "influence_par_guilde_pure": 2
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Placez un jeton Libération de la réserve sur votre Secteur-Mère et résolvez-le immédiatement.",
+    "effet": {
+      "placer_liberation_secteur_mere": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Placez un jeton Libération de la réserve sur votre Secteur-Mère et résolvez-le immédiatement.",
+    "effet": {
+      "placer_liberation_secteur_mere": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Gagnez un jeton Prime et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "gagner_prime",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Gagnez un jeton Prime et/ou avancez sur la piste Gouvernement.",
+    "effet": {
+      "choice": [
+        "gagner_prime",
+        {
+          "avancer_civilisation_gouvernement": 1
+        }
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Aucun effet (mais vous pouvez y avancer).",
+    "effet": {}
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Construisez une Installation.",
+    "effet": {
+      "construire_installation": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Gagnez une Technologie de base et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        {
+          "gagner_technologie": "base"
+        },
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Activez 1 cube et/ou déployez jusqu'à 2 cubes.",
+    "effet": {
+      "choice": [
+        "activer_cube",
+        {
+          "deployer_cube_up_to": 2
+        }
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Activez jusqu'à 2 cubes.",
+    "effet": {
+      "activer_cube_up_to": 2
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Déployez jusqu'à 2 cubes et/ou gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "choice": [
+        {
+          "deployer_cube_up_to": 2
+        },
+        "influence_valeur_gloire"
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Aucun effet (mais vous pouvez y avancer).",
+    "effet": {}
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez un jeton Prime.",
+    "effet": {
+      "gagner_prime": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Gagnez deux jetons Prime.",
+    "effet": {
+      "gagner_prime": 2
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Gagnez un jeton Prime et/ou un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "gagner_prime",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Gagnez un Programme Richesse.",
+    "effet": {
+      "gagner_programme": "richesse"
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Gagnez un jeton Prime et/ou 4 ressources de votre choix.",
+    "effet": {
+      "choice": [
+        "gagner_prime",
+        {
+          "ressource_choix": 4
+        }
+      ]
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_objectifs_programme_pur": 1
+    }
+  },
+  {
+    "type": "Yarvek",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Aucun effet (mais vous pouvez y avancer).",
+    "effet": {}
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme Force.",
+    "effet": {
+      "gagner_programme": "force"
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Retirez une Corruption.",
+    "effet": {
+      "retirer_corruption": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure et/ou retirez une Corruption.",
+    "effet": {
+      "choice": [
+        "augmenter_population",
+        "retirer_corruption"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 6,
+    "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+    "effet": {
+      "exclude": "programme_depart",
+      "evaluer_objectifs_programme_pur": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Société",
+    "caseNumero": 7,
+    "texte": "Gagnez 15 Influence.",
+    "effet": {
+      "influence": 15
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 1,
+    "texte": "Activez 1 cube.",
+    "effet": {
+      "activer_cube": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 2,
+    "texte": "Construisez une Installation et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "construire_installation",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 4,
+    "texte": "Gagnez une Technologie de base ou améliorée.",
+    "effet": {
+      "gagner_technologie": [
+        "base",
+        "amelioree"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 5,
+    "texte": "Regroupez et/ou activez 1 cube.",
+    "effet": {
+      "choice": [
+        "regrouper",
+        "activer_cube"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 6,
+    "texte": "Gagnez un Programme Domination.",
+    "effet": {
+      "gagner_programme": "domination"
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 1,
+    "texte": "Gagnez 1 Crédit et 1 Science.",
+    "effet": {
+      "credit": 1,
+      "science": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 2,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 3,
+    "texte": "Gagnez un Programme.",
+    "effet": {
+      "gagner_programme": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 4,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Standard",
+    "piste": "Société",
+    "caseNumero": 5,
+    "texte": "Augmentez une Population Pure.",
+    "effet": {
+      "augmenter_population": 1
+    }
+  },
+  {
+    "type": "Fenrax",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 18 Influence.",
+    "effet": {
+      "influence": 18
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Gouvernement",
+    "caseNumero": 7,
+    "texte": "Gagnez 4 Influence pour chacune de vos Guildes de Scientifiques Pures.",
+    "effet": {
+      "influence_par_guilde_scientifique_pure": 4
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 1,
+    "texte": "Gagnez 1 Nourriture, 1 Énergie, 1 Matériel et 1 Science.",
+    "effet": {
+      "energie": 1,
+      "science": 1,
+      "materiel": 1,
+      "nourriture": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 2,
+    "texte": "Établissez une Guilde.",
+    "effet": {
+      "etablir_guilde": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 3,
+    "texte": "Avance rapide.",
+    "effet": {
+      "avance_rapide": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 4,
+    "texte": "Établissez une Guilde et/ou gagnez un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 5,
+    "texte": "Établissez une Guilde et/ou gagnez un jeton Commerce.",
+    "effet": {
+      "choice": [
+        "etablir_guilde",
+        "gagner_commerce"
+      ]
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 6,
+    "texte": "Gagnez autant d'Influence que votre valeur totale de Gloire.",
+    "effet": {
+      "influence_valeur_gloire": 1
+    }
+  },
+  {
+    "type": "Zenor",
+    "piste": "Économie",
+    "caseNumero": 7,
+    "texte": "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins une Guilde.",
+    "effet": {
+      "influence_par_secteur_pur_avec_guilde": 3
+    }
+  }
+]
