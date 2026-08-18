@@ -916,6 +916,15 @@
      * addEventListener à .onchange (idempotent d'un appel à l'autre,
      * jamais de listener dupliqué), même pattern que
      * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
+     *
+     * 17/08/2026 (Lot K — corrections mineures, technologies avancées) :
+     * la case #check-amelioree-depart n'appliquait pas le même verrou que
+     * les 5 cases de "Technologies obtenues" (Lot I) — elle ne se
+     * désactivait que si aucune technologie de départ n'était choisie,
+     * sans vérifier qu'elle est bien référencée sur Plat. Galactique (dans
+     * le groupe actif du cycle en cours, GameService.obtenir
+     * TechnologiesAvanceesGroupes(partie).actif). Corrigé : même règle,
+     * même source de vérité que renderTechnologiesObtenues_ ci-dessous.
      */
     function renderEcranPlateauMaison_(partie) {
       var joueur = partie.joueur || {};
@@ -931,8 +940,9 @@
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
+        var nomsAmeliorablesDepart = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
         checkboxDepart.checked = !!techDepart.amelioree;
-        checkboxDepart.disabled = !techDepart.nom;
+        checkboxDepart.disabled = !techDepart.nom || nomsAmeliorablesDepart.indexOf(techDepart.nom) === -1;
         checkboxDepart.onchange = function () {
           var etatDemande = checkboxDepart.checked;
           checkboxDepart.disabled = true;

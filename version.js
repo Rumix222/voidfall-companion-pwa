@@ -15,6 +15,18 @@
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
  *
+ * 17/08/2026 (Lot K — corrections mineures, technologies avancées) :
+ * incrémenté suite à un correctif sur Plat. maison — la case "Améliorée"
+ * de la Technologie de départ (#check-amelioree-depart) n'appliquait pas
+ * le même verrou que les 5 cases de "Technologies obtenues" (Lot I,
+ * v21) : elle se déverrouillait dès qu'une technologie de départ était
+ * choisie, sans vérifier qu'elle est référencée sur Plat. Galactique
+ * (dans le groupe actif du cycle en cours). Corrigé : même contrôle,
+ * même source de vérité (GameService.obtenirTechnologiesAvanceesGroupes
+ * (partie).actif), aucun changement côté gameService.js : index.html
+ * (v23). Fichier modifié, chemin déjà en cache, aucune nouvelle entrée
+ * dans FICHIERS_A_METTRE_EN_CACHE.
+ *
  * 17/08/2026 (Lot J — corrections mineures, écran Combat) : incrémenté
  * suite à un correctif sur l'écran Combat — les vaisseaux disponibles
  * (CombatService.vaisseauxDebloques) se rafraîchissent désormais dès le
@@ -310,4 +322,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260817.29';
+var APP_VERSION = '20260817.30';
