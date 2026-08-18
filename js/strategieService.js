@@ -1,7 +1,24 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 13 — 17/08/2026 (Lot F — corrections mineures)
+ * Version 14 — 18/08/2026 (Simplification UI Événement galactique)
+ *
+ * 18/08/2026 (Simplification UI Événement galactique, points 3/4/6) :
+ * - demanderChoix, contexte 'placement_secteur_neant_adjacent' : la
+ *   `description` (qui reprenait le texte du cadre, redondant avec la
+ *   carte affichée derrière la popup — point 3) n'est plus affichée.
+ *   L'option de secteur n'affiche plus que "Secteur N" (le détail des
+ *   emplacements libres est retiré — point 4) et gagne un "⚠️" si
+ *   l'emplacement Installation OU Guilde restant est le dernier
+ *   disponible sur ce secteur.
+ * - Nouveau contexte 'resoudre_cadre_evenement' (point 6) : popup
+ *   générique pour résoudre un Cadre d'Événement galactique (un seul
+ *   effet ou un choix entre plusieurs effets exclusifs) — une option =
+ *   un bouton (ou un champ quantité + bouton pour une option
+ *   proportionnelle), pas de rappel du texte du cadre. Remplace
+ *   l'ancienne popup dédiée 'confirmation' de l'option "Gagner une
+ *   technologie" (index.html gère désormais tout via une seule popup,
+ *   voir ouvrirPopupCadreEtRafraichir_).
  *
  * 17/08/2026 (Lot F — corrections mineures) :
  * - Focus (joueur ET héroïques, carteFocusJoueurHTML_) : type de Focus
@@ -2030,13 +2047,11 @@ var StrategieService = (function () {
             }
 
             contenu.innerHTML = '' +
-              (contexte.description ? '<p class="hint">' + contexte.description + '</p>' : '') +
               '<label class="hint" for="placement-select-secteur">Secteur du Néant</label>' +
               '<select id="placement-select-secteur">' +
               eligibles.map(function (e) {
-                return '<option value="' + e.numero + '">Secteur ' + e.numero + ' (' +
-                  e.emplacementsInstallationLibres + ' emplacement(s) Installation, ' +
-                  e.emplacementsGuildeLibres + ' emplacement(s) Guilde libres)</option>';
+                var dernierEmplacement = e.emplacementsInstallationLibres === 1 || e.emplacementsGuildeLibres === 1;
+                return '<option value="' + e.numero + '">Secteur ' + e.numero + (dernierEmplacement ? ' ❗' : '') + '</option>';
               }).join('') +
               '</select>';
 
@@ -2051,6 +2066,50 @@ var StrategieService = (function () {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
+
+      } else if (contexte.type === 'resoudre_cadre_evenement') {
+        // 18/08/2026 (Simplification UI Événement galactique, point 6) :
+        // popup générique de résolution d'un Cadre d'Événement galactique
+        // — le texte du cadre n'est PAS répété ici (déjà visible sur la
+        // carte, restée affichée derrière la popup) : seule la liste des
+        // effets possibles est montrée, une option = un bouton. Une
+        // option "proportionnelle" (échange N pour N, cf. actionsCadre_
+        // dans index.html) affiche un champ quantité + un bouton dédié.
+        // resolve({ indexChoisi, quantite }) ; l'appelant (index.html)
+        // connaît la liste d'actions dans le même ordre et sait quoi
+        // appliquer pour l'index choisi.
+        titre.textContent = contexte.titre || 'Résoudre l\u2019effet';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        contenu.innerHTML = '<div class="modal-choix-boutons">' +
+          contexte.options.map(function (option, i) {
+            if (option.proportionnel) {
+              return '<span class="cadre-action-proportionnelle" data-index="' + i + '">' +
+                '<input type="number" min="0"' + (option.plafond ? ' max="' + option.plafond + '"' : '') +
+                ' value="0" class="cadre-input-proportionnel">' +
+                '<button type="button" class="btn btn-secondary btn-choix-liste-proportionnel" data-index="' + i + '">' +
+                option.label + '</button></span>';
+            }
+            return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' + option.label + '</button>';
+          }).join('') + '</div>';
+
+        Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+          btn.addEventListener('click', function () {
+            fermerModale_();
+            resolve({ indexChoisi: Number(btn.dataset.index) });
+          });
+        });
+        Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste-proportionnel'), function (btn) {
+          btn.addEventListener('click', function () {
+            var input = btn.parentElement ? btn.parentElement.querySelector('.cadre-input-proportionnel') : null;
+            var quantite = Math.max(0, Math.floor(Number(input && input.value) || 0));
+            if (!quantite) return;
+            fermerModale_();
+            resolve({ indexChoisi: Number(btn.dataset.index), quantite: quantite });
+          });
+        });
 
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les

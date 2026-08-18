@@ -1127,22 +1127,13 @@
       par_joueur: 'Par joueur', unique: 'Une fois', permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
     };
 
-    // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : libellés
-    // des éléments posables par un cadre de type "placement" (voir
-    // data/catalogue/evenements.json, effet.elements) — mêmes clés que
-    // SecteurService.construire (categorie installation/guilde).
-    var LABEL_ELEMENT_PLACEMENT_ = {
-      defense_secteur: 'Défense de Secteur', chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
-      guilde_scientifique: 'Guilde de Scientifiques', guilde_fermiers: 'Guilde de Fermiers',
-      guilde_ingenieurs: 'Guilde d’Ingénieurs', guilde_mineurs: 'Guilde de Mineurs', guilde_banquiers: 'Guilde de Banquiers'
-    };
-
-    // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2, option Science
-    // -> Technologie) : couleur de la pastille de coût Science — même
-    // valeur que CHAMP_RESSOURCE.science.couleur dans strategieService.js
-    // (non exposée par ce module, dupliquée ici comme LABEL_RESSOURCE_
-    // CADRE_ ci-dessus).
-    var COULEUR_SCIENCE_CADRE_ = '#06afe5';
+    // 18/08/2026 (Simplification UI Événement galactique) : LABEL_ELEMENT_
+    // PLACEMENT_/libelleElementsPlacementCadre_ et COULEUR_SCIENCE_CADRE_
+    // (pastille de coût du bouton "Gagner une technologie") devenus
+    // orphelins suite au retrait des libellés détaillés du titre de
+    // popup/texte "Appliqué" (points 3-5) et du bouton dédié sur la carte
+    // (point 6) — supprimés (hors périmètre demandé mais signalé : code
+    // mort direct de ce même lot, aucune autre référence dans le fichier).
 
     function libelleDeltaCadre_(delta) {
       return Object.keys(delta || {}).map(function (cle) {
@@ -1151,20 +1142,13 @@
       }).join(', ');
     }
 
-    function libelleElementsPlacementCadre_(elements) {
-      return Object.keys(elements || {}).map(function (cle) {
-        var valeur = elements[cle];
-        return (valeur > 1 ? valeur + '× ' : '') + (LABEL_ELEMENT_PLACEMENT_[cle] || cle);
-      }).join(' + ');
-    }
-
     /**
      * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2) : reconnaît
      * l'option "dépenser N Science pour gagner une Technologie de base"
      * (cadre.effet.type === 'choix', voir data/catalogue/evenements.json)
      * — coût 100% simple (Science), gain non automatisable (le choix de
      * LA technologie reste manuel, sur Plat. maison) : seul le coût est
-     * appliqué en un clic (voir appliquerCadreTechnologieEtRafraichir_),
+     * appliqué en un clic (voir actionsCadre_/ouvrirPopupCadreEtRafraichir_),
      * jamais le gain.
      */
     function optionTechnologieViaScience_(option) {
@@ -1242,14 +1226,20 @@
      * appliquerCadrePlacement (qui revalide tout côté SecteurService) et
      * rafraîchit l'écran — même pattern qu'appliquerCadreEtRafraichir_
      * ci-dessus pour les cadres "1 clic" sur ressources simples.
+     *
+     * 18/08/2026 (Simplification UI Événement galactique, points 3 et 4) :
+     * titre de popup générique ("Choisir un secteur") au lieu de rappeler
+     * les éléments posés (déjà lisibles sur le texte du cadre, visible
+     * derrière la popup) ; la `description` (qui reprenait cadre.texte,
+     * redondant) est supprimée. Le paramètre `cadre` n'est plus utilisé
+     * ici mais conservé dans la signature pour cohérence avec l'appelant.
      */
     function appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
       bouton.disabled = true;
       StrategieService.demanderChoix({
         type: 'placement_secteur_neant_adjacent',
-        titre: 'Placer : ' + libelleElementsPlacementCadre_(cadre.effet.elements),
-        description: cadre.texte
+        titre: 'Choisir un secteur'
       }).then(function (resultat) {
         if (!resultat || resultat.annule) { bouton.disabled = false; return; }
         return GameService.appliquerCadrePlacement(partie.id, cycle, ordre, resultat.numero)
@@ -1266,32 +1256,77 @@
     }
 
     /**
-     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2, option Science
-     * -> Technologie) : ouvre une confirmation (modale générique,
-     * contexte 'confirmation') rappelant que seul le coût est automatisé
-     * (-N Science) — le gain (choix de la Technologie de base) reste
-     * manuel, sur Plat. maison. Annuler ne débite rien ; Valider délègue à
-     * appliquerCadreEtRafraichir_ (même mécanisme "1 clic" que le bouton
-     * "Appliquer : +3 Crédit" de l'autre option de ce cadre — les deux
-     * partagent cadresAppliques[ordre], donc appliquer l'une verrouille
-     * l'autre, conforme au mode "exclusif" du catalogue).
+     * 18/08/2026 (Simplification UI Événement galactique, point 6) : un
+     * cadre "choix" (options exclusives, ex. +3 Crédit / -1 Science pour
+     * une Technologie) n'affiche plus ses boutons directement sur la
+     * carte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre une
+     * seule popup listant les effets possibles (contexte
+     * 'resoudre_cadre_evenement', voir strategieService.js), un clic sur
+     * une option = résolution immédiate (pas de double confirmation :
+     * l'ancienne popup de confirmation dédiée à l'option Technologie a
+     * disparu, son rappel "-N Science, technologie à choisir sur Plat.
+     * maison" est désormais directement le libellé de cette option dans
+     * la liste). `actionsCadre_` construit la liste normalisée
+     * (delta simple / proportionnel / technologie) réutilisée à la fois
+     * pour savoir si le cadre est cliquable (renderCadresEvenement_) et
+     * pour résoudre le choix une fois la popup validée.
      */
-    function appliquerCadreTechnologieEtRafraichir_(partie, cycle, ordre, coutScience, bouton) {
+    function actionsCadre_(cadre) {
+      var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
+        return action.proportionnel
+          ? {
+              proportionnel: true, plafond: action.plafond, action: action,
+              label: 'Échanger ' + (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) +
+                ' → ' + (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain)
+            }
+          : { proportionnel: false, action: action, label: 'Appliquer : ' + libelleDeltaCadre_(action.delta) };
+      });
+
+      if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
+        cadre.effet.options.forEach(function (option) {
+          if (!optionTechnologieViaScience_(option)) return;
+          actions.push({
+            proportionnel: false, technologie: true, coutScience: option.cout.science,
+            label: 'Gagner une technologie (-' + option.cout.science + ' Science — à choisir manuellement sur Plat. maison)'
+          });
+        });
+      }
+
+      return actions;
+    }
+
+    function ouvrirPopupCadreEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
+      var actions = actionsCadre_(cadre);
+      if (!actions.length) return;
+
       bouton.disabled = true;
       StrategieService.demanderChoix({
-        type: 'confirmation',
-        titre: 'Gagner une technologie',
-        message: '-' + coutScience + ' Science — choisissez une technologie manuellement dans l\'onglet Plat. maison.',
-        texteValider: 'Valider (-' + coutScience + ' Science)'
+        type: 'resoudre_cadre_evenement',
+        titre: actions.length > 1 ? 'Choisir un effet' : 'Résoudre l\u2019effet',
+        options: actions.map(function (a) { return { label: a.label, proportionnel: a.proportionnel, plafond: a.plafond }; })
       }).then(function (resultat) {
-        if (!resultat || !resultat.confirme) { bouton.disabled = false; return; }
-        var delta = {};
-        delta.science = -coutScience;
-        appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton);
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        var choisie = actions[resultat.indexChoisi];
+        if (!choisie) { bouton.disabled = false; return; }
+
+        if (choisie.technologie) {
+          var deltaTechnologie = {};
+          deltaTechnologie.science = -choisie.coutScience;
+          appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
+        } else if (choisie.proportionnel) {
+          var quantite = Math.max(0, Math.floor(Number(resultat.quantite) || 0));
+          if (!quantite) { bouton.disabled = false; return; }
+          var deltaProportionnel = {};
+          deltaProportionnel[choisie.action.ressourceCout] = -quantite;
+          deltaProportionnel[choisie.action.ressourceGain] = quantite;
+          appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaProportionnel, bouton);
+        } else {
+          appliquerCadreEtRafraichir_(partie, cycle, ordre, choisie.action.delta, bouton);
+        }
       }).catch(function (erreur) {
         bouton.disabled = false;
-        window.alert('Échec : ' + erreur.message);
+        window.alert('Échec de la résolution du cadre : ' + erreur.message);
       });
     }
 
@@ -1315,6 +1350,16 @@
      * les docs de règles) : affiché en texte seul, à résoudre manuellement.
      * cadresAppliques (persisté sur evenements.cycleN, voir gameService.js)
      * empêche une double application et affiche "✓ Appliqué".
+     *
+     * 18/08/2026 (Simplification UI Événement galactique, points 1/5/6) :
+     * plus aucun bouton "Placer"/"Appliquer"/"Gagner une technologie" sur
+     * la carte elle-même — dès qu'un cadre non résolu a au moins une
+     * action possible (placement OU actionsCadre_ non vide), c'est tout
+     * le cadre (.cadre-carte-cliquable, role="button"/tabindex) qui ouvre
+     * la popup adaptée (placement_secteur_neant_adjacent ou
+     * resoudre_cadre_evenement). Le texte "✓ Appliqué" d'un cadre
+     * "placement" ne réaffiche plus le détail des éléments posés
+     * (implicite, toujours les mêmes pour ce cadre) : juste le secteur.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -1333,57 +1378,29 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
-          var cliquablePlacement = estPlacementNeantAdjacent && !applique;
 
-          var actionsHtml = '';
+          var statutHtml = '';
+          var actions = [];
           if (estPlacementNeantAdjacent) {
-            actionsHtml = applique
-              ? '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ' : ' + libelleElementsPlacementCadre_(cadre.effet.elements) + ')</p>'
-              : '';
+            if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
           } else if (applique) {
-            actionsHtml = estAppliqueViaTechnologieScience_(cadre, applique)
+            statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
               ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
               : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
           } else {
-            var boutonsCadre = [];
-            var actions = GameService.actionsSimplesCadre(cadre);
-            actions.forEach(function (action, i) {
-              if (action.proportionnel) {
-                boutonsCadre.push('<span class="cadre-action-proportionnelle" data-action-i="' + i + '">' +
-                  '<input type="number" min="0"' + (action.plafond ? ' max="' + action.plafond + '"' : '') +
-                  ' value="0" class="cadre-input-proportionnel">' +
-                  '<button type="button" class="btn btn-secondary btn-cadre-appliquer-proportionnel">Échanger ' +
-                  (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) + ' → ' +
-                  (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain) + '</button></span>');
-              } else {
-                boutonsCadre.push('<button type="button" class="btn btn-secondary btn-cadre-appliquer" data-action-i="' + i + '">' +
-                  'Appliquer : ' + libelleDeltaCadre_(action.delta) + '</button>');
-              }
-            });
-
-            if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
-              cadre.effet.options.forEach(function (option) {
-                if (!optionTechnologieViaScience_(option)) return;
-                boutonsCadre.push('<button type="button" class="btn btn-secondary btn-cadre-technologie" data-cout="' + option.cout.science + '">' +
-                  '<span class="pastille-cout" style="--couleur-pastille:' + COULEUR_SCIENCE_CADRE_ + '">' + option.cout.science + '</span>' +
-                  'Gagner une technologie</button>');
-              });
-            }
-
-            if (boutonsCadre.length) {
-              actionsHtml = '<div class="cadre-actions" data-ordre="' + cadre.ordre + '">' + boutonsCadre.join('') + '</div>';
-            }
+            actions = actionsCadre_(cadre);
           }
 
-          var classeCarte = classeObligatoire + (cliquablePlacement ? ' cadre-carte-cliquable' : '');
-          var attributsCarte = cliquablePlacement
-            ? ' data-ordre="' + cadre.ordre + '" data-placement="1" role="button" tabindex="0"'
+          var cliquable = !applique && (estPlacementNeantAdjacent || actions.length);
+          var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
+          var attributsCarte = cliquable
+            ? ' data-ordre="' + cadre.ordre + '"' + (estPlacementNeantAdjacent ? ' data-placement="1"' : ' data-resolution="1"') + ' role="button" tabindex="0"'
             : '';
 
           return '<div class="cadre-carte ' + classeCarte + '"' + attributsCarte + '>' +
             badgeResolution +
             '<p class="cadre-texte">' + cadre.texte + '</p>' +
-            actionsHtml +
+            statutHtml +
             '</div>';
         }).join('');
 
@@ -1400,37 +1417,16 @@
         });
       });
 
-      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions:not([data-placement="1"])'), function (blocActions) {
-        var ordre = Number(blocActions.dataset.ordre);
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-resolution="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
         var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
-        var actions = GameService.actionsSimplesCadre(cadre);
-
-        Array.prototype.forEach.call(blocActions.querySelectorAll('.btn-cadre-appliquer'), function (bouton) {
-          bouton.addEventListener('click', function () {
-            var action = actions[Number(bouton.dataset.actionI)];
-            appliquerCadreEtRafraichir_(partie, cycle, ordre, action.delta, bouton);
-          });
-        });
-
-        Array.prototype.forEach.call(blocActions.querySelectorAll('.cadre-action-proportionnelle'), function (blocProportionnel) {
-          var action = actions[Number(blocProportionnel.dataset.actionI)];
-          var input = blocProportionnel.querySelector('.cadre-input-proportionnel');
-          var bouton = blocProportionnel.querySelector('.btn-cadre-appliquer-proportionnel');
-          bouton.addEventListener('click', function () {
-            var quantite = Math.max(0, Math.floor(Number(input.value) || 0));
-            if (!quantite) return;
-            var delta = {};
-            delta[action.ressourceCout] = -quantite;
-            delta[action.ressourceGain] = quantite;
-            appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton);
-          });
-        });
-
-        Array.prototype.forEach.call(blocActions.querySelectorAll('.btn-cadre-technologie'), function (bouton) {
-          bouton.addEventListener('click', function () {
-            var coutScience = Number(bouton.dataset.cout) || 1;
-            appliquerCadreTechnologieEtRafraichir_(partie, cycle, ordre, coutScience, bouton);
-          });
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          ouvrirPopupCadreEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
         });
       });
     }

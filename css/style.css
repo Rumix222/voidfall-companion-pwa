@@ -508,31 +508,18 @@ input:disabled {
   font-size: 0.85rem;
   color: var(--color-coral);
 }
-.cadre-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-.cadre-actions .btn {
-  padding: 9px 14px;
-  font-size: 0.85rem;
-  width: auto;
-}
+/* 18/08/2026 (Simplification UI Événement galactique, points 1/6) :
+   .cadre-actions/.btn-cadre-appliquer(-proportionnel)/.btn-cadre-
+   technologie/.btn-cadre-placement retirées — plus aucun bouton n'est
+   rendu directement sur la carte, toute résolution passe désormais par
+   .cadre-carte-cliquable + la popup générique 'resoudre_cadre_evenement'
+   (voir index.html/strategieService.js). .cadre-action-proportionnelle et
+   .cadre-input-proportionnel sont conservées : réutilisées telles
+   quelles à l'intérieur de cette popup (.modal-choix-boutons). */
 .cadre-action-proportionnelle {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-/* Bouton "Gagner une technologie" (Événement A, Cycle 1, Cadre 2) — pastille
-   de coût (.pastille-cout, réutilisée depuis les cartes Focus) + libellé,
-   sur un seul bouton .cadre-actions au lieu des deux éléments séparés du
-   gabarit Focus (pastille + bouton rond) : override du display:inline-block
-   de .btn pour aligner correctement le cercle et le texte. */
-.btn-cadre-technologie {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .cadre-input-proportionnel {
   width: 60px;

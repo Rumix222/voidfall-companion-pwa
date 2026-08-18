@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 30 — 2026-08-18
+ * Version 31 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,39 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Simplification UI Événement galactique, points 2 à 6) :
+ * suite du point 1 (cadre entier cliquable). Popups (StrategieService.
+ * demanderChoix) : le texte du cadre n'est plus jamais répété dedans
+ * (point 3) — 'placement_secteur_neant_adjacent' perd sa `description`
+ * et son titre devient générique ("Choisir un secteur" au lieu de
+ * rappeler les éléments posés) ; sa liste déroulante n'affiche plus que
+ * "Secteur N" (retrait du détail des emplacements libres, point 4) et
+ * ajoute un "❗" si l'emplacement Installation OU Guilde restant est le
+ * dernier disponible sur ce secteur. Le texte "✓ Appliqué" du cadre
+ * placement n'affiche plus le détail des éléments posés (implicite,
+ * toujours identiques pour ce cadre) : juste "✓ Appliqué (Secteur N)"
+ * (point 5). Nouveau contexte 'resoudre_cadre_evenement' (point 6) :
+ * les cadres "choix" (ex. Cadre 2 de l'Événement A — +3 Crédit / -1
+ * Science pour une Technologie) perdent leurs boutons directs sur la
+ * carte ; le cadre entier devient cliquable comme un cadre "placement"
+ * et ouvre une popup listant les effets possibles (un clic = résolution
+ * immédiate, plus de confirmation séparée pour l'option Technologie —
+ * son rappel "-N Science, à choisir sur Plat. maison" est désormais le
+ * libellé de l'option dans la liste). index.html (v29 — actionsCadre_
+ * factorise la construction de la liste d'actions [simple/proportionnel/
+ * technologie] réutilisée pour savoir si un cadre est cliquable ET pour
+ * résoudre le choix ; ouvrirPopupCadreEtRafraichir_ remplace
+ * appliquerCadreTechnologieEtRafraichir_, supprimée ; renderCadresEvenement_
+ * n'émet plus aucun <button>/<div class="cadre-actions"> ; LABEL_ELEMENT_
+ * PLACEMENT_/libelleElementsPlacementCadre_/COULEUR_SCIENCE_CADRE_,
+ * devenues orphelines, supprimées), js/strategieService.js (v17 — voir
+ * son propre en-tête pour le détail), css/style.css (v18 — .cadre-actions/
+ * .btn-cadre-appliquer(-proportionnel)/.btn-cadre-technologie retirées,
+ * désormais orphelines ; .cadre-action-proportionnelle/.cadre-input-
+ * proportionnel conservées, réutilisées dans la nouvelle popup). Aucun
+ * changement gameService.js/secteurService.js (mêmes fonctions
+ * appelées, seule l'IHM autour change).
  *
  * 18/08/2026 (Simplification UI Événement galactique, point 1) : le cadre
  * "placement" (Défense de Secteur + Guilde, seul cadre à popup existant à
@@ -415,4 +448,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.6';
+var APP_VERSION = '20260818.7';
