@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 29 — 2026-08-18
+ * Version 30 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,24 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Simplification UI Événement galactique, point 1) : le cadre
+ * "placement" (Défense de Secteur + Guilde, seul cadre à popup existant à
+ * ce jour) n'a plus de bouton "Placer : ..." dédié sous le texte — c'est
+ * tout le cadre (.cadre-carte-cliquable) qui devient cliquable/activable
+ * au clavier (role="button", tabindex, Entrée/Espace) et ouvre directement
+ * la popup de sélection du secteur. index.html (v28 — actionsHtml du cas
+ * placement non appliqué vidé, classe/attributs cliquables sur la div
+ * .cadre-carte, nouvelle fonction pseudoBoutonCarte_ qui adapte le div à
+ * l'API .disabled attendue par appliquerCadrePlacementEtRafraichir_ via
+ * une classe CSS plutôt que l'attribut natif, listener déplacé de
+ * .btn-cadre-placement vers .cadre-carte-cliquable), css/style.css (v17 —
+ * .cadre-carte-cliquable/.cadre-carte-en-cours, .btn-cadre-placement
+ * conservée en CSS pour compat mais plus référencée en HTML). Aucun
+ * changement gameService.js/secteurService.js/strategieService.js (même
+ * appel appliquerCadrePlacementEtRafraichir_, même popup demanderChoix,
+ * seul le déclencheur change). Le texte "✓ Appliqué (Secteur N : ...)"
+ * n'est pas touché par ce lot (point 2, à traiter séparément).
  *
  * 18/08/2026 (Événement A Cycle 1, Cadre 2 — option Science -> Technologie) :
  * bouton "Gagner une technologie" (pastille de coût "1" ronde, couleur
@@ -397,4 +415,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.5';
+var APP_VERSION = '20260818.6';

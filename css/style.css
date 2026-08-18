@@ -483,6 +483,20 @@ input:disabled {
 }
 .cadre-carte-obligatoire { border-style: solid; }
 .cadre-carte-optionnel { border-style: dashed; }
+/* 18/08/2026 (Simplification UI Événement galactique) : cadre entier
+   cliquable (remplace le bouton "Placer" dédié sous le texte, cf.
+   renderCadresEvenement_/pseudoBoutonCarte_ dans index.html) pour les
+   cadres à résoudre via popup sans choix affiché en dur dans la carte
+   (ex. placement Défense de Secteur + Guilde). */
+.cadre-carte-cliquable {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.cadre-carte-cliquable:active { transform: scale(0.98); }
+.cadre-carte-en-cours {
+  opacity: 0.6;
+  pointer-events: none;
+}
 .cadre-entete { margin-bottom: 6px; }
 .cadre-texte {
   margin: 0;

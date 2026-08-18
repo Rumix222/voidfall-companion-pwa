@@ -1214,6 +1214,26 @@
     }
 
     /**
+     * 18/08/2026 (Simplification UI Événement galactique) : le cadre de
+     * type "placement" n'a plus de bouton "Placer" dédié sous le texte —
+     * c'est désormais tout le cadre (.cadre-carte-cliquable) qui ouvre la
+     * popup au clic (cf. renderCadresEvenement_ ci-dessous). Comme
+     * appliquerCadrePlacementEtRafraichir_ attend un élément exposant
+     * .disabled (pattern <button>) pour désactiver l'action pendant la
+     * popup/l'appel réseau, ce faux "bouton" adapte un <div> en bascule
+     * simplement une classe CSS (.cadre-carte-en-cours, cursor:not-allowed
+     * + opacité réduite, voir style.css) plutôt que l'attribut natif
+     * disabled — évite de dupliquer la logique d'appel dans
+     * appliquerCadrePlacementEtRafraichir_.
+     */
+    function pseudoBoutonCarte_(carteEl) {
+      return {
+        get disabled() { return carteEl.classList.contains('cadre-carte-en-cours'); },
+        set disabled(valeur) { carteEl.classList.toggle('cadre-carte-en-cours', !!valeur); }
+      };
+    }
+
+    /**
      * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : cadre de
      * type "placement" (zone "secteur_neant_adjacent") — ouvre la même
      * modale de choix générique que les actions de Focus (StrategieService.
@@ -1313,14 +1333,13 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+          var cliquablePlacement = estPlacementNeantAdjacent && !applique;
 
           var actionsHtml = '';
           if (estPlacementNeantAdjacent) {
             actionsHtml = applique
               ? '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ' : ' + libelleElementsPlacementCadre_(cadre.effet.elements) + ')</p>'
-              : '<div class="cadre-actions" data-ordre="' + cadre.ordre + '" data-placement="1">' +
-                '<button type="button" class="btn btn-secondary btn-cadre-placement">Placer : ' +
-                libelleElementsPlacementCadre_(cadre.effet.elements) + '</button></div>';
+              : '';
           } else if (applique) {
             actionsHtml = estAppliqueViaTechnologieScience_(cadre, applique)
               ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
@@ -1356,19 +1375,28 @@
             }
           }
 
-          return '<div class="cadre-carte ' + classeObligatoire + '">' +
+          var classeCarte = classeObligatoire + (cliquablePlacement ? ' cadre-carte-cliquable' : '');
+          var attributsCarte = cliquablePlacement
+            ? ' data-ordre="' + cadre.ordre + '" data-placement="1" role="button" tabindex="0"'
+            : '';
+
+          return '<div class="cadre-carte ' + classeCarte + '"' + attributsCarte + '>' +
             badgeResolution +
             '<p class="cadre-texte">' + cadre.texte + '</p>' +
             actionsHtml +
             '</div>';
         }).join('');
 
-      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions[data-placement="1"]'), function (blocActions) {
-        var ordre = Number(blocActions.dataset.ordre);
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
         var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
-        var bouton = blocActions.querySelector('.btn-cadre-placement');
-        bouton.addEventListener('click', function () {
-          appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton);
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
         });
       });
 
