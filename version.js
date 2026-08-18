@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 25 — 2026-08-18
+ * Version 27 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,44 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
+ * "Cycle X" quitte les .section-title et devient un titre de page
+ * (.titre-cycle, sans trait orange) dans un bandeau d'en-tête avec
+ * l'Entretien dû juste en dessous et le bouton "Fin du cycle" à droite
+ * (les deux étaient tout en bas de l'écran) ; les 3 blocs restants
+ * (Événement galactique — manches rapatriées ici depuis "Cycle X",
+ * Technologies avancées, Focus héroïques) deviennent des sections à part
+ * entière avec le trait orange (h3.subsection-title n'avait en réalité
+ * aucune règle CSS définie) ; Focus héroïques : double cadre par
+ * emplacement corrigé (.card autour d'un simple <select> qui a déjà son
+ * propre cadre — résidu du détail de carte affiché ici avant le Lot F),
+ * aligné sur le gabarit .techno-obtenue-ligne de Technologies avancées ;
+ * #btn-retour-accueil-partie supprimé, remplacé par le titre de l'app
+ * cliquable (#topbar-titre) depuis n'importe quel onglet : index.html
+ * (v25), js/strategieService.js (v14), css/style.css (v16).
+ *
+ * 18/08/2026 (Refonte affichage Événement galactique) : formatEvenement_
+ * lit désormais cadres[]/objectifs.blocs[]/manches (plus texte1/texte2,
+ * disparus de la migration catalogue ci-dessous) — Plat. Galactique
+ * affiche les Cadres et Objectifs séparément (bordure pleine/pointillée
+ * selon obligatoire, badge de résolution), le nombre de manches à côté du
+ * titre "Cycle X", et un bouton "Appliquer" par action de cadre que
+ * GameService.actionsSimplesCadre reconnaît comme un simple delta sur les
+ * 5 ressources déjà suivies (le reste — secteurs, Gloire, Corruption...
+ * reste à résoudre manuellement) : js/gameService.js (v11), index.html
+ * (v23), css/style.css (v15).
+ * Correctifs suite au retour utilisateur sur ce lot : titre "Cadres —
+ * Phase Préparation" et badges "Obligatoire"/"Facultatif" retirés (la
+ * carte imprimée ne montre que la bordure pleine/pointillée, conservée en
+ * CSS ; le texte "Cadres" faisait doublon avec le bloc Objectifs juste en
+ * dessous) ; et correctif d'un bug réel : cliquer "Appliquer" créditait
+ * bien plateauMaison en base, mais #ressources-principales (Plat. maison)
+ * ne se rafraîchissait pas, car rendu par StrategieService.afficher()
+ * (jamais rappelé après l'action — afficherEcran ne fait que basculer la
+ * visibilité entre écrans, ne re-rend rien) : index.html (v24). Aucun
+ * changement gameService.js pour ce correctif (la donnée était déjà
+ * correctement persistée, seul l'affichage était en cause).
  *
  * 18/08/2026 (Migration catalogue Supabase -> JSON local) : le catalogue
  * n'est plus lu depuis Supabase (js/catalogueSync.js réécrit, plus de
@@ -329,4 +367,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.1';
+var APP_VERSION = '20260818.3';

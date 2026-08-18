@@ -1,2048 +1,1030 @@
 [
   {
-    "code": "A",
-    "cycle": 1,
-    "nom": "L'Aube de la technologie",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "defense_secteur": 1,
-            "guilde_scientifique": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "cost": {
-            "science": 1
-          },
-          "gain": {
-            "technologie_base": 1
-          }
-        },
-        {
-          "gain": {
-            "credit": 3
-          }
-        }
-      ]
-    },
-    "effet4": [
+    "code": "A", "cycle": 1, "nom": "L'Aube de la technologie", "manches": 4,
+    "cadres": [
       {
-        "reward": {
-          "prime": 2,
-          "activate_cube": 1
-        },
-        "condition": {
-          "guilde_scientifique_pure": 2
-        }
+        "ordre": 1, "obligatoire": true, "resolution": null,
+        "texte": "Chaque joueur place une Défense de Secteur et une Guilde de Scientifiques dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "defense_secteur": 1, "guilde_scientifique": 1 } }
       },
       {
-        "reward": {
-          "credit": 1,
-          "produce_resource": 1
-        },
-        "condition": {
-          "technologie": 3
-        }
+        "ordre": 2, "obligatoire": false, "resolution": null,
+        "texte": "Chaque joueur peut soit dépenser 1 Science pour gagner une Technologie de base, soit gagner 3 Crédits.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cout": { "science": 1 }, "gain": { "technologie_base": 1 } },
+          { "gain": { "credit": 3 } }
+        ] }
       }
     ],
-    "texte1": "Chaque joueur place une Défense de Secteur et une Guilde de Scientifiques dans un secteur du Néant adjacent. Puis il peut payer 1 Science pour gagner une Technologie de base ou gagner 3 Crédits.",
-    "texte2": "Chaque joueur doit placer une Défense de Secteur et une Guilde de Scientifiques dans un secteur du Néant adjacent. Chaque joueur peut dépenser 1 Science pour gagner une Technologie de base ou gagner 3 Crédits."
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins deux Guildes de Scientifiques Pures, gagnez deux jetons Prime et/ou activez 1 cube.",
+          "condition": { "cle": "guilde_scientifique_pure_min", "valeur": 2 },
+          "recompense": { "mode": "libre", "gains": [ { "cle": "prime", "valeur": 2 }, { "cle": "activer_cube", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins trois Technologies de base ou améliorées, produisez un type de ressources et/ou gagnez 1 Crédit.",
+          "condition": { "cle": "technologie_total_min", "valeur": 3 },
+          "recompense": { "mode": "libre", "gains": [ { "cle": "produire_ressource_type", "valeur": 1 }, { "cle": "credit", "valeur": 1 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "B",
-    "cycle": 1,
-    "nom": "Destinée imminente",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "liberation": 1,
-            "defense_secteur": 1
-          }
-        },
-        {
-          "offer": {
-            "programme_domination_corruption": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "activate_cube": 1
-        },
-        {
-          "deploy": {
-            "unit": "cube",
-            "quantity": 1,
-            "destination": "secteur_mere"
-          }
-        }
-      ]
-    },
-    "effet4": [
+    "code": "B", "cycle": 1, "nom": "Destinée imminente", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "build_installation": 1
-        },
-        "condition": {
-          "programme_pur": 1
-        }
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
       },
       {
-        "reward": {
-          "programme": 1
-        },
-        "condition": {
-          "guilde_pure": 5
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent. Placez une Corruption sur l'offre de Programme Domination.",
-    "texte2": "Chaque joueur place 1 cube du Néant et un jeton Gloire de valeur 1 dans un secteur du Néant adjacent."
-  },
-  {
-    "code": "C",
-    "cycle": 1,
-    "nom": "Vestiges du Domineum",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "place_lowest_population": {
-            "prime": 1
-          }
-        },
-        {
-          "place_highest_population": {
-            "liberation": 1,
-            "defense_secteur": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "build_guilde": 1
-        },
-        {
-          "build_installation": 1
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "move_corruption": 1,
-          "remove_corruption": 1
-        },
-        "condition": {
-          "cube_dans_secteurs": 6
-        }
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Corruption sur l'offre de Programme Domination.",
+        "effet": { "type": "gain", "cible": "offre_programme", "cible_detail": "programme_domination", "elements": { "corruption": 1 } }
       },
       {
-        "reward": {
-          "credit": 2,
-          "commerce": 1
-        },
-        "condition": {
-          "civilisation_pure_min": 1
-        }
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit activer 1 cube, soit déployer 1 cube sur son Secteur-Mère.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "activer_cube", "valeur": 1 },
+          { "cle": "deployer_cube", "valeur": 1, "cible": "secteur_mere" }
+        ] }
       }
     ],
-    "texte1": "Chaque joueur place un jeton Prime dans le secteur du Néant adjacent ayant la plus faible Population puis un jeton Libération et une Défense de Secteur dans celui ayant la plus forte Population.",
-    "texte2": "Chaque joueur place un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent. Une Corruption est placée sur l’offre de Programme Domination."
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez un Programme Pur en jeu (sauf Programme de départ), construisez une Installation.",
+          "condition": { "cle": "programme_pur_en_jeu_hors_depart", "valeur": 1 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "construire_installation", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins cinq Guildes Pures, gagnez un Programme.",
+          "condition": { "cle": "guilde_pure_min", "valeur": 5 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "gagner_programme", "valeur": 1 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "D",
-    "cycle": 1,
-    "nom": "Nous sommes la résistance",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "gloire": 1,
-            "cube_neant": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "activate_cube": 1
-        },
-        {
-          "population_pure": 1
-        },
-        {
-          "build_guilde_banquier": 1
-        }
-      ]
-    },
-    "effet4": [
+    "code": "C", "cycle": 1, "nom": "Vestiges du Domineum", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "build_guilde": 1,
-          "build_installation": 1
-        },
-        "condition": {
-          "population_totale": 10
-        }
-      },
-      {
-        "reward": {
-          "advance_civilisation": 1
-        },
-        "condition": {
-          "guilde_banquier_pure": 3
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un cube du Néant et un jeton Gloire de valeur 1 dans un secteur du Néant adjacent.",
-    "texte2": "Chaque joueur place une Guilde de Banquiers et un cube du Néant dans un secteur du Néant adjacent."
-  },
-  {
-    "code": "E",
-    "cycle": 1,
-    "nom": "Civilisation renaissante",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1,
-            "guilde_banquier": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "advance": {
-            "civilisation": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "technologie": 1
-          }
-        },
-        "condition": {
-          "secteur_pur_avec_guilde_banquier": 3
-        }
-      },
-      {
-        "reward": {
-          "produce": {
-            "resource_types": 2
-          }
-        },
-        "condition": {
-          "emplacements_guilde_vides_max": 2
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place une Guilde de Banquiers et un cube du Néant dans un secteur du Néant adjacent puis peut avancer sur une piste de Civilisation.",
-    "texte2": "Chaque joueur place un jeton Prime et des éléments de défense dans des secteurs du Néant adjacents selon leur population."
-  },
-  {
-    "code": "T",
-    "cycle": 2,
-    "nom": "Par l’illumination (Tutorial)",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "discard": {
-            "focus": [
-              "production",
-              "progres",
-              "renfort",
-              "tentation"
-            ]
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "technologie_base": 1
-          },
-          "activate": {
-            "cube": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "choice": [
-            {
-              "activate": {
-                "cube": 1
-              }
-            },
-            {
-              "gain": {
-                "technologie_base": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "population_pure_total": 9
-        }
-      },
-      {
-        "reward": {
-          "choice": [
-            {
-              "activate": {
-                "cube": 1
-              }
-            },
-            {
-              "population_pure": 1
-            }
-          ]
-        },
-        "condition": {
-          "technologie_base_ou_amelioree": 3
-        }
-      }
-    ],
-    "texte1": "Chaque joueur défausse les Focus Production, Progrès, Renfort et Tentation. Chaque joueur peut activer un cube et/ou gagner une Technologie de base.",
-    "texte2": null
-  },
-  {
-    "code": "F",
-    "cycle": 1,
-    "nom": "L'heure des comptes",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "choice": [
-            {
-              "place": {
-                "guilde": 1,
-                "cube_neant": 1
-              },
-              "target": "secteur_neant_population_basse"
-            },
-            {
-              "place": {
-                "gloire": 2,
-                "defense_secteur": 1
-              },
-              "target": "secteur_neant_population_haute"
-            }
-          ]
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "deploy": {
-            "unit": "cube",
-            "quantity": 1,
-            "destination": "secteur_mere"
-          }
-        },
-        {
-          "upgrade": {
-            "gloire": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "population_pure": 1
-          }
-        },
-        "condition": {
-          "entretien": 3
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "prime": 3
-          }
-        },
-        "condition": {
-          "jetons_gloire": 3
-        }
-      }
-    ],
-    "texte1": "Chaque joueur choisit l'un des deux placements imposés puis peut déployer un cube dans son Secteur-Mère ou améliorer un jeton Gloire.",
-    "texte2": "Chaque joueur place des éléments dans un secteur du Néant adjacent selon la population."
-  },
-  {
-    "code": "G",
-    "cycle": 1,
-    "nom": "Le visage du mal",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": [
-            "programme",
-            "civilisation"
-          ]
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "keep_removed_corruption_until_evaluation": true
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence_per_corruption": 1,
-            "nourriture_per_corruption": 2
-          },
-          "remove": {
-            "kept_corruption": "all"
-          }
-        },
-        "condition": {
-          "kept_corruption": 1
-        }
-      },
-      {
-        "limit": {
-          "max_sectors": 3
-        },
-        "reward": {
-          "gain": {
-            "population_pure": 3
-          }
-        },
-        "condition": {
-          "guilde_scientifique": 1
-        }
-      }
-    ],
-    "texte1": "Chaque joueur gagne une Corruption. Les Corruptions retirées sont conservées jusqu'à la phase Évaluation.",
-    "texte2": null
-  },
-  {
-    "code": "H",
-    "cycle": 1,
-    "nom": "Droit en enfer",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "choice": [
-            {
-              "gain": {
-                "gloire": 1,
-                "corruption": 1
-              }
-            },
-            {
-              "recall": {
-                "cube": 1
-              }
-            }
-          ]
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "deploy": {
-            "cost_choice": {
-              "corruption": 1,
-              "materiel_per_cube": 1
-            }
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "choice": [
-            {
-              "gain": {
-                "gloire": 2
-              }
-            },
-            {
-              "upgrade": {
-                "gloire": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "corruption_maison": 0
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "technologie": 1
-          }
-        },
-        "condition": {
-          "secteurs_purs": {
-            "count": 2,
-            "min_cubes": 2
-          }
-        }
-      }
-    ],
-    "texte1": "Chaque joueur gagne une Corruption pour obtenir un jeton Gloire ou rappelle un cube. Pendant tout le Cycle, chaque déploiement nécessite une Corruption ou 1 Matériel par cube.",
-    "texte2": null
-  },
-  {
-    "code": "I",
-    "cycle": 1,
-    "nom": "Ascension glorieuse",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "liberation": 1,
-            "defense_secteur": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "upgrade": {
-            "gloire": 1
-          },
-          "activate": {
-            "cube": 1
-          }
-        },
-        {
-          "advance": {
-            "civilisation": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "activate": {
-            "cube_per_civilisation_pure": 1
-          }
-        },
-        "condition": {
-          "civilisation_pure_level_min": 1
-        }
-      },
-      {
-        "reward": {
-          "remove": {
-            "corruption": 1
-          }
-        },
-        "condition": {
-          "gloire_value_min": 4
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent. Puis il peut améliorer un jeton Gloire et/ou activer un cube, ou avancer sur une piste de Civilisation.",
-    "texte2": null
-  },
-  {
-    "code": "J",
-    "cycle": 1,
-    "nom": "Connais ton ennemi (Co-op/Solo)",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "cooperative": {
-            "gain": {
-              "corruption": 2
-            },
-            "remove": {
-              "guardian": 1
-            },
-            "shared": true,
-            "allow_storage": {
-              "decontamination": true
-            }
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "gloire": 3
-          }
-        },
-        "condition": {
-          "sector_count": 4
-        }
-      },
-      {
-        "reward": {
-          "advance": {
-            "civilisation": 1
-          }
-        },
-        "condition": {
-          "resource_amount": 10
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un cube du Néant dans un secteur du Néant adjacent. Les joueurs peuvent gagner deux Corruptions en tout pour retirer un Gardien et le renvoyer à la réserve.",
-    "texte2": null
-  },
-  {
-    "code": "T",
-    "cycle": 1,
-    "nom": "Depuis les cendres (Tutorial)",
-    "manches": 3,
-    "effet1": {
-      "mandatory": [
-        {
-          "discard": {
-            "focus": [
-              "conquete",
-              "politique",
-              "progres",
-              "prosperite",
-              "tentation"
-            ]
-          }
-        },
-        {
-          "move": {
-            "corruption": {
-              "to": "avant_poste",
-              "from": "house"
-            }
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "choice": [
-            {
-              "gain": {
-                "population_pure": 1
-              }
-            },
-            {
-              "gain": {
-                "credit": 1,
-                "science": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "cube_sector_count": 5
-        }
-      },
-      {
-        "reward": {
-          "choice": [
-            {
-              "gain": {
-                "food": 2
-              }
-            },
-            {
-              "deploy": {
-                "qty": 1,
-                "unit": "cube"
-              }
-            }
-          ]
-        },
-        "condition": {
-          "pure_guild_count": 5
-        }
-      }
-    ],
-    "texte1": "Chaque joueur défausse ses Focus Conquête, Politique, Progrès, Prospérité et Tentation. La Corruption de sa fiche Maison est déplacée vers son Avant-Poste.",
-    "texte2": null
-  },
-  {
-    "code": "A",
-    "cycle": 2,
-    "nom": "Âge sombre",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1,
-            "liberation": 1
-          }
-        },
-        {
-          "offer": {
-            "programme_force_corruption": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "credit": "science_spent"
-          },
-          "spend": {
-            "science": {
-              "max": 6
-            }
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "programme": 1
-          }
-        },
-        "condition": {
-          "entretien_total": 8,
-          "entretien_satisfait": true
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 8
-          }
-        },
-        "condition": {
-          "installations_pures": 8
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un jeton Libération et un cube du Néant dans un secteur du Néant adjacent. Placez une Corruption sur l’offre de Programme Force. Chaque joueur peut dépenser jusqu’à 6 Science pour gagner autant de Crédits.",
-    "texte2": null
-  },
-  {
-    "code": "B",
-    "cycle": 2,
-    "nom": "La force du nombre",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1,
-            "guilde_banquier": 1
-          }
-        },
-        {
-          "offer": {
-            "programme_soutien_corruption": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "activate": {
-            "cube": 2
-          }
-        },
-        {
-          "deploy": {
-            "cube": 2
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "commerce": 1
-          }
-        },
-        "condition": {
-          "defense_secteur_ou_base_stellaire_pure": 5
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 4
-          },
-          "remove": {
-            "corruption": 1
-          }
-        },
-        "condition": {
-          "entretien_total_max": 6
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un cube du Néant et une Guilde de Banquiers dans un secteur du Néant adjacent. Placez une Corruption sur l’offre de Programme Soutien.",
-    "texte2": null
-  },
-  {
-    "code": "C",
-    "cycle": 2,
-    "nom": "Effort militaire",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "place_on_all_neant_with_defense": {
-            "prime": 1,
-            "gloire": 1
-          }
-        },
-        {
-          "offer": {
-            "programme_richesse_corruption": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "cost": {
-            "population_pure": 1
-          },
-          "build": {
-            "installation": 1
-          },
-          "deploy": {
-            "cube": 2
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "choose_twice": [
-            {
-              "remove": {
-                "corruption": 1
-              }
-            },
-            {
-              "activate": {
-                "cube": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "guilds": [
-            "fermier",
-            "ingenieur",
-            "mineur"
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Prime dans le secteur du Néant adjacent avec la Population la plus basse, puis placer un jeton Libération et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée. Si un seul secteur du Néant est adjacent aux secteurs d'un joueur, il doit y placer tous les jetons (Prime, Libération et Défense de Secteur).",
+        "effet": {
+          "type": "placement_multiple", "zone": "secteur_neant_adjacent",
+          "placements": [
+            { "critere": "population_min", "elements": { "prime": 1 } },
+            { "critere": "population_max", "elements": { "liberation": 1, "defense_secteur": 1 } }
           ],
-          "sector_count": 3,
-          "min_guild_per_sector": 2
+          "cas_particulier": { "condition": "un_seul_secteur_neant_adjacent", "consequence": "tous_les_jetons_dans_ce_secteur" }
         }
       },
       {
-        "reward": {
-          "gain": {
-            "influence_per_installation": 2
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit établir une Guilde, soit construire une Installation.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "etablir_guilde", "valeur": 1 },
+          { "cle": "construire_installation", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins 6 cubes dans vos secteurs (Purs ou Corrompus), retirez une Corruption et déplacez une Corruption.",
+          "condition": { "cle": "cubes_secteurs_min", "valeur": 6, "purs_ou_corrompus": true },
+          "recompense": { "mode": "groupe", "gains": [ { "cle": "retirer_corruption", "valeur": 1 }, { "cle": "deplacer_corruption", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez atteint le Niveau 1 (ou supérieur) sur au moins une de vos pistes de Civilisation Pures, gagnez 2 Crédits ou un jeton Commerce.",
+          "condition": { "cle": "civilisation_pure_niveau_min", "valeur": 1 },
+          "recompense": { "mode": "exclusif", "gains": [ { "cle": "credit", "valeur": 2 }, { "cle": "commerce", "valeur": 1 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "D", "cycle": 1, "nom": "Nous sommes la résistance", "manches": 4,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer 1 cube du Néant et un jeton Gloire de valeur 1 dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "gloire": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut choisir d'activer 1 cube ou augmenter une Population Pure ou établir une Guilde de Banquiers.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "activer_cube", "valeur": 1 },
+          { "cle": "augmenter_population_pure", "valeur": 1 },
+          { "cle": "etablir_guilde_banquier", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins une Population Pure totale de 10, établissez une Guilde et/ou construisez une Installation.",
+          "condition": { "cle": "population_pure_totale_min", "valeur": 10 },
+          "recompense": { "mode": "libre", "gains": [ { "cle": "etablir_guilde", "valeur": 1 }, { "cle": "construire_installation", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins trois Guildes de Banquiers Pures, avancez sur une piste de Civilisation.",
+          "condition": { "cle": "guilde_banquier_pure_min", "valeur": 3 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "avancer_civilisation", "valeur": 1 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "E", "cycle": 1, "nom": "Civilisation renaissante", "manches": 4,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer une Guilde de Banquiers et 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquier": 1, "cube_neant": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut avancer sur une piste de Civilisation.",
+        "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "avancer_civilisation", "valeur": 1 } ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins trois secteurs Purs avec au moins une Guilde de Banquiers, gagnez une Technologie de base ou améliorée.",
+          "condition": { "cle": "secteur_pur_avec_guilde_banquier_min", "valeur": 3 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "technologie_base_ou_amelioree", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez deux emplacements de Guilde vides au total (ou moins), produisez jusqu'à deux types de ressources différents. Les emplacements apportés par Vaisseaux-Arches ne comptent pas.",
+          "condition": { "cle": "emplacements_guilde_vides_max", "valeur": 2, "precision": "emplacements_vaisseaux_arches_exclus" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "produire_type_ressource", "valeur": 2, "quantite": "jusqu_a" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "F", "cycle": 1, "nom": "L'heure des comptes", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit soit placer une Guilde et 1 cube du Néant dans le secteur du Néant adjacent avec la Population la plus basse, soit placer un jeton Gloire de valeur 2 et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "type": "placement", "critere": "population_min", "elements": { "guilde": 1, "cube_neant": 1 } },
+          { "type": "placement", "critere": "population_max", "elements": { "gloire": 2, "defense_secteur": 1 } }
+        ] }
+      },
+      {
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit déployer 1 cube sur son Secteur-Mère, soit améliorer un jeton Gloire.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "deployer_cube", "valeur": 1, "cible": "secteur_mere" },
+          { "cle": "ameliorer_gloire", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vos secteurs génèrent un Entretien de 3 ou plus, augmentez une Population Pure.",
+          "condition": { "cle": "entretien_secteurs_min", "valeur": 3 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "augmenter_population_pure", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins trois jetons Gloire (quelle que soit leur valeur), gagnez trois jetons Prime.",
+          "condition": { "cle": "jetons_gloire_min", "valeur": 3, "precision": "valeur_indifferente" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "prime", "valeur": 3 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "G", "cycle": 1, "nom": "Le visage du mal", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit gagner une Corruption sur un emplacement de Programme ou sur une piste de Civilisation. Si la Corruption est placée sur une piste et que son marqueur n'est pas dans la case la plus à droite, le joueur doit avancer sur cette piste (et donc ignorer le bénéfice rapporté par la case qu'il atteint).",
+        "effet": {
+          "type": "gain", "cible_options": [ "emplacement_programme", "piste_civilisation" ], "elements": { "corruption": 1 },
+          "effet_conditionnel": {
+            "si_cible": "piste_civilisation", "condition": "marqueur_pas_case_la_plus_a_droite",
+            "consequence": { "cle": "avancer_piste_civilisation", "valeur": 1, "note": "ignorer_le_benefice_de_la_case_atteinte" }
           }
-        },
-        "condition": {
-          "installations_pures": 1
+        }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 1 : chaque fois que vous retirez une Corruption, au lieu de la placer dans la réserve commune, gardez-la dans votre zone de jeu personnelle, jusqu'à la phase Évaluation.",
+        "effet": { "type": "modificateur_permanent", "declencheur": "retrait_corruption", "consequence": { "conserver_au_lieu_de_reserve": true, "jusqua": "phase_evaluation" } }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 2 Nourriture et/ou 1 Influence pour chaque Corruption que vous avez conservée (via les instructions de cette carte). Puis remettez tous les jetons Corruption conservés dans la réserve commune.",
+          "recompense": {
+            "mode": "libre",
+            "gains": [ { "cle": "nourriture", "valeur": 2, "par": "corruption_conservee" }, { "cle": "influence", "valeur": 1, "par": "corruption_conservee" } ],
+            "puis": { "cle": "remettre_corruption_conservee_en_reserve", "valeur": "toutes" }
+          } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Augmentez la Population de jusqu'à trois secteurs Purs différents où vous avez au moins une Guilde de Scientifiques.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "augmenter_population_pure", "valeur": 1, "par": "secteur_pur_avec_guilde_scientifique", "plafond_occurrences": 3 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "H", "cycle": 1, "nom": "Droit en enfer", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit soit gagner une Corruption pour gagner un jeton Gloire de valeur 1, soit rappeler 1 cube.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "gain": { "corruption": 1, "gloire": 1 } },
+          { "recall": { "cube": 1 } }
+        ] }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 1 : chaque fois que vous déployez au moins 1 cube, gagnez une Corruption (une fois par Focus) ou dépensez 1 Matériel pour chaque cube ainsi déployé. Ce coût s'ajoute au coût en Matériel normalement requis pour déployer un cube de Cuirassé.",
+        "effet": {
+          "type": "modificateur_permanent", "declencheur": "deploiement_cube",
+          "cout_supplementaire": { "mode": "exclusif", "options": [ { "corruption": 1, "frequence": "une_fois_par_focus" }, { "materiel_par_cube": 1 } ] },
+          "cumul": "s_ajoute_au_cout_existant"
         }
       }
     ],
-    "texte1": "Placez un jeton Prime et un jeton Gloire de valeur 1 sur chaque secteur du Néant avec une Défense de Secteur. Chaque joueur peut diminuer une Population Pure pour construire une Installation et déployer 2 cubes.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous n'avez pas de Corruption sur votre fiche Maison, gagnez un jeton Gloire de valeur 2 ou améliorez un jeton Gloire.",
+          "condition": { "cle": "corruption_maison", "valeur": 0 },
+          "recompense": { "mode": "exclusif", "gains": [ { "cle": "gain_gloire", "valeur": 2 }, { "cle": "ameliorer_gloire", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins deux secteurs Purs avec au moins 2 cubes dans chacun, gagnez une Technologie de base ou améliorée.",
+          "condition": { "cle": "secteurs_purs_avec_cubes_min", "valeur": { "count": 2, "cubes_min": 2 } },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "technologie_base_ou_amelioree", "valeur": 1 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "D",
-    "cycle": 2,
-    "nom": "Le soulèvement de l’humanité",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "tokens": {
-            "prime": 1,
-            "cube_neant": 2,
-            "liberation": 1
-          },
-          "place_on_neant_population_min": 4
-        },
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "civilisation"
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "science": 3
-          }
-        },
-        {
-          "advance": {
-            "civilisation": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
+    "code": "I", "cycle": 1, "nom": "Ascension glorieuse", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "produce": [
-            "nourriture",
-            "energie",
-            "materiel"
-          ]
-        },
-        "condition": {
-          "credit_income": 3
-        }
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
       },
       {
-        "reward": {
-          "gain": {
-            "influence": 10
-          }
-        },
-        "condition": {
-          "technologie": 5
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit améliorer un jeton Gloire et/ou activer 1 cube, soit avancer sur une piste de Civilisation.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "mode": "libre", "gains": [ { "cle": "ameliorer_gloire", "valeur": 1 }, { "cle": "activer_cube", "valeur": 1 } ] },
+          { "cle": "avancer_civilisation", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Si vous avez atteint le Niveau 1 (ou supérieur) sur au moins une de vos pistes de Civilisation Pures, activez 1 cube pour chacune de vos pistes de Civilisation Pures.",
+          "condition": { "cle": "civilisation_pure_niveau_min", "valeur": 1, "portee": "au_moins_une_piste" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "activer_cube", "valeur": 1, "par": "piste_civilisation_pure" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins un jeton Gloire de valeur 4 ou 5, retirez une Corruption de l'un de vos secteurs.",
+          "condition": { "cle": "gloire_valeur_min", "valeur": 4 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "retirer_corruption", "valeur": 1, "cible": "secteur_au_choix" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "J", "cycle": 1, "nom": "Connais ton ennemi", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": false, "resolution": "collectif",
+        "texte": "Les joueurs peuvent gagner deux Corruption en tout (à partager entre l'ensemble des joueurs) pour retirer un Gardien d'un secteur et le renvoyer à la réserve. Toute Corruption gagnée à cette occasion parmi les deux peut être placée sur la carte Technologie des Chambres de Décontamination, si les joueurs en disposent.",
+        "effet": {
+          "type": "echange_collectif", "partage_entre_joueurs": true,
+          "cout_total": { "corruption": 2 },
+          "gain": { "retirer_gardien": 1, "cible": "secteur_au_choix" },
+          "stockage_alternatif": { "condition": "possede_technologie_chambres_decontamination", "cible": "carte_technologie_chambres_decontamination" }
         }
       }
     ],
-    "texte1": "Placez un jeton Libération, un jeton Prime et 2 cubes du Néant sur chaque secteur du Néant ayant au moins 4 Population. Chaque joueur gagne une Corruption sur une piste de Civilisation si possible.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins quatre secteurs (Purs ou Corrompus), gagnez un jeton Gloire de valeur 3.",
+          "condition": { "cle": "secteurs_min", "valeur": 4, "precision": "purs_ou_corrompus" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "gloire", "valeur": 3 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins 10 unités d'un type de ressource en réserve, avancez sur une piste de Civilisation.",
+          "condition": { "cle": "ressource_reserve_min", "valeur": 10, "precision": "un_seul_type" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "avancer_civilisation", "valeur": 1 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "E",
-    "cycle": 2,
-    "nom": "Rallier les Guildes",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "sector_or_house"
-        },
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "liberation": 1,
-            "defense_secteur": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "commerce": 1
-          },
-          "condition": {
-            "guilds_pures": 6
-          }
-        },
-        {
-          "otherwise": {
-            "gain": {
-              "prime": 1
-            }
-          }
-        }
-      ]
-    },
-    "effet4": [
+    "code": "A", "cycle": 2, "nom": "Âge sombre", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "advance": {
-            "civilisation": 1
-          }
-        },
-        "condition": {
-          "preferred_focus_not_discarded": true
-        }
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Libération et 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "cube_neant": 1 } }
       },
       {
-        "reward": {
-          "gain": {
-            "influence": 8
-          }
-        },
-        "condition": {
-          "corruption_house_and_sector_max": 1
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Corruption sur l'offre de Programme Force.",
+        "effet": { "type": "gain", "cible": "offre_programme", "cible_detail": "programme_force", "elements": { "corruption": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut dépenser jusqu'à 6 Science de sa réserve pour gagner autant de Crédits.",
+        "effet": { "type": "echange", "mode": "proportionnel", "cout": { "cle": "science", "plafond": 6 }, "gain": { "cle": "credit", "ratio": "1_pour_1_avec_cout" } }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si votre Entretien total est de 8 ou plus, et si vous réussissez à le satisfaire intégralement (via une compétence de Technologie ou non), gagnez un Programme.",
+          "condition": { "et": [ { "cle": "entretien_total_min", "valeur": 8 }, { "cle": "entretien_integralement_satisfait", "valeur": true, "precision": "technologie_ou_autre" } ] },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "programme", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins huit Installations Pures en tout, gagnez 8 Influence.",
+          "condition": { "cle": "installations_pures_min", "valeur": 8 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 8 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "B", "cycle": 2, "nom": "La force du nombre", "manches": 4,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer 1 cube du Néant et une Guilde de Banquiers dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "guilde_banquier": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Corruption sur l'offre de Programme Soutien.",
+        "effet": { "type": "gain", "cible": "offre_programme", "cible_detail": "programme_soutien", "elements": { "corruption": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut activer ou déployer 2 cubes.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "activer_cube", "valeur": 2 },
+          { "cle": "deployer_cube", "valeur": 2 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au total au moins cinq Défenses de Secteur ou Bases Stellaires Pures, gagnez un jeton Commerce.",
+          "condition": { "cle": "defense_secteur_ou_base_stellaire_pure_min", "valeur": 5 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "commerce", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si votre Entretien total est de 6 ou moins, gagnez 4 Influence et/ou retirez une Corruption.",
+          "condition": { "cle": "entretien_total_max", "valeur": 6 },
+          "recompense": { "mode": "libre", "gains": [ { "cle": "influence", "valeur": 4 }, { "cle": "retirer_corruption", "valeur": 1 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "C", "cycle": 2, "nom": "Effort militaire", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez un jeton Prime et un jeton Gloire de valeur 1 sur chaque secteur du Néant ayant au moins une Défense de Secteur.",
+        "effet": { "type": "placement", "zone": "chaque_secteur_neant_avec_defense_secteur_min_1", "elements": { "prime": 1, "gloire": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Corruption sur l'offre de Programme Richesse.",
+        "effet": { "type": "gain", "cible": "offre_programme", "cible_detail": "programme_richesse", "elements": { "corruption": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut diminuer la Population Pure de l'un de ses secteurs (sauf Secteur-Mère) pour construire une Installation et déployer 2 cubes dans ce même secteur.",
+        "effet": {
+          "type": "echange",
+          "cout": { "cle": "population_pure", "valeur": 1, "cible": "secteur_au_choix", "exclusion": "secteur_mere" },
+          "gain": { "mode": "groupe", "gains": [ { "cle": "construire_installation", "valeur": 1 }, { "cle": "deployer_cube", "valeur": 2 } ], "cible": "meme_secteur_que_le_cout" }
         }
       }
     ],
-    "texte1": "Chaque joueur gagne une Corruption dans un secteur si possible et place un jeton Libération ainsi qu’une Défense de Secteur dans un secteur du Néant adjacent. Les joueurs avec au moins six Guildes Pures gagnent un jeton Commerce, les autres un jeton Prime.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins trois secteurs (Purs ou Corrompus) avec au moins deux Guildes parmi Fermiers, Ingénieurs et/ou Mineurs dans chacun, choisissez deux fois : retirez une Corruption ou activez 1 cube.",
+          "condition": { "cle": "secteurs_avec_guildes_specifiques_min", "valeur": 3, "guildes": [ "fermier", "ingenieur", "mineur" ], "min_guildes_par_secteur": 2, "precision": "purs_ou_corrompus" },
+          "recompense": { "mode": "exclusif_repete", "repetitions": 2, "gains": [ { "cle": "retirer_corruption", "valeur": 1 }, { "cle": "activer_cube", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 2 Influence pour chacune de vos Installations Pures.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 2, "par": "installation_pure" } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "F",
-    "cycle": 2,
-    "nom": "Terre brûlée",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1
-          }
-        },
-        {
-          "destroy_choice": {
-            "exclude": "secteur_mere",
-            "targets": [
-              "guilde",
-              "installation"
-            ],
-            "quantity": 2
-          }
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "evaluation": {
-            "ignore": {
-              "crise": true,
-              "escarmouche": true
-            }
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
+    "code": "D", "cycle": 2, "nom": "Le soulèvement de l'humanité", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "advance": {
-            "civilisation": 1
-          }
-        },
-        "condition": {
-          "pure_sector_population_min": {
-            "count": 2,
-            "population": 5
-          }
+        "ordre": 1, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez un jeton Libération, un jeton Prime et 2 cubes du Néant sur chaque secteur du Néant ayant au moins 4 Population.",
+        "effet": { "type": "placement", "zone": "chaque_secteur_neant_population_min_4", "elements": { "liberation": 1, "prime": 1, "cube_neant": 2 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit gagner une Corruption sur une piste de Civilisation, si possible. Si toutes les pistes de Civilisation d'un joueur sont déjà Corrompues, alors il place cette Corruption sur un emplacement de Programme, l'un de ses secteurs, ou sur la carte Technologie Chambres de Décontamination.",
+        "effet": {
+          "type": "gain", "cible": "piste_civilisation", "elements": { "corruption": 1 },
+          "repli": { "condition": "toutes_pistes_civilisation_corrompues", "cibles_possibles": [ "emplacement_programme", "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
         }
       },
       {
-        "reward": {
-          "gain": {
-            "influence_per_resource_type": 5
-          }
-        },
-        "condition": {
-          "resource_stock_types_min": {
-            "quantity": 8
-          }
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut gagner 3 Science ou avancer sur une piste de Civilisation.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "science", "valeur": 3 },
+          { "cle": "avancer_civilisation", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez un Revenu de Crédits de 3 ou plus, produisez de la Nourriture, de l'Énergie et du Matériel.",
+          "condition": { "cle": "revenu_credit_min", "valeur": 3 },
+          "recompense": { "mode": "groupe", "gains": [ { "cle": "produire_nourriture", "valeur": 1 }, { "cle": "produire_energie", "valeur": 1 }, { "cle": "produire_materiel", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins cinq Technologies de base ou améliorées en tout, gagnez 10 Influence.",
+          "condition": { "cle": "technologie_base_ou_amelioree_total_min", "valeur": 5 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 10 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "E", "cycle": 2, "nom": "Rallier les Guildes", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit gagner une Corruption dans un secteur, si possible. Si tous les secteurs (corruptibles) d'un joueur sont déjà Corrompus, alors il place cette Corruption sur sa fiche Maison ou sur la carte Technologie Chambres de Décontamination.",
+        "effet": {
+          "type": "gain", "cible": "secteur_au_choix", "elements": { "corruption": 1 },
+          "repli": { "condition": "tous_secteurs_corruptibles_deja_corrompus", "cibles_possibles": [ "fiche_maison", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur ayant au moins six Guildes dans ses secteurs Purs peut gagner un jeton Commerce. Tous les autres joueurs peuvent gagner un jeton Prime.",
+        "effet": {
+          "type": "si_sinon",
+          "si": { "condition": { "cle": "guilde_dans_secteurs_purs_min", "valeur": 6 }, "alors": { "cle": "commerce", "valeur": 1 } },
+          "sinon": { "cle": "prime", "valeur": 1 }
         }
       }
     ],
-    "texte1": "Chaque joueur place un cube du Néant dans un secteur du Néant adjacent et détruit deux fois une Guilde ou une Installation (hors Secteur-Mère). Lors de l’Évaluation du Cycle 2, ignorez l’Escarmouche ou le plateau Crise.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si aucun des Focus préférés de votre Maison n'est dans votre défausse, avancez sur une piste de Civilisation.",
+          "condition": { "cle": "focus_preferes_absents_de_defausse", "valeur": true },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "avancer_civilisation", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Gagnez 8 Influence s'il n'y a pas plus d'une Corruption, en tout, sur votre fiche Maison et vos secteurs. La Corruption des Chambres de Décontamination ne compte pas.",
+          "condition": { "cle": "corruption_maison_et_secteurs_max", "valeur": 1, "precision": "corruption_chambres_decontamination_exclue" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 8 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "G",
-    "cycle": 2,
-    "nom": "Disruption interne",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "target": "pure_sector",
-          "increase": {
-            "population_pure": 1
-          }
-        },
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "same_sector",
-          "restriction": {
-            "no_decontamination_storage": true
-          }
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "protection": {
-            "influence_max": 40,
-            "cannot_be_invaded": true,
-            "ignore_crisis_escarmouche": true
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
+    "code": "F", "cycle": 2, "nom": "Terre brûlée", "manches": 5,
+    "cadres": [
       {
-        "reward": {
-          "gain": {
-            "prime": 1,
-            "technologie_base": 1
-          }
-        },
-        "condition": {
-          "gloire_tokens": 4
-        }
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1 } }
       },
       {
-        "reward": {
-          "gain": {
-            "influence": 12
-          }
-        },
-        "condition": {
-          "population_pure_total": 16
-        }
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit choisir deux fois : détruire une Guilde ou détruire une Installation (mais jamais dans son Secteur-Mère).",
+        "effet": { "type": "choix", "mode": "exclusif_repete", "repetitions": 2, "options": [
+          { "cle": "detruire_guilde", "valeur": 1 },
+          { "cle": "detruire_installation", "valeur": 1 }
+        ], "exclusion": "secteur_mere" }
+      },
+      {
+        "ordre": 3, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 2 : lors de la phase Évaluation du Cycle 2, ignorez le plateau Crise.",
+        "effet": { "type": "modificateur_permanent", "declencheur": "phase_evaluation_cycle_2", "consequence": { "ignorer": "plateau_crise" } }
       }
     ],
-    "texte1": "Chaque joueur augmente la Population d’un secteur Pur puis place une Corruption sur ce secteur. Les joueurs ayant 40 Influence ou moins ne peuvent pas être envahis.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez au moins deux secteurs Purs avec une Population de 5 ou plus, avancez sur une piste de Civilisation.",
+          "condition": { "cle": "secteur_pur_population_min", "seuil_population": 5, "nombre_secteurs_min": 2 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "avancer_civilisation", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 5 Influence pour chaque type de ressource dont vous avez au moins 8 unités en réserve.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 5, "par": "type_ressource_avec_8_unites_min_en_reserve" } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "H",
-    "cycle": 2,
-    "nom": "Adaptation",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "produce": {
-            "resource_types": 2
-          }
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "escarmouche": {
-            "neant_absorb_salve_per_technologie_amelioree": 1
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
+    "code": "G", "cycle": 2, "nom": "Disruption interne", "manches": 4,
+    "cadres": [
       {
-        "reward": {
-          "choice": [
-            {
-              "remove": {
-                "corruption": 1
-              }
-            },
-            {
-              "gain": {
-                "programme": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "gloire_total": 8
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence_per_active_cube": 3
-          }
-        },
-        "condition": {}
-      }
-    ],
-    "texte1": "Chaque joueur peut produire deux ressources différentes. Le Néant gagne 1 Absorption de Salve par Technologie améliorée possédée.",
-    "texte2": null
-  },
-  {
-    "code": "I",
-    "cycle": 2,
-    "nom": "Triomphe suprême",
-    "manches": 4,
-    "effet1": {
-      "mandatory": [
-        {
-          "choice": [
-            {
-              "gain": {
-                "technologie_base": 1
-              }
-            },
-            {
-              "gain": {
-                "commerce": 1
-              },
-              "activate": {
-                "cube": 1
-              }
-            }
-          ]
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "gloire_gain": {
-            "auto_upgrade": true
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "produce": {
-            "resource_per_gloire_5": 1
-          }
-        },
-        "condition": {
-          "gloire_value_5": 1
-        }
-      },
-      {
-        "reward": {
-          "choice": [
-            {
-              "gain": {
-                "influence": 10
-              }
-            },
-            {
-              "advance": {
-                "civilisation_gouvernement": 1
-              }
-            }
-          ]
-        },
-        "condition": {
-          "entretien_total": 10,
-          "entretien_satisfait": true
-        }
-      }
-    ],
-    "texte1": "Chaque joueur choisit entre gagner une Technologie de base ou activer un cube et gagner un jeton Commerce. Les nouveaux jetons Gloire peuvent être améliorés immédiatement.",
-    "texte2": null
-  },
-  {
-    "code": "J",
-    "cycle": 2,
-    "nom": "Menace croissante (Co-op/Solo)",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "place": {
-            "gardien": 1
-          },
-          "target": "faille_all"
-        },
-        {
-          "place": {
-            "liberation": 1
-          },
-          "target": "neant_adjacent_faille"
-        },
-        {
-          "trade": {
-            "resources": 4,
-            "between_players": true
-          }
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "before_evaluation": {
-            "place": {
-              "cube_neant": 1
-            },
-            "target": "neant_with_guardian"
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "prime_per_liberation": 1
-          }
-        },
-        "condition": {
-          "liberation_tokens": 1
-        }
-      },
-      {
-        "reward": {
-          "remove": {
-            "corruption": 1
-          }
-        },
-        "condition": {
-          "crisis_catastrophe": 0
-        }
-      }
-    ],
-    "texte1": "Placez un Gardien sur chaque Faille et un jeton Libération sur chaque secteur du Néant adjacent à une Faille. Un joueur peut échanger 4 ressources avec un autre joueur.",
-    "texte2": null
-  },
-  {
-    "code": "A",
-    "cycle": 3,
-    "nom": "Revanche des Novarques",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "place": {
-            "defense_secteur": 1
-          },
-          "target": "neant_with_cube_neant_max_2"
-        },
-        {
-          "destroy": {
-            "guilde": 1
-          },
-          "restriction": "not_secteur_mere"
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "move_corruption": {
-        "unlimited": true
-      }
-    },
-    "effet4": [
-      {
-        "reward": {
-          "influence": [
-            3,
-            6,
-            9,
-            12
-          ]
-        },
-        "condition": {
-          "civilisation_pure_level": 1
-        }
-      },
-      {
-        "reward": {
-          "score": {
-            "active_zone_cube": 1,
-            "pure_sector_cube": 2
-          }
-        },
-        "condition": {}
-      }
-    ],
-    "texte1": "Placez une Défense de Secteur sur chaque secteur du Néant avec deux cubes du Néant ou moins. Chaque joueur détruit une Guilde si possible et peut déplacer autant de Corruption qu’il souhaite.",
-    "texte2": null
-  },
-  {
-    "code": "B",
-    "cycle": 3,
-    "nom": "Guerre totale",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "gloire": 3,
-            "cube_neant": 1,
-            "defense_secteur": 1
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": null,
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": "total_gloire"
-          }
-        },
-        "condition": {}
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 5
-          }
-        },
-        "condition": {
-          "pure_sector_cube_min": 3
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 3
-          }
-        },
-        "condition": {
-          "sector_maintenance_min": 2
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un cube du Néant, un jeton Gloire de valeur 3 et une Défense de Secteur dans un secteur du Néant adjacent.",
-    "texte2": null
-  },
-  {
-    "code": "C",
-    "cycle": 3,
-    "nom": "La connaissance mène au pouvoir",
-    "manches": 5,
-    "effet1": null,
-    "effet2": {},
-    "effet3": {
-      "commerce_condition": {
-        "has": true,
-        "else": {
-          "gain": {
-            "commerce": 1
-          },
-          "spend": {
-            "science": 1
-          }
-        },
-        "gain": {
-          "science": 3
-        }
-      }
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": "total_resources_div_2_floor"
-          }
-        },
-        "condition": {}
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence_per_installation": 2
-          }
-        },
-        "condition": {
-          "installations_pures": 1
-        }
-      }
-    ],
-    "texte1": "Chaque joueur place un jeton Prime et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée.",
-    "texte2": null
-  },
-  {
-    "code": "D",
-    "cycle": 3,
-    "nom": "Baroud d’honneur",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "gain": {
-            "corruption": 2
-          },
-          "target": "program_slots"
-        },
-        {
-          "place": {
-            "gloire": 3
-          },
-          "target": "neant_or_fallen_house"
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "deploy": {
-            "cube": 1
-          }
-        },
-        {
-          "establish": {
-            "guilde": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "evaluate_program_objective": true
-        },
-        "condition": {
-          "program_pure_in_play": true
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence_per_house_corruption": 3
-          }
-        },
-        "condition": {
-          "house_corruption": 1
-        }
-      }
-    ],
-    "texte1": "Chaque joueur gagne deux Corruptions sur des emplacements de Programme si possible. Puis place un jeton Gloire de valeur 3 dans un secteur du Néant ou occupé par une Maison Déchue.",
-    "texte2": null
-  },
-  {
-    "code": "E",
-    "cycle": 3,
-    "nom": "Étincelle d'espoir",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "cube_neant": 1,
-            "defense_secteur": 1,
-            "guilde_banquier": 1
-          }
-        },
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "house_sheet"
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "influence": 6
-          },
-          "recall": {
-            "cube": 1
-          },
-          "remove": {
-            "corruption": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": 5
-          }
-        },
-        "condition": {
-          "pure_sector_with_bank_guild": 1
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": "population_pure_total"
-          }
-        },
-        "condition": {}
-      }
-    ],
-    "texte1": "Chaque joueur place une Guilde de Banquiers, un cube du Néant et une Défense de Secteur dans un secteur du Néant adjacent. Chaque joueur gagne une Corruption sur sa fiche Maison si possible.",
-    "texte2": null
-  },
-  {
-    "code": "F",
-    "cycle": 3,
-    "nom": "L’Ombre du Vide",
-    "manches": 6,
-    "effet1": null,
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "remove": {
-            "corruption": 1
-          }
-        },
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "program_slot",
-          "advance": {
-            "civilisation": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence_formula": {
-              "highest_resource_income": 1,
-              "lowest_food_energy_material_income": 1
-            }
-          }
-        },
-        "condition": {}
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 20
-          }
-        },
-        "condition": {
-          "house_corruption": 0,
-          "technologies_base_or_upgraded": 5
-        }
-      }
-    ],
-    "texte1": "Placez une Corruption sur chaque offre de Programme non Corrompue. Placez un cube du Néant dans chaque secteur du Néant ayant au moins 4 Population.",
-    "texte2": null
-  },
-  {
-    "code": "G",
-    "cycle": 3,
-    "nom": "Vent d’annihilation",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "house_sheet"
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "delayed_effect": {
-            "combat": {
-              "extra_cube_neant": 1
-            },
-            "timing": "end_first_turn"
-          }
-        }
-      ]
-    },
-    "effet3": {
-      "choices": [
-        {
-          "advance": {
-            "civilisation": 1
-          },
-          "increase": {
-            "population_pure": 1
-          }
-        },
-        {
-          "deploy": {
-            "cube": 3
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": 1
-          }
-        },
-        "condition": {
-          "pure_sector_population": 4
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 3
-          }
-        },
-        "condition": {
-          "pure_sector_population": 5
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 6
-          }
-        },
-        "condition": {
-          "pure_sector_population": 6
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 5
-          }
-        },
-        "condition": {
-          "pure_sector_count_above_4": 1
-        }
-      }
-    ],
-    "texte1": "Chaque joueur gagne une Corruption sur sa fiche Maison si possible. À la fin de son premier tour, chaque joueur résout une Escarmouche avec un cube du Néant supplémentaire.",
-    "texte2": null
-  },
-  {
-    "code": "H",
-    "cycle": 3,
-    "nom": "S’adapter et surmonter",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "gain": {
-            "corruption": 1
-          },
-          "target": "house_sheet"
-        },
-        {
-          "zone": "secteur_neant_adjacent",
-          "place": {
-            "liberation": 1
-          }
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "preferred_focus_cost": {
-            "energy": 1
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence_per_sector": 2
-          }
-        },
-        "condition": {
-          "pure_sector_with_guild": [
-            "fermier",
-            "ingenieur",
-            "mineur"
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit augmenter la Population de l'un de ses secteurs Purs (sauf Secteur-Mère), si possible. Ensuite, chaque joueur doit placer une Corruption sur ce secteur. La Corruption ne peut pas être placée sur sa carte Technologie Chambres de Décontamination. Si un joueur ne peut pas augmenter une Population, il ne gagne pas la Corruption.",
+        "effet": {
+          "type": "sequence",
+          "etapes": [
+            { "cle": "augmenter_population_pure", "valeur": 1, "cible": "secteur_pur_au_choix", "exclusion": "secteur_mere", "si_echec": "annuler_les_etapes_suivantes" },
+            { "type": "gain", "elements": { "corruption": 1 }, "cible": "meme_secteur_que_etape_precedente", "restriction": "stockage_chambres_decontamination_interdit" }
           ]
         }
       },
       {
-        "reward": {
-          "gain": {
-            "influence_per_track": 6
-          }
-        },
-        "condition": {
-          "civilisation_pure_level": 1
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 2 : si vous avez 40 Influence (ou moins), vous ne pouvez pas être envahi par une Escarmouche. Si la pénalité de la Crise actuelle est une Escarmouche, elle devra être défaussée sans effet (y compris l'effet supplémentaire de résolution du Combat).",
+        "effet": {
+          "type": "modificateur_permanent", "condition": { "cle": "influence_max", "valeur": 40 },
+          "consequence": { "protection": "ne_peut_pas_etre_envahi_par_escarmouche", "si_penalite_crise_est_escarmouche": "defaussee_sans_effet_y_compris_combat_supplementaire" }
         }
       }
     ],
-    "texte1": "Chaque joueur gagne une Corruption sur sa fiche Maison si possible et place un jeton Libération dans un secteur du Néant adjacent.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si vous avez exactement quatre jetons Gloire, gagnez un jeton Prime et/ou une Technologie de base.",
+          "condition": { "cle": "jetons_gloire_exact", "valeur": 4 },
+          "recompense": { "mode": "libre", "gains": [ { "cle": "prime", "valeur": 1 }, { "cle": "technologie_base", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si vous avez une Population Pure totale de 16 ou plus, gagnez 12 Influence.",
+          "condition": { "cle": "population_pure_totale_min", "valeur": 16 },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 12 } ] } }
+      ] }
+    ] }
   },
   {
-    "code": "I",
-    "cycle": 3,
-    "nom": "Avenir radieux",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "choice": [
+    "code": "H", "cycle": 2, "nom": "Adaptation", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut produire deux ressources différentes.",
+        "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "produire_type_ressource", "valeur": 2 } ] }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 2 : pour chaque Technologie améliorée qu'un joueur possède, le Néant gagne 1 Absorption de Salve lors de chaque étape de Salve des Escarmouches menées contre ce joueur.",
+        "effet": { "type": "modificateur_permanent", "declencheur": "etape_salve_escarmouche", "consequence": { "cle": "absorption_salve_neant", "valeur": 1, "par": "technologie_amelioree_possedee" } }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Si votre valeur totale de Gloire est de 8 ou plus, retirez une Corruption ou gagnez un Programme.",
+          "condition": { "cle": "gloire_valeur_totale_min", "valeur": 8 },
+          "recompense": { "mode": "exclusif", "gains": [ { "cle": "retirer_corruption", "valeur": 1 }, { "cle": "programme", "valeur": 1 } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 3 Influence pour chaque cube de la zone active de votre fiche Maison.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 3, "par": "cube_zone_active_fiche_maison" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "I", "cycle": 2, "nom": "Triomphe suprême", "manches": 4,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur choisit : gagnez une Technologie de base, ou activez 1 cube et gagnez un jeton Commerce.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "technologie_base", "valeur": 1 },
+          { "mode": "groupe", "gains": [ { "cle": "activer_cube", "valeur": 1 }, { "cle": "commerce", "valeur": 1 } ] }
+        ] }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent : chaque fois qu'un joueur gagne un nouveau jeton Gloire, il peut l'améliorer immédiatement. Améliorer un jeton ne compte pas comme en gagner un nouveau.",
+        "effet": {
+          "type": "modificateur_permanent", "declencheur": "gain_nouveau_jeton_gloire",
+          "consequence": { "cle": "ameliorer_gloire", "valeur": 1, "optionnel": true, "immediat": true },
+          "precision": "ameliorer_un_jeton_ne_compte_pas_comme_en_gagner_un_nouveau"
+        }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Produisez un type de ressource pour chacun de vos jetons Gloire de valeur 5. Si vous en avez plusieurs, vous devez produire un type différent par jeton.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "produire_type_ressource", "valeur": 1, "par": "jeton_gloire_valeur_5", "contrainte": "type_different_par_occurrence" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Si votre Entretien total est de 10 ou plus, et si vous réussissez à le satisfaire intégralement (via une compétence de Technologie ou non), gagnez 10 Influence ou avancez sur la piste de Civilisation Gouvernement.",
+          "condition": { "et": [ { "cle": "entretien_total_min", "valeur": 10 }, { "cle": "entretien_integralement_satisfait", "valeur": true, "precision": "technologie_ou_autre" } ] },
+          "recompense": { "mode": "exclusif", "gains": [ { "cle": "influence", "valeur": 10 }, { "cle": "avancer_civilisation_gouvernement", "valeur": 1 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "J", "cycle": 2, "nom": "Menace croissante", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez un Gardien sur chaque Faille.",
+        "effet": { "type": "placement", "zone": "chaque_faille", "elements": { "gardien": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez un jeton Libération sur chaque secteur du Néant adjacent à au moins une Faille.",
+        "effet": { "type": "placement", "zone": "chaque_secteur_neant_adjacent_a_une_faille", "elements": { "liberation": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 2 : avant la première étape de la phase Évaluation, placez 1 cube du Néant sur chaque secteur du Néant occupé par un Gardien.",
+        "effet": {
+          "type": "modificateur_permanent", "declencheur": "avant_premiere_etape_phase_evaluation",
+          "consequence": { "type": "placement", "zone": "chaque_secteur_neant_avec_gardien", "elements": { "cube_neant": 1 } }
+        }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez un jeton Prime pour chacun de vos jetons Libération.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "prime", "valeur": 1, "par": "jeton_liberation" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "S'il n'y a aucun jeton Catastrophe sur le plateau Crise, retirez une Corruption. Chaque joueur doit évaluer cet objectif séparément.",
+          "condition": { "cle": "jetons_catastrophe_plateau_crise", "valeur": 0, "precision": "evaluation_individuelle_par_joueur" },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "retirer_corruption", "valeur": 1 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "A", "cycle": 3, "nom": "Revanche des Novarques", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Défense de Secteur sur chaque secteur du Néant avec 2 cubes du Néant ou moins.",
+        "effet": { "type": "placement", "zone": "chaque_secteur_neant_cube_neant_max_2", "elements": { "defense_secteur": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit détruire une Guilde d'un de ses secteurs (sauf Secteur-Mère), si possible.",
+        "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "detruire_guilde", "valeur": 1, "cible": "secteur_au_choix", "exclusion": "secteur_mere" } ] }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut déplacer autant de Corruption qu'il le souhaite.",
+        "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "deplacer_corruption", "quantite": "illimite" } ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Pour chaque piste de Civilisation Pure, gagnez respectivement 3/6/9/12 Influence si vous avez atteint le Niveau 1/2/3/4.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "par": "piste_civilisation_pure", "bareme": [
+            { "niveau": 1, "valeur": 3 }, { "niveau": 2, "valeur": 6 }, { "niveau": 3, "valeur": 9 }, { "niveau": 4, "valeur": 12 }
+          ] } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 1 Influence pour chaque cube de la zone active de votre fiche Maison.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 1, "par": "cube_zone_active_fiche_maison" } ] } },
+        { "type": "multiplicateur", "texte": "Gagnez 2 Influence pour chaque cube de vos secteurs Purs.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 2, "par": "cube_secteur_pur" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "B", "cycle": 3, "nom": "Guerre totale", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer 1 cube du Néant, un jeton Gloire de valeur 3 et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "gloire": 3, "defense_secteur": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut évaluer les objectifs de l'un de ses Programmes Purs en jeu (sauf Programme de départ) et/ou déployer 1 cube dans un secteur qu'il contrôle comprenant un Chantier Naval.",
+        "effet": { "type": "choix", "mode": "libre", "options": [
+          { "cle": "evaluer_objectifs_programme", "valeur": 1, "cible": "programme_pur_en_jeu_hors_depart" },
+          { "cle": "deployer_cube", "valeur": 1, "cible": "secteur_controle_avec_chantier_naval" }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que votre valeur totale de Gloire.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "formule": "egal_a_valeur_totale_gloire" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 5 Influence pour chacun de vos secteurs Purs ayant au moins 3 cubes.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 5, "par": "secteur_pur_cube_min_3" } ] } },
+        { "type": "multiplicateur", "texte": "Gagnez 3 Influence pour chacun de vos secteurs (Purs ou Corrompus) ayant au moins 2 Entretien.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 3, "par": "secteur_pur_ou_corrompu_entretien_min_2" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "C", "cycle": 3, "nom": "La connaissance mène au pouvoir", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Prime et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent_population_max", "elements": { "prime": 1, "defense_secteur": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "restriction_joueurs": { "cle": "technologie_amelioree_min", "valeur": 1 },
+        "texte": "Chaque joueur ayant au moins une Technologie améliorée doit gagner une Corruption sur une piste de Civilisation, si possible. Si toutes les pistes de Civilisation d'un joueur sont déjà Corrompues, alors il place cette Corruption sur un emplacement de Programme, l'un de ses secteurs et/ou la carte Technologie Chambres de Décontamination si possible.",
+        "effet": {
+          "type": "gain", "cible": "piste_civilisation", "elements": { "corruption": 1 },
+          "repli": { "condition": "toutes_pistes_civilisation_corrompues", "cibles_possibles": [ "emplacement_programme", "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Si un joueur a au moins un jeton Commerce, il peut gagner 3 Science. Si un joueur n'a aucun jeton Commerce, il peut dépenser 1 Science pour gagner un jeton Commerce.",
+        "effet": {
+          "type": "si_sinon",
+          "si": { "condition": { "cle": "jeton_commerce_min", "valeur": 1 }, "alors": { "cle": "science", "valeur": 3 } },
+          "sinon": { "cle": "commerce", "valeur": 1, "cout": { "science": 1 } }
+        }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que le nombre de ressources de toutes vos réserves divisé par deux, arrondi à l'inférieur.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "formule": "total_ressources_reserve_divise_par_2_arrondi_inferieur" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 2 Influence pour chacune de vos Installations Pures.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 2, "par": "installation_pure" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "D", "cycle": 3, "nom": "Baroud d'honneur", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit gagner deux Corruption sur des emplacements de Programme, si possible. Si tous les emplacements de Programme d'un joueur sont Corrompus, alors il doit placer l'excédent sur ses pistes de Civilisation, l'un de ses secteurs et/ou la carte Chambres de Décontamination, si possible.",
+        "effet": {
+          "type": "gain", "cible": "emplacement_programme", "elements": { "corruption": 2 },
+          "repli": { "mode": "excedent", "condition": "emplacements_programme_insuffisants", "cibles_possibles": [ "piste_civilisation", "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer un jeton Gloire de valeur 3 dans un secteur du Néant ou un secteur occupé par une Maison Déchue.",
+        "effet": { "type": "placement", "zone": "secteur_neant_ou_secteur_maison_dechue", "elements": { "gloire": 3 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut déployer 1 cube et/ou établir une Guilde.",
+        "effet": { "type": "choix", "mode": "libre", "options": [
+          { "cle": "deployer_cube", "valeur": 1 },
+          { "cle": "etablir_guilde", "valeur": 1 }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+          "condition": { "cle": "programme_pur_en_jeu_hors_depart_disponible", "valeur": true },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "evaluer_objectifs_programme", "valeur": 1, "cible": "programme_pur_au_choix_hors_depart" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 3 Influence pour chaque Corruption de votre fiche Maison. La Corruption des Chambres de Décontamination ne compte pas.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 3, "par": "corruption_fiche_maison", "precision": "corruption_chambres_decontamination_exclue" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "E", "cycle": 3, "nom": "Étincelle d'espoir", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit placer une Guilde de Banquiers, 1 cube du Néant et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquier": 1, "cube_neant": 1, "defense_secteur": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur gagne une Corruption sur sa fiche Maison, si possible. Si tous les emplacements de sa fiche Maison sont déjà Corrompus, alors il doit placer la Corruption dans l'un de ses secteurs ou sur la carte Chambres de Décontamination.",
+        "effet": {
+          "type": "gain", "cible": "fiche_maison", "elements": { "corruption": 1 },
+          "repli": { "condition": "fiche_maison_pleine", "cibles_possibles": [ "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut rappeler 1 cube pour retirer une Corruption du même secteur ou d'un secteur adjacent. Tout joueur qui retire une Corruption ainsi gagne 6 Influence.",
+        "effet": {
+          "type": "echange",
+          "cout": { "cle": "rappeler_cube", "valeur": 1, "cible": "secteur_au_choix" },
+          "gain": { "mode": "groupe", "gains": [
+            { "cle": "retirer_corruption", "valeur": 1, "cible": "meme_secteur_ou_adjacent_au_cout" },
+            { "cle": "influence", "valeur": 6 }
+          ] }
+        }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 5 Influence pour chacun de vos secteurs Purs ayant au moins une Guilde des Banquiers.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 5, "par": "secteur_pur_avec_guilde_banquier_min_1" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que votre Population Pure totale.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "formule": "egal_a_population_pure_totale" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "F", "cycle": 3, "nom": "L'Ombre du Vide", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez une Corruption sur chaque offre de Programmes qui n'est pas déjà Corrompue.",
+        "effet": { "type": "gain", "cible": "chaque_offre_programme_non_corrompue", "elements": { "corruption": 1 } }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "unique",
+        "texte": "Placez 1 cube du Néant dans chaque secteur du Néant ayant au moins 4 Population.",
+        "effet": { "type": "placement", "zone": "chaque_secteur_neant_population_min_4", "elements": { "cube_neant": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit retirer une Corruption, soit gagner une Corruption sur un emplacement de Programme pour avancer sur une piste de Civilisation. Cette Corruption ne peut pas être placée sur la carte Technologie Chambres de Décontamination.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "cle": "retirer_corruption", "valeur": 1 },
+          { "type": "echange", "cout": { "cle": "corruption", "valeur": 1, "cible": "emplacement_programme", "restriction": "stockage_chambres_decontamination_interdit" }, "gain": { "cle": "avancer_civilisation", "valeur": 1 } }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que votre Revenu le plus élevé parmi les cinq types de ressources, plus autant d'Influence que votre Revenu le plus bas parmi Nourriture, Énergie et Matériel.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "formule": { "operation": "somme", "termes": [ "revenu_max_parmi_5_types_ressource", "revenu_min_parmi_nourriture_energie_materiel" ] } } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "exploit", "texte": "Gagnez 20 Influence si vous n'avez aucune Corruption sur votre fiche Maison, et au moins cinq Technologies de base ou améliorées en tout. La Corruption des Chambres de Décontamination ne compte pas.",
+          "condition": { "et": [
+            { "cle": "corruption_fiche_maison", "valeur": 0, "precision": "corruption_chambres_decontamination_exclue" },
+            { "cle": "technologie_base_ou_amelioree_total_min", "valeur": 5 }
+          ] },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 20 } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "G", "cycle": 3, "nom": "Vent d'annihilation", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur gagne une Corruption sur sa fiche Maison, si possible. Si tous les emplacements de sa fiche Maison sont déjà Corrompus, il doit alors placer la Corruption dans l'un de ses secteurs ou sur la carte Chambres de Décontamination.",
+        "effet": {
+          "type": "gain", "cible": "fiche_maison", "elements": { "corruption": 1 },
+          "repli": { "condition": "fiche_maison_pleine", "cibles_possibles": [ "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "retardement",
+        "texte": "À retardement : à la fin de son premier tour, chaque joueur doit résoudre une Escarmouche avec 1 cube du Néant supplémentaire. En partie co-op/solo, cet effet est résolu après l'étape Progression du Néant du tour du joueur.",
+        "effet": {
+          "type": "modificateur_ponctuel", "declencheur": "fin_premier_tour", "timing": "apres_etape_progression_du_neant",
+          "consequence": { "escarmouche": { "cube_neant_supplementaire": 1 } }
+        }
+      },
+      {
+        "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
+        "texte": "Chaque joueur peut soit avancer sur une piste de Civilisation et/ou augmenter une Population Pure, soit déployer jusqu'à 3 cubes.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "mode": "libre", "gains": [ { "cle": "avancer_civilisation", "valeur": 1 }, { "cle": "augmenter_population_pure", "valeur": 1 } ] },
+          { "cle": "deployer_cube", "valeur": 3, "quantite": "jusqu_a" }
+        ] }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 1 Influence pour chacun de vos secteurs Purs avec 4 Population.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 1, "par": "secteur_pur_population_4" } ] } },
+        { "type": "multiplicateur", "texte": "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 3, "par": "secteur_pur_population_5" } ] } },
+        { "type": "multiplicateur", "texte": "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 6, "par": "secteur_pur_population_6" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 5 Influence pour chacun de vos secteurs Purs au-delà du quatrième.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 5, "par": "secteur_pur_au_dela_du_4e" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "H", "cycle": 3, "nom": "S'adapter et surmonter", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur gagne une Corruption sur sa fiche Maison, si possible. Si tous les emplacements de sa fiche Maison sont déjà Corrompus, alors il doit placer la Corruption dans l'un de ses secteurs ou sur la carte Chambres de Décontamination.",
+        "effet": {
+          "type": "gain", "cible": "fiche_maison", "elements": { "corruption": 1 },
+          "repli": { "condition": "fiche_maison_pleine", "cibles_possibles": [ "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
+        }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur place un jeton Libération dans un secteur du Néant adjacent.",
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1 } }
+      },
+      {
+        "ordre": 3, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 3 : chaque action de vos Focus préférés coûte 1 Énergie supplémentaire.",
+        "effet": { "type": "modificateur_permanent", "declencheur": "action_focus_prefere", "consequence": { "cout_supplementaire": { "energie": 1 } } }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins une Guilde de Fermiers, d'Ingénieurs ou de Mineurs.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 2, "par": "secteur_pur_avec_guilde_fermier_ingenieur_ou_mineur_min_1" } ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 6 Influence pour chacune de vos pistes de Civilisation Pures où vous avez atteint le Niveau 1 (ou supérieur).",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 6, "par": "piste_civilisation_pure_niveau_min_1" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "I", "cycle": 3, "nom": "Avenir radieux", "manches": 5,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit soit dépenser 1 Crédit pour améliorer un jeton Gloire, soit défausser un jeton Gloire pour gagner 3 Crédits.",
+        "effet": { "type": "choix", "mode": "exclusif", "options": [
+          { "type": "echange", "cout": { "credit": 1 }, "gain": { "cle": "ameliorer_gloire", "valeur": 1 } },
+          { "type": "echange", "cout": { "cle": "defausser_gloire", "valeur": 1 }, "gain": { "cle": "credit", "valeur": 3 } }
+        ] }
+      },
+      {
+        "ordre": 2, "obligatoire": true, "resolution": "permanent",
+        "texte": "Permanent au Cycle 3 : chaque action de vos Focus préférés coûte 1 Crédit au lieu de son coût imprimé, même si l'action d'origine ne coûtait rien.",
+        "effet": {
+          "type": "modificateur_permanent", "declencheur": "action_focus_prefere",
+          "consequence": { "cout_remplace": { "credit": 1 }, "precision": "s_applique_meme_si_cout_original_nul" }
+        }
+      }
+    ],
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que la valeur cumulée de trois de vos jetons Gloire différents, multipliée par deux. Si vous avez moins de trois jetons Gloire, vous ne pouvez pas compter un même jeton deux fois.",
+          "recompense": { "mode": "unique", "gains": [
+            { "cle": "influence", "formule": { "operation": "produit", "termes": [ "somme_valeur_3_meilleurs_jetons_gloire_distincts", 2 ] }, "precision": "si_moins_de_3_jetons_ne_pas_compter_un_jeton_deux_fois" }
+          ] } }
+      ] },
+      { "separateur_avant": "OU", "lignes": [
+        { "type": "multiplicateur", "texte": "Gagnez 1 Influence pour chaque Crédit de votre réserve.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 1, "par": "credit_en_reserve" } ] } },
+        { "type": "multiplicateur", "texte": "Gagnez 2 Influence pour chacune de vos Guildes de Banquiers Pures.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "valeur": 2, "par": "guilde_banquier_pure" } ] } }
+      ] }
+    ] }
+  },
+  {
+    "code": "J", "cycle": 3, "nom": "Dernier souffle", "manches": 6,
+    "cadres": [
+      {
+        "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
+        "texte": "Chaque joueur doit choisir une option parmi les trois suivantes : défausser une Crise permanente du plateau Crise et placer un jeton Catastrophe du côté droit du plateau Crise (rappel : lorsque la Catastrophe est placée, chaque joueur peut immédiatement choisir de retirer une Corruption ou de gagner 5 ressources de son choix) ; placer un Gardien dans un secteur du Néant ; gagner une Corruption sur sa fiche Maison.",
+        "effet": {
+          "type": "choix", "mode": "exclusif",
+          "options": [
             {
-              "spend": {
-                "credit": 1
-              },
-              "upgrade": {
-                "gloire": 1
-              }
+              "mode": "groupe",
+              "gains": [
+                { "cle": "defausser_crise_permanente", "valeur": 1, "cible": "plateau_crise" },
+                { "cle": "placer_catastrophe", "valeur": 1, "cible": "plateau_crise_cote_droit" }
+              ],
+              "rappel": "declenche_regle_standard_gain_catastrophe"
             },
-            {
-              "gain": {
-                "credit": 3
-              },
-              "discard": {
-                "gloire": 1
-              }
-            }
+            { "cle": "placer_gardien", "valeur": 1, "cible": "secteur_neant_au_choix" },
+            { "cle": "gagner_corruption", "valeur": 1, "cible": "fiche_maison" }
           ]
         }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "preferred_focus_action_cost": {
-            "credit": 1
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": "sum_three_gloire_values_x2"
-          }
-        },
-        "condition": {
-          "gloire_tokens": 3
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence_per_credit": 1,
-            "influence_per_pure_bank_guild": 2
-          }
-        },
-        "condition": {}
       }
     ],
-    "texte1": "Chaque action de vos Focus préférés coûte 1 Crédit au lieu de son coût imprimé.",
-    "texte2": null
-  },
-  {
-    "code": "J",
-    "cycle": 3,
-    "nom": "Menace croissante (Co-op/Solo)",
-    "manches": 6,
-    "effet1": {
-      "mandatory": [
-        {
-          "place": {
-            "gardien": 1
-          },
-          "target": "faille_all"
-        },
-        {
-          "place": {
-            "liberation": 1
-          },
-          "target": "neant_adjacent_faille"
-        }
-      ]
-    },
-    "effet2": {
-      "effects": [
-        {
-          "before_evaluation": {
-            "place": {
-              "cube_neant": 1
-            },
-            "target": "neant_with_guardian"
-          }
-        }
-      ]
-    },
-    "effet3": {},
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "prime_per_liberation": 1
-          }
-        },
-        "condition": {
-          "liberation_tokens": 1
-        }
-      },
-      {
-        "reward": {
-          "remove": {
-            "corruption": 1
-          }
-        },
-        "condition": {
-          "crisis_catastrophe": 0
-        }
-      }
-    ],
-    "texte1": "Placez un Gardien sur chaque Faille et un jeton Libération sur chaque secteur du Néant adjacent à une Faille.",
-    "texte2": null
-  },
-  {
-    "code": "T",
-    "cycle": 3,
-    "nom": "La rédemption attend (Tutorial)",
-    "manches": 5,
-    "effet1": {
-      "mandatory": [
-        {
-          "discard": {
-            "focus": [
-              "tentation"
-            ]
-          }
-        }
-      ]
-    },
-    "effet2": {},
-    "effet3": {
-      "choices": [
-        {
-          "gain": {
-            "programme": 1
-          }
-        },
-        {
-          "advance": {
-            "civilisation": 1
-          }
-        }
-      ]
-    },
-    "effet4": [
-      {
-        "reward": {
-          "gain": {
-            "influence": 15
-          }
-        },
-        "condition": {
-          "pure_guilds": 8
-        }
-      },
-      {
-        "reward": {
-          "gain": {
-            "influence": 15
-          }
-        },
-        "condition": {
-          "civilisation_level_min": 2
-        }
-      }
-    ],
-    "texte1": "Chaque joueur défausse son Focus Tentation. Chaque joueur peut gagner un Programme ou avancer sur une piste de Civilisation.",
-    "texte2": null
+    "objectifs": { "blocs": [
+      { "lignes": [
+        { "type": "exploit", "texte": "Évaluez les objectifs d'un Programme Pur en jeu (sauf Programme de départ).",
+          "condition": { "cle": "programme_pur_en_jeu_hors_depart_disponible", "valeur": true },
+          "recompense": { "mode": "unique", "gains": [ { "cle": "evaluer_objectifs_programme", "valeur": 1, "cible": "programme_pur_au_choix_hors_depart" } ] } }
+      ] },
+      { "separateur_avant": "ET/OU", "lignes": [
+        { "type": "formule", "texte": "Gagnez autant d'Influence que votre Population Pure totale.",
+          "recompense": { "mode": "unique", "gains": [ { "cle": "influence", "formule": "egal_a_population_pure_totale" } ] } }
+      ] }
+    ] }
   }
 ]

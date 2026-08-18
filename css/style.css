@@ -214,6 +214,14 @@ html, body {
   margin: 0;
 }
 
+/* 18/08/2026 (Réorganisation Plat. Galactique) : le titre de l'app fait
+   désormais office de bouton "Retour à l'accueil", cliquable depuis
+   n'importe quel onglet (remplace #btn-retour-accueil-partie, retiré de
+   l'écran Plat. Galactique — décision utilisateur). Pas de <button> ici :
+   un <h1> n'est pas un contenu de "phrasing" valide dans <button>, un
+   simple curseur pointer + listener JS suffit (voir index.html). */
+.topbar-titre { cursor: pointer; }
+
 .topbar-accent {
   display: block;
   font-weight: 500;
@@ -401,6 +409,142 @@ input:disabled {
   color: var(--color-text-muted);
   line-height: 1.4;
 }
+
+/* 18/08/2026 (Réorganisation Plat. Galactique) : nombre de manches à
+   droite du titre "Événement galactique" (§2 Introduction,
+   docs-rules-cycle-de-jeu.md — coin supérieur droit de la carte).
+   Renommée .section-title-cycle -> .section-title-avec-suffixe : cette
+   classe habillait initialement le titre "Cycle X" lui-même (retiré du
+   flux des .section-title, voir .titre-cycle/.plateau-galactique-entete
+   ci-dessous — le nombre de manches est rapatrié sur "Événement
+   galactique" à la demande de l'utilisateur), mais reste utile telle
+   quelle pour n'importe quel section-title avec un suffixe à droite. */
+.section-title-avec-suffixe {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.section-title-suffixe {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* 18/08/2026 (Réorganisation Plat. Galactique) : bandeau d'en-tête de
+   l'écran — titre "Cycle X" (+ Entretien dû, en petit dessous) à gauche,
+   bouton "Fin du cycle"/"Terminer la partie" à droite (décision
+   utilisateur : les deux remontent en haut de l'écran, plus besoin de
+   descendre toute la page pour les atteindre). .titre-cycle n'a
+   volontairement PAS le trait orange de .section-title (réservé aux 3
+   sections en dessous — Événement galactique/Technologies avancées/Focus
+   héroïques) : c'est un titre de page, pas une section. */
+.plateau-galactique-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.titre-cycle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.5px;
+  margin: 0;
+  color: var(--color-text);
+}
+.titre-cycle span {
+  color: var(--color-coral);
+}
+.plateau-galactique-entete .hint {
+  margin: 4px 0 0;
+}
+.plateau-galactique-entete .btn-primary,
+.plateau-galactique-entete .btn-secondary {
+  width: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 12px 18px;
+}
+
+/* Cadres d'Événement galactique (moitié gauche de la carte, §1.5) :
+   bordure pleine si obligatoire, pointillée si facultatif — reprend la
+   convention visuelle imprimée sur la carte elle-même (§1.5.1/§1.5.2). */
+.cadre-carte {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 10px;
+  border: 1px solid var(--color-border);
+}
+.cadre-carte-obligatoire { border-style: solid; }
+.cadre-carte-optionnel { border-style: dashed; }
+.cadre-entete { margin-bottom: 6px; }
+.cadre-texte {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.cadre-statut {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-coral);
+}
+.cadre-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cadre-actions .btn {
+  padding: 9px 14px;
+  font-size: 0.85rem;
+  width: auto;
+}
+.cadre-action-proportionnelle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cadre-input-proportionnel {
+  width: 60px;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+}
+
+/* Objectifs d'Événement galactique (moitié droite de la carte, §3.3) —
+   groupés par bloc, séparateur imprimé sur la carte entre deux blocs
+   alternatifs ("OU"). */
+.objectif-bloc {
+  background: var(--color-surface-2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+.objectif-separateur {
+  text-align: center;
+  margin: 10px 0;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.objectif-ligne {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+.objectif-ligne:last-child { margin-bottom: 0; }
 
 /* --- Mise en place manuelle (écran Créer une partie) --- */
 .case-mise-en-place-manuelle {

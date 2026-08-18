@@ -1126,6 +1126,17 @@ var StrategieService = (function () {
    * toute façon jamais utile ici : tous les Focus choisis sur cet écran
    * sont "Héroïque" par construction (FocusService.obtenirNomsPoolHeroique
    * ne liste que ce pool).
+   *
+   * 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
+   * chaque emplacement passe de <div class="card"><select>...</select>
+   * </div> à <div class="techno-obtenue-ligne"><select>...</select>
+   * </div> — même gabarit qu'un emplacement "Technologies avancées"
+   * juste au-dessus sur cet écran (index.html). .card dessine son propre
+   * cadre (fond + bordure) tout comme <select> le fait déjà nativement :
+   * en ne contenant plus qu'un select (le badge type + liste d'actions a
+   * quitté cet écran au Lot F, voir plus haut), .card ne faisait plus que
+   * doubler ce cadre. #plateau-galactique-focus-heroiques n'est donc plus
+   * un .card-list côté HTML (index.html) — devenu un conteneur nu.
    */
   function renderFocusHeroiques_(partie) {
     var container = document.getElementById('plateau-galactique-focus-heroiques');
@@ -1148,7 +1159,7 @@ var StrategieService = (function () {
           return '<option value="' + nom + '"' + (nom === valeurActuelle ? ' selected' : '') + '>' + nom + '</option>';
         }).join('');
 
-        return '<div class="card">' +
+        return '<div class="techno-obtenue-ligne">' +
           '<select class="select-focus-heroique" data-slot="' + slot + '">' + options + '</select>' +
           '</div>';
       }).join('');

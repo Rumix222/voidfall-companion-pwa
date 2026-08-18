@@ -20,7 +20,7 @@
 <div id="app">
 
   <header class="topbar">
-    <h1>Voidfall<span class="topbar-accent">Companion</span></h1>
+    <h1 id="topbar-titre" class="topbar-titre" title="Retour à l'accueil">Voidfall<span class="topbar-accent">Companion</span></h1>
   </header>
 
   <!-- Barre visible uniquement pendant une partie ouverte.
@@ -172,18 +172,51 @@
        GAS dont le SQL source n'a jamais été récupéré (hors périmètre,
        voir gameService.js en-tête) — rien à porter, pas encore réécrit
        depuis les règles. -->
+  <!-- 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
+       - "Cycle X" quitte le flux des .section-title (devient un titre de
+         page, .titre-cycle, sans le trait orange) et remonte dans un
+         bandeau d'en-tête (.plateau-galactique-entete) avec l'Entretien
+         dû juste en dessous et le bouton "Fin du cycle" à droite — les
+         deux étaient auparavant tout en bas de l'écran, loin d'être vus
+         en premier.
+       - Les 3 blocs restants (Événement galactique/Technologies avancées/
+         Focus héroïques) devienent des sections à part entière (h2.
+         section-title, trait orange — jusqu'ici de simples h3.
+         subsection-title SANS style, voir audit CSS : la classe n'avait
+         jamais eu de règle définie). Le nombre de manches (auparavant à
+         côté de "Cycle X") est rapatrié à côté d'"Événement galactique",
+         là où il est imprimé sur la carte physique (coin supérieur
+         droit).
+       - #btn-retour-accueil-partie supprimé : le titre de l'app
+         (#topbar-titre, voir header ci-dessus) fait désormais ce rôle
+         depuis n'importe quel onglet. -->
   <section id="screen-plateau-galactique" class="screen" hidden>
-    <h2 class="section-title">Cycle <span id="plateau-galactique-cycle">—</span></h2>
+    <div class="plateau-galactique-entete">
+      <div>
+        <h2 class="titre-cycle">Cycle <span id="plateau-galactique-cycle">—</span></h2>
+        <p class="hint" id="entretien-secteurs"></p>
+      </div>
+      <button id="btn-fin-cycle" class="btn btn-primary">Fin du cycle</button>
+    </div>
 
     <!-- 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
          l'événement galactique du cycle en cours — choisirEvenement porté
-         (fonction JS pure côté GAS, jamais une RPC), voir gameService.js. -->
+         (fonction JS pure côté GAS, jamais une RPC), voir gameService.js.
+         18/08/2026 (Refonte affichage Événement galactique) : le texte de
+         l'événement (#evenement-cycle-texte, ancien texte1/texte2 aplati)
+         est remplacé par #evenement-cycle-detail — Cadres (moitié gauche
+         de la carte, §1.5 docs-rules-cycle-de-jeu.md) puis Objectifs
+         (moitié droite, §3.3), rendus séparément par
+         renderEvenementCycle_/renderCadresEvenement_/renderObjectifsEvenement_. -->
+    <h2 class="section-title section-title-avec-suffixe">
+      <span>Événement galactique</span>
+      <span class="section-title-suffixe" id="plateau-galactique-manches"></span>
+    </h2>
     <div class="game-block" id="bloc-evenement-cycle" hidden>
-      <h3 class="subsection-title">Événement galactique</h3>
       <select id="select-evenement-cycle">
         <option value="">— Choisir —</option>
       </select>
-      <p class="hint" id="evenement-cycle-texte" style="margin-top:8px;"></p>
+      <div id="evenement-cycle-detail" style="margin-top:10px;"></div>
     </div>
 
     <!-- 17/08/2026 (Lot C — Technologies avancées) : 4 emplacements —
@@ -205,21 +238,27 @@
          cycle en cours (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif,
          déjà calculé et exposé — aucun changement côté gameService.js) —
          voir renderTechnologiesObtenues_ plus bas. -->
-    <div class="game-block" id="bloc-technologies-avancees" style="margin-top:14px;">
-      <h3 class="subsection-title">Technologies avancées</h3>
+    <h2 class="section-title" style="margin-top:22px;">Technologies avancées</h2>
+    <div class="game-block" id="bloc-technologies-avancees">
       <div id="technologies-avancees-liste"></div>
     </div>
 
-    <div class="game-block" style="margin-top:14px;">
-      <h3 class="subsection-title">Focus héroïques</h3>
-      <div class="card-list" id="plateau-galactique-focus-heroiques" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <!-- 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
+         #plateau-galactique-focus-heroiques passe de .card-list (grille
+         de .card, un cadre complet par emplacement) à un conteneur nu —
+         renderFocusHeroiques_ (js/strategieService.js) n'y rend plus
+         qu'un <select> par emplacement (le détail badge+actions a quitté
+         cet écran il y a plusieurs lots déjà, voir son en-tête), donc
+         .card créait un second cadre autour du cadre déjà dessiné par le
+         <select> lui-même — résidu visuel, corrigé en alignant sur le
+         même gabarit .techno-obtenue-ligne que "Technologies avancées"
+         juste au-dessus (un seul cadre par ligne). -->
+    <h2 class="section-title" style="margin-top:22px;">Focus héroïques</h2>
+    <div class="game-block">
+      <div id="plateau-galactique-focus-heroiques"></div>
     </div>
 
-    <button id="btn-fin-cycle" class="btn btn-primary" style="width:100%;margin-top:14px;">Fin du cycle</button>
-    <p class="hint" id="entretien-secteurs" style="margin-top:8px;"></p>
-
-    <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;" hidden>Terminer la partie</button>
-    <button id="btn-retour-accueil-partie" class="btn btn-secondary" style="width:100%;margin-top:8px;">Retour à l'accueil</button>
+    <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:14px;" hidden>Terminer la partie</button>
   </section>
 
 
@@ -1076,6 +1115,162 @@
       });
     }
 
+    // Libellés d'affichage pour les Cadres d'Événement galactique (voir
+    // renderCadresEvenement_ ci-dessous) — RESSOURCES_SIMPLES_CADRE côté
+    // gameService.js fixe la liste des 5 clés possibles ; LABEL_RESOLUTION_
+    // CADRE_ couvre les valeurs de `resolution` du catalogue (voir
+    // data/catalogue/evenements.json et docs-rules-cycle-de-jeu.md §1.5.3).
+    var LABEL_RESSOURCE_CADRE_ = {
+      nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel', credit: 'Crédit', science: 'Science'
+    };
+    var LABEL_RESOLUTION_CADRE_ = {
+      par_joueur: 'Par joueur', unique: 'Une fois', permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
+    };
+
+    function libelleDeltaCadre_(delta) {
+      return Object.keys(delta || {}).map(function (cle) {
+        var valeur = delta[cle];
+        return (valeur > 0 ? '+' : '') + valeur + ' ' + (LABEL_RESSOURCE_CADRE_[cle] || cle);
+      }).join(', ');
+    }
+
+    /**
+     * 18/08/2026 (Refonte affichage Événement galactique) : applique un
+     * cadre "1 clic" (GameService.appliquerCadreEffet) puis rafraîchit
+     * l'écran. #ressources-principales (Plat. maison) et le bandeau de
+     * rappel (Focus) sont rendus par StrategieService.afficher() — jamais
+     * mis à jour tout seuls au changement d'onglet (afficherEcran ne fait
+     * que basculer la visibilité, voir en-tête App ci-dessus) — d'où le
+     * rappel explicite ici, même pattern que le bouton "Fin du cycle" plus
+     * bas (btn-fin-cycle, seule autre action de cet écran qui modifie les
+     * ressources).
+     */
+    function appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton) {
+      bouton.disabled = true;
+      GameService.appliquerCadreEffet(partie.id, cycle, ordre, delta)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de l\'application du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * 18/08/2026 (Refonte affichage Événement galactique) : rend les
+     * Cadres (moitié gauche de la carte, résolus en Phase Préparation —
+     * voir docs-rules-cycle-de-jeu.md §1.5), un par ligne : bordure pleine/
+     * pointillée selon `obligatoire` (§1.5.1/§1.5.2), badge de résolution
+     * (§1.5.3), texte intégral, puis un bouton "Appliquer" par action que
+     * GameService.actionsSimplesCadre reconnaît comme un simple delta sur
+     * les 5 ressources déjà suivies par l'app. Tout le reste d'un cadre
+     * (secteurs, Gloire, jetons, Civilisation, Corruption...) reste hors
+     * périmètre (la plupart des sous-points de §1.5 sont ❌/🚫 dans les
+     * docs de règles) : affiché en texte seul, à résoudre manuellement.
+     * cadresAppliques (persisté sur evenements.cycleN, voir gameService.js)
+     * empêche une double application et affiche "✓ Appliqué".
+     */
+    function renderCadresEvenement_(partie, cycle, evenementActuel) {
+      var conteneur = document.getElementById('evenement-cadres');
+      if (!conteneur) return;
+      var cadres = evenementActuel && (evenementActuel.cadres || []).length
+        ? evenementActuel.cadres.slice().sort(function (a, b) { return a.ordre - b.ordre; })
+        : [];
+      if (!cadres.length) { conteneur.innerHTML = ''; return; }
+
+      var cadresAppliques = evenementActuel.cadresAppliques || {};
+
+      conteneur.innerHTML = cadres.map(function (cadre) {
+          var applique = cadresAppliques[cadre.ordre];
+          var classeObligatoire = cadre.obligatoire ? 'cadre-carte-obligatoire' : 'cadre-carte-optionnel';
+          var badgeResolution = cadre.resolution && LABEL_RESOLUTION_CADRE_[cadre.resolution]
+            ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
+
+          var actionsHtml = '';
+          if (applique) {
+            actionsHtml = '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
+          } else {
+            var actions = GameService.actionsSimplesCadre(cadre);
+            if (actions.length) {
+              actionsHtml = '<div class="cadre-actions" data-ordre="' + cadre.ordre + '">' +
+                actions.map(function (action, i) {
+                  if (action.proportionnel) {
+                    return '<span class="cadre-action-proportionnelle" data-action-i="' + i + '">' +
+                      '<input type="number" min="0"' + (action.plafond ? ' max="' + action.plafond + '"' : '') +
+                      ' value="0" class="cadre-input-proportionnel">' +
+                      '<button type="button" class="btn btn-secondary btn-cadre-appliquer-proportionnel">Échanger ' +
+                      (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) + ' → ' +
+                      (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain) + '</button></span>';
+                  }
+                  return '<button type="button" class="btn btn-secondary btn-cadre-appliquer" data-action-i="' + i + '">' +
+                    'Appliquer : ' + libelleDeltaCadre_(action.delta) + '</button>';
+                }).join('') + '</div>';
+            }
+          }
+
+          return '<div class="cadre-carte ' + classeObligatoire + '">' +
+            badgeResolution +
+            '<p class="cadre-texte">' + cadre.texte + '</p>' +
+            actionsHtml +
+            '</div>';
+        }).join('');
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions'), function (blocActions) {
+        var ordre = Number(blocActions.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var actions = GameService.actionsSimplesCadre(cadre);
+
+        Array.prototype.forEach.call(blocActions.querySelectorAll('.btn-cadre-appliquer'), function (bouton) {
+          bouton.addEventListener('click', function () {
+            var action = actions[Number(bouton.dataset.actionI)];
+            appliquerCadreEtRafraichir_(partie, cycle, ordre, action.delta, bouton);
+          });
+        });
+
+        Array.prototype.forEach.call(blocActions.querySelectorAll('.cadre-action-proportionnelle'), function (blocProportionnel) {
+          var action = actions[Number(blocProportionnel.dataset.actionI)];
+          var input = blocProportionnel.querySelector('.cadre-input-proportionnel');
+          var bouton = blocProportionnel.querySelector('.btn-cadre-appliquer-proportionnel');
+          bouton.addEventListener('click', function () {
+            var quantite = Math.max(0, Math.floor(Number(input.value) || 0));
+            if (!quantite) return;
+            var delta = {};
+            delta[action.ressourceCout] = -quantite;
+            delta[action.ressourceGain] = quantite;
+            appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton);
+          });
+        });
+      });
+    }
+
+    /**
+     * 18/08/2026 (Refonte affichage Événement galactique) : rend les
+     * Objectifs (moitié droite de la carte, évalués en Phase Évaluation —
+     * §3.3 docs-rules-cycle-de-jeu.md), groupés par bloc avec le
+     * séparateur imprimé sur la carte ("OU" entre deux blocs alternatifs).
+     * Affichage seul pour l'instant : leur résolution automatique reste
+     * hors périmètre de ce lot (contrairement aux Cadres ci-dessus).
+     */
+    function renderObjectifsEvenement_(evenementActuel) {
+      var conteneur = document.getElementById('evenement-objectifs');
+      if (!conteneur) return;
+      var blocs = evenementActuel && evenementActuel.objectifs ? (evenementActuel.objectifs.blocs || []) : [];
+      if (!blocs.length) { conteneur.innerHTML = ''; return; }
+
+      conteneur.innerHTML = '<h3 class="subsection-title" style="margin-top:14px;">Objectifs — Phase Évaluation</h3>' +
+        blocs.map(function (bloc, i) {
+          var separateur = (i > 0 && bloc.separateur_avant)
+            ? '<p class="objectif-separateur">' + bloc.separateur_avant + '</p>' : '';
+          var lignes = (bloc.lignes || []).map(function (ligne) {
+            return '<p class="objectif-ligne">' + ligne.texte + '</p>';
+          }).join('');
+          return separateur + '<div class="objectif-bloc">' + lignes + '</div>';
+        }).join('');
+    }
+
     /**
      * 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
      * l'événement galactique du cycle en cours — portage direct de
@@ -1083,17 +1278,38 @@
      * pool de tirage aléatoire ici, cette partie reste hors périmètre —
      * seul le choix manuel d'un événement est branché). Masqué si la
      * partie est terminée (cycleActuel === 'termine').
+     *
+     * 18/08/2026 (Refonte affichage Événement galactique) : le nombre de
+     * manches (coin supérieur droit de la carte, §2 Introduction) rejoint
+     * le titre "Cycle X" (#plateau-galactique-manches) ; le texte de
+     * l'événement est désormais rendu par renderCadresEvenement_/
+     * renderObjectifsEvenement_ (#evenement-cycle-detail), plus par un
+     * simple <p> à plat (#evenement-cycle-texte, supprimé).
      */
     function renderEvenementCycle_(partie) {
       var bloc = document.getElementById('bloc-evenement-cycle');
       var cycle = partie.cycleActuel;
-      if (!cycle || cycle === 'termine') { bloc.hidden = true; return; }
+      var manchesEl = document.getElementById('plateau-galactique-manches');
+      if (!cycle || cycle === 'termine') {
+        bloc.hidden = true;
+        if (manchesEl) manchesEl.textContent = '';
+        return;
+      }
       bloc.hidden = false;
 
       var select = document.getElementById('select-evenement-cycle');
-      var texte = document.getElementById('evenement-cycle-texte');
       var evenementActuel = (partie.evenements || {})['cycle' + cycle] || null;
-      texte.textContent = evenementActuel ? evenementActuel.texte : '';
+
+      if (manchesEl) {
+        manchesEl.textContent = evenementActuel && evenementActuel.manches
+          ? evenementActuel.manches + ' manche' + (evenementActuel.manches > 1 ? 's' : '')
+          : '';
+      }
+
+      var detail = document.getElementById('evenement-cycle-detail');
+      if (detail) detail.innerHTML = '<div id="evenement-cadres"></div><div id="evenement-objectifs"></div>';
+      renderCadresEvenement_(partie, cycle, evenementActuel);
+      renderObjectifsEvenement_(evenementActuel);
 
       GameService.getEvenementsParCycle().then(function (groupes) {
         var options = groupes['cycle' + cycle] || [];
@@ -1110,7 +1326,7 @@
             .then(function (partieMaj) {
               partieCourante = partieMaj;
               select.disabled = false;
-              texte.textContent = ((partieMaj.evenements || {})['cycle' + cycle] || {}).texte || '';
+              renderEvenementCycle_(partieMaj);
             })
             .catch(function (erreur) {
               select.disabled = false;
@@ -1492,7 +1708,12 @@
         });
     });
 
-    document.getElementById('btn-retour-accueil-partie').addEventListener('click', function () {
+    // 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
+    // remplace #btn-retour-accueil-partie (supprimé, voir screen-plateau-
+    // galactique) — le titre de l'app sert désormais de "Retour à
+    // l'accueil" depuis n'importe quel onglet, même événement partagé
+    // (voidfall:retour-accueil, réutilisé par scoreVueService.js).
+    document.getElementById('topbar-titre').addEventListener('click', function () {
       document.dispatchEvent(new Event('voidfall:retour-accueil'));
     });
 

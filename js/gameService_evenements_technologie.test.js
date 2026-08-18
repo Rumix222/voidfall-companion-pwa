@@ -79,18 +79,42 @@ function creerContexte_(db) {
   return ctx;
 }
 
-test('getEvenementsParCycle : groupe par cycle et concatène texte1/texte2', function () {
+// Fixture alignée sur le schéma réel de data/catalogue/evenements.json
+// post-migration (Supabase -> JSON local) : cadres[]/objectifs.blocs[],
+// plus de texte1/texte2 à plat (voir formatEvenement_, gameService.js).
+function evenementFixture_(champs) {
+  return Object.assign({
+    code: 'E1', cycle: 1, nom: 'Invasion', manches: 3,
+    cadres: [
+      { ordre: 1, obligatoire: true, resolution: 'unique', texte: 'Cadre obligatoire.',
+        effet: { type: 'gain', cible: 'offre_programme', elements: { corruption: 1 } } },
+      { ordre: 2, obligatoire: false, resolution: 'par_joueur', texte: 'Cadre facultatif, ressources simples.',
+        effet: { type: 'choix', mode: 'exclusif', options: [
+          { cout: { science: 1 }, gain: { credit: 3 } },
+          { cle: 'science', valeur: 2 }
+        ] } }
+    ],
+    objectifs: { blocs: [
+      { lignes: [ { type: 'exploit', texte: 'Objectif de fin de Cycle.' } ] }
+    ] }
+  }, champs || {});
+}
+
+test('getEvenementsParCycle : groupe par cycle et conserve cadres/objectifs/manches', function () {
   var db = creerDbFactice_();
-  db._stores.evenements['E1|1'] = { code: 'E1', cycle: 1, nom: 'Invasion', manches: 3, texte1: 'Premier texte.', texte2: 'Second texte.' };
-  db._stores.evenements['E2|2'] = { code: 'E2', cycle: 2, nom: 'Famine', manches: 2, texte1: 'Seul texte.', texte2: null };
+  db._stores.evenements['E1|1'] = evenementFixture_();
+  db._stores.evenements['E2|2'] = evenementFixture_({ code: 'E2', cycle: 2, nom: 'Famine', manches: 2 });
   var ctx = creerContexte_(db);
 
   return ctx.GameService.getEvenementsParCycle().then(function (groupes) {
     assert.strictEqual(groupes.cycle1.length, 1);
     assert.strictEqual(groupes.cycle1[0].nom, 'Invasion');
-    assert.strictEqual(groupes.cycle1[0].texte, 'Premier texte. Second texte.');
+    assert.strictEqual(groupes.cycle1[0].manches, 3);
+    assert.strictEqual(groupes.cycle1[0].cadres.length, 2);
+    assert.strictEqual(groupes.cycle1[0].cadres[0].texte, 'Cadre obligatoire.');
+    assert.strictEqual(groupes.cycle1[0].objectifs.blocs.length, 1);
     assert.strictEqual(groupes.cycle2.length, 1);
-    assert.strictEqual(groupes.cycle2[0].texte, 'Seul texte.');
+    assert.strictEqual(groupes.cycle2[0].texte, undefined);
     assert.strictEqual(groupes.cycle3.length, 0);
   });
 });
@@ -99,11 +123,12 @@ test('choisirEvenement : enregistre l\'événement du bon cycle et persiste (eta
   var db = creerDbFactice_();
   db._stores.parties['partie-1'] = ligneParties_('partie-1');
   db._stores.plateauMaison['partie-1'] = lignePlateauMaison_('partie-1');
-  db._stores.evenements['E1|1'] = { code: 'E1', cycle: 1, nom: 'Invasion', manches: 3, texte1: 'Texte.', texte2: null };
+  db._stores.evenements['E1|1'] = evenementFixture_();
   var ctx = creerContexte_(db);
 
   return ctx.GameService.choisirEvenement('partie-1', 1, 'Invasion').then(function (partie) {
     assert.strictEqual(partie.evenements.cycle1.nom, 'Invasion');
+    assert.strictEqual(partie.evenements.cycle1.cadres.length, 2);
     assert.strictEqual(partie.evenements.cycle2, null);
     // Persisté : relecture directe du store, pas juste l'objet en mémoire renvoyé.
     var relu = db._stores.parties['partie-1'];
@@ -115,13 +140,78 @@ test('choisirEvenement : rejette si l\'événement n\'existe pas pour ce cycle',
   var db = creerDbFactice_();
   db._stores.parties['partie-1'] = ligneParties_('partie-1');
   db._stores.plateauMaison['partie-1'] = lignePlateauMaison_('partie-1');
-  db._stores.evenements['E1|1'] = { code: 'E1', cycle: 1, nom: 'Invasion', manches: 3, texte1: 'Texte.', texte2: null };
+  db._stores.evenements['E1|1'] = evenementFixture_();
   var ctx = creerContexte_(db);
 
   return ctx.GameService.choisirEvenement('partie-1', 2, 'Invasion').then(function () {
     assert.fail('aurait dû rejeter (Invasion est cycle 1, pas 2)');
   }, function (erreur) {
     assert.match(erreur.message, /introuvable/i);
+  });
+});
+
+test('actionsSimplesCadre : extrait un delta ressources d\'un cadre "choix" simple', function () {
+  var db = creerDbFactice_();
+  var ctx = creerContexte_(db);
+  var cadre = evenementFixture_().cadres[1];
+
+  var actions = ctx.GameService.actionsSimplesCadre(cadre);
+  assert.strictEqual(actions.length, 2);
+  assert.deepStrictEqual(actions[0], { index: 0, delta: { science: -1, credit: 3 } });
+  assert.deepStrictEqual(actions[1], { index: 1, delta: { science: 2 } });
+});
+
+test('actionsSimplesCadre : ignore les options hors périmètre (secteur, Gloire, Technologie...)', function () {
+  var db = creerDbFactice_();
+  var ctx = creerContexte_(db);
+  var cadre = {
+    ordre: 1, obligatoire: true, resolution: 'par_joueur', texte: 'Placement en secteur.',
+    effet: { type: 'placement', zone: 'secteur_neant_adjacent', elements: { defense_secteur: 1 } }
+  };
+
+  assert.deepStrictEqual(ctx.GameService.actionsSimplesCadre(cadre), []);
+});
+
+test('actionsSimplesCadre : ignore les cadres permanents/collectifs/à retardement', function () {
+  var db = creerDbFactice_();
+  var ctx = creerContexte_(db);
+  var cadre = {
+    ordre: 1, obligatoire: true, resolution: 'permanent', texte: 'Permanent.',
+    effet: { type: 'choix', mode: 'exclusif', options: [ { cle: 'science', valeur: 2 } ] }
+  };
+
+  assert.deepStrictEqual(ctx.GameService.actionsSimplesCadre(cadre), []);
+});
+
+test('appliquerCadreEffet : applique le delta ressources et marque le cadre résolu', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['partie-1'] = ligneParties_('partie-1', { cycle1: evenementFixture_() });
+  db._stores.plateauMaison['partie-1'] = lignePlateauMaison_('partie-1', { ressourceScience: 5, ressourceCredit: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.GameService.appliquerCadreEffet('partie-1', 1, 2, { science: -1, credit: 3 }).then(function (partie) {
+    assert.strictEqual(partie.plateauMaison.ressources.science, 4);
+    assert.strictEqual(partie.plateauMaison.ressources.credit, 3);
+    assert.strictEqual(partie.evenements.cycle1.cadresAppliques[2].delta.credit, 3);
+
+    return ctx.GameService.appliquerCadreEffet('partie-1', 1, 2, { science: -1, credit: 3 }).then(function () {
+      assert.fail('aurait dû rejeter (cadre déjà appliqué)');
+    }, function (erreur) {
+      assert.match(erreur.message, /déjà été appliqué/i);
+    });
+  });
+});
+
+test('appliquerCadreEffet : rejette si la ressource nécessaire est insuffisante', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['partie-1'] = ligneParties_('partie-1', { cycle1: evenementFixture_() });
+  db._stores.plateauMaison['partie-1'] = lignePlateauMaison_('partie-1', { ressourceScience: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.GameService.appliquerCadreEffet('partie-1', 1, 2, { science: -1, credit: 3 }).then(function () {
+    assert.fail('aurait dû rejeter (Science insuffisante)');
+  }, function (erreur) {
+    assert.match(erreur.message, /insuffisante/i);
   });
 });
 

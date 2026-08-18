@@ -345,20 +345,146 @@ var GameService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12 — restauration IHM Partie) : formate un
-   * événement galactique — portage direct de formatEvenement_
-   * (GameService.js GAS), adapté aux clés camelCase du store IndexedDB
-   * `evenements` (CatalogueSync convertit systématiquement les colonnes
-   * Supabase snake_case en camelCase — voir catalogueSync.js — alors que
-   * la version GAS lisait directement des en-têtes Google Sheets tels
-   * quels : e['Nom']/e['Cycle']/e['Texte1']/e['Texte2']).
+   * 18/08/2026 (Refonte affichage Événement galactique — Plat. Galactique) :
+   * formate un événement galactique. Remplace l'ancienne lecture
+   * texte1/texte2/nom/cycle (portage direct de l'ex-formatEvenement_ GAS),
+   * devenue caduque suite à la migration du catalogue Supabase -> JSON
+   * local (data/catalogue/evenements.json) : ce fichier structure
+   * désormais chaque événement en `cadres[]` (effets de la moitié gauche
+   * de la carte, résolus en Phase Préparation, à l'ouverture du Cycle —
+   * voir docs/docs-rules-cycle-de-jeu.md §1.5) et `objectifs.blocs[]`
+   * (moitié droite, évalués en Phase Évaluation, §3.3), et n'a plus de
+   * champs texte1/texte2/nom/cycle à plat. `manches` (haut droit de la
+   * carte, §2 Introduction) est conservé tel quel.
    */
   function formatEvenement_(e) {
     return {
+      code: e.code,
       nom: e.nom,
       cycle: e.cycle,
-      texte: [e.texte1, e.texte2].filter(Boolean).join(' ')
+      manches: e.manches,
+      cadres: (e.cadres || []).map(function (c) {
+        return {
+          ordre: c.ordre,
+          obligatoire: !!c.obligatoire,
+          resolution: c.resolution || null,
+          texte: c.texte,
+          effet: c.effet || null
+        };
+      }),
+      objectifs: e.objectifs || null
     };
+  }
+
+  // Les 5 ressources de plateauMaison déjà suivies par l'app — seule
+  // "monnaie" commune assez simple pour être créditée/débitée en un clic
+  // depuis un cadre d'Événement galactique (voir actionsSimplesCadre_
+  // ci-dessous). Tout le reste d'un cadre (secteurs, Gloire, jetons
+  // Commerce/Prime/Libération, pistes de Civilisation, Corruption...)
+  // reste hors périmètre (docs-rules-cycle-de-jeu.md §1.5, la plupart des
+  // sous-points sont ❌/🚫) et s'affiche en texte brut, à résoudre
+  // manuellement par le joueur.
+  var RESSOURCES_SIMPLES_CADRE = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+  var CHAMP_RESSOURCE_PLATEAU_MAISON_ = {
+    nourriture: 'ressourceNourriture', energie: 'ressourceEnergie', materiel: 'ressourceMateriel',
+    credit: 'ressourceCredit', science: 'ressourceScience'
+  };
+
+  /**
+   * Réduit un objet {ressource: valeur, ...} à un delta exploitable
+   * seulement s'il ne porte QUE sur RESSOURCES_SIMPLES_CADRE — sinon null
+   * (l'effet sort du périmètre "1 clic").
+   */
+  function deltaRessourcesSimple_(objet) {
+    if (!objet) return null;
+    var delta = {};
+    var cles = Object.keys(objet);
+    for (var i = 0; i < cles.length; i++) {
+      var cle = cles[i];
+      if (RESSOURCES_SIMPLES_CADRE.indexOf(cle) === -1) return null;
+      var valeur = Number(objet[cle]);
+      if (!valeur) return null;
+      delta[cle] = valeur;
+    }
+    return Object.keys(delta).length ? delta : null;
+  }
+
+  function ajouterDelta_(base, ajout, signe) {
+    var resultat = Object.assign({}, base);
+    Object.keys(ajout || {}).forEach(function (cle) {
+      resultat[cle] = (resultat[cle] || 0) + signe * ajout[cle];
+    });
+    return resultat;
+  }
+
+  /**
+   * Extrait un delta ressources "1 clic" d'une option de cadre (élément
+   * de effet.options, ou effet lui-même pour un échange direct) — deux
+   * formes rencontrées dans evenements.json :
+   *   - { cle: 'science', valeur: 3 } (gain direct)
+   *   - { cout: {...}, gain: {...} } (échange)
+   * Retourne null si l'option contient autre chose (secteur, Gloire,
+   * Technologie, jeton...).
+   */
+  function deltaOptionCadre_(option) {
+    if (!option) return null;
+    if (option.cle && !option.cout && !option.gain) {
+      if (RESSOURCES_SIMPLES_CADRE.indexOf(option.cle) === -1 || !option.valeur) return null;
+      var direct = {};
+      direct[option.cle] = Number(option.valeur);
+      return direct;
+    }
+    if (option.cout || option.gain) {
+      var coutSimple = deltaRessourcesSimple_(option.cout);
+      var gainSimple = deltaRessourcesSimple_(option.gain);
+      if ((option.cout && !coutSimple) || (option.gain && !gainSimple)) return null;
+      var delta = ajouterDelta_(ajouterDelta_({}, coutSimple, -1), gainSimple, 1);
+      return Object.keys(delta).length ? delta : null;
+    }
+    return null;
+  }
+
+  /**
+   * Retourne les actions "1 clic" applicables pour un cadre d'Événement
+   * galactique ({index, delta}[]), ou [] si l'effet ne se prête pas à une
+   * résolution automatique (nécessite un secteur, un choix de Gloire/
+   * Technologie précis, une piste de Civilisation, etc.) — dans ce cas le
+   * cadre reste affiché en texte seul, à résoudre manuellement. Les
+   * résolutions "permanent"/"collectif"/"retardement" ne sont jamais
+   * proposées en 1 clic : elles ne se résolvent pas une fois pour toutes
+   * au début du Cycle (voir docs-rules-cycle-de-jeu.md §1.5.3).
+   */
+  function actionsSimplesCadre_(cadre) {
+    if (!cadre || !cadre.effet) return [];
+    if (cadre.resolution && ['permanent', 'collectif', 'retardement'].indexOf(cadre.resolution) !== -1) return [];
+    var effet = cadre.effet;
+
+    if (effet.type === 'choix' && Array.isArray(effet.options)) {
+      var actions = [];
+      effet.options.forEach(function (option, index) {
+        var delta = deltaOptionCadre_(option);
+        if (delta) actions.push({ index: index, delta: delta });
+      });
+      return actions;
+    }
+
+    if (effet.type === 'echange' && effet.mode === 'proportionnel' &&
+        effet.cout && effet.gain && effet.gain.ratio === '1_pour_1_avec_cout' &&
+        RESSOURCES_SIMPLES_CADRE.indexOf(effet.cout.cle) !== -1 &&
+        RESSOURCES_SIMPLES_CADRE.indexOf(effet.gain.cle) !== -1) {
+      return [{
+        index: 0, proportionnel: true,
+        ressourceCout: effet.cout.cle, ressourceGain: effet.gain.cle,
+        plafond: Number(effet.cout.plafond) || null
+      }];
+    }
+
+    if (effet.type === 'echange' && (effet.cout || effet.gain)) {
+      var deltaEchange = deltaOptionCadre_(effet);
+      return deltaEchange ? [{ index: 0, delta: deltaEchange }] : [];
+    }
+
+    return [];
   }
 
   // ------------------------------------------------------------
@@ -904,6 +1030,75 @@ var GameService = (function () {
           partie.evenements['cycle' + cycle] = evenement;
           return GameService.sauvegarderPartie(partie, 'choix_evenement_cycle' + cycle, nomEvenement);
         });
+    },
+
+    /**
+     * 18/08/2026 (Refonte affichage Événement galactique — Plat.
+     * Galactique) : fonction PURE (aucun accès DB), exposée pour l'IHM —
+     * voir actionsSimplesCadre_ ci-dessus pour le détail de ce qui est
+     * considéré "1 clic" (uniquement des deltas sur les 5 ressources
+     * suivies par plateauMaison) et ce qui reste hors périmètre.
+     */
+    actionsSimplesCadre: actionsSimplesCadre_,
+
+    /**
+     * 18/08/2026 (Refonte affichage Événement galactique — Plat.
+     * Galactique) : applique en un clic l'une des actions renvoyées par
+     * actionsSimplesCadre_ pour le cadre `ordreCadre` de l'Événement
+     * galactique choisi au Cycle `cycle` — crédite/débite les 5
+     * ressources concernées sur plateauMaison et marque le cadre comme
+     * résolu (evenements.cycleN.cadresAppliques[ordreCadre]) pour éviter
+     * une double application. Même pattern lecture-fusion-écriture que
+     * definirTechnologieAvanceeAmelioree : écriture directe sur la ligne
+     * plateauMaison (pas de passage par majPlateauMaison, qui ne connaît
+     * pas ce contexte "cadre d'Événement"), puis sauvegarderPartie pour
+     * persister evenements (etatJson). `delta` doit être l'un des objets
+     * `delta` renvoyés par actionsSimplesCadre_ (ou dérivé d'un `.gain`
+     * proportionnel) — revalidé ici (RESSOURCES_SIMPLES_CADRE) avant
+     * toute écriture, jamais fait confiance à l'appelant.
+     */
+    appliquerCadreEffet: function (partieId, cycle, ordreCadre, delta) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var champsPlateauMaison = {};
+        Object.keys(delta || {}).forEach(function (ressource) {
+          if (RESSOURCES_SIMPLES_CADRE.indexOf(ressource) === -1) return;
+          var stockActuel = partie.plateauMaison.ressources[ressource] || 0;
+          var nouveauStock = stockActuel + Number(delta[ressource]);
+          if (nouveauStock < 0) throw new Error('Ressource insuffisante pour appliquer ce cadre (' + ressource + ').');
+          champsPlateauMaison[CHAMP_RESSOURCE_PLATEAU_MAISON_[ressource]] = nouveauStock;
+        });
+        if (!Object.keys(champsPlateauMaison).length) {
+          throw new Error('Aucune ressource valide à appliquer pour ce cadre.');
+        }
+
+        evenementCycle.cadresAppliques[ordreCadre] = { delta: delta, le: new Date().toISOString() };
+        partie.evenements[cleCycle] = evenementCycle;
+
+        Object.keys(champsPlateauMaison).forEach(function (champ) {
+          lignePlateauMaison[champ] = champsPlateauMaison[champ];
+        });
+
+        return Promise.all([
+          DB.put('plateauMaison', lignePlateauMaison),
+          GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+        ]);
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
     },
 
     /**
