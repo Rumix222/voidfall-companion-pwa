@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 27 — 2026-08-18
+ * Version 29 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,36 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Événement A Cycle 1, Cadre 2 — option Science -> Technologie) :
+ * bouton "Gagner une technologie" (pastille de coût "1" ronde, couleur
+ * Science, réutilise .pastille-cout des cartes Focus) pour la première
+ * moitié de l'option exclusive du Cadre 2 — seul le coût (-1 Science) est
+ * automatisé, le gain (choix de la Technologie de base) reste manuel sur
+ * Plat. maison (rappelé dans une confirmation avant de débiter). Les deux
+ * options du cadre (celle-ci et "Appliquer : +3 Crédit") partagent le même
+ * cadresAppliques[ordre] : appliquer l'une verrouille l'autre, conforme au
+ * mode "exclusif" du catalogue. js/strategieService.js (v16 — nouveau cas
+ * contexte.type === 'confirmation' de demanderChoix, générique, réutilisable
+ * hors de ce cadre), index.html (v27), css/style.css (v16 —
+ * .btn-cadre-technologie). Aucun changement gameService.js/secteurService.js
+ * (réutilise appliquerCadreEffet tel quel, le coût étant une simple
+ * ressource déjà gérée par RESSOURCES_SIMPLES_CADRE).
+ *
+ * 18/08/2026 (Événement A Cycle 1, Cadre 1 — placement Défense de Secteur
+ * + Guilde de Scientifiques) : premier cadre de type "placement" (zone
+ * "secteur_neant_adjacent") sorti du hors-périmètre — bouton "Placer"
+ * dédié (même gabarit que "Appliquer : +3 Crédit") qui ouvre la modale de
+ * choix générique des actions de Focus pour sélectionner le secteur du
+ * Néant cible (candidats filtrés : Néant, adjacent à un secteur du
+ * joueur, au moins un emplacement Installation ET un emplacement Guilde
+ * libres), puis persiste : js/secteurService.js (v3 —
+ * obtenirSecteursEligiblesDefenseGuildeNeantAdjacent/
+ * placerDefenseGuildeNeantAdjacent), js/gameService.js (v12 —
+ * appliquerCadrePlacement), js/strategieService.js (v15 — nouveau cas
+ * contexte.type === 'placement_secteur_neant_adjacent' de demanderChoix),
+ * index.html (v26). Aucune nouvelle classe CSS (réutilise .cadre-actions/
+ * .btn-cadre-appliquer et .hint/select de la modale générique).
  *
  * 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
  * "Cycle X" quitte les .section-title et devient un titre de page
@@ -367,4 +397,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.3';
+var APP_VERSION = '20260818.5';

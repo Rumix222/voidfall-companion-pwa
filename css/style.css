@@ -510,6 +510,16 @@ input:disabled {
   align-items: center;
   gap: 6px;
 }
+/* Bouton "Gagner une technologie" (Événement A, Cycle 1, Cadre 2) — pastille
+   de coût (.pastille-cout, réutilisée depuis les cartes Focus) + libellé,
+   sur un seul bouton .cadre-actions au lieu des deux éléments séparés du
+   gabarit Focus (pastille + bouton rond) : override du display:inline-block
+   de .btn pour aligner correctement le cercle et le texte. */
+.btn-cadre-technologie {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .cadre-input-proportionnel {
   width: 60px;
   padding: 9px 8px;

@@ -575,6 +575,96 @@ var SecteurService = (function () {
     });
   }
 
+  /**
+   * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : secteurs
+   * candidats pour l'effet "placez une Défense de Secteur et une Guilde
+   * de Scientifiques dans un secteur du Néant adjacent à l'un de vos
+   * secteurs" — un secteur du Néant (pnNeant > 0), adjacent à un secteur
+   * qui appartient au joueur, avec au moins un emplacement Installation
+   * ET un emplacement Guilde libres (les deux structures sont posées
+   * ensemble, jamais l'une sans l'autre — voir placerDefenseGuildeNeant
+   * Adjacent ci-dessous).
+   */
+  function obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partieId) {
+    return DB.get('parties', partieId).then(function (ligneP) {
+      if (!ligneP || !ligneP.scenarioId) return [];
+
+      return Promise.all([
+        obtenirSecteurs(partieId),
+        obtenirAdjacences(ligneP.scenarioId),
+        DB.getAll('scenarioSecteurs'),
+        DB.getAll('typesSecteur')
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var scenarioSecteurs = resultats[2].filter(function (l) { return l.scenarioId === ligneP.scenarioId; });
+        var typesParId = {};
+        resultats[3].forEach(function (t) { typesParId[t.id] = t; });
+
+        var secteursParNumero = {};
+        secteurs.forEach(function (s) { secteursParNumero[s.numero] = s; });
+
+        var adjacenceMap = {};
+        resultats[1].forEach(function (a) {
+          adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
+          adjacenceMap[a.numeroA].push(a.numeroB);
+          adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
+          adjacenceMap[a.numeroB].push(a.numeroA);
+        });
+
+        var resultat = [];
+        secteurs.forEach(function (s) {
+          if ((s.pnNeant || 0) <= 0) return;
+          var adjacentAuJoueur = (adjacenceMap[s.numero] || []).some(function (n) {
+            var voisin = secteursParNumero[n];
+            return voisin && appartientAuJoueur_(voisin);
+          });
+          if (!adjacentAuJoueur) return;
+
+          var ligneScenario = scenarioSecteurs.filter(function (l) { return l.numero === s.numero; })[0];
+          var typeSecteur = ligneScenario ? typesParId[ligneScenario.type] : null;
+          if (!typeSecteur) return;
+
+          var installationsUtilisees = s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire;
+          var guildesUtilisees = s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques;
+          var emplacementsInstallationLibres = (typeSecteur.nombreInstallationMax || 0) - installationsUtilisees;
+          var emplacementsGuildeLibres = (typeSecteur.nombreGuildeMax || 0) - guildesUtilisees;
+          if (emplacementsInstallationLibres > 0 && emplacementsGuildeLibres > 0) {
+            resultat.push({
+              numero: s.numero,
+              emplacementsInstallationLibres: emplacementsInstallationLibres,
+              emplacementsGuildeLibres: emplacementsGuildeLibres
+            });
+          }
+        });
+        return resultat;
+      });
+    });
+  }
+
+  /**
+   * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : place 1
+   * Défense de Secteur et 1 Guilde de Scientifiques dans le secteur du
+   * Néant adjacent choisi par le joueur — revalide les mêmes conditions
+   * qu'obtenirSecteursEligiblesDefenseGuildeNeantAdjacent (jamais
+   * confiance à l'appelant, même principe que construire ci-dessus)
+   * avant d'écrire.
+   */
+  function placerDefenseGuildeNeantAdjacent(partieId, numero) {
+    return obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partieId).then(function (eligibles) {
+      var cible = eligibles.filter(function (e) { return e.numero === numero; })[0];
+      if (!cible) {
+        throw new Error('Secteur ' + numero + ' non éligible (doit être un secteur du Néant, adjacent à l\'un de vos secteurs, avec un emplacement Installation et un emplacement Guilde libres).');
+      }
+
+      return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+        if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
+        secteur.installationDefenseSecteur = (secteur.installationDefenseSecteur || 0) + 1;
+        secteur.guildeScientifiques = (secteur.guildeScientifiques || 0) + 1;
+        return DB.put('secteursPartie', secteur).then(function () { return secteur; });
+      });
+    });
+  }
+
   return {
     SCENARIO_PAR_DEFAUT: SCENARIO_PAR_DEFAUT,
     instancierSecteurs: instancierSecteurs,
@@ -588,6 +678,8 @@ var SecteurService = (function () {
     regrouper: regrouper,
     envahirResoudre: envahirResoudre,
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
+    obtenirSecteursEligiblesDefenseGuildeNeantAdjacent: obtenirSecteursEligiblesDefenseGuildeNeantAdjacent,
+    placerDefenseGuildeNeantAdjacent: placerDefenseGuildeNeantAdjacent,
     getEntretien: getEntretien
   };
 })();

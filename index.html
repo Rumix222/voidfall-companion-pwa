@@ -1127,11 +1127,65 @@
       par_joueur: 'Par joueur', unique: 'Une fois', permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
     };
 
+    // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : libellés
+    // des éléments posables par un cadre de type "placement" (voir
+    // data/catalogue/evenements.json, effet.elements) — mêmes clés que
+    // SecteurService.construire (categorie installation/guilde).
+    var LABEL_ELEMENT_PLACEMENT_ = {
+      defense_secteur: 'Défense de Secteur', chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
+      guilde_scientifique: 'Guilde de Scientifiques', guilde_fermiers: 'Guilde de Fermiers',
+      guilde_ingenieurs: 'Guilde d’Ingénieurs', guilde_mineurs: 'Guilde de Mineurs', guilde_banquiers: 'Guilde de Banquiers'
+    };
+
+    // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2, option Science
+    // -> Technologie) : couleur de la pastille de coût Science — même
+    // valeur que CHAMP_RESSOURCE.science.couleur dans strategieService.js
+    // (non exposée par ce module, dupliquée ici comme LABEL_RESSOURCE_
+    // CADRE_ ci-dessus).
+    var COULEUR_SCIENCE_CADRE_ = '#06afe5';
+
     function libelleDeltaCadre_(delta) {
       return Object.keys(delta || {}).map(function (cle) {
         var valeur = delta[cle];
         return (valeur > 0 ? '+' : '') + valeur + ' ' + (LABEL_RESSOURCE_CADRE_[cle] || cle);
       }).join(', ');
+    }
+
+    function libelleElementsPlacementCadre_(elements) {
+      return Object.keys(elements || {}).map(function (cle) {
+        var valeur = elements[cle];
+        return (valeur > 1 ? valeur + '× ' : '') + (LABEL_ELEMENT_PLACEMENT_[cle] || cle);
+      }).join(' + ');
+    }
+
+    /**
+     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2) : reconnaît
+     * l'option "dépenser N Science pour gagner une Technologie de base"
+     * (cadre.effet.type === 'choix', voir data/catalogue/evenements.json)
+     * — coût 100% simple (Science), gain non automatisable (le choix de
+     * LA technologie reste manuel, sur Plat. maison) : seul le coût est
+     * appliqué en un clic (voir appliquerCadreTechnologieEtRafraichir_),
+     * jamais le gain.
+     */
+    function optionTechnologieViaScience_(option) {
+      return !!(option && option.cout && Object.keys(option.cout).length === 1 && typeof option.cout.science === 'number' &&
+        option.gain && Object.keys(option.gain).length === 1 && option.gain.technologie_base);
+    }
+
+    // Détecte si le cadre déjà appliqué l'a été via l'option ci-dessus
+    // (delta = { science: -N } seul) plutôt que via une autre option
+    // "1 clic" du même cadre (ex. +3 Crédit) — même cadresAppliques[ordre]
+    // partagé entre toutes les options d'un cadre "choix" exclusif, donc
+    // appliquer l'une verrouille bien les autres (règle du jeu : un seul
+    // des deux effets du Cadre 2 peut être choisi).
+    function estAppliqueViaTechnologieScience_(cadre, applique) {
+      if (!applique || !applique.delta) return false;
+      var cles = Object.keys(applique.delta);
+      if (cles.length !== 1 || cles[0] !== 'science' || !(applique.delta.science < 0)) return false;
+      if (!cadre.effet || cadre.effet.type !== 'choix' || !Array.isArray(cadre.effet.options)) return false;
+      return cadre.effet.options.some(function (option) {
+        return optionTechnologieViaScience_(option) && option.cout.science === -applique.delta.science;
+      });
     }
 
     /**
@@ -1160,16 +1214,85 @@
     }
 
     /**
+     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : cadre de
+     * type "placement" (zone "secteur_neant_adjacent") — ouvre la même
+     * modale de choix générique que les actions de Focus (StrategieService.
+     * demanderChoix, contexte 'placement_secteur_neant_adjacent') pour
+     * sélectionner le secteur, puis persiste via GameService.
+     * appliquerCadrePlacement (qui revalide tout côté SecteurService) et
+     * rafraîchit l'écran — même pattern qu'appliquerCadreEtRafraichir_
+     * ci-dessus pour les cadres "1 clic" sur ressources simples.
+     */
+    function appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'placement_secteur_neant_adjacent',
+        titre: 'Placer : ' + libelleElementsPlacementCadre_(cadre.effet.elements),
+        description: cadre.texte
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        return GameService.appliquerCadrePlacement(partie.id, cycle, ordre, resultat.numero)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
+     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2, option Science
+     * -> Technologie) : ouvre une confirmation (modale générique,
+     * contexte 'confirmation') rappelant que seul le coût est automatisé
+     * (-N Science) — le gain (choix de la Technologie de base) reste
+     * manuel, sur Plat. maison. Annuler ne débite rien ; Valider délègue à
+     * appliquerCadreEtRafraichir_ (même mécanisme "1 clic" que le bouton
+     * "Appliquer : +3 Crédit" de l'autre option de ce cadre — les deux
+     * partagent cadresAppliques[ordre], donc appliquer l'une verrouille
+     * l'autre, conforme au mode "exclusif" du catalogue).
+     */
+    function appliquerCadreTechnologieEtRafraichir_(partie, cycle, ordre, coutScience, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'confirmation',
+        titre: 'Gagner une technologie',
+        message: '-' + coutScience + ' Science — choisissez une technologie manuellement dans l\'onglet Plat. maison.',
+        texteValider: 'Valider (-' + coutScience + ' Science)'
+      }).then(function (resultat) {
+        if (!resultat || !resultat.confirme) { bouton.disabled = false; return; }
+        var delta = {};
+        delta.science = -coutScience;
+        appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton);
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec : ' + erreur.message);
+      });
+    }
+
+    /**
      * 18/08/2026 (Refonte affichage Événement galactique) : rend les
      * Cadres (moitié gauche de la carte, résolus en Phase Préparation —
      * voir docs-rules-cycle-de-jeu.md §1.5), un par ligne : bordure pleine/
      * pointillée selon `obligatoire` (§1.5.1/§1.5.2), badge de résolution
      * (§1.5.3), texte intégral, puis un bouton "Appliquer" par action que
      * GameService.actionsSimplesCadre reconnaît comme un simple delta sur
-     * les 5 ressources déjà suivies par l'app. Tout le reste d'un cadre
-     * (secteurs, Gloire, jetons, Civilisation, Corruption...) reste hors
-     * périmètre (la plupart des sous-points de §1.5 sont ❌/🚫 dans les
-     * docs de règles) : affiché en texte seul, à résoudre manuellement.
+     * les 5 ressources déjà suivies par l'app.
+     *
+     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : premier
+     * cadre de type "placement" (zone "secteur_neant_adjacent") sorti de
+     * ce hors-périmètre — bouton "Placer" dédié
+     * (appliquerCadrePlacementEtRafraichir_ ci-dessus) qui ouvre la
+     * modale de choix générique des actions de Focus pour sélectionner le
+     * secteur, puis persiste via GameService.appliquerCadrePlacement. Le
+     * reste d'un cadre (Gloire, jetons, Civilisation, Corruption...) reste
+     * hors périmètre (la plupart des sous-points de §1.5 sont ❌/🚫 dans
+     * les docs de règles) : affiché en texte seul, à résoudre manuellement.
      * cadresAppliques (persisté sur evenements.cycleN, voir gameService.js)
      * empêche une double application et affiche "✓ Appliqué".
      */
@@ -1189,25 +1312,47 @@
           var badgeResolution = cadre.resolution && LABEL_RESOLUTION_CADRE_[cadre.resolution]
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
+          var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+
           var actionsHtml = '';
-          if (applique) {
-            actionsHtml = '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
+          if (estPlacementNeantAdjacent) {
+            actionsHtml = applique
+              ? '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ' : ' + libelleElementsPlacementCadre_(cadre.effet.elements) + ')</p>'
+              : '<div class="cadre-actions" data-ordre="' + cadre.ordre + '" data-placement="1">' +
+                '<button type="button" class="btn btn-secondary btn-cadre-placement">Placer : ' +
+                libelleElementsPlacementCadre_(cadre.effet.elements) + '</button></div>';
+          } else if (applique) {
+            actionsHtml = estAppliqueViaTechnologieScience_(cadre, applique)
+              ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
+              : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
           } else {
+            var boutonsCadre = [];
             var actions = GameService.actionsSimplesCadre(cadre);
-            if (actions.length) {
-              actionsHtml = '<div class="cadre-actions" data-ordre="' + cadre.ordre + '">' +
-                actions.map(function (action, i) {
-                  if (action.proportionnel) {
-                    return '<span class="cadre-action-proportionnelle" data-action-i="' + i + '">' +
-                      '<input type="number" min="0"' + (action.plafond ? ' max="' + action.plafond + '"' : '') +
-                      ' value="0" class="cadre-input-proportionnel">' +
-                      '<button type="button" class="btn btn-secondary btn-cadre-appliquer-proportionnel">Échanger ' +
-                      (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) + ' → ' +
-                      (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain) + '</button></span>';
-                  }
-                  return '<button type="button" class="btn btn-secondary btn-cadre-appliquer" data-action-i="' + i + '">' +
-                    'Appliquer : ' + libelleDeltaCadre_(action.delta) + '</button>';
-                }).join('') + '</div>';
+            actions.forEach(function (action, i) {
+              if (action.proportionnel) {
+                boutonsCadre.push('<span class="cadre-action-proportionnelle" data-action-i="' + i + '">' +
+                  '<input type="number" min="0"' + (action.plafond ? ' max="' + action.plafond + '"' : '') +
+                  ' value="0" class="cadre-input-proportionnel">' +
+                  '<button type="button" class="btn btn-secondary btn-cadre-appliquer-proportionnel">Échanger ' +
+                  (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) + ' → ' +
+                  (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain) + '</button></span>');
+              } else {
+                boutonsCadre.push('<button type="button" class="btn btn-secondary btn-cadre-appliquer" data-action-i="' + i + '">' +
+                  'Appliquer : ' + libelleDeltaCadre_(action.delta) + '</button>');
+              }
+            });
+
+            if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
+              cadre.effet.options.forEach(function (option) {
+                if (!optionTechnologieViaScience_(option)) return;
+                boutonsCadre.push('<button type="button" class="btn btn-secondary btn-cadre-technologie" data-cout="' + option.cout.science + '">' +
+                  '<span class="pastille-cout" style="--couleur-pastille:' + COULEUR_SCIENCE_CADRE_ + '">' + option.cout.science + '</span>' +
+                  'Gagner une technologie</button>');
+              });
+            }
+
+            if (boutonsCadre.length) {
+              actionsHtml = '<div class="cadre-actions" data-ordre="' + cadre.ordre + '">' + boutonsCadre.join('') + '</div>';
             }
           }
 
@@ -1218,7 +1363,16 @@
             '</div>';
         }).join('');
 
-      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions'), function (blocActions) {
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions[data-placement="1"]'), function (blocActions) {
+        var ordre = Number(blocActions.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var bouton = blocActions.querySelector('.btn-cadre-placement');
+        bouton.addEventListener('click', function () {
+          appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton);
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-actions:not([data-placement="1"])'), function (blocActions) {
         var ordre = Number(blocActions.dataset.ordre);
         var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
         var actions = GameService.actionsSimplesCadre(cadre);
@@ -1241,6 +1395,13 @@
             delta[action.ressourceCout] = -quantite;
             delta[action.ressourceGain] = quantite;
             appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton);
+          });
+        });
+
+        Array.prototype.forEach.call(blocActions.querySelectorAll('.btn-cadre-technologie'), function (bouton) {
+          bouton.addEventListener('click', function () {
+            var coutScience = Number(bouton.dataset.cout) || 1;
+            appliquerCadreTechnologieEtRafraichir_(partie, cycle, ordre, coutScience, bouton);
           });
         });
       });

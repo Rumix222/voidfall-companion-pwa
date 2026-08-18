@@ -23,7 +23,8 @@ js/
                              # archiver/supprimer, majPlateauMaison, majCivilisation)
   secteurService.js         # plateau des secteurs — mise en place/lecture + actions
                              # (construire/deployerCube/rappelerCube/retirerCorruption/
-                             # regrouper/envahirResoudre/getEntretien — voir §2)
+                             # regrouper/envahirResoudre/getEntretien/
+                             # placerDefenseGuildeNeantAdjacent — voir §2)
   focusService.js           # catalogue Focus (mise en place par maison, pool héroïque)
   focusEngine.js            # moteur PUR coût/effet des cartes Focus (aucun DOM, aucun
                              # IndexedDB) — voir §2 pour les clés hors périmètre restantes
@@ -39,7 +40,9 @@ js/
   strategieService.js       # écran Stratégie (DOM) — ressources, Focus jouables, Civilisation,
                              # modale de choix générique (demanderChoix : option_exclusive/
                              # options_inclusives/ressource_choix/bonus_commerce/regrouper/
-                             # deployer_cube/envahir)
+                             # deployer_cube/envahir/placement_secteur_neant_adjacent), réutilisée
+                             # par index.html pour les cadres d'Événement galactique de type
+                             # "placement" (voir Événement A, Cycle 1, Cadre 1)
   setupService.js           # écran Créer une partie (DOM)
 icons/
 ```

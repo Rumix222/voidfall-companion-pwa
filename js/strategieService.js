@@ -1354,6 +1354,21 @@ var StrategieService = (function () {
         }
         render();
 
+      } else if (contexte.type === 'confirmation') {
+        // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2, option
+        // Science -> Technologie) : confirmation générique (message +
+        // Annuler/Valider), même modale que les autres types de choix —
+        // pour une action sans sélection à faire (juste un coût à
+        // confirmer avant de débiter, le reste — ici le choix de la
+        // Technologie — restant manuel, hors périmètre).
+        titre.textContent = contexte.titre || 'Confirmer';
+        contenu.innerHTML = '<p class="hint">' + (contexte.message || '') + '</p>';
+        btnAnnuler.hidden = false;
+        btnValider.hidden = false;
+        btnValider.textContent = contexte.texteValider || 'Valider';
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+        btnValider.onclick = function () { fermerModale_(); resolve({ confirme: true }); };
+
       } else if (contexte.type === 'bonus_commerce') {
         titre.textContent = 'Bonus Commerce — choisissez un bonus';
         btnValider.hidden = true;
@@ -1990,6 +2005,52 @@ var StrategieService = (function () {
           contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
           window.alert('Échec du chargement des secteurs : ' + erreur.message);
         });
+
+      } else if (contexte.type === 'placement_secteur_neant_adjacent') {
+        // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : choix
+        // du secteur du Néant où placer une structure — même gabarit que
+        // 'envahir' ci-dessus (secteurs + adjacences chargés via
+        // SecteurService, select unique + bouton Valider) mais sans
+        // combat : la sélection seule est résolue ici, la persistance
+        // (SecteurService.placerDefenseGuildeNeantAdjacent, revalidée
+        // côté service) est déclenchée par l'appelant (index.html,
+        // GameService.appliquerCadrePlacement) une fois le choix connu.
+        titre.textContent = contexte.titre || 'Choisir un secteur du Néant';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partiePlacement = partieAffichee;
+        SecteurService.obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partiePlacement.id)
+          .then(function (eligibles) {
+            if (!eligibles.length) {
+              contenu.innerHTML = '<p class="hint">Aucun secteur du Néant adjacent à l’un de vos secteurs, avec un emplacement Installation et un emplacement Guilde libres actuellement.</p>';
+              return;
+            }
+
+            contenu.innerHTML = '' +
+              (contexte.description ? '<p class="hint">' + contexte.description + '</p>' : '') +
+              '<label class="hint" for="placement-select-secteur">Secteur du Néant</label>' +
+              '<select id="placement-select-secteur">' +
+              eligibles.map(function (e) {
+                return '<option value="' + e.numero + '">Secteur ' + e.numero + ' (' +
+                  e.emplacementsInstallationLibres + ' emplacement(s) Installation, ' +
+                  e.emplacementsGuildeLibres + ' emplacement(s) Guilde libres)</option>';
+              }).join('') +
+              '</select>';
+
+            btnValider.hidden = false;
+            btnValider.textContent = 'Placer';
+            btnValider.onclick = function () {
+              var numero = Number(document.getElementById('placement-select-secteur').value);
+              fermerModale_();
+              resolve({ numero: numero });
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
 
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les
