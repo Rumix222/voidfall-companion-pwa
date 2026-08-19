@@ -616,6 +616,37 @@
  * "Gloire (N)" (N = la valeur), sorti de LABEL_JETON_SECTEUR/
  * listeNonNulle_ (qui reste correct pour Prime/Libération, de vrais
  * compteurs) : index.html.
+ *
+ * 19/08/2026 (correctif Piège n°1 — mises à jour Service Worker non
+ * détectées, en local ET potentiellement en production) : un changement de
+ * data/catalogue/maisons.json (difficulté des maisons) restait invisible
+ * malgré commit + déploiement + "Synchroniser le catalogue", car
+ * incrémenter APP_VERSION seul ne suffit pas à faire réinstaller le
+ * Service Worker — la détection native du navigateur compare
+ * service-worker.js OCTET À OCTET, or ce fichier ne référence APP_VERSION
+ * que via importScripts('./version.js'), donc ses propres octets ne
+ * changent jamais quand seul version.js/le catalogue bouge. Pire :
+ * "Synchroniser le catalogue" (cache:'no-store', correctif du 19/08
+ * précédent) ne suffisait pas non plus une fois un ancien Service Worker
+ * déjà actif — son handler 'fetch' cache-first intercepte la requête AVANT
+ * le réseau, quel que soit le mode de cache demandé, dès que
+ * caches.match() trouve une entrée pour l'URL exacte. Correctif à deux
+ * volets : (1) index.html — nouveau mécanisme d'auto-réparation, exécuté à
+ * chaque chargement, qui compare l'APP_VERSION réellement servie par le
+ * réseau (fetch avec paramètre anti-cache ?bust=, qui rend l'URL inédite
+ * pour caches.match() et la fait retomber sur un vrai fetch() réseau côté
+ * Service Worker) à celle chargée par la page ; en cas d'écart, purge
+ * Service Worker + Cache Storage puis recharge une seule fois (garde
+ * sessionStorage) — indépendant de la détection native, se répare tout
+ * seul à chaque déploiement futur, même catalogue-only ; (2)
+ * js/catalogueSync.js (v3) — même paramètre anti-cache ?bust= sur
+ * lireFichier_, pour que "Synchroniser le catalogue" atteigne toujours le
+ * réseau réel. service-worker.js (v14) change aussi ses octets (aucun
+ * changement fonctionnel) : indispensable pour que CE déploiement-ci soit
+ * détecté nativement au moins une fois et installe le nouveau index.html —
+ * les déploiements suivants n'en auront plus besoin, l'auto-réparation
+ * prenant le relais. IndexedDB (parties sauvegardées) non affecté par
+ * aucune purge de ce correctif.
  */
 
-var APP_VERSION = '20260819.11';
+var APP_VERSION = '20260819.12';

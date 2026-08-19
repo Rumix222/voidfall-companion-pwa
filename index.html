@@ -2045,6 +2045,40 @@
 
     versionApp.textContent = 'v' + APP_VERSION;
 
+    // 19/08/2026 (correctif Piège n°1) : la détection native de mise à jour
+    // du navigateur ne se déclenche que si service-worker.js change au
+    // niveau octet — un simple incrément d'APP_VERSION (version.js, importé
+    // par service-worker.js) ne suffit donc pas à réinstaller le Service
+    // Worker, qui continue de servir un cache périmé indéfiniment (bug
+    // constaté en local, potentiellement aussi en production). On vérifie
+    // donc ici, à chaque chargement, la version réellement servie par le
+    // réseau (fetch avec paramètre anti-cache pour forcer un aller-retour
+    // réseau même sous un Service Worker actif — voir js/catalogueSync.js
+    // pour le même principe) : si elle diffère de celle chargée par cette
+    // page, on purge Service Worker + Cache Storage et on recharge une
+    // seule fois. IndexedDB (parties sauvegardées) n'est pas concerné.
+    if ('serviceWorker' in navigator && window.caches) {
+      fetch('./version.js?bust=' + Date.now(), { cache: 'no-store' })
+        .then(function (reponse) { return reponse.text(); })
+        .then(function (texte) {
+          var correspondance = texte.match(/APP_VERSION\s*=\s*'([^']+)'/);
+          if (!correspondance || correspondance[1] === APP_VERSION) return;
+          var versionServeur = correspondance[1];
+          var cleTraitee = 'sw_reload_version_traitee';
+          if (sessionStorage.getItem(cleTraitee) === versionServeur) return;
+          sessionStorage.setItem(cleTraitee, versionServeur);
+          Promise.all([
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            }),
+            caches.keys().then(function (noms) {
+              return Promise.all(noms.map(function (n) { return caches.delete(n); }));
+            })
+          ]).then(function () { location.reload(); });
+        })
+        .catch(function () { /* hors-ligne : on reste sur le cache actuel */ });
+    }
+
     if (!('serviceWorker' in navigator)) {
       etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
     } else {

@@ -1,7 +1,12 @@
 /**
  * catalogueSync.js
  * Import JSON local -> IndexedDB (catalogue, lecture seule)
- * Version 2 — 18/08/2026
+ * Version 3 — 19/08/2026
+ *
+ * 19/08/2026 : lireFichier_ ajoute un paramètre anti-cache (?bust=) à
+ * l'URL — cache:'no-store' seul ne suffisait pas à garantir un aller-retour
+ * réseau réel une fois un Service Worker déjà actif (voir commentaire dans
+ * lireFichier_ et version.js pour le détail du correctif complet, Piège n°1).
  *
  * 18/08/2026 : suppression de la dépendance Supabase. Le catalogue est
  * désormais bundlé dans le repo sous forme de fichiers JSON statiques
@@ -55,7 +60,16 @@ var CatalogueSync = (function () {
     // après une mise à jour bien déployée (APP_VERSION incrémenté, SW
     // réinstallé). Le catalogue devant toujours refléter le fichier
     // actuel au moment du clic, on force ici un aller-retour réseau.
-    return fetch(url, { cache: 'no-store' }).then(function (reponse) {
+    //
+    // 19/08/2026 (correctif Piège n°1, suite) : cache:'no-store' seul reste
+    // insuffisant tant qu'un ancien Service Worker est actif — son
+    // handler 'fetch' (cache-first) intercepte la requête AVANT qu'elle
+    // n'atteigne le réseau, quel que soit son mode de cache, dès que
+    // caches.match() trouve une entrée pour cette URL exacte. Un paramètre
+    // anti-cache rend l'URL inédite pour caches.match() (comparaison
+    // stricte, query string incluse), ce qui la fait retomber sur le vrai
+    // fetch() réseau dans le handler du Service Worker.
+    return fetch(url + '?bust=' + Date.now(), { cache: 'no-store' }).then(function (reponse) {
       if (!reponse.ok) {
         throw new Error('HTTP ' + reponse.status + ' sur ' + url);
       }

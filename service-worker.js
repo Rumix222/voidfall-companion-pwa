@@ -1,6 +1,25 @@
 /**
  * service-worker.js
- * Version 13 — 2026-08-18
+ * Version 14 — 2026-08-19
+ * 19/08/2026 (correctif Piège n°1 — mises à jour non détectées) : ce
+ * fichier n'avait pas changé au niveau octet depuis la Version 13
+ * (2026-08-18), alors qu'APP_VERSION avait déjà été incrémenté 11 fois
+ * depuis dans ce laps de temps (version.js) — la détection native de mise
+ * à jour du navigateur, qui compare service-worker.js octet à octet, ne
+ * s'était donc jamais déclenchée : le Service Worker restait bloqué sur un
+ * ancien cache, potentiellement en local ET en production (bug constaté en
+ * testant une modification de data/catalogue/maisons.json, jamais reflétée
+ * malgré commit + déploiement + "Synchroniser le catalogue"). Aucun
+ * changement fonctionnel ici (install/activate/fetch inchangés, déjà
+ * corrects — skipWaiting/clients.claim déjà en place) : le vrai correctif
+ * est le mécanisme d'auto-réparation ajouté côté index.html, qui compare à
+ * chaque chargement l'APP_VERSION réellement servie par le réseau
+ * (fetch anti-cache, voir js/catalogueSync.js pour le même principe) à
+ * celle chargée par la page, et purge Service Worker + Cache Storage
+ * s'il y a un écart — indépendamment de la détection native. Ce présent
+ * changement d'octets sert uniquement à faire passer CE déploiement-ci
+ * (indispensable pour que le nouveau code index.html s'installe la
+ * première fois). IndexedDB (parties sauvegardées) non concerné.
  * 18/08/2026 (Migration catalogue Supabase -> JSON local) : ajout des 12
  * fichiers data/catalogue/*.json à FICHIERS_A_METTRE_EN_CACHE (le
  * catalogue est désormais bundlé dans l'app, plus d'appel réseau externe
