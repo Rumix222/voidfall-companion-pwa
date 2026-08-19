@@ -392,6 +392,13 @@ var GameService = (function () {
    * (moitié droite, évalués en Phase Évaluation, §3.3), et n'a plus de
    * champs texte1/texte2/nom/cycle à plat. `manches` (haut droit de la
    * carte, §2 Introduction) est conservé tel quel.
+   *
+   * 19/08/2026 (retour utilisateur, principe à garder pour les prochains
+   * événements) : `instruction` (champ optionnel côté catalogue, popup
+   * de résolution manuelle d'un cadre "gain" — voir index.html
+   * appliquerCadreManuelEtRafraichir_) ajouté à la liste blanche —
+   * absent par défaut (null), jamais bloquant pour un cadre qui n'en
+   * définit pas encore.
    */
   function formatEvenement_(e) {
     return {
@@ -405,6 +412,7 @@ var GameService = (function () {
           obligatoire: !!c.obligatoire,
           resolution: c.resolution || null,
           texte: c.texte,
+          instruction: c.instruction || null,
           effet: c.effet || null
         };
       }),

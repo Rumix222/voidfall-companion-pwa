@@ -40,6 +40,7 @@
       {
         "ordre": 2, "obligatoire": true, "resolution": "unique",
         "texte": "Placez une Corruption sur l'offre de Programme Domination.",
+        "instruction": "Placer la corruption manuellement sur l'offre programme",
         "effet": { "type": "gain", "cible": "offre_programme", "cible_detail": "programme_domination", "elements": { "corruption": 1 } }
       },
       {

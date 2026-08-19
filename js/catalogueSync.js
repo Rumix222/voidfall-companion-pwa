@@ -48,7 +48,14 @@ var CatalogueSync = (function () {
    */
   function lireFichier_(nomFichier) {
     var url = './data/catalogue/' + nomFichier + '.json';
-    return fetch(url).then(function (reponse) {
+    // 19/08/2026 (bug constaté en test) : sans cache:'no-store', le
+    // navigateur peut resservir une réponse HTTP mise en cache pour ce
+    // fetch (le serveur statique n'envoie pas d'en-têtes de cache forts)
+    // — "Synchroniser le catalogue" resservait alors un JSON périmé même
+    // après une mise à jour bien déployée (APP_VERSION incrémenté, SW
+    // réinstallé). Le catalogue devant toujours refléter le fichier
+    // actuel au moment du clic, on force ici un aller-retour réseau.
+    return fetch(url, { cache: 'no-store' }).then(function (reponse) {
       if (!reponse.ok) {
         throw new Error('HTTP ' + reponse.status + ' sur ' + url);
       }

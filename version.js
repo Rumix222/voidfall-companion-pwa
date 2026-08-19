@@ -549,6 +549,27 @@
  * un Cadre est appliqué, le select Événement galactique est verrouillé
  * (disabled) pour empêcher de changer d'événement en cours de
  * résolution.
+ *
+ * 19/08/2026 (retour utilisateur, suite) : vocabulaire des statuts de
+ * Cadre uniformisé sur "Appliqué" (jamais "Fait") et "manuellement"
+ * (jamais "à la main") — "✓ Appliqué (manuellement)" pour un cadre
+ * "gain", "✓ Appliqué (-1 Science / technologie choisie manuellement)"
+ * pour l'option Technologie du Cadre 2 Événement A (formulé au passé,
+ * l'action manuelle est considérée faite). Popup manuelle du Cadre 2
+ * Événement B : message remplacé par une instruction courte et
+ * spécifique en italique (cadre.instruction, nouveau champ optionnel du
+ * catalogue data/catalogue/evenements.json — fallback sur cadre.texte
+ * si absent) au lieu du message générique précédent. `instruction`
+ * ajouté à la liste blanche de champs de formatEvenement_
+ * (js/gameService.js) — sans ce correctif, le champ était filtré et le
+ * message retombait toujours sur cadre.texte.
+ *
+ * 19/08/2026 (correctif, bug constaté en testant ce qui précède) :
+ * js/catalogueSync.js force désormais `cache: 'no-store'` sur le fetch
+ * de chaque fichier JSON du catalogue — sans ça, "Synchroniser le
+ * catalogue" pouvait resservir une réponse HTTP mise en cache par le
+ * navigateur au lieu du fichier à jour, même après une mise à jour bien
+ * déployée (APP_VERSION incrémenté, Service Worker réinstallé).
  */
 
-var APP_VERSION = '20260819.3';
+var APP_VERSION = '20260819.6';
