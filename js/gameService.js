@@ -1,7 +1,18 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 10 — 17/08/2026 (Lot F — corrections mineures)
+ * Version 11 — 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique)
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
+ * appliquerCadrePlacement ne délègue plus à une fonction SecteurService
+ * dédiée à un seul jeu d'éléments (Défense de Secteur + Guilde de
+ * Scientifiques) — elle retrouve le cadre `ordreCadre` dans
+ * evenementCycle.cadres (déjà chargé en mémoire, catalogue complet
+ * persisté par choisirEvenement) et transmet son `effet.elements` tel
+ * quel à SecteurService.placerElementsNeantAdjacent (générique, voir son
+ * en-tête). Permet de porter le Cadre 1 de l'Événement B Cycle 1 (jeton
+ * Libération + Défense de Secteur) sans aucune nouvelle fonction dédiée.
+ * secteurService.js (v4), js/strategieService.js (v18), index.html (v30).
  *
  * 17/08/2026 (Lot F — corrections mineures) : technologiesObtenues passe
  * de 6 à 5 emplacements (les 3 occurrences du tableau par défaut) — avec
@@ -1107,10 +1118,21 @@ var GameService = (function () {
      * data/catalogue/evenements.json) — hors périmètre d'actionsSimplesCadre_
      * (ne porte pas sur les 5 ressources simples de plateauMaison mais sur
      * secteursPartie). Place la structure sur le secteur choisi par le
-     * joueur via SecteurService.placerDefenseGuildeNeantAdjacent (qui
+     * joueur via SecteurService.placerElementsNeantAdjacent (qui
      * revalide Néant/adjacence/emplacements libres — jamais confiance à
      * l'appelant), puis marque le cadre comme résolu, même garde-fou
      * anti-double-application qu'appliquerCadreEffet ci-dessus.
+     *
+     * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+     * générique) : retrouve le cadre `ordreCadre` dans
+     * evenementCycle.cadres (catalogue complet de l'événement choisi,
+     * déjà persisté par choisirEvenement) pour lire son `effet.elements`
+     * et le transmettre tel quel à SecteurService.placerElementsNeantAdjacent
+     * (générique) — auparavant appelait SecteurService.
+     * placerDefenseGuildeNeantAdjacent, codée en dur pour Défense de
+     * Secteur + Guilde de Scientifiques (seul jeu d'éléments existant à
+     * l'époque). Permet à ce même point d'entrée de résoudre n'importe
+     * quel cadre "placement" du catalogue, quels que soient ses éléments.
      */
     appliquerCadrePlacement: function (partieId, cycle, ordreCadre, numeroSecteur) {
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
@@ -1126,7 +1148,12 @@ var GameService = (function () {
           throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
         }
 
-        return SecteurService.placerDefenseGuildeNeantAdjacent(partieId, numeroSecteur).then(function () {
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        if (!cadre || !cadre.effet || cadre.effet.type !== 'placement') {
+          throw new Error('Cadre de placement introuvable pour cet ordre.');
+        }
+
+        return SecteurService.placerElementsNeantAdjacent(partieId, numeroSecteur, cadre.effet.elements).then(function () {
           evenementCycle.cadresAppliques[ordreCadre] = { secteur: numeroSecteur, le: new Date().toISOString() };
           partie.evenements[cleCycle] = evenementCycle;
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);

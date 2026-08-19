@@ -1231,15 +1231,23 @@
      * titre de popup générique ("Choisir un secteur") au lieu de rappeler
      * les éléments posés (déjà lisibles sur le texte du cadre, visible
      * derrière la popup) ; la `description` (qui reprenait cadre.texte,
-     * redondant) est supprimée. Le paramètre `cadre` n'est plus utilisé
-     * ici mais conservé dans la signature pour cohérence avec l'appelant.
+     * redondant) est supprimée.
+     *
+     * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+     * générique) : `elements: cadre.effet.elements` transmis à la popup
+     * (contexte.elements, voir strategieService.js) — SecteurService.
+     * obtenirSecteursEligiblesPlacementNeantAdjacent en a besoin pour
+     * calculer les emplacements requis (générique, plus figé sur Défense
+     * de Secteur + Guilde de Scientifiques). Le paramètre `cadre` est de
+     * nouveau utilisé (il ne l'était plus depuis les points 3/4).
      */
     function appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
       bouton.disabled = true;
       StrategieService.demanderChoix({
         type: 'placement_secteur_neant_adjacent',
-        titre: 'Choisir un secteur'
+        titre: 'Choisir un secteur',
+        elements: cadre.effet.elements
       }).then(function (resultat) {
         if (!resultat || resultat.annule) { bouton.disabled = false; return; }
         return GameService.appliquerCadrePlacement(partie.id, cycle, ordre, resultat.numero)

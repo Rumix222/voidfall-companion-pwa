@@ -1261,6 +1261,15 @@ input:disabled {
   gap: 10px;
   margin-bottom: 16px;
 }
+/* 18/08/2026 (Simplification UI Événement galactique, retour utilisateur) :
+   marge sous la ddl seule de la popup de placement (#placement-select-
+   secteur) — sans elle elle était collée aux boutons Annuler/Valider
+   (.modal-actions), aucun autre élément entre les deux (le label
+   "Secteur du Néant" a été retiré, jugé redondant avec le titre de la
+   popup "Choisir un secteur"). */
+.modal-choix-select {
+  margin-bottom: 16px;
+}
 .modal-choix-case {
   display: flex;
   align-items: center;

@@ -1,7 +1,26 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 14 — 18/08/2026 (Simplification UI Événement galactique)
+ * Version 15 — 18/08/2026 (Simplification UI Événement galactique — suite)
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — suite, retour
+ * utilisateur + Cadre 1 générique) :
+ * - Popup 'placement_secteur_neant_adjacent' : le label "Secteur du
+ *   Néant" au-dessus de la liste déroulante est retiré (redondant avec
+ *   le titre "Choisir un secteur") ; la liste gagne une marge basse
+ *   (.modal-choix-select) pour ne plus être collée aux boutons Annuler/
+ *   Valider.
+ * - Même popup généralisée : appelle désormais SecteurService.
+ *   obtenirSecteursEligiblesPlacementNeantAdjacent(partieId,
+ *   contexte.elements) au lieu de l'ancienne fonction dédiée Défense de
+ *   Secteur + Guilde de Scientifiques — `elements` vient de l'appelant
+ *   (index.html, cadre.effet.elements) ; le "❗" (dernier emplacement)
+ *   est maintenant calculé côté SecteurService (`e.dernierEmplacement`),
+ *   qui seul sait quels types d'emplacement ce cadre consomme réellement.
+ *   Permet de résoudre le Cadre 1 de l'Événement B Cycle 1 (jeton
+ *   Libération + Défense de Secteur) avec ce même contexte, sans nouveau
+ *   code ici. secteurService.js (v4), js/gameService.js (v11),
+ *   index.html (v30).
  *
  * 18/08/2026 (Simplification UI Événement galactique, points 3/4/6) :
  * - demanderChoix, contexte 'placement_secteur_neant_adjacent' : la
@@ -2029,9 +2048,17 @@ var StrategieService = (function () {
         // 'envahir' ci-dessus (secteurs + adjacences chargés via
         // SecteurService, select unique + bouton Valider) mais sans
         // combat : la sélection seule est résolue ici, la persistance
-        // (SecteurService.placerDefenseGuildeNeantAdjacent, revalidée
-        // côté service) est déclenchée par l'appelant (index.html,
+        // (SecteurService.placerElementsNeantAdjacent, revalidée côté
+        // service) est déclenchée par l'appelant (index.html,
         // GameService.appliquerCadrePlacement) une fois le choix connu.
+        //
+        // 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+        // générique) : `contexte.elements` (effet.elements du cadre,
+        // transmis par l'appelant) remplace l'appel figé à l'ancienne
+        // fonction dédiée Défense de Secteur + Guilde de Scientifiques —
+        // permet de résoudre n'importe quel cadre "placement" du
+        // catalogue (ex. Événement B Cycle 1 Cadre 1 : jeton Libération +
+        // Défense de Secteur) avec ce même contexte, sans nouveau code.
         titre.textContent = contexte.titre || 'Choisir un secteur du Néant';
         contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
         btnValider.hidden = true;
@@ -2039,19 +2066,17 @@ var StrategieService = (function () {
         btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
 
         var partiePlacement = partieAffichee;
-        SecteurService.obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partiePlacement.id)
+        SecteurService.obtenirSecteursEligiblesPlacementNeantAdjacent(partiePlacement.id, contexte.elements)
           .then(function (eligibles) {
             if (!eligibles.length) {
-              contenu.innerHTML = '<p class="hint">Aucun secteur du Néant adjacent à l’un de vos secteurs, avec un emplacement Installation et un emplacement Guilde libres actuellement.</p>';
+              contenu.innerHTML = '<p class="hint">Aucun secteur du Néant adjacent à l’un de vos secteurs, avec les emplacements Installation/Guilde requis libres actuellement.</p>';
               return;
             }
 
             contenu.innerHTML = '' +
-              '<label class="hint" for="placement-select-secteur">Secteur du Néant</label>' +
-              '<select id="placement-select-secteur">' +
+              '<select id="placement-select-secteur" class="modal-choix-select">' +
               eligibles.map(function (e) {
-                var dernierEmplacement = e.emplacementsInstallationLibres === 1 || e.emplacementsGuildeLibres === 1;
-                return '<option value="' + e.numero + '">Secteur ' + e.numero + (dernierEmplacement ? ' ❗' : '') + '</option>';
+                return '<option value="' + e.numero + '">Secteur ' + e.numero + (e.dernierEmplacement ? ' ❗' : '') + '</option>';
               }).join('') +
               '</select>';
 

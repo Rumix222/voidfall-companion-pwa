@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 31 — 2026-08-18
+ * Version 32 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,44 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — retouches popup +
+ * Cadre 1 générique, Événement B Cycle 1) :
+ * - Popup 'placement_secteur_neant_adjacent' (retour utilisateur) : label
+ *   "Secteur du Néant" au-dessus de la ddl retiré (redondant avec le
+ *   titre "Choisir un secteur") ; marge ajoutée sous la ddl
+ *   (.modal-choix-select) pour ne plus être collée aux boutons Annuler/
+ *   Valider. js/strategieService.js (v15), css/style.css (v19).
+ * - Cadre 1 (placement) généralisé pour porter l'Événement B Cycle 1
+ *   (jeton Libération + Défense de Secteur), qui utilise des éléments
+ *   différents de l'Événement A (Défense de Secteur + Guilde de
+ *   Scientifiques, seul cas géré jusqu'ici — la fonction était codée en
+ *   dur pour ce jeu d'éléments précis) : SecteurService.
+ *   obtenirSecteursEligiblesDefenseGuildeNeantAdjacent/
+ *   placerDefenseGuildeNeantAdjacent remplacées par
+ *   obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements)/
+ *   placerElementsNeantAdjacent(partieId, numero, elements), génériques
+ *   à n'importe quelle combinaison d'Installations/Guildes/jetons
+ *   (CHAMP_ELEMENT_PLACEMENT_) — un jeton comme Libération se pose sans
+ *   consommer d'emplacement Installation/Guilde. Le "❗" dernier
+ *   emplacement n'alerte que sur un type d'emplacement réellement
+ *   demandé par le cadre en cours (ex. un cadre qui ne pose pas de
+ *   Guilde n'alerte jamais sur la Guilde). secteurService.js (v4 —
+ *   fonctions génériques + test fumée dédié
+ *   test_secteurService_placement.js, node --test, mock DB en mémoire
+ *   via vm, 2 scénarios Événement A/B), js/gameService.js (v11 —
+ *   appliquerCadrePlacement lit cadre.effet.elements depuis
+ *   evenementCycle.cadres au lieu d'appeler l'ancienne fonction dédiée),
+ *   js/strategieService.js (v15 — contexte 'placement_secteur_neant_
+ *   adjacent' reçoit `elements` et délègue aux fonctions génériques),
+ *   index.html (v31 — appliquerCadrePlacementEtRafraichir_ transmet
+ *   cadre.effet.elements à la popup). Le Cadre 2 (Corruption sur l'offre
+ *   de Programme Domination) reste hors périmètre (texte seul, décision
+ *   utilisateur — aucun modèle d'offre de Programme dans l'app
+ *   actuellement). Le Cadre 3 (choix activer/déployer 1 cube) reste en
+ *   attente de focusEngine.js (nécessaire pour ne pas dupliquer/
+ *   dérégler la logique de débit de cubeActif déjà utilisée côté Focus),
+ *   demandé à l'utilisateur, non traité dans ce lot.
  *
  * 18/08/2026 (Simplification UI Événement galactique, points 2 à 6) :
  * suite du point 1 (cadre entier cliquable). Popups (StrategieService.
@@ -448,4 +486,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.7';
+var APP_VERSION = '20260818.8';
