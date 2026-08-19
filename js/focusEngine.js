@@ -1,7 +1,39 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 4 — 17/08/2026 (Session 14 fin — action secteur "Envahir" portée)
+ * Version 5 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ *
+ * 19/08/2026 (retour utilisateur : "on a dû perdre cette possibilité lors
+ * du portage en PWA, il y a des actions de focus qui placent des guildes
+ * ou des installations aussi") : "construire_installation"/"installation"/
+ * "etablir_guilde"/"guilde" retirés de CLES_SECTEUR_HORS_PERIMETRE —
+ * nouveau cas dédié dans resoudreCle_ (CLES_CONSTRUIRE/
+ * CATEGORIE_PAR_CLE_CONSTRUIRE_) qui délègue à demanderChoix({type:
+ * 'construire', categorie, ...}). Même principe que regrouper/envahir/
+ * deployer_cube : la popup (DOM, strategieService.js) fait la sélection
+ * secteur (possédé, au moins un emplacement libre pour la catégorie,
+ * SecteurService.obtenirSecteursEligiblesConstruction déjà porté Session
+ * 12/13 mais jamais branché ailleurs que le formulaire dédié écran
+ * Secteurs) + type (Guilde ou Installation, au choix), appelle
+ * directement SecteurService.construire et persiste en IndexedDB AU
+ * MOMENT de la validation — resoudreCle_ ne fait que relayer le résumé
+ * dans le journal, focusEngine reste pur. Bénéfice immédiat : toute carte
+ * Focus du catalogue utilisant ces 4 clés (ex. id 21 "Organiser" —
+ * Prospérité Standard, `effet.choice: ["gagner_programme", "installation"]`)
+ * devient jouable sans changement supplémentaire (dispatch générique par
+ * clé JSON, déjà en place). Portée volontairement limitée aux 4 clés de
+ * base (quantité 1, secteur libre + type libre) — les variantes du
+ * catalogue (etablir_guilde_meme_secteur/_up_to/_scientifique,
+ * construire_installation_meme_secteur/_autre_secteur/_up_to) restent hors
+ * périmètre (repli générique "effet non chiffré", pas de régression, juste
+ * pas automatisées par ce lot — nécessiteraient de croiser l'état d'une
+ * autre clé résolue dans le même JSON, ou une répétition "jusqu'à N fois",
+ * hors de la portée demandée). js/strategieService.js (nouveau contexte
+ * 'construire' de demanderChoix), js/gameService.js (cleFocusEnginePourOptionCadre_
+ * étendu — Cadre "choix" d'Événement galactique portant sur etablir_guilde/
+ * construire_installation, ex. Événement C Cycle 1 Cadre 2, réutilise
+ * désormais ce même mécanisme au lieu d'une résolution manuelle),
+ * index.html (idem, copie dupliquée par convention).
  *
  * 17/08/2026 (Session 14 fin) : "envahir"/"envahir_corrompu" retirés de
  * CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié dans resoudreCle_ qui
@@ -163,10 +195,29 @@ var FocusEngine = (function () {
 
   var CLES_MODIFICATEURS_SILENCIEUSES = ['sans_benefice_case', 'exclude', 'restriction', 'same_sector', 'meme_secteur', 'tie_break'];
 
+  // 19/08/2026 (Construire une Installation / Établir une Guilde — retour
+  // utilisateur : "on a dû perdre cette possibilité lors du portage") :
+  // "rappeler_cube"/"retirer_corruption"/"effet_secteur" restent hors
+  // périmètre (déjà branchés en formulaires dédiés écran Secteurs, session
+  // 13, pas de popup Focus/Cadre dédiée demandée pour eux) — seules les 4
+  // clés de construction/établissement générique sortent de cette liste
+  // (voir CLES_CONSTRUIRE/CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous). Les
+  // VARIANTES du catalogue (etablir_guilde_meme_secteur/_up_to/
+  // _scientifique, construire_installation_meme_secteur/_autre_secteur/
+  // _up_to — contrainte de secteur croisée avec une autre clé du même
+  // JSON, répétition "jusqu'à N fois", ou type figé) restent hors
+  // périmètre : elles retombent sur le repli générique en bas de
+  // resoudreCle_ ("effet non chiffré — à appliquer manuellement"), pas de
+  // régression, juste pas automatisées par CE lot (portée volontairement
+  // limitée au pattern décrit : secteur libre + type au choix, quantité 1).
   var CLES_SECTEUR_HORS_PERIMETRE = [
-    'construire_installation', 'installation', 'etablir_guilde', 'guilde',
     'rappeler_cube', 'retirer_corruption', 'effet_secteur'
   ];
+  var CATEGORIE_PAR_CLE_CONSTRUIRE_ = {
+    construire_installation: 'installation', installation: 'installation',
+    etablir_guilde: 'guilde', guilde: 'guilde'
+  };
+  var CLES_CONSTRUIRE = Object.keys(CATEGORIE_PAR_CLE_CONSTRUIRE_);
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
   var MODE_PAR_CLE_DEPLOYER_CUBE = {
     deployer_cube_par_chantier: 'par_chantier',
@@ -274,6 +325,31 @@ var FocusEngine = (function () {
           (Object.keys(coutParRessource).length
             ? ' (coût : ' + Object.keys(coutParRessource).map(function (r) { return coutParRessource[r] + ' ' + r; }).join(', ') + ')'
             : '') + '.');
+        return true;
+      });
+    }
+
+    // --- Construire une Installation / Établir une Guilde : Effet
+    // UNIQUEMENT (signe > 0 — aucune clé de ce catalogue ne les utilise
+    // comme Coût à ce jour ; une "détruire" éventuelle est une clé séparée,
+    // déjà hors périmètre, voir "detruire" dans le repli générique).
+    // Ouvre une popup dédiée (secteur possédé avec un emplacement libre
+    // pour la catégorie + type au choix, voir contexte.type === 'construire'
+    // de strategieService.js) qui appelle directement SecteurService.
+    // construire et persiste en IndexedDB AU MOMENT de la validation (comme
+    // regrouper/envahir/deployer_cube ci-dessus — focusEngine reste pur,
+    // aucun accès DB ici). "installation"/"guilde" (formes courtes, sans
+    // préfixe verbe, rencontrées dans des tableaux "choice") sont les mêmes
+    // clés que "construire_installation"/"etablir_guilde". ---
+    if (CLES_CONSTRUIRE.indexOf(cle) !== -1 && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'construire',
+        categorie: CATEGORIE_PAR_CLE_CONSTRUIRE_[cle],
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
         return true;
       });
     }

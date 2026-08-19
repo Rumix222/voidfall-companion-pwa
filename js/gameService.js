@@ -1,7 +1,47 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 12 — 18/08/2026 (Simplification UI Événement galactique — Cadre 3 générique)
+ * Version 14 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ *
+ * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
+ * retour utilisateur : "on a dû perdre cette possibilité lors du portage
+ * en PWA, il y a des actions de focus qui placent des guildes ou des
+ * installations aussi") : cleFocusEnginePourOptionCadre_ reconnaît
+ * désormais { cle: 'etablir_guilde' } / { cle: 'construire_installation' }
+ * (identité — FocusEngine.resoudreCle_ les gère nativement, voir
+ * focusEngine.js v5, CLES_CONSTRUIRE). appliquerCadreChoixCube renommée
+ * appliquerCadreChoixFocusEngine (ne concernait plus que les cubes) — le
+ * mécanisme (délègue à FocusEngine.resoudreEffet) est inchangé, sert
+ * maintenant aussi la construction. Événement C Cycle 1 Cadre 2
+ * ("Etablissez une Guilde OU construisez une Installation", ajouté la
+ * session précédente avec une résolution manuelle de repli) passe ainsi
+ * automatiquement par ce mécanisme, sans changement propre à ce cadre.
+ * appliquerCadreChoixManuel (session précédente) reste en place comme
+ * filet de sécurité générique pour toute future option de cadre "choix"
+ * réellement non automatisable. js/focusEngine.js (v5), js/strategieService.js
+ * (v19 — nouveau contexte 'construire'), index.html.
+ *
+ * 19/08/2026 (Événement galactique C, Cycle 1 "Vestiges du Domineum") :
+ * deux nouvelles méthodes pour les 2 Cadres de cet événement.
+ * appliquerCadrePlacementMultiple(partieId, cycle, ordreCadre,
+ * ciblesParGroupe) — Cadre 1, nouveau type de cadre "placement_multiple"
+ * (data/catalogue/evenements.json) — délègue tout le calcul/la
+ * revalidation à SecteurService.appliquerPlacementMultipleNeantAdjacent
+ * (secteurService.js v4, voir son en-tête) ; `ciblesParGroupe` vient de
+ * l'appelant (IHM) mais n'est jamais cru sur parole (revalidé côté
+ * SecteurService, même principe qu'appliquerCadrePlacement). Stocke
+ * `{ secteurs: [...], le }` (dédupliqué — le cas particulier "un seul
+ * secteur du Néant adjacent" fusionne tous les jetons sur un seul
+ * secteur). appliquerCadreChoixManuel(partieId, cycle, ordreCadre,
+ * indexOption, resume) — Cadre 2 ("Établissez une Guilde OU construisez
+ * une Installation") : les deux options sont hors périmètre (aucune
+ * mécanique de construction de Guilde/Installation automatisée par
+ * l'app, mêmes clés déjà signalées hors périmètre côté Focus/
+ * focusEngine.js) — enregistre juste l'option choisie comme résolue
+ * manuellement (`resume`, texte au passé fourni par l'appelant, ex.
+ * "Guilde établie manuellement"), aucun delta plateauMaison/secteursPartie.
+ * index.html (nouveaux data-placement-multiple/gestion actionsCadre_ pour
+ * les options non automatisables).
  *
  * 18/08/2026 (Simplification UI Événement galactique — Cadre 3 générique,
  * Événement B Cycle 1 : "activer 1 cube / déployer 1 cube sur le
@@ -492,13 +532,19 @@ var GameService = (function () {
    * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
    * générique, Événement B Cycle 1) : correspondance entre une option
    * `effet.options[i]` d'un cadre "choix" et la clé Effet reconnue par
-   * FocusEngine.resoudreCle_ pour les actions sur les cubes de Puissance
-   * Navale (voir focusEngine.js, CLES_DEPLOYER_CUBE et la clé générique
-   * "cube") — seules les 2 formes rencontrées dans le catalogue à ce
-   * jour : { cle: 'activer_cube', valeur: N } et { cle: 'deployer_cube',
-   * valeur: N, cible: 'secteur_mere' | absent }. Retourne null si
-   * l'option ne correspond à aucune des deux formes reconnues (jamais
-   * d'invention de clé FocusEngine à partir d'une donnée non prévue).
+   * FocusEngine.resoudreCle_ — d'abord pour les cubes de Puissance Navale
+   * (voir focusEngine.js, CLES_DEPLOYER_CUBE et la clé générique "cube") :
+   * { cle: 'activer_cube', valeur: N } et { cle: 'deployer_cube', valeur:
+   * N, cible: 'secteur_mere' | absent }.
+   *
+   * 19/08/2026 (Construire une Installation / Établir une Guilde portées) :
+   * { cle: 'etablir_guilde', valeur: N } / { cle: 'construire_installation',
+   * valeur: N } ajoutés (identité — FocusEngine.resoudreCle_ reconnaît ces
+   * clés telles quelles, voir CLES_CONSTRUIRE côté focusEngine.js) — ex.
+   * Événement C Cycle 1 Cadre 2 ("Etablissez une Guilde OU construisez une
+   * Installation"). Retourne null si l'option ne correspond à aucune des
+   * formes reconnues (jamais d'invention de clé FocusEngine à partir d'une
+   * donnée non prévue).
    */
   function cleFocusEnginePourOptionCadre_(option) {
     if (!option || !option.cle) return null;
@@ -507,6 +553,7 @@ var GameService = (function () {
       if (option.cible === 'secteur_mere') return 'deployer_cube_secteur_mere';
       if (!option.cible) return 'deployer_cube';
     }
+    if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
     return null;
   }
 
@@ -1257,19 +1304,127 @@ var GameService = (function () {
     },
 
     /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+     * Domineum") : applique un cadre de type "placement_multiple" — jeux
+     * d'éléments répartis sur des secteurs du Néant adjacents désignés par
+     * un critère de Population (pas un libre choix comme "placement"
+     * simple, voir SecteurService.resoudrePlacementMultipleNeantAdjacent).
+     * `ciblesParGroupe` (un numéro de secteur par groupe, même ordre que
+     * SecteurService.resoudrePlacementMultipleNeantAdjacent(...).groupes)
+     * vient de l'appelant (StrategieService/index.html, secteur unique par
+     * groupe ou choisi par le joueur en cas d'égalité de Population) mais
+     * est intégralement revalidé côté SecteurService.
+     * appliquerPlacementMultipleNeantAdjacent (jamais confiance à
+     * l'appelant), même garde-fou anti-double-application que
+     * appliquerCadrePlacement ci-dessus.
+     */
+    appliquerCadrePlacementMultiple: function (partieId, cycle, ordreCadre, ciblesParGroupe) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        if (!cadre || !cadre.effet || cadre.effet.type !== 'placement_multiple') {
+          throw new Error('Cadre de placement multiple introuvable pour cet ordre.');
+        }
+
+        return SecteurService.appliquerPlacementMultipleNeantAdjacent(partieId, cadre.effet, ciblesParGroupe).then(function (resultat) {
+          var secteursUniques = [];
+          (resultat.secteurs || []).forEach(function (numero) {
+            if (secteursUniques.indexOf(numero) === -1) secteursUniques.push(numero);
+          });
+          evenementCycle.cadresAppliques[ordreCadre] = { secteurs: secteursUniques, le: new Date().toISOString() };
+          partie.evenements[cleCycle] = evenementCycle;
+          return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+        });
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
+    },
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
+     * une Guilde OU construisez une Installation") : applique un cadre de
+     * type "choix" (data/catalogue/evenements.json) dont l'option retenue
+     * ne correspond à AUCUNE mécanique automatisée par l'app (ni cube/
+     * construction — cleFocusEnginePourOptionCadre_ —, ni
+     * Science->Technologie — optionTechnologieViaScience_) : fallback
+     * générique — ne fait qu'enregistrer que le joueur a résolu l'option
+     * choisie à la main sur le plateau physique, même garde-fou anti-
+     * double-application que les autres appliquerCadre*, sans toucher ni
+     * plateauMaison ni secteursPartie. `resume` (texte au passé, ex.
+     * "Guilde établie manuellement") est fourni par l'appelant (IHM) —
+     * GameService reste une couche de données pure, comme pour
+     * appliquerCadreChoixFocusEngine (resume dérivé côté FocusEngine, ici
+     * côté index.html faute de mécanique à déléguer).
+     *
+     * 19/08/2026 (Construire une Installation / Établir une Guilde
+     * portées) : etablir_guilde/construire_installation, l'exemple
+     * d'origine de cette fonction (Cadre 2 ci-dessus), sont désormais
+     * automatisés (voir appliquerCadreChoixFocusEngine) — cette fonction
+     * reste le filet de sécurité générique pour toute future option de
+     * cadre "choix" sans mécanique automatisée derrière, pas figée sur un
+     * cadre précis.
+     */
+    appliquerCadreChoixManuel: function (partieId, cycle, ordreCadre, indexOption, resume) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        if (!option) throw new Error('Option de cadre introuvable pour cet ordre.');
+
+        evenementCycle.cadresAppliques[ordreCadre] = { manuel: true, resume: resume, le: new Date().toISOString() };
+        partie.evenements[cleCycle] = evenementCycle;
+
+        return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
+    },
+
+    /**
      * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
      * générique, Événement B Cycle 1) : applique un cadre "choix" dont
-     * l'option retenue (`indexOption`, dans cadre.effet.options) porte
-     * sur les cubes de Puissance Navale (activer_cube / deployer_cube —
-     * voir cleFocusEnginePourOptionCadre_ ci-dessus) — hors périmètre
+     * l'option retenue (`indexOption`, dans cadre.effet.options) porte sur
+     * une mécanique déjà automatisée côté FocusEngine (voir
+     * cleFocusEnginePourOptionCadre_ ci-dessus) — hors périmètre
      * d'actionsSimplesCadre_ (ne porte pas sur les 5 ressources simples).
      * Réutilise FocusEngine.resoudreEffet (moteur pur déjà utilisé par
      * l'écran Focus pour ces mêmes clés — activer_cube y est une clé
-     * "cube" générique, deployer_cube_secteur_mere y ouvre la popup
-     * dédiée 'deployer_cube' via `demanderChoix`, voir focusEngine.js)
-     * plutôt que de dupliquer une deuxième logique de débit de cubeActif :
-     * seule source de vérité pour cette mécanique, qu'elle soit déclenchée
-     * depuis Focus ou depuis un Cadre d'Événement galactique.
+     * "cube" générique, deployer_cube_secteur_mere y ouvre la popup dédiée
+     * 'deployer_cube', etablir_guilde/construire_installation la popup
+     * 'construire' via `demanderChoix`, voir focusEngine.js) plutôt que de
+     * dupliquer une deuxième logique de résolution : seule source de
+     * vérité pour ces mécaniques, qu'elles soient déclenchées depuis Focus
+     * ou depuis un Cadre d'Événement galactique. Renommée (ex-
+     * appliquerCadreChoixCube) le 19/08/2026 lors de l'ajout de
+     * etablir_guilde/construire_installation — le nom "Cube" ne
+     * correspondait plus à ce que fait la fonction.
      *
      * `demanderChoix` est fourni par l'appelant (StrategieService,
      * couche IHM) — GameService reste autrement une couche de données
@@ -1277,17 +1432,19 @@ var GameService = (function () {
      * accepte un callback IHM, exactement comme FocusEngine.
      * jouerActionEtPersister le fait déjà pour les actions Focus.
      *
-     * Ne lève PAS d'erreur si le joueur annule la popup imbriquée (choix
-     * du type de Flotte à déployer, voir strategieService.js) : ce n'est
-     * pas un échec, `resultatEffet.succes === false` dans ce cas précis
-     * (Annuler sur 'deployer_cube') — résout avec { annule: true } plutôt
-     * que de rejeter, pour que l'appelant (index.html) réactive
-     * simplement le cadre sans message d'erreur, cohérent avec le
-     * comportement d'Annuler sur les autres popups de résolution de
-     * cadre. `champsPlateauMaison` reste borné aux champs déjà surveillés
-     * par FocusEngine (CHAMPS_DIFF_SUIVIS) — jamais une clé arbitraire.
+     * Ne lève PAS d'erreur si le joueur annule la popup imbriquée
+     * (déployer/construire), voir strategieService.js : ce n'est pas un
+     * échec, `resultatEffet.succes === false` dans ce cas précis — résout
+     * avec { annule: true } plutôt que de rejeter, pour que l'appelant
+     * (index.html) réactive simplement le cadre sans message d'erreur,
+     * cohérent avec le comportement d'Annuler sur les autres popups de
+     * résolution de cadre. `champsPlateauMaison` reste borné aux champs
+     * déjà surveillés par FocusEngine (CHAMPS_DIFF_SUIVIS) — jamais une
+     * clé arbitraire (etablir_guilde/construire_installation ne touchent
+     * d'ailleurs aucun de ces champs — mutations vide, l'écriture se fait
+     * directement sur secteursPartie par la popup, voir strategieService.js).
      */
-    appliquerCadreChoixCube: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
+    appliquerCadreChoixFocusEngine: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
         var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
         var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
@@ -1305,7 +1462,7 @@ var GameService = (function () {
         var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
           ? cadre.effet.options[indexOption] : null;
         var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
-        if (!cleFocusEngine) throw new Error('Option de cube introuvable pour ce cadre.');
+        if (!cleFocusEngine) throw new Error('Option automatisable introuvable pour ce cadre.');
         if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
 
         var effet = {};

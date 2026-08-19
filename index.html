@@ -1156,6 +1156,40 @@
     var LABEL_RESSOURCE_CADRE_PLURIEL_ = { credit: 'Crédits' };
 
     /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+     * Domineum") : libellés des critères de SecteurService.
+     * resoudrePlacementMultipleNeantAdjacent (cadre.effet.placements[].critere,
+     * data/catalogue/evenements.json) — titre de la popup de désambiguïsation
+     * en cas d'égalité de Population, texte de la popup de confirmation.
+     */
+    var LABEL_CRITERE_PLACEMENT_ = {
+      population_min: 'Population la plus basse', population_max: 'Population la plus élevée'
+    };
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
+     * une Guilde OU construisez une Installation") : filet de sécurité
+     * générique pour une option de cadre "choix" dont la `cle` ne
+     * correspond à AUCUNE mécanique automatisée (ni cube/construction —
+     * cleFocusEnginePourOptionCadre_ —, ni Science->Technologie —
+     * optionTechnologieViaScience_) : `label` (bouton, infinitif) /
+     * `resume` (statut "✓ Appliqué (...)", au passé — voir mémoire projet,
+     * toujours "manuellement" jamais "à la main"/parenthèses imbriquées).
+     * Fallback générique (humaniserCleCadre_) pour toute clé non
+     * répertoriée ici, plutôt que de rendre le cadre bloqué — vide pour
+     * l'instant (etablir_guilde/construire_installation, ses 2 entrées
+     * d'origine, sont automatisées depuis le 19/08/2026, voir
+     * LABEL_OPTION_CONSTRUIRE_/cleFocusEnginePourOptionCadre_ ci-dessous) :
+     * conservé prêt à accueillir une future clé réellement non
+     * automatisable.
+     */
+    var LABEL_OPTION_CADRE_MANUELLE_ = {};
+    function humaniserCleCadre_(cle) {
+      var texte = String(cle || '').replace(/_/g, ' ');
+      return texte.charAt(0).toUpperCase() + texte.slice(1);
+    }
+
+    /**
      * 19/08/2026 (retour utilisateur) : libellé d'action pour le bouton
      * d'une popup de cadre — au lieu du delta brut préfixé "Appliquer : "
      * (ex. "Appliquer : +3 Crédit"), reprend le gabarit d'effet du jeu
@@ -1216,6 +1250,10 @@
      * comme pour optionTechnologieViaScience_ ci-dessus). Retourne la clé
      * FocusEngine correspondante (voir focusEngine.js, CLES_DEPLOYER_CUBE
      * et la clé générique "cube"), ou null.
+     *
+     * 19/08/2026 (Construire une Installation / Établir une Guilde
+     * portées) : etablir_guilde/construire_installation ajoutés (identité
+     * — voir CLES_CONSTRUIRE côté focusEngine.js, gameService.js v14).
      */
     function cleFocusEnginePourOptionCadre_(option) {
       if (!option || !option.cle) return null;
@@ -1224,6 +1262,7 @@
         if (option.cible === 'secteur_mere') return 'deployer_cube_secteur_mere';
         if (!option.cible) return 'deployer_cube';
       }
+      if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
       return null;
     }
 
@@ -1237,6 +1276,30 @@
         return 'Déployer ' + valeur + ' cube' + pluriel + ' sur le Secteur-Mère';
       }
       return 'Déployer ' + valeur + ' cube' + pluriel;
+    }
+
+    // 19/08/2026 (Construire une Installation / Établir une Guilde
+    // portées) : libellés (bouton, infinitif) pour les 2 clés
+    // etablir_guilde/construire_installation reconnues par
+    // cleFocusEnginePourOptionCadre_ — le détail (secteur + type choisis)
+    // n'apparaît qu'après résolution, dans le statut "✓ Appliqué (...)"
+    // (resume dérivé du journal FocusEngine, voir
+    // GameService.appliquerCadreChoixFocusEngine).
+    var LABEL_OPTION_CONSTRUIRE_ = {
+      etablir_guilde: 'Établir une Guilde',
+      construire_installation: 'Construire une Installation'
+    };
+
+    /**
+     * 19/08/2026 (Construire une Installation / Établir une Guilde
+     * portées) : dispatche le libellé de bouton d'une option de cadre
+     * "choix" automatisée via FocusEngine selon la clé reconnue par
+     * cleFocusEnginePourOptionCadre_ — cube (libelleOptionCube_, déjà
+     * existant) ou construction (LABEL_OPTION_CONSTRUIRE_, nouveau).
+     */
+    function libelleOptionFocusEngine_(option, cleFocusEngine) {
+      if (LABEL_OPTION_CONSTRUIRE_[cleFocusEngine]) return LABEL_OPTION_CONSTRUIRE_[cleFocusEngine];
+      return libelleOptionCube_(option, cleFocusEngine);
     }
 
     /**
@@ -1266,25 +1329,52 @@
 
     /**
      * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
-     * générique, Événement B Cycle 1) : applique l'option cube choisie
-     * (activer/déployer, voir cleFocusEnginePourOptionCadre_ ci-dessus)
-     * via GameService.appliquerCadreChoixCube — qui délègue à
-     * FocusEngine.resoudreEffet, seule source de vérité pour la
-     * mécanique de cubes (déjà utilisée par l'écran Focus), en lui
-     * passant StrategieService.demanderChoix pour la popup imbriquée
-     * "Déployer des cubes" (choix du type de Flotte) le cas échéant.
-     * `resultat.annule` (Annuler sur cette popup imbriquée) n'est PAS
-     * une erreur : réactive juste le cadre, comme les autres popups.
+     * générique, Événement B Cycle 1) : applique l'option choisie (activer/
+     * déployer un cube, ou — depuis le 19/08/2026 — établir une Guilde/
+     * construire une Installation, voir cleFocusEnginePourOptionCadre_
+     * ci-dessus) via GameService.appliquerCadreChoixFocusEngine (ex-
+     * appliquerCadreChoixCube, renommée à l'ajout de la construction) —
+     * qui délègue à FocusEngine.resoudreEffet, seule source de vérité pour
+     * ces mécaniques (déjà utilisées par l'écran Focus), en lui passant
+     * StrategieService.demanderChoix pour la popup imbriquée ("Déployer
+     * des cubes" ou "Construire une Installation"/"Établir une Guilde")
+     * le cas échéant. `resultat.annule` (Annuler sur cette popup
+     * imbriquée) n'est PAS une erreur : réactive juste le cadre, comme
+     * les autres popups.
      */
-    function appliquerCadreCubeEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+    function appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
       if (typeof StrategieService === 'undefined') return;
       bouton.disabled = true;
-      GameService.appliquerCadreChoixCube(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+      GameService.appliquerCadreChoixFocusEngine(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
         .then(function (resultat) {
           if (!resultat || resultat.annule) { bouton.disabled = false; return; }
           partieCourante = resultat;
           renderEvenementCycle_(resultat);
           StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
+     * une Guilde OU construisez une Installation") : applique l'option
+     * choisie sans mécanique automatisée (voir LABEL_OPTION_CADRE_MANUELLE_/
+     * actionsCadre_ ci-dessus) via GameService.appliquerCadreChoixManuel —
+     * `resume` est le même texte au passé affiché ensuite comme statut
+     * "✓ Appliqué (...)" (rendu générique déjà en place pour
+     * cadresAppliques[ordre].resume, voir renderCadresEvenement_ — aucun
+     * changement nécessaire côté rendu).
+     */
+    function appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, indexOption, resume, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      GameService.appliquerCadreChoixManuel(partie.id, cycle, ordre, indexOption, resume)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          StrategieService.afficher(partieMaj);
         })
         .catch(function (erreur) {
           bouton.disabled = false;
@@ -1359,6 +1449,124 @@
     }
 
     /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+     * Domineum") : construit le texte de la popup de confirmation d'un
+     * cadre "placement_multiple" une fois les cibles connues (sans égalité
+     * de Population à trancher) — jamais le texte du cadre répété (déjà
+     * visible sur la carte derrière la popup), juste le résultat calculé,
+     * pour que le joueur puisse le reporter sur le plateau physique.
+     */
+    function libelleConfirmationPlacementMultiple_(casParticulier, groupes, cibles) {
+      if (casParticulier) {
+        return 'Un seul secteur du Néant est adjacent à vos secteurs : tous les jetons sont placés sur le Secteur ' + cibles[0] + '.';
+      }
+      return groupes.map(function (groupe, i) {
+        return (LABEL_CRITERE_PLACEMENT_[groupe.critere] || 'Secteur') + ' → Secteur ' + cibles[i] + '.';
+      }).join('<br>');
+    }
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : résout
+     * séquentiellement chaque groupe renvoyé par SecteurService.
+     * resoudrePlacementMultipleNeantAdjacent — un groupe à candidat unique
+     * est retenu directement (aucune interaction, la cible est déterminée
+     * par la règle de Population) ; un groupe à plusieurs candidats
+     * (égalité de Population, cas rare) ouvre la popup de sélection de
+     * secteur déjà utilisée pour un cadre "placement" simple, restreinte à
+     * ces candidats (contexte.numeros, voir strategieService.js). Résout
+     * avec le tableau des cibles choisies (même ordre que `groupes`), ou
+     * `null` si le joueur annule une désambiguïsation en cours de route.
+     */
+    function resoudreGroupesPlacementMultiple_(groupes, index, cibles) {
+      if (index >= groupes.length) return Promise.resolve(cibles);
+      var groupe = groupes[index];
+      if (groupe.candidats.length === 1) {
+        cibles.push(groupe.candidats[0]);
+        return resoudreGroupesPlacementMultiple_(groupes, index + 1, cibles);
+      }
+      return StrategieService.demanderChoix({
+        type: 'placement_secteur_neant_adjacent',
+        titre: 'Choisir un secteur (' + (LABEL_CRITERE_PLACEMENT_[groupe.critere] || 'égalité de Population') + ')',
+        elements: groupe.elements,
+        numeros: groupe.candidats
+      }).then(function (resultatChoix) {
+        if (!resultatChoix || resultatChoix.annule) return null;
+        cibles.push(resultatChoix.numero);
+        return resoudreGroupesPlacementMultiple_(groupes, index + 1, cibles);
+      });
+    }
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : persiste les
+     * cibles retenues via GameService.appliquerCadrePlacementMultiple
+     * (revalide tout côté SecteurService) puis rafraîchit l'écran — même
+     * pattern qu'appliquerCadrePlacementEtRafraichir_ ci-dessus.
+     */
+    function finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton) {
+      return GameService.appliquerCadrePlacementMultiple(partie.id, cycle, ordre, cibles)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          App.renderSecteurs(partieMaj);
+          StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec du placement : ' + erreur.message);
+        });
+    }
+
+    /**
+     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+     * Domineum") : cadre de type "placement_multiple" — la cible de chaque
+     * jeu d'éléments est déterminée par la Population des secteurs du
+     * Néant adjacents (voir SecteurService.resoudrePlacementMultipleNeantAdjacent),
+     * pas par un libre choix comme le cadre "placement" simple. Si aucune
+     * désambiguïsation n'a été nécessaire (aucune égalité de Population),
+     * une popup de confirmation (Annuler/Valider — voir mémoire projet :
+     * "La popup a toujours exactement Annuler + Valider") récapitule le
+     * résultat calculé avant d'écrire ; sinon, la ou les popups de
+     * désambiguïsation déjà affichées (resoudreGroupesPlacementMultiple_)
+     * tiennent lieu de confirmation (pas de double confirmation, même
+     * principe que le point 6 des Cadres "choix").
+     */
+    function appliquerCadrePlacementMultipleEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined' || typeof SecteurService === 'undefined') return;
+      bouton.disabled = true;
+      SecteurService.resoudrePlacementMultipleNeantAdjacent(partie.id, cadre.effet).then(function (resultat) {
+        var groupes = resultat.groupes || [];
+        if (!groupes.length || groupes.some(function (g) { return !g.candidats.length; })) {
+          bouton.disabled = false;
+          window.alert('Aucun secteur du Néant adjacent à l’un de vos secteurs, avec les emplacements requis libres actuellement.');
+          return;
+        }
+
+        var desambiguisationRequise = groupes.some(function (g) { return g.candidats.length > 1; });
+
+        return resoudreGroupesPlacementMultiple_(groupes, 0, []).then(function (cibles) {
+          if (!cibles) { bouton.disabled = false; return; }
+
+          if (desambiguisationRequise) {
+            return finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton);
+          }
+
+          return StrategieService.demanderChoix({
+            type: 'confirmation',
+            titre: 'Confirmer le placement',
+            message: libelleConfirmationPlacementMultiple_(resultat.casParticulier, groupes, cibles),
+            texteValider: 'Valider'
+          }).then(function (confirmation) {
+            if (!confirmation || confirmation.annule || !confirmation.confirme) { bouton.disabled = false; return; }
+            return finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton);
+          });
+        });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
      * 19/08/2026 (Événement galactique B, Cycle 1 — Cadre 2 "Placez une
      * Corruption sur l'offre de Programme Domination") : cadre de type
      * "gain" (aucune ressource plateauMaison suivie par l'app derrière —
@@ -1419,10 +1627,20 @@
      *
      * 18/08/2026 (Cadre 3 générique, Événement B Cycle 1) : une option
      * "cube" (activer_cube / deployer_cube_secteur_mere) délègue à
-     * appliquerCadreCubeEtRafraichir_ (GameService.appliquerCadreChoixCube
-     * -> FocusEngine.resoudreEffet) — pour "déployer", une SECONDE popup
-     * imbriquée s'ouvre (choix du type de Flotte, contexte 'deployer_cube'
-     * déjà existant côté Focus) : comportement attendu, pas un bug.
+     * appliquerCadreFocusEngineEtRafraichir_ (GameService.
+     * appliquerCadreChoixFocusEngine -> FocusEngine.resoudreEffet) — pour
+     * "déployer", une SECONDE popup imbriquée s'ouvre (choix du type de
+     * Flotte, contexte 'deployer_cube' déjà existant côté Focus) :
+     * comportement attendu, pas un bug.
+     *
+     * 19/08/2026 (Construire une Installation / Établir une Guilde
+     * portées) : une option "etablir_guilde"/"construire_installation"
+     * (ex. Cadre 2 Événement C Cycle 1) suit désormais le même chemin que
+     * "cube" ci-dessus (même fonction générique, cleFocusEnginePourOptionCadre_
+     * les reconnaît aussi) — délègue à appliquerCadreFocusEngineEtRafraichir_,
+     * qui ouvre la popup imbriquée 'construire' (secteur + type, voir
+     * strategieService.js). Le fallback "manuel" ci-dessous ne sert plus
+     * qu'à une future option de cadre "choix" sans mécanique automatisée.
      *
      * 19/08/2026 (retour utilisateur, principe à garder pour les
      * prochains événements) : le libellé d'une option "delta simple"
@@ -1459,8 +1677,21 @@
           var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
           if (cleFocusEngine) {
             actions.push({
-              proportionnel: false, cube: true, indexOption: indexOption,
-              label: libelleOptionCube_(option, cleFocusEngine)
+              proportionnel: false, focusEngine: true, indexOption: indexOption,
+              label: libelleOptionFocusEngine_(option, cleFocusEngine)
+            });
+            return;
+          }
+          // Option dont la `cle` ne correspond à aucune mécanique
+          // automatisée connue — reste sélectionnable dans la popup,
+          // résolue manuellement (voir LABEL_OPTION_CADRE_MANUELLE_/
+          // appliquerCadreChoixManuelEtRafraichir_).
+          if (option.cle) {
+            var infoManuelle = LABEL_OPTION_CADRE_MANUELLE_[option.cle] ||
+              { label: humaniserCleCadre_(option.cle), resume: humaniserCleCadre_(option.cle) + ' résolu manuellement' };
+            actions.push({
+              proportionnel: false, manuel: true, indexOption: indexOption,
+              label: infoManuelle.label, resume: infoManuelle.resume
             });
           }
         });
@@ -1488,8 +1719,10 @@
           var deltaTechnologie = {};
           deltaTechnologie.science = -choisie.coutScience;
           appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
-        } else if (choisie.cube) {
-          appliquerCadreCubeEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.focusEngine) {
+          appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.manuel) {
+          appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, choisie.indexOption, choisie.resume, bouton);
         } else if (choisie.proportionnel) {
           var quantite = Math.max(0, Math.floor(Number(resultat.quantite) || 0));
           if (!quantite) { bouton.disabled = false; return; }
@@ -1575,12 +1808,26 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+          // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges
+          // du Domineum") : nouveau type de cadre "placement_multiple" —
+          // plusieurs jeux d'éléments, chacun sur un secteur du Néant
+          // adjacent déterminé par un critère de Population (voir
+          // SecteurService.resoudrePlacementMultipleNeantAdjacent), pas un
+          // libre choix comme "placement" simple.
+          var estPlacementMultiple = !!(cadre.effet && cadre.effet.type === 'placement_multiple');
           var estManuel = !!(cadre.effet && cadre.effet.type === 'gain');
 
           var statutHtml = '';
           var actions = [];
           if (estPlacementNeantAdjacent) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
+          } else if (estPlacementMultiple) {
+            if (applique) {
+              var secteursTexte = (applique.secteurs || []).length > 1
+                ? 'Secteurs ' + applique.secteurs.join(' et ')
+                : 'Secteur ' + applique.secteurs[0];
+              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + secteursTexte + ')</p>';
+            }
           } else if (estManuel) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (manuellement)</p>';
           } else if (applique) {
@@ -1595,9 +1842,10 @@
             actions = actionsCadre_(cadre);
           }
 
-          var cliquable = !applique && (estPlacementNeantAdjacent || estManuel || actions.length);
+          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || actions.length);
           var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
-          var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"');
+          var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' :
+            (estPlacementMultiple ? ' data-placement-multiple="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"'));
           var attributsCarte = cliquable
             ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
             : '';
@@ -1615,6 +1863,19 @@
         var declencher = function () {
           if (carteEl.classList.contains('cadre-carte-en-cours')) return;
           appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement-multiple="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementMultipleEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
         };
         carteEl.addEventListener('click', declencher);
         carteEl.addEventListener('keydown', function (evenement) {

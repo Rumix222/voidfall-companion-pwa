@@ -198,7 +198,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit gagner une Corruption sur un emplacement de Programme ou sur une piste de Civilisation. Si la Corruption est placée sur une piste et que son marqueur n'est pas dans la case la plus à droite, le joueur doit avancer sur cette piste (et donc ignorer le bénéfice rapporté par la case qu'il atteint).",
+        "texte": "Gagnez une Corruption sur un emplacement de Programme ou sur une piste de Civilisation. Si la Corruption est placée sur une piste et que son marqueur n'est pas dans la case la plus à droite, le joueur doit avancer sur cette piste (et donc ignorer le bénéfice rapporté par la case qu'il atteint).",
         "effet": {
           "type": "gain", "cible_options": [ "emplacement_programme", "piste_civilisation" ], "elements": { "corruption": 1 },
           "effet_conditionnel": {
@@ -233,7 +233,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit soit gagner une Corruption pour gagner un jeton Gloire de valeur 1, soit rappeler 1 cube.",
+        "texte": "Gagnez une Corruption pour gagner un jeton Gloire de valeur 1 ou rappeler 1 cube.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "gain": { "corruption": 1, "gloire": 1 } },
           { "recall": { "cube": 1 } }
@@ -267,12 +267,12 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut soit améliorer un jeton Gloire et/ou activer 1 cube, soit avancer sur une piste de Civilisation.",
+        "texte": "Améliorez un jeton Gloire et/ou activer 1 cube OU avancer sur une piste de Civilisation.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "mode": "libre", "gains": [ { "cle": "ameliorer_gloire", "valeur": 1 }, { "cle": "activer_cube", "valeur": 1 } ] },
           { "cle": "avancer_civilisation", "valeur": 1 }
@@ -297,12 +297,12 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez 1 cube du Néant dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1 } }
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "collectif",
-        "texte": "Les joueurs peuvent gagner deux Corruption en tout (à partager entre l'ensemble des joueurs) pour retirer un Gardien d'un secteur et le renvoyer à la réserve. Toute Corruption gagnée à cette occasion parmi les deux peut être placée sur la carte Technologie des Chambres de Décontamination, si les joueurs en disposent.",
+        "texte": "Gagnez deux Corruption en tout pour retirer un Gardien d'un secteur et le renvoyer à la réserve. Toute Corruption gagnée à cette occasion parmi les deux peut être placée sur la carte Technologie des Chambres de Décontamination.",
         "effet": {
           "type": "echange_collectif", "partage_entre_joueurs": true,
           "cout_total": { "corruption": 2 },
@@ -329,7 +329,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer un jeton Libération et 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez un jeton Libération et 1 cube du Néant dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "cube_neant": 1 } }
       },
       {
@@ -361,7 +361,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer 1 cube du Néant et une Guilde de Banquiers dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez 1 cube du Néant et une Guilde de Banquiers dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "guilde_banquier": 1 } }
       },
       {
@@ -371,7 +371,7 @@
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut activer ou déployer 2 cubes.",
+        "texte": "Activez ou déployez 2 cubes.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "activer_cube", "valeur": 2 },
           { "cle": "deployer_cube", "valeur": 2 }
@@ -406,7 +406,7 @@
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut diminuer la Population Pure de l'un de ses secteurs (sauf Secteur-Mère) pour construire une Installation et déployer 2 cubes dans ce même secteur.",
+        "texte": "Diminuez la Population Pure de l'un de ses secteurs (sauf Secteur-Mère) pour construire une Installation et déployer 2 cubes dans ce même secteur.",
         "effet": {
           "type": "echange",
           "cout": { "cle": "population_pure", "valeur": 1, "cible": "secteur_au_choix", "exclusion": "secteur_mere" },
@@ -436,7 +436,7 @@
       },
       {
         "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit gagner une Corruption sur une piste de Civilisation, si possible. Si toutes les pistes de Civilisation d'un joueur sont déjà Corrompues, alors il place cette Corruption sur un emplacement de Programme, l'un de ses secteurs, ou sur la carte Technologie Chambres de Décontamination.",
+        "texte": "Gagnez une Corruption sur une piste de Civilisation, si possible. Si toutes les pistes de Civilisation sont déjà Corrompues, alors placez cette Corruption sur un emplacement de Programme, un secteurs, ou sur la carte Technologie Chambres de Décontamination.",
         "effet": {
           "type": "gain", "cible": "piste_civilisation", "elements": { "corruption": 1 },
           "repli": { "condition": "toutes_pistes_civilisation_corrompues", "cibles_possibles": [ "emplacement_programme", "secteur_au_choix", "carte_technologie_chambres_decontamination" ] }
@@ -444,7 +444,7 @@
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut gagner 3 Science ou avancer sur une piste de Civilisation.",
+        "texte": "Gagnez 3 Science ou avancez sur une piste de Civilisation.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "science", "valeur": 3 },
           { "cle": "avancer_civilisation", "valeur": 1 }
@@ -469,7 +469,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit gagner une Corruption dans un secteur, si possible. Si tous les secteurs (corruptibles) d'un joueur sont déjà Corrompus, alors il place cette Corruption sur sa fiche Maison ou sur la carte Technologie Chambres de Décontamination.",
+        "texte": "Gagnez une Corruption dans un secteur, si possible. Si tous les secteurs (corruptibles) sont déjà Corrompus, alors placez cette Corruption sur la fiche Maison ou sur la carte Technologie Chambres de Décontamination.",
         "effet": {
           "type": "gain", "cible": "secteur_au_choix", "elements": { "corruption": 1 },
           "repli": { "condition": "tous_secteurs_corruptibles_deja_corrompus", "cibles_possibles": [ "fiche_maison", "carte_technologie_chambres_decontamination" ] }
@@ -477,12 +477,12 @@
       },
       {
         "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur ayant au moins six Guildes dans ses secteurs Purs peut gagner un jeton Commerce. Tous les autres joueurs peuvent gagner un jeton Prime.",
+        "texte": "Si vous avez au moins six Guildes dans vos secteurs Purs gagnez un jeton Commerce, sinon gagnez un jeton Prime.",
         "effet": {
           "type": "si_sinon",
           "si": { "condition": { "cle": "guilde_dans_secteurs_purs_min", "valeur": 6 }, "alors": { "cle": "commerce", "valeur": 1 } },
@@ -508,12 +508,12 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez 1 cube du Néant dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1 } }
       },
       {
         "ordre": 2, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit choisir deux fois : détruire une Guilde ou détruire une Installation (mais jamais dans son Secteur-Mère).",
+        "texte": "Choisissez deux fois : détruire une Guilde ou détruire une Installation (mais jamais dans son Secteur-Mère).",
         "effet": { "type": "choix", "mode": "exclusif_repete", "repetitions": 2, "options": [
           { "cle": "detruire_guilde", "valeur": 1 },
           { "cle": "detruire_installation", "valeur": 1 }
@@ -542,7 +542,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit augmenter la Population de l'un de ses secteurs Purs (sauf Secteur-Mère), si possible. Ensuite, chaque joueur doit placer une Corruption sur ce secteur. La Corruption ne peut pas être placée sur sa carte Technologie Chambres de Décontamination. Si un joueur ne peut pas augmenter une Population, il ne gagne pas la Corruption.",
+        "texte": "Augmentez la Population de l'un de vos secteurs Purs (sauf Secteur-Mère), si possible. Ensuite, placez une Corruption sur ce secteur. La Corruption ne peut pas être placée sur sa carte Technologie Chambres de Décontamination. Si un joueur ne peut pas augmenter une Population, il ne gagne pas la Corruption.",
         "effet": {
           "type": "sequence",
           "etapes": [

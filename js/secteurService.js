@@ -1,7 +1,28 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 3 — 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique)
+ * Version 4 — 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du Domineum")
+ *
+ * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+ * Domineum") : nouveau type de cadre "placement_multiple" (data/catalogue/
+ * evenements.json) — plusieurs jeux d'éléments à poser, chacun sur un
+ * secteur du Néant adjacent désigné par un critère de Population
+ * (`population_min`/`population_max`), pas par un libre choix du joueur
+ * comme le cadre "placement" simple. `prime` ajouté à
+ * CHAMP_ELEMENT_PLACEMENT_ (jeton, aucun emplacement consommé — premier
+ * cadre à poser un jeton Prime). Nouvelles fonctions PURES (aucune
+ * écriture) resoudrePlacementMultipleNeantAdjacent(partieId, effet) —
+ * calcule les cibles (secteur atteignant l'extremum de Population par
+ * groupe de placements, ou plusieurs candidats à égalité) en réutilisant
+ * obtenirSecteursEligiblesPlacementNeantAdjacent existante (filtre Néant/
+ * adjacence/emplacements) pour chaque jeu d'éléments — et
+ * appliquerPlacementMultipleNeantAdjacent(partieId, effet, ciblesParGroupe)
+ * — revalide à neuf (jamais confiance à l'appelant) puis écrit
+ * séquentiellement via placerElementsNeantAdjacent (inchangée). Le cas
+ * particulier "un seul secteur du Néant adjacent" (effet.cas_particulier
+ * du catalogue) fusionne tous les placements en un seul groupe ciblant ce
+ * secteur unique. js/gameService.js (v13 — appliquerCadrePlacementMultiple),
+ * index.html (rendu Cadre 1 + popup de confirmation/désambiguïsation).
  *
  * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
  * obtenirSecteursEligiblesDefenseGuildeNeantAdjacent/
@@ -619,7 +640,11 @@ var SecteurService = (function () {
     guilde_ingenieurs: { champ: 'guildeIngenieurs', categorie: 'guilde' },
     guilde_mineurs: { champ: 'guildeMineurs', categorie: 'guilde' },
     guilde_banquiers: { champ: 'guildeBanquiers', categorie: 'guilde' },
-    liberation: { champ: 'jetonLiberation', categorie: 'jeton' }
+    liberation: { champ: 'jetonLiberation', categorie: 'jeton' },
+    // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+    // Domineum") : premier cadre à poser un jeton Prime (jeton, comme
+    // Libération, aucun emplacement Installation/Guilde consommé).
+    prime: { champ: 'jetonPrime', categorie: 'jeton' }
   };
 
   /**
@@ -737,6 +762,113 @@ var SecteurService = (function () {
     });
   }
 
+  /**
+   * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+   * Domineum") : calcule (SANS écrire) les cibles d'un cadre de type
+   * "placement_multiple" (data/catalogue/evenements.json, effet.placements[]
+   * — chaque entrée { critere: 'population_min'|'population_max', elements }).
+   * Contrairement à un cadre "placement" simple, le secteur n'est pas un
+   * libre choix du joueur : il est déterminé par la Population des
+   * secteurs du Néant adjacents à l'un des secteurs du joueur (la plus
+   * basse pour l'un, la plus élevée pour l'autre) — seule une égalité de
+   * Population (rare) laisse un vrai choix au joueur (plusieurs candidats
+   * à égalité pour le même critère).
+   *
+   * Retourne { casParticulier, groupes } où `groupes` est un tableau
+   * parallèle à `effet.placements` (même ordre, même longueur) SAUF si
+   * `casParticulier` est vrai (un seul secteur du Néant est adjacent au
+   * total, voir `effet.cas_particulier` du catalogue) : dans ce cas
+   * `groupes` ne contient qu'UNE entrée, ses `elements` fusionnant ceux de
+   * TOUS les `placements` (tous les jetons posés sur cet unique secteur,
+   * conforme à la règle imprimée). Chaque groupe : { elements, candidats }
+   * — `candidats` = liste des numéros de secteur atteignant le critère (1
+   * seul élément si aucune égalité, plusieurs sinon, vide si aucun secteur
+   * éligible actuellement).
+   *
+   * Réutilise obtenirSecteursEligiblesPlacementNeantAdjacent (déjà
+   * générique, filtre Néant/adjacence/emplacements Installation-Guilde
+   * libres) pour chaque jeu d'éléments plutôt que de dupliquer ce filtre —
+   * seule la Population (obtenirSecteurs) est nouvelle ici.
+   */
+  function resoudrePlacementMultipleNeantAdjacent(partieId, effet) {
+    if (!effet || effet.type !== 'placement_multiple' || !Array.isArray(effet.placements)) {
+      return Promise.resolve({ casParticulier: false, groupes: [] });
+    }
+
+    return Promise.all([
+      obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, {}),
+      obtenirSecteurs(partieId)
+    ]).then(function (resultats) {
+      var eligiblesBase = resultats[0];
+      var populationParNumero = {};
+      resultats[1].forEach(function (s) { populationParNumero[s.numero] = s.population; });
+
+      var casParticulier = !!(effet.cas_particulier &&
+        effet.cas_particulier.condition === 'un_seul_secteur_neant_adjacent' &&
+        eligiblesBase.length === 1);
+
+      if (casParticulier) {
+        var elementsFusionnes = {};
+        effet.placements.forEach(function (p) {
+          Object.keys(p.elements || {}).forEach(function (cle) {
+            elementsFusionnes[cle] = (elementsFusionnes[cle] || 0) + (Number(p.elements[cle]) || 0);
+          });
+        });
+        return obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elementsFusionnes).then(function (eligiblesFusionnes) {
+          var candidats = eligiblesFusionnes.map(function (e) { return e.numero; });
+          return { casParticulier: true, groupes: [{ elements: elementsFusionnes, candidats: candidats }] };
+        });
+      }
+
+      return Promise.all(effet.placements.map(function (p) {
+        return obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, p.elements).then(function (eligibles) {
+          if (!eligibles.length) return { elements: p.elements, critere: p.critere, candidats: [] };
+          var populations = eligibles.map(function (e) { return Number(populationParNumero[e.numero]) || 0; });
+          var extremum = p.critere === 'population_max' ? Math.max.apply(null, populations) : Math.min.apply(null, populations);
+          var candidats = eligibles
+            .filter(function (e) { return (Number(populationParNumero[e.numero]) || 0) === extremum; })
+            .map(function (e) { return e.numero; });
+          return { elements: p.elements, critere: p.critere, candidats: candidats };
+        });
+      })).then(function (groupes) {
+        return { casParticulier: false, groupes: groupes };
+      });
+    });
+  }
+
+  /**
+   * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : applique un
+   * cadre "placement_multiple" — `ciblesParGroupe` (un numéro de secteur
+   * par entrée de `resoudrePlacementMultipleNeantAdjacent(...).groupes`,
+   * même ordre) vient du joueur (choix explicite en cas d'égalité de
+   * Population, ou seul candidat possible sinon) mais est REVALIDÉ ici :
+   * les groupes sont recalculés à neuf (jamais confiance à l'appelant, même
+   * principe que placerElementsNeantAdjacent) et chaque cible doit figurer
+   * parmi les candidats recalculés. Écrit séquentiellement via
+   * placerElementsNeantAdjacent (déjà générique) pour chaque groupe.
+   */
+  function appliquerPlacementMultipleNeantAdjacent(partieId, effet, ciblesParGroupe) {
+    return resoudrePlacementMultipleNeantAdjacent(partieId, effet).then(function (resultat) {
+      var groupes = resultat.groupes;
+      if (!groupes.length || !Array.isArray(ciblesParGroupe) || ciblesParGroupe.length !== groupes.length) {
+        throw new Error('Sélection de secteurs invalide pour ce cadre.');
+      }
+      groupes.forEach(function (groupe, i) {
+        if (groupe.candidats.indexOf(ciblesParGroupe[i]) === -1) {
+          throw new Error('Secteur ' + ciblesParGroupe[i] + ' non éligible pour ce placement (Population).');
+        }
+      });
+
+      var promesse = Promise.resolve();
+      groupes.forEach(function (groupe, i) {
+        promesse = promesse.then(function () {
+          return placerElementsNeantAdjacent(partieId, ciblesParGroupe[i], groupe.elements);
+        });
+      });
+      return promesse.then(function () { return { secteurs: ciblesParGroupe.slice() }; });
+    });
+  }
+
   return {
     SCENARIO_PAR_DEFAUT: SCENARIO_PAR_DEFAUT,
     instancierSecteurs: instancierSecteurs,
@@ -752,6 +884,8 @@ var SecteurService = (function () {
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
+    resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,
+    appliquerPlacementMultipleNeantAdjacent: appliquerPlacementMultipleNeantAdjacent,
     getEntretien: getEntretien
   };
 })();

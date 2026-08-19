@@ -652,6 +652,66 @@
  * "Ajouter ce déploiement" collé à l'input Quantité au-dessus et à la
  * liste des déploiements engagés en dessous — marge ajoutée avant/après
  * (margin-top/bottom 8px -> 16px) : js/strategieService.js.
+ *
+ * 19/08/2026 (Événement galactique C, Cycle 1 "Vestiges du Domineum") :
+ * les 2 Cadres de cet événement portés. Cadre 1 — nouveau type de cadre
+ * "placement_multiple" (data/catalogue/evenements.json) : plusieurs jeux
+ * d'éléments (jeton Prime / jeton Libération + Défense de Secteur),
+ * chacun sur un secteur du Néant adjacent désigné par un critère de
+ * Population (la plus basse / la plus élevée) — pas un libre choix du
+ * joueur comme le cadre "placement" simple existant. SecteurService (v4)
+ * calcule les cibles (resoudrePlacementMultipleNeantAdjacent, réutilise le
+ * filtre Néant/adjacence/emplacements déjà générique) et écrit
+ * (appliquerPlacementMultipleNeantAdjacent, revalide tout) ; `prime`
+ * ajouté à CHAMP_ELEMENT_PLACEMENT_ (jeton, aucun emplacement consommé —
+ * premier cadre à en poser un). En l'absence d'égalité de Population,
+ * l'app calcule seule les 2 secteurs cibles et affiche une popup de
+ * confirmation (Annuler/Valider) avant d'écrire ; en cas d'égalité (rare),
+ * une popup de sélection restreinte aux secteurs à égalité s'ouvre à la
+ * place (contexte.numeros, nouveau paramètre optionnel de la popup
+ * 'placement_secteur_neant_adjacent', js/strategieService.js v18). Le cas
+ * particulier "un seul secteur du Néant adjacent" (règle imprimée sur la
+ * carte) fusionne tous les jetons sur cet unique secteur, géré par le même
+ * calcul générique (pas un code séparé). Cadre 2 ("Établissez une Guilde
+ * OU construisez une Installation") : les deux options sont hors
+ * périmètre (aucune mécanique de construction de Guilde/Installation
+ * automatisée par l'app à ce jour, mêmes clés déjà signalées hors
+ * périmètre côté Focus) — nouvelle option "manuelle" générique dans la
+ * popup de résolution de cadre (comme "Gagner une technologie"), marque
+ * juste l'option choisie comme résolue à la main
+ * (GameService.appliquerCadreChoixManuel, aucun delta), statut "✓ Appliqué
+ * (Guilde établie manuellement)"/"(Installation construite manuellement)".
+ * js/gameService.js (v13), js/secteurService.js (v4), js/strategieService.js
+ * (v18), index.html. Aucun changement css/style.css (réutilise les
+ * classes .cadre-carte-cliquable/.modal-choix-* existantes).
+ *
+ * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
+ * retour utilisateur : "on a dû perdre cette possibilité lors du portage
+ * en PWA, il y a des actions de focus qui placent des guildes ou des
+ * installations aussi") : les clés "construire_installation"/
+ * "installation"/"etablir_guilde"/"guilde" (Focus ET Cadres d'Événement
+ * galactique) sortent de CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié
+ * dans FocusEngine.resoudreCle_ qui délègue à une popup dédiée (nouveau
+ * contexte 'construire' de StrategieService.demanderChoix) : secteur
+ * possédé avec un emplacement libre pour la catégorie (❗ si c'est le
+ * dernier, même convention que le placement d'Événement galactique), puis
+ * type au choix (5 Guildes ou 3 Installations) — Valider appelle
+ * directement SecteurService.construire (déjà porté Session 12/13,
+ * jusqu'ici seulement branché sur le formulaire dédié de l'écran
+ * Secteurs) et persiste. Bénéfice double : toute carte Focus du catalogue
+ * utilisant ces 4 clés devient jouable (dispatch générique déjà en place,
+ * aucun changement supplémentaire nécessaire), ET Événement C Cycle 1
+ * Cadre 2 ("Etablissez une Guilde OU construisez une Installation", porté
+ * la session précédente avec une résolution manuelle de repli) devient
+ * automatisé de la même façon — GameService.appliquerCadreChoixCube
+ * renommée appliquerCadreChoixFocusEngine (ne concernait plus que les
+ * cubes). Portée volontairement limitée aux 4 clés de base (secteur libre
+ * + type libre, quantité 1) — les variantes du catalogue
+ * (etablir_guilde_meme_secteur/_up_to/_scientifique,
+ * construire_installation_meme_secteur/_autre_secteur/_up_to) restent
+ * hors périmètre (repli générique existant, pas de régression).
+ * js/focusEngine.js (v5), js/strategieService.js (v19), js/gameService.js
+ * (v14), index.html. Aucun changement css/style.css.
  */
 
-var APP_VERSION = '20260819.13';
+var APP_VERSION = '20260819.15';

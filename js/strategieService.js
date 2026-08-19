@@ -1,7 +1,35 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 17 — 19/08/2026 (retour utilisateur — ligne Cube éditable + bouton Activer)
+ * Version 19 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ *
+ * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
+ * retour utilisateur : mécanique perdue lors du portage GAS -> PWA)
+ * : nouveau contexte 'construire' de demanderChoix (secteur possédé avec un
+ * emplacement libre pour la catégorie, ❗ si c'est le dernier — même
+ * gabarit que 'placement_secteur_neant_adjacent' — + type au choix,
+ * TYPES_INSTALLATION_CONSTRUIRE_/TYPES_GUILDE_CONSTRUIRE_ nouvelles,
+ * dupliquées depuis index.html par convention) — appelé par
+ * focusEngine.js (resoudreCle_, clés construire_installation/installation/
+ * etablir_guilde/guilde, désormais sorties de CLES_SECTEUR_HORS_PERIMETRE)
+ * pour toute carte Focus ET par GameService.appliquerCadreChoixFocusEngine
+ * pour un Cadre "choix" d'Événement galactique (ex. Événement C Cycle 1
+ * Cadre 2). Persiste directement via SecteurService.construire (déjà porté
+ * Session 12/13, jusqu'ici seulement branché sur le formulaire dédié de
+ * l'écran Secteurs) au clic sur Valider, comme regrouper/envahir/
+ * deployer_cube — focusEngine.js reste pur.
+ *
+ * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
+ * Domineum") : popup 'placement_secteur_neant_adjacent' accepte un
+ * `contexte.numeros` optionnel (liste de numéros précise, ex. secteurs à
+ * égalité de Population) qui restreint la liste déroulante — la liste
+ * éligible complète reste calculée via SecteurService.
+ * obtenirSecteursEligiblesPlacementNeantAdjacent puis simplement filtrée,
+ * aucune nouvelle logique d'éligibilité. Utilisé par index.html pour
+ * désambiguïser un cadre "placement_multiple" (SecteurService.
+ * resoudrePlacementMultipleNeantAdjacent) quand plusieurs secteurs sont à
+ * égalité pour le même critère de Population — rétrocompatible (les
+ * appelants existants ne passent pas `numeros`, comportement inchangé).
  *
  * 18/08/2026 (retour utilisateur) : fallback de titre par défaut de la
  * popup 'placement_secteur_neant_adjacent' ("Choisir un secteur du
@@ -418,6 +446,25 @@ var StrategieService = (function () {
     corvette: 'pnCorvette', sentinelle: 'pnSentinelle', destroyer: 'pnDestroyer',
     cuirasse: 'pnCuirasse', porte_vaisseau: 'pnPorteVaisseau'
   };
+
+  // 19/08/2026 (Construire une Installation / Établir une Guilde portées) :
+  // mêmes clés que CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) — pour le
+  // popup 'construire' (sélection du type), portage direct des libellés
+  // déjà utilisés par le formulaire dédié de l'écran Secteurs (index.html,
+  // TYPES_INSTALLATION/TYPES_GUILDE), dupliqués ici par convention (même
+  // principe que TYPES_VAISSEAU ci-dessus).
+  var TYPES_INSTALLATION_CONSTRUIRE_ = [
+    { cle: 'chantier_naval', label: 'Chantier Naval' },
+    { cle: 'defense_secteur', label: 'Défense de Secteur' },
+    { cle: 'base_stellaire', label: 'Base Stellaire' }
+  ];
+  var TYPES_GUILDE_CONSTRUIRE_ = [
+    { cle: 'fermiers', label: 'Fermiers' },
+    { cle: 'ingenieurs', label: 'Ingénieurs' },
+    { cle: 'mineurs', label: 'Mineurs' },
+    { cle: 'banquiers', label: 'Banquiers' },
+    { cle: 'scientifiques', label: 'Scientifiques' }
+  ];
 
   // --- Portage direct depuis strategie-2.html GAS, pour le formulaire
   // "Déployer des cubes" (Session 14 suite) ---
@@ -2113,9 +2160,20 @@ var StrategieService = (function () {
         btnAnnuler.hidden = false;
         btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
 
+        // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges
+        // du Domineum") : `contexte.numeros`, optionnel — restreint la
+        // liste à ces numéros précis (candidats déjà calculés par
+        // l'appelant, ex. secteurs à égalité de Population pour
+        // SecteurService.resoudrePlacementMultipleNeantAdjacent) au lieu
+        // de tous les secteurs éligibles. La liste éligible complète (avec
+        // `dernierEmplacement`) reste calculée normalement puis filtrée —
+        // aucune duplication de la logique d'éligibilité.
         var partiePlacement = partieAffichee;
         SecteurService.obtenirSecteursEligiblesPlacementNeantAdjacent(partiePlacement.id, contexte.elements)
           .then(function (eligibles) {
+            if (Array.isArray(contexte.numeros)) {
+              eligibles = eligibles.filter(function (e) { return contexte.numeros.indexOf(e.numero) !== -1; });
+            }
             if (!eligibles.length) {
               contenu.innerHTML = '<p class="hint">Aucun secteur du Néant adjacent à l’un de vos secteurs, avec les emplacements Installation/Guilde requis libres actuellement.</p>';
               return;
@@ -2134,6 +2192,79 @@ var StrategieService = (function () {
               var numero = Number(document.getElementById('placement-select-secteur').value);
               fermerModale_();
               resolve({ numero: numero });
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+      } else if (contexte.type === 'construire') {
+        // 19/08/2026 (Construire une Installation / Établir une Guilde
+        // portées — retour utilisateur) : popup dédiée pour les clés
+        // Focus/Cadre "construire_installation"/"installation"/
+        // "etablir_guilde"/"guilde" (voir focusEngine.js) — même gabarit
+        // que 'placement_secteur_neant_adjacent' (secteur + ❗ dernier
+        // emplacement), avec un second <select> pour le type (au choix du
+        // joueur, la règle ne l'impose jamais — docs-rules-secteurs.md
+        // §2.3). Réutilise SecteurService.obtenirSecteursEligiblesConstruction/
+        // construire, déjà portés (Session 12/13) mais jusqu'ici seulement
+        // branchés sur le formulaire dédié de l'écran Secteurs — aucune
+        // nouvelle logique métier ici, seulement une seconde façon de les
+        // appeler (popup modale, réutilisable depuis Focus ET les Cadres
+        // d'Événement galactique). `contexte.categorie` ('installation' ou
+        // 'guilde') vient de focusEngine.js. Persiste directement via
+        // SecteurService.construire au clic sur Valider (comme regrouper/
+        // envahir/deployer_cube) — resolve({ detail }) pour le journal, ou
+        // { annule: true } sur Annuler.
+        var estInstallation = contexte.categorie === 'installation';
+        titre.textContent = estInstallation ? 'Construire une Installation' : 'Établir une Guilde';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieConstruire = partieAffichee;
+        var typesConstruire = estInstallation ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
+
+        SecteurService.obtenirSecteursEligiblesConstruction(partieConstruire.id, contexte.categorie)
+          .then(function (eligibles) {
+            if (!eligibles.length) {
+              contenu.innerHTML = '<p class="hint">Aucun secteur possédé avec un emplacement ' +
+                (estInstallation ? 'Installation' : 'Guilde') + ' libre actuellement.</p>';
+              return;
+            }
+
+            contenu.innerHTML = '' +
+              '<select id="construire-select-secteur" class="modal-choix-select">' +
+              eligibles.map(function (e) {
+                return '<option value="' + e.numero + '">Secteur ' + e.numero + (e.emplacementsLibres === 1 ? ' ❗' : '') + '</option>';
+              }).join('') +
+              '</select>' +
+              '<select id="construire-select-type" class="modal-choix-select" style="margin-top:8px;">' +
+              typesConstruire.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') +
+              '</select>';
+
+            btnValider.hidden = false;
+            btnValider.textContent = estInstallation ? 'Construire' : 'Établir';
+            btnValider.onclick = function () {
+              var numero = Number(document.getElementById('construire-select-secteur').value);
+              var type = document.getElementById('construire-select-type').value;
+              var labelType = typesConstruire.filter(function (t) { return t.cle === type; })[0].label;
+              btnValider.disabled = true;
+
+              SecteurService.construire(partieConstruire.id, numero, contexte.categorie, type)
+                .then(function () {
+                  fermerModale_();
+                  btnValider.disabled = false;
+                  var detail = estInstallation
+                    ? 'Installation ' + labelType + ' construite sur le Secteur ' + numero + '.'
+                    : 'Guilde ' + labelType + ' établie sur le Secteur ' + numero + '.';
+                  resolve({ detail: detail, numero: numero, type: type });
+                })
+                .catch(function (erreur) {
+                  btnValider.disabled = false;
+                  window.alert('Échec de la construction : ' + erreur.message);
+                });
             };
           }).catch(function (erreur) {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
