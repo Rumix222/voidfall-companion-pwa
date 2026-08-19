@@ -1370,19 +1370,22 @@
      * à appliquerCadreEtRafraichir_ ci-dessus).
      *
      * 19/08/2026 (retour utilisateur, principe à garder pour les
-     * prochains événements) : le message ne rappelle plus cadre.texte
-     * (déjà lisible sur la carte juste derrière la popup, redondant —
-     * même logique que le titre "Choisir un secteur" déjà générique côté
-     * appliquerCadrePlacementEtRafraichir_ ci-dessus) : le message reste
-     * générique quel que soit le cadre "manuel" concerné.
+     * prochains événements) : le message n'est jamais le rappel verbatim
+     * de cadre.texte (déjà lisible sur la carte juste derrière la popup)
+     * — c'est une instruction courte, à l'infinitif, en italique, portée
+     * par le catalogue (cadre.instruction, voir data/catalogue/
+     * evenements.json) pour rester spécifique au cadre sans dupliquer sa
+     * description complète. Fallback sur cadre.texte si le catalogue ne
+     * fournit pas encore d'instruction dédiée (cadre "gain" futur pas
+     * encore enrichi).
      */
     function appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
       bouton.disabled = true;
       StrategieService.demanderChoix({
         type: 'confirmation',
-        titre: 'Effet à résoudre à la main',
-        message: 'Une fois fait sur le plateau physique, validez pour cocher ce cadre.',
+        titre: 'Effet à résoudre manuellement',
+        message: '<em>' + (cadre.instruction || cadre.texte) + '</em>',
         texteValider: 'Valider'
       }).then(function (resultat) {
         if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
@@ -1548,10 +1551,12 @@
      * hors-périmètre ci-dessus — cliquable comme les autres (data-manuel),
      * ouvre une popup générique de confirmation (contexte 'confirmation'
      * de StrategieService.demanderChoix, réutilisé tel quel) invitant à
-     * résoudre l'effet à la main sur le plateau physique ; Valider marque
-     * juste le cadre comme fait (GameService.appliquerCadreManuel, aucun
-     * delta), affiché "✓ Fait (à la main)". Générique à tout futur cadre
-     * "gain" du catalogue, pas figé sur ce seul cadre.
+     * résoudre l'effet manuellement sur le plateau physique ; Valider
+     * marque juste le cadre comme fait (GameService.appliquerCadreManuel,
+     * aucun delta), affiché "✓ Appliqué (manuellement)" (19/08/2026,
+     * retour utilisateur : "Appliqué" toujours préféré à "Fait",
+     * "manuellement" à "à la main" — voir mémoire projet). Générique à
+     * tout futur cadre "gain" du catalogue, pas figé sur ce seul cadre.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -1577,13 +1582,13 @@
           if (estPlacementNeantAdjacent) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
           } else if (estManuel) {
-            if (applique) statutHtml = '<p class="cadre-statut">✓ Fait (à la main)</p>';
+            if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (manuellement)</p>';
           } else if (applique) {
             if (applique.resume) {
               statutHtml = '<p class="cadre-statut">✓ Appliqué (' + applique.resume + ')</p>';
             } else {
               statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
-                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
+                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' / technologie choisie manuellement)</p>'
                 : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
             }
           } else {
