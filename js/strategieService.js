@@ -1694,7 +1694,7 @@ var StrategieService = (function () {
                 '</select>'
               : '') +
             '<input type="number" min="1" step="1" value="1" id="deployer-quantite" style="margin-top:6px;">' +
-            '<button type="button" class="btn btn-secondary" id="deployer-ajouter" style="width:100%;margin-top:8px;">Ajouter ce déploiement</button>' +
+            '<button type="button" class="btn btn-secondary" id="deployer-ajouter" style="width:100%;margin:16px 0;">Ajouter ce déploiement</button>' +
             '</div>';
 
           renderListe_();

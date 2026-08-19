@@ -647,6 +647,11 @@
  * les déploiements suivants n'en auront plus besoin, l'auto-réparation
  * prenant le relais. IndexedDB (parties sauvegardées) non affecté par
  * aucune purge de ce correctif.
+ *
+ * 19/08/2026 (retour utilisateur — popup "Déployer des cubes") : bouton
+ * "Ajouter ce déploiement" collé à l'input Quantité au-dessus et à la
+ * liste des déploiements engagés en dessous — marge ajoutée avant/après
+ * (margin-top/bottom 8px -> 16px) : js/strategieService.js.
  */
 
-var APP_VERSION = '20260819.12';
+var APP_VERSION = '20260819.13';

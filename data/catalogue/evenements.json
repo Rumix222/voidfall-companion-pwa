@@ -165,7 +165,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit soit placer une Guilde et 1 cube du Néant dans le secteur du Néant adjacent avec la Population la plus basse, soit placer un jeton Gloire de valeur 2 et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée.",
+        "texte": "Placez une Guilde et 1 cube du Néant dans le secteur du Néant adjacent avec la Population la plus basse OU placez un jeton Gloire de valeur 2 et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "type": "placement", "critere": "population_min", "elements": { "guilde": 1, "cube_neant": 1 } },
           { "type": "placement", "critere": "population_max", "elements": { "gloire": 2, "defense_secteur": 1 } }
