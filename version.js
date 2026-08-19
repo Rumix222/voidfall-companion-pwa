@@ -536,6 +536,19 @@
  * GameService.appliquerCadreManuel (js/gameService.js v14 — marque le
  * cadre résolu, aucun delta sur plateauMaison). Générique à tout futur
  * cadre "gain" du catalogue.
+ *
+ * 19/08/2026 (retour utilisateur, principes UX/UI à garder pour les
+ * prochains événements) : libellé d'une option "delta simple" au
+ * gabarit du jeu ("Gagner 3 Crédits" au lieu de "Appliquer : +3
+ * Crédit") ; option "Technologie" séparée en libellé concis + sousTexte
+ * italique/petit ("Choisir la technologie manuellement sur Plat.
+ * maison") plutôt que noyée entre parenthèses (index.html v32,
+ * js/strategieService.js v20, css/style.css — .cadre-action-sous-texte) ;
+ * popup manuelle de l'Événement B (Cadre 2) ne rappelle plus le texte du
+ * cadre (déjà visible sur la carte derrière la popup) ; dès qu'au moins
+ * un Cadre est appliqué, le select Événement galactique est verrouillé
+ * (disabled) pour empêcher de changer d'événement en cours de
+ * résolution.
  */
 
-var APP_VERSION = '20260819.2';
+var APP_VERSION = '20260819.3';

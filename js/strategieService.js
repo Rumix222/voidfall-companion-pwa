@@ -2116,6 +2116,16 @@ var StrategieService = (function () {
         btnAnnuler.hidden = false;
         btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
 
+        // 19/08/2026 (retour utilisateur, principe à garder pour les
+        // prochains événements) : une option peut porter un `sousTexte`
+        // optionnel (ex. "Choisir la technologie manuellement sur Plat.
+        // maison") — rendu en italique, plus petit, sous le libellé
+        // principal dans le même bouton (jamais noyé dans `option.label`
+        // lui-même, qui reste concis).
+        var sousTexteHtml_ = function (option) {
+          return option.sousTexte ? '<br><span class="cadre-action-sous-texte">' + option.sousTexte + '</span>' : '';
+        };
+
         contenu.innerHTML = '<div class="modal-choix-boutons">' +
           contexte.options.map(function (option, i) {
             if (option.proportionnel) {
@@ -2123,9 +2133,10 @@ var StrategieService = (function () {
                 '<input type="number" min="0"' + (option.plafond ? ' max="' + option.plafond + '"' : '') +
                 ' value="0" class="cadre-input-proportionnel">' +
                 '<button type="button" class="btn btn-secondary btn-choix-liste-proportionnel" data-index="' + i + '">' +
-                option.label + '</button></span>';
+                option.label + sousTexteHtml_(option) + '</button></span>';
             }
-            return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' + option.label + '</button>';
+            return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' +
+              option.label + sousTexteHtml_(option) + '</button>';
           }).join('') + '</div>';
 
         Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {

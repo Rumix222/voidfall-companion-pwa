@@ -531,6 +531,19 @@ input:disabled {
   font-family: var(--font-body);
   font-size: 0.9rem;
 }
+/* 19/08/2026 (retour utilisateur, principe à garder pour les prochains
+   événements) : sous-texte optionnel d'une option de popup
+   'resoudre_cadre_evenement' (ex. "Choisir la technologie manuellement
+   sur Plat. maison") — plus petit et en italique que le libellé
+   principal du bouton, jamais confondu avec lui. */
+.cadre-action-sous-texte {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.85;
+}
 
 /* Objectifs d'Événement galactique (moitié droite de la carte, §3.3) —
    groupés par bloc, séparateur imprimé sur la carte entre deux blocs

@@ -1148,6 +1148,33 @@
       }).join(', ');
     }
 
+    // 19/08/2026 (retour utilisateur) : seul le Crédit se pluralise en
+    // français dans le vocabulaire du jeu ("Gagnez 2 Crédits.", voir
+    // data/catalogue/pistesCivilisation.json) — Nourriture/Énergie/
+    // Matériel/Science restent invariables (noms de quantité, jamais
+    // pluralisés dans le catalogue).
+    var LABEL_RESSOURCE_CADRE_PLURIEL_ = { credit: 'Crédits' };
+
+    /**
+     * 19/08/2026 (retour utilisateur) : libellé d'action pour le bouton
+     * d'une popup de cadre — au lieu du delta brut préfixé "Appliquer : "
+     * (ex. "Appliquer : +3 Crédit"), reprend le gabarit d'effet du jeu
+     * ("Gagnez N Ressource(s).", voir catalogue) au verbe à l'infinitif
+     * pour un bouton ("Gagner 3 Crédits"). Ne couvre que le cas à une
+     * seule ressource (le seul rencontré à ce jour, effet.type "choix"
+     * simple) ; retombe sur le format delta générique pour un futur cadre
+     * à plusieurs ressources dans un même delta.
+     */
+    function libelleActionCadre_(delta) {
+      var cles = Object.keys(delta || {});
+      if (cles.length === 1) {
+        var cle = cles[0], valeur = delta[cle];
+        var nom = (Math.abs(valeur) > 1 && LABEL_RESSOURCE_CADRE_PLURIEL_[cle]) || LABEL_RESSOURCE_CADRE_[cle] || cle;
+        return (valeur > 0 ? 'Gagner ' : 'Perdre ') + Math.abs(valeur) + ' ' + nom;
+      }
+      return 'Appliquer : ' + libelleDeltaCadre_(delta);
+    }
+
     /**
      * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2) : reconnaît
      * l'option "dépenser N Science pour gagner une Technologie de base"
@@ -1341,6 +1368,13 @@
      * (message + Annuler/Valider), puis persiste juste "cadre résolu" via
      * GameService.appliquerCadreManuel (aucun delta appliqué, contrairement
      * à appliquerCadreEtRafraichir_ ci-dessus).
+     *
+     * 19/08/2026 (retour utilisateur, principe à garder pour les
+     * prochains événements) : le message ne rappelle plus cadre.texte
+     * (déjà lisible sur la carte juste derrière la popup, redondant —
+     * même logique que le titre "Choisir un secteur" déjà générique côté
+     * appliquerCadrePlacementEtRafraichir_ ci-dessus) : le message reste
+     * générique quel que soit le cadre "manuel" concerné.
      */
     function appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -1348,7 +1382,7 @@
       StrategieService.demanderChoix({
         type: 'confirmation',
         titre: 'Effet à résoudre à la main',
-        message: cadre.texte + ' Une fois fait sur le plateau physique, validez pour cocher ce cadre.',
+        message: 'Une fois fait sur le plateau physique, validez pour cocher ce cadre.',
         texteValider: 'Valider'
       }).then(function (resultat) {
         if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
@@ -1386,6 +1420,17 @@
      * -> FocusEngine.resoudreEffet) — pour "déployer", une SECONDE popup
      * imbriquée s'ouvre (choix du type de Flotte, contexte 'deployer_cube'
      * déjà existant côté Focus) : comportement attendu, pas un bug.
+     *
+     * 19/08/2026 (retour utilisateur, principe à garder pour les
+     * prochains événements) : le libellé d'une option "delta simple"
+     * (ex. +3 Crédit) suit désormais le gabarit du jeu à l'infinitif
+     * ("Gagner 3 Crédits" — libelleActionCadre_) plutôt que le brut
+     * "Appliquer : +3 Crédit". Une option qui nécessite un geste manuel
+     * complémentaire (ex. Technologie : coût automatisable mais choix de
+     * LA technologie hors périmètre) porte désormais un `sousTexte`
+     * séparé (rendu en italique, plus petit, sous le libellé principal
+     * dans le bouton — voir strategieService.js) plutôt que noyé dans le
+     * même libellé entre parenthèses.
      */
     function actionsCadre_(cadre) {
       var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
@@ -1395,7 +1440,7 @@
               label: 'Échanger ' + (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) +
                 ' → ' + (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain)
             }
-          : { proportionnel: false, action: action, label: 'Appliquer : ' + libelleDeltaCadre_(action.delta) };
+          : { proportionnel: false, action: action, label: libelleActionCadre_(action.delta) };
       });
 
       if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
@@ -1403,7 +1448,8 @@
           if (optionTechnologieViaScience_(option)) {
             actions.push({
               proportionnel: false, technologie: true, coutScience: option.cout.science,
-              label: 'Gagner une technologie (-' + option.cout.science + ' Science — à choisir manuellement sur Plat. maison)'
+              label: 'Gagner une technologie (-' + option.cout.science + ' Science)',
+              sousTexte: 'Choisir la technologie manuellement sur Plat. maison'
             });
             return;
           }
@@ -1429,7 +1475,7 @@
       StrategieService.demanderChoix({
         type: 'resoudre_cadre_evenement',
         titre: actions.length > 1 ? 'Choisir un effet' : 'Résoudre l\u2019effet',
-        options: actions.map(function (a) { return { label: a.label, proportionnel: a.proportionnel, plafond: a.plafond }; })
+        options: actions.map(function (a) { return { label: a.label, sousTexte: a.sousTexte, proportionnel: a.proportionnel, plafond: a.plafond }; })
       }).then(function (resultat) {
         if (!resultat || resultat.annule) { bouton.disabled = false; return; }
         var choisie = actions[resultat.indexChoisi];
@@ -1651,6 +1697,12 @@
 
       var select = document.getElementById('select-evenement-cycle');
       var evenementActuel = (partie.evenements || {})['cycle' + cycle] || null;
+      // 19/08/2026 (retour utilisateur) : dès qu'au moins un Cadre a été
+      // appliqué, le choix de l'Événement galactique est verrouillé (select
+      // désactivé, onchange non attaché) — changer d'événement en cours de
+      // résolution laisserait des cadresAppliques orphelins (ordre d'un
+      // cadre d'un autre événement).
+      var evenementVerrouille = !!(evenementActuel && evenementActuel.cadresAppliques && Object.keys(evenementActuel.cadresAppliques).length);
 
       if (manchesEl) {
         manchesEl.textContent = evenementActuel && evenementActuel.manches
@@ -1670,6 +1722,8 @@
             var choisi = evenementActuel && evenementActuel.nom === e.nom;
             return '<option value="' + e.nom + '"' + (choisi ? ' selected' : '') + '>' + e.nom + '</option>';
           }).join('');
+        select.disabled = evenementVerrouille;
+        if (evenementVerrouille) return;
 
         select.onchange = function () {
           if (!select.value) return;
