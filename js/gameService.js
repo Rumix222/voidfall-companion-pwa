@@ -1,7 +1,32 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 11 — 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique)
+ * Version 12 — 18/08/2026 (Simplification UI Événement galactique — Cadre 3 générique)
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — Cadre 3 générique,
+ * Événement B Cycle 1 : "activer 1 cube / déployer 1 cube sur le
+ * Secteur-Mère") : nouvelle méthode appliquerCadreChoixCube(partieId,
+ * cycle, ordreCadre, indexOption, demanderChoix) — pour une option de
+ * cadre "choix" portant sur les cubes de Puissance Navale
+ * (cleFocusEnginePourOptionCadre_ reconnaît activer_cube/deployer_cube),
+ * délègue à FocusEngine.resoudreEffet (moteur pur déjà utilisé par
+ * l'écran Focus pour ces mêmes clés) plutôt que de dupliquer une
+ * deuxième logique de débit de cubeActif — FocusEngine reste la SEULE
+ * source de vérité pour cette mécanique. `demanderChoix` est le seul
+ * paramètre IHM que GameService accepte (comme FocusEngine.
+ * jouerActionEtPersister le fait déjà) : nécessaire pour la popup
+ * imbriquée "Déployer des cubes" (choix du type de Flotte) côté option
+ * "déployer". Une annulation de cette popup imbriquée résout avec
+ * { annule: true } (pas une erreur — le joueur peut réessayer). GameService
+ * dépend désormais de FocusEngine (référence globale paresseuse, résolue
+ * seulement à l'appel — focusEngine.js peut être chargé après
+ * gameService.js dans index.html, l'inverse de sa propre dépendance
+ * documentée sur GameService pour son orchestrateur jouerActionEtPersister).
+ * index.html (v32 — actionsCadre_ reconnaît les options cube,
+ * appliquerCadreCubeEtRafraichir_ nouvelle), css/style.css inchangé.
+ * Tests fumée dédiés : test_gameService_cadreChoixCube.js (node --test,
+ * charge le VRAI focusEngine.js + mock DB en mémoire via vm, 4
+ * scénarios : activer, déployer validé, déployer annulé, option inconnue).
  *
  * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
  * appliquerCadrePlacement ne délègue plus à une fonction SecteurService
@@ -451,6 +476,28 @@ var GameService = (function () {
       if ((option.cout && !coutSimple) || (option.gain && !gainSimple)) return null;
       var delta = ajouterDelta_(ajouterDelta_({}, coutSimple, -1), gainSimple, 1);
       return Object.keys(delta).length ? delta : null;
+    }
+    return null;
+  }
+
+  /**
+   * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
+   * générique, Événement B Cycle 1) : correspondance entre une option
+   * `effet.options[i]` d'un cadre "choix" et la clé Effet reconnue par
+   * FocusEngine.resoudreCle_ pour les actions sur les cubes de Puissance
+   * Navale (voir focusEngine.js, CLES_DEPLOYER_CUBE et la clé générique
+   * "cube") — seules les 2 formes rencontrées dans le catalogue à ce
+   * jour : { cle: 'activer_cube', valeur: N } et { cle: 'deployer_cube',
+   * valeur: N, cible: 'secteur_mere' | absent }. Retourne null si
+   * l'option ne correspond à aucune des deux formes reconnues (jamais
+   * d'invention de clé FocusEngine à partir d'une donnée non prévue).
+   */
+  function cleFocusEnginePourOptionCadre_(option) {
+    if (!option || !option.cle) return null;
+    if (option.cle === 'activer_cube') return 'activer_cube';
+    if (option.cle === 'deployer_cube') {
+      if (option.cible === 'secteur_mere') return 'deployer_cube_secteur_mere';
+      if (!option.cible) return 'deployer_cube';
     }
     return null;
   }
@@ -1162,6 +1209,94 @@ var GameService = (function () {
         return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
           return assemblerPartie_(r2[0], r2[1]);
         });
+      });
+    },
+
+    /**
+     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
+     * générique, Événement B Cycle 1) : applique un cadre "choix" dont
+     * l'option retenue (`indexOption`, dans cadre.effet.options) porte
+     * sur les cubes de Puissance Navale (activer_cube / deployer_cube —
+     * voir cleFocusEnginePourOptionCadre_ ci-dessus) — hors périmètre
+     * d'actionsSimplesCadre_ (ne porte pas sur les 5 ressources simples).
+     * Réutilise FocusEngine.resoudreEffet (moteur pur déjà utilisé par
+     * l'écran Focus pour ces mêmes clés — activer_cube y est une clé
+     * "cube" générique, deployer_cube_secteur_mere y ouvre la popup
+     * dédiée 'deployer_cube' via `demanderChoix`, voir focusEngine.js)
+     * plutôt que de dupliquer une deuxième logique de débit de cubeActif :
+     * seule source de vérité pour cette mécanique, qu'elle soit déclenchée
+     * depuis Focus ou depuis un Cadre d'Événement galactique.
+     *
+     * `demanderChoix` est fourni par l'appelant (StrategieService,
+     * couche IHM) — GameService reste autrement une couche de données
+     * pure ; FocusEngine.resoudreEffet est la SEULE fonction ici qui
+     * accepte un callback IHM, exactement comme FocusEngine.
+     * jouerActionEtPersister le fait déjà pour les actions Focus.
+     *
+     * Ne lève PAS d'erreur si le joueur annule la popup imbriquée (choix
+     * du type de Flotte à déployer, voir strategieService.js) : ce n'est
+     * pas un échec, `resultatEffet.succes === false` dans ce cas précis
+     * (Annuler sur 'deployer_cube') — résout avec { annule: true } plutôt
+     * que de rejeter, pour que l'appelant (index.html) réactive
+     * simplement le cadre sans message d'erreur, cohérent avec le
+     * comportement d'Annuler sur les autres popups de résolution de
+     * cadre. `champsPlateauMaison` reste borné aux champs déjà surveillés
+     * par FocusEngine (CHAMPS_DIFF_SUIVIS) — jamais une clé arbitraire.
+     */
+    appliquerCadreChoixCube: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
+        if (!cleFocusEngine) throw new Error('Option de cube introuvable pour ce cadre.');
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+        var effet = {};
+        effet[cleFocusEngine] = Number(option.valeur) || 1;
+
+        var source = 'Cadre #' + ordreCadre;
+        var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, lignePlateauMaison);
+
+        return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effet, source, cadre.texte, demanderChoix)
+          .then(function (resultatEffet) {
+            if (!resultatEffet.succes) {
+              return { annule: true };
+            }
+
+            var champs = {};
+            resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+            Object.keys(champs).forEach(function (champ) { lignePlateauMaison[champ] = champs[champ]; });
+
+            var resume = resultatEffet.journal.map(function (ligne) {
+              var prefixe = source + ' : ';
+              return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
+            }).join(' ').replace(/\.\s*$/, '');
+
+            evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
+            partie.evenements[cleCycle] = evenementCycle;
+
+            return Promise.all([
+              DB.put('plateauMaison', lignePlateauMaison),
+              GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+            ]).then(function () {
+              return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+                return assemblerPartie_(r2[0], r2[1]);
+              });
+            });
+          });
       });
     },
 

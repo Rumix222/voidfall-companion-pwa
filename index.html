@@ -1173,6 +1173,40 @@
     }
 
     /**
+     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
+     * générique, Événement B Cycle 1 : "activer 1 cube / déployer 1 cube
+     * sur le Secteur-Mère") : reconnaît une option de cadre "choix"
+     * portant sur les cubes de Puissance Navale — même correspondance
+     * que GameService.cleFocusEnginePourOptionCadre_ (dupliquée ici
+     * uniquement pour savoir si le cadre est cliquable/pour l'étiquette
+     * de la popup ; la revalidation faisant foi reste côté GameService,
+     * comme pour optionTechnologieViaScience_ ci-dessus). Retourne la clé
+     * FocusEngine correspondante (voir focusEngine.js, CLES_DEPLOYER_CUBE
+     * et la clé générique "cube"), ou null.
+     */
+    function cleFocusEnginePourOptionCadre_(option) {
+      if (!option || !option.cle) return null;
+      if (option.cle === 'activer_cube') return 'activer_cube';
+      if (option.cle === 'deployer_cube') {
+        if (option.cible === 'secteur_mere') return 'deployer_cube_secteur_mere';
+        if (!option.cible) return 'deployer_cube';
+      }
+      return null;
+    }
+
+    function libelleOptionCube_(option, cleFocusEngine) {
+      var valeur = Number(option.valeur) || 1;
+      var pluriel = valeur > 1 ? 's' : '';
+      if (cleFocusEngine === 'activer_cube') {
+        return 'Activer ' + valeur + ' cube' + pluriel + ' de Puissance Navale';
+      }
+      if (cleFocusEngine === 'deployer_cube_secteur_mere') {
+        return 'Déployer ' + valeur + ' cube' + pluriel + ' sur le Secteur-Mère';
+      }
+      return 'Déployer ' + valeur + ' cube' + pluriel;
+    }
+
+    /**
      * 18/08/2026 (Refonte affichage Événement galactique) : applique un
      * cadre "1 clic" (GameService.appliquerCadreEffet) puis rafraîchit
      * l'écran. #ressources-principales (Plat. maison) et le bandeau de
@@ -1194,6 +1228,34 @@
         .catch(function (erreur) {
           bouton.disabled = false;
           window.alert('Échec de l\'application du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
+     * générique, Événement B Cycle 1) : applique l'option cube choisie
+     * (activer/déployer, voir cleFocusEnginePourOptionCadre_ ci-dessus)
+     * via GameService.appliquerCadreChoixCube — qui délègue à
+     * FocusEngine.resoudreEffet, seule source de vérité pour la
+     * mécanique de cubes (déjà utilisée par l'écran Focus), en lui
+     * passant StrategieService.demanderChoix pour la popup imbriquée
+     * "Déployer des cubes" (choix du type de Flotte) le cas échéant.
+     * `resultat.annule` (Annuler sur cette popup imbriquée) n'est PAS
+     * une erreur : réactive juste le cadre, comme les autres popups.
+     */
+    function appliquerCadreCubeEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixCube(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
         });
     }
 
@@ -1275,9 +1337,16 @@
      * disparu, son rappel "-N Science, technologie à choisir sur Plat.
      * maison" est désormais directement le libellé de cette option dans
      * la liste). `actionsCadre_` construit la liste normalisée
-     * (delta simple / proportionnel / technologie) réutilisée à la fois
-     * pour savoir si le cadre est cliquable (renderCadresEvenement_) et
-     * pour résoudre le choix une fois la popup validée.
+     * (delta simple / proportionnel / technologie / cube) réutilisée à
+     * la fois pour savoir si le cadre est cliquable (renderCadresEvenement_)
+     * et pour résoudre le choix une fois la popup validée.
+     *
+     * 18/08/2026 (Cadre 3 générique, Événement B Cycle 1) : une option
+     * "cube" (activer_cube / deployer_cube_secteur_mere) délègue à
+     * appliquerCadreCubeEtRafraichir_ (GameService.appliquerCadreChoixCube
+     * -> FocusEngine.resoudreEffet) — pour "déployer", une SECONDE popup
+     * imbriquée s'ouvre (choix du type de Flotte, contexte 'deployer_cube'
+     * déjà existant côté Focus) : comportement attendu, pas un bug.
      */
     function actionsCadre_(cadre) {
       var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
@@ -1291,12 +1360,21 @@
       });
 
       if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
-        cadre.effet.options.forEach(function (option) {
-          if (!optionTechnologieViaScience_(option)) return;
-          actions.push({
-            proportionnel: false, technologie: true, coutScience: option.cout.science,
-            label: 'Gagner une technologie (-' + option.cout.science + ' Science — à choisir manuellement sur Plat. maison)'
-          });
+        cadre.effet.options.forEach(function (option, indexOption) {
+          if (optionTechnologieViaScience_(option)) {
+            actions.push({
+              proportionnel: false, technologie: true, coutScience: option.cout.science,
+              label: 'Gagner une technologie (-' + option.cout.science + ' Science — à choisir manuellement sur Plat. maison)'
+            });
+            return;
+          }
+          var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
+          if (cleFocusEngine) {
+            actions.push({
+              proportionnel: false, cube: true, indexOption: indexOption,
+              label: libelleOptionCube_(option, cleFocusEngine)
+            });
+          }
         });
       }
 
@@ -1322,6 +1400,8 @@
           var deltaTechnologie = {};
           deltaTechnologie.science = -choisie.coutScience;
           appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
+        } else if (choisie.cube) {
+          appliquerCadreCubeEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
         } else if (choisie.proportionnel) {
           var quantite = Math.max(0, Math.floor(Number(resultat.quantite) || 0));
           if (!quantite) { bouton.disabled = false; return; }
@@ -1368,6 +1448,13 @@
      * resoudre_cadre_evenement). Le texte "✓ Appliqué" d'un cadre
      * "placement" ne réaffiche plus le détail des éléments posés
      * (implicite, toujours les mêmes pour ce cadre) : juste le secteur.
+     *
+     * 18/08/2026 (Cadre 3 générique, Événement B Cycle 1) : un cadre
+     * résolu via une option "cube" (GameService.appliquerCadreChoixCube)
+     * stocke { resume, le } dans cadresAppliques[ordre] (au lieu de
+     * { delta, le }) — `applique.resume` (déjà le libellé du journal
+     * FocusEngine, ex. "+1 cube(s) activé(s)") prime sur le rendu delta
+     * générique ci-dessous.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -1392,9 +1479,13 @@
           if (estPlacementNeantAdjacent) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
           } else if (applique) {
-            statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
-              ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
-              : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
+            if (applique.resume) {
+              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + applique.resume + ')</p>';
+            } else {
+              statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
+                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' — technologie à choisir manuellement sur Plat. maison)</p>'
+                : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
+            }
           } else {
             actions = actionsCadre_(cadre);
           }

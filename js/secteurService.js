@@ -1,7 +1,33 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 2 — 17/08/2026 (Session 12 — SQL RPC récupéré)
+ * Version 3 — 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique)
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
+ * obtenirSecteursEligiblesDefenseGuildeNeantAdjacent/
+ * placerDefenseGuildeNeantAdjacent (Session précédente, codées en dur pour
+ * Défense de Secteur + Guilde de Scientifiques, Événement A Cycle 1 Cadre
+ * 1) remplacées par des versions génériques,
+ * obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements)/
+ * placerElementsNeantAdjacent(partieId, numero, elements) — `elements` est
+ * l'objet effet.elements du cadre (data/catalogue/evenements.json),
+ * n'importe quelle combinaison d'Installations/Guildes/jetons Libération
+ * (CHAMP_ELEMENT_PLACEMENT_ ci-dessous fait la correspondance vers les
+ * champs secteursPartie). Permet de porter le Cadre 1 de l'Événement B
+ * Cycle 1 (jeton Libération + Défense de Secteur) sans dupliquer la
+ * logique d'éligibilité (Néant, adjacence, emplacements Installation/
+ * Guilde libres) : seuls les éléments de type Installation/Guilde
+ * comptent pour les emplacements, un jeton (Libération) se pose sans
+ * consommer d'emplacement. `dernierEmplacement` (bool, remplace les deux
+ * compteurs bruts renvoyés avant) n'est vrai que si un TYPE D'EMPLACEMENT
+ * RÉELLEMENT DEMANDÉ par ce cadre est à son dernier emplacement libre —
+ * évite d'alerter sur la Guilde quand le cadre ne pose qu'une Installation
+ * (ou l'inverse). gameService.js (v13 — appliquerCadrePlacement lit
+ * désormais cadre.effet.elements depuis evenementCycle.cadres au lieu
+ * d'appeler l'ancienne fonction dédiée), js/strategieService.js (v18 —
+ * contexte 'placement_secteur_neant_adjacent' reçoit `elements` et appelle
+ * les fonctions génériques), index.html (v30 — appliquerCadrePlacementEtRafraichir_
+ * transmet cadre.effet.elements à demanderChoix).
  *
  * 17/08/2026 (Session 12) : portage de toutes les actions de jeu sur les
  * secteurs, désormais possible grâce au code SQL des RPC (fourni par
@@ -576,16 +602,44 @@ var SecteurService = (function () {
   }
 
   /**
-   * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : secteurs
-   * candidats pour l'effet "placez une Défense de Secteur et une Guilde
-   * de Scientifiques dans un secteur du Néant adjacent à l'un de vos
-   * secteurs" — un secteur du Néant (pnNeant > 0), adjacent à un secteur
-   * qui appartient au joueur, avec au moins un emplacement Installation
-   * ET un emplacement Guilde libres (les deux structures sont posées
-   * ensemble, jamais l'une sans l'autre — voir placerDefenseGuildeNeant
-   * Adjacent ci-dessous).
+   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+   * générique) : correspondance entre les clés `elements` d'un cadre de
+   * type "placement" (data/catalogue/evenements.json) et les champs
+   * secteursPartie à incrémenter. `categorie` détermine si l'élément
+   * consomme un emplacement Installation/Guilde (limité par
+   * typesSecteur.nombreInstallationMax/nombreGuildeMax) ou se pose
+   * librement (jeton, categorie 'jeton', aucune limite d'emplacement).
    */
-  function obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partieId) {
+  var CHAMP_ELEMENT_PLACEMENT_ = {
+    defense_secteur: { champ: 'installationDefenseSecteur', categorie: 'installation' },
+    chantier_naval: { champ: 'installationChantierNaval', categorie: 'installation' },
+    base_stellaire: { champ: 'installationBaseStellaire', categorie: 'installation' },
+    guilde_scientifique: { champ: 'guildeScientifiques', categorie: 'guilde' },
+    guilde_fermiers: { champ: 'guildeFermiers', categorie: 'guilde' },
+    guilde_ingenieurs: { champ: 'guildeIngenieurs', categorie: 'guilde' },
+    guilde_mineurs: { champ: 'guildeMineurs', categorie: 'guilde' },
+    guilde_banquiers: { champ: 'guildeBanquiers', categorie: 'guilde' },
+    liberation: { champ: 'jetonLiberation', categorie: 'jeton' }
+  };
+
+  /**
+   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+   * générique) : secteurs candidats pour un cadre de type "placement"
+   * (zone "secteur_neant_adjacent") — un secteur du Néant (pnNeant > 0),
+   * adjacent à un secteur qui appartient au joueur, avec assez
+   * d'emplacements Installation ET Guilde libres pour les éléments de
+   * type correspondant demandés par `elements` (les jetons, ex.
+   * Libération, ne consomment aucun emplacement). Généralise
+   * l'ancienne obtenirSecteursEligiblesDefenseGuildeNeantAdjacent
+   * (codée en dur pour Défense de Secteur + Guilde de Scientifiques,
+   * Événement A Cycle 1 Cadre 1) : même filtre Néant/adjacence, calcul
+   * des emplacements requis dérivé de `elements` au lieu d'être fixe.
+   * `dernierEmplacement` (bool) n'est vrai que si un type d'emplacement
+   * réellement demandé par ce cadre est à son dernier emplacement libre
+   * sur ce secteur (ex. un cadre qui ne pose qu'une Installation
+   * n'alerte jamais sur la Guilde, et inversement).
+   */
+  function obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements) {
     return DB.get('parties', partieId).then(function (ligneP) {
       if (!ligneP || !ligneP.scenarioId) return [];
 
@@ -611,6 +665,15 @@ var SecteurService = (function () {
           adjacenceMap[a.numeroB].push(a.numeroA);
         });
 
+        var installationsNecessaires = 0, guildesNecessaires = 0;
+        Object.keys(elements || {}).forEach(function (cle) {
+          var info = CHAMP_ELEMENT_PLACEMENT_[cle];
+          if (!info) return;
+          var quantite = Number(elements[cle]) || 0;
+          if (info.categorie === 'installation') installationsNecessaires += quantite;
+          if (info.categorie === 'guilde') guildesNecessaires += quantite;
+        });
+
         var resultat = [];
         secteurs.forEach(function (s) {
           if ((s.pnNeant || 0) <= 0) return;
@@ -628,13 +691,15 @@ var SecteurService = (function () {
           var guildesUtilisees = s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques;
           var emplacementsInstallationLibres = (typeSecteur.nombreInstallationMax || 0) - installationsUtilisees;
           var emplacementsGuildeLibres = (typeSecteur.nombreGuildeMax || 0) - guildesUtilisees;
-          if (emplacementsInstallationLibres > 0 && emplacementsGuildeLibres > 0) {
-            resultat.push({
-              numero: s.numero,
-              emplacementsInstallationLibres: emplacementsInstallationLibres,
-              emplacementsGuildeLibres: emplacementsGuildeLibres
-            });
-          }
+
+          if (installationsNecessaires > 0 && emplacementsInstallationLibres < installationsNecessaires) return;
+          if (guildesNecessaires > 0 && emplacementsGuildeLibres < guildesNecessaires) return;
+
+          var dernierEmplacement =
+            (installationsNecessaires > 0 && emplacementsInstallationLibres === installationsNecessaires) ||
+            (guildesNecessaires > 0 && emplacementsGuildeLibres === guildesNecessaires);
+
+          resultat.push({ numero: s.numero, dernierEmplacement: dernierEmplacement });
         });
         return resultat;
       });
@@ -642,24 +707,31 @@ var SecteurService = (function () {
   }
 
   /**
-   * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : place 1
-   * Défense de Secteur et 1 Guilde de Scientifiques dans le secteur du
-   * Néant adjacent choisi par le joueur — revalide les mêmes conditions
-   * qu'obtenirSecteursEligiblesDefenseGuildeNeantAdjacent (jamais
+   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
+   * générique) : place les éléments d'un cadre "placement" dans le
+   * secteur du Néant adjacent choisi par le joueur — revalide les mêmes
+   * conditions qu'obtenirSecteursEligiblesPlacementNeantAdjacent (jamais
    * confiance à l'appelant, même principe que construire ci-dessus)
-   * avant d'écrire.
+   * avant d'écrire. Généralise placerDefenseGuildeNeantAdjacent (codée
+   * en dur pour Défense de Secteur + Guilde de Scientifiques) : incrémente
+   * le champ secteursPartie de chaque clé de `elements` reconnue par
+   * CHAMP_ELEMENT_PLACEMENT_, de la quantité indiquée.
    */
-  function placerDefenseGuildeNeantAdjacent(partieId, numero) {
-    return obtenirSecteursEligiblesDefenseGuildeNeantAdjacent(partieId).then(function (eligibles) {
+  function placerElementsNeantAdjacent(partieId, numero, elements) {
+    return obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements).then(function (eligibles) {
       var cible = eligibles.filter(function (e) { return e.numero === numero; })[0];
       if (!cible) {
-        throw new Error('Secteur ' + numero + ' non éligible (doit être un secteur du Néant, adjacent à l\'un de vos secteurs, avec un emplacement Installation et un emplacement Guilde libres).');
+        throw new Error('Secteur ' + numero + ' non éligible (doit être un secteur du Néant, adjacent à l\'un de vos secteurs, avec les emplacements Installation/Guilde requis libres).');
       }
 
       return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
         if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
-        secteur.installationDefenseSecteur = (secteur.installationDefenseSecteur || 0) + 1;
-        secteur.guildeScientifiques = (secteur.guildeScientifiques || 0) + 1;
+        Object.keys(elements || {}).forEach(function (cle) {
+          var info = CHAMP_ELEMENT_PLACEMENT_[cle];
+          if (!info) return;
+          var quantite = Number(elements[cle]) || 0;
+          secteur[info.champ] = (secteur[info.champ] || 0) + quantite;
+        });
         return DB.put('secteursPartie', secteur).then(function () { return secteur; });
       });
     });
@@ -678,8 +750,8 @@ var SecteurService = (function () {
     regrouper: regrouper,
     envahirResoudre: envahirResoudre,
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
-    obtenirSecteursEligiblesDefenseGuildeNeantAdjacent: obtenirSecteursEligiblesDefenseGuildeNeantAdjacent,
-    placerDefenseGuildeNeantAdjacent: placerDefenseGuildeNeantAdjacent,
+    obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
+    placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     getEntretien: getEntretien
   };
 })();

@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 32 — 2026-08-18
+ * Version 33 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,32 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
+ * générique, Événement B Cycle 1 : "activer 1 cube / déployer 1 cube
+ * sur le Secteur-Mère") : dernier cadre de l'Événement B Cycle 1 porté,
+ * en réutilisant focusEngine.js (fourni par l'utilisateur cette
+ * session) — GameService.appliquerCadreChoixCube délègue à
+ * FocusEngine.resoudreEffet (moteur pur déjà utilisé par l'écran Focus
+ * pour activer_cube/deployer_cube_secteur_mere) plutôt que de dupliquer
+ * une deuxième logique de débit de cubeActif : FocusEngine reste la
+ * SEULE source de vérité pour cette mécanique, qu'elle soit déclenchée
+ * depuis Focus ou depuis un Cadre d'Événement galactique. Pour l'option
+ * "déployer", une SECONDE popup s'ouvre (choix du type de Flotte,
+ * contexte 'deployer_cube' déjà existant côté Focus, mode 'secteur_mere'
+ * — aucune modification nécessaire côté strategieService.js pour ce
+ * mode, déjà générique). js/gameService.js (v12 — nouvelle méthode
+ * appliquerCadreChoixCube + cleFocusEnginePourOptionCadre_, dépend
+ * désormais de FocusEngine — référence globale paresseuse, résolue
+ * seulement à l'appel), index.html (v32 — actionsCadre_ reconnaît les
+ * options cube via cleFocusEnginePourOptionCadre_/libelleOptionCube_,
+ * nouvelle appliquerCadreCubeEtRafraichir_, texte "✓ Appliqué" gère le
+ * cas cadresAppliques[ordre].resume en plus de .delta/.secteur). Tests
+ * fumée dédiés : test_gameService_cadreChoixCube.js (node --test, charge
+ * le vrai focusEngine.js + mock DB en mémoire, 4 scénarios). Avec ce
+ * lot, les 3 Cadres de l'Événement B Cycle 1 sont couverts : Cadre 1
+ * (placement, généralisé précédemment), Cadre 2 (Corruption, hors
+ * périmètre — décision utilisateur), Cadre 3 (ce lot).
  *
  * 18/08/2026 (Simplification UI Événement galactique — retouches popup +
  * Cadre 1 générique, Événement B Cycle 1) :
@@ -486,4 +512,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.8';
+var APP_VERSION = '20260818.9';
