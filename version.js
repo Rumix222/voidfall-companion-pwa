@@ -528,6 +528,14 @@
  * écran "Créer une partie" mort). Contenu de setupService.js restauré à
  * sa dernière version valide (secteurService.js n'a pas été affecté,
  * aucune régression côté Événement B).
+ *
+ * 19/08/2026 (Cadre 2 générique, Événement B Cycle 1 — "Placez une
+ * Corruption sur l'offre de Programme Domination") : cadre `effet.type
+ * === 'gain'` rendu cliquable (index.html v31 — data-manuel, popup
+ * 'confirmation' réutilisée, statut "✓ Fait (à la main)") ; ajout de
+ * GameService.appliquerCadreManuel (js/gameService.js v14 — marque le
+ * cadre résolu, aucun delta sur plateauMaison). Générique à tout futur
+ * cadre "gain" du catalogue.
  */
 
-var APP_VERSION = '20260819.1';
+var APP_VERSION = '20260819.2';

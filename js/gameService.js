@@ -1160,6 +1160,42 @@ var GameService = (function () {
     },
 
     /**
+     * 19/08/2026 (Événement galactique B, Cycle 1 — Cadre 2 "Placez une
+     * Corruption sur l'offre de Programme Domination") : applique un cadre
+     * de type "gain" (voir data/catalogue/evenements.json) — hors
+     * périmètre d'actionsSimplesCadre_ (ne porte sur aucune des 5
+     * ressources plateauMaison, l'app ne suit pas l'offre de Programme) :
+     * ne fait qu'enregistrer que le joueur a résolu l'effet à la main sur
+     * le plateau physique, même garde-fou anti-double-application que
+     * appliquerCadreEffet/appliquerCadrePlacement ci-dessus, mais sans
+     * toucher plateauMaison (aucun delta à appliquer).
+     */
+    appliquerCadreManuel: function (partieId, cycle, ordreCadre) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        evenementCycle.cadresAppliques[ordreCadre] = { manuel: true, le: new Date().toISOString() };
+        partie.evenements[cleCycle] = evenementCycle;
+
+        return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
+    },
+
+    /**
      * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : applique un
      * cadre de type "placement" (zone "secteur_neant_adjacent", voir
      * data/catalogue/evenements.json) — hors périmètre d'actionsSimplesCadre_

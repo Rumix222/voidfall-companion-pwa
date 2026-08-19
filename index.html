@@ -1332,6 +1332,39 @@
     }
 
     /**
+     * 19/08/2026 (Événement galactique B, Cycle 1 — Cadre 2 "Placez une
+     * Corruption sur l'offre de Programme Domination") : cadre de type
+     * "gain" (aucune ressource plateauMaison suivie par l'app derrière —
+     * l'offre de Programme n'est pas modélisée) — ouvre la même modale
+     * générique que les autres cadres, en réutilisant le contexte
+     * 'confirmation' déjà existant côté StrategieService.demanderChoix
+     * (message + Annuler/Valider), puis persiste juste "cadre résolu" via
+     * GameService.appliquerCadreManuel (aucun delta appliqué, contrairement
+     * à appliquerCadreEtRafraichir_ ci-dessus).
+     */
+    function appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'confirmation',
+        titre: 'Effet à résoudre à la main',
+        message: cadre.texte + ' Une fois fait sur le plateau physique, validez pour cocher ce cadre.',
+        texteValider: 'Valider'
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreManuel(partie.id, cycle, ordre)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec de la validation du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
      * 18/08/2026 (Simplification UI Événement galactique, point 6) : un
      * cadre "choix" (options exclusives, ex. +3 Crédit / -1 Science pour
      * une Technologie) n'affiche plus ses boutons directement sur la
@@ -1461,6 +1494,18 @@
      * { delta, le }) — `applique.resume` (déjà le libellé du journal
      * FocusEngine, ex. "+1 cube(s) activé(s)") prime sur le rendu delta
      * générique ci-dessous.
+     *
+     * 19/08/2026 (Cadre 2 générique, Événement B Cycle 1 — "Placez une
+     * Corruption sur l'offre de Programme Domination") : un cadre
+     * `effet.type === 'gain'` (aucune ressource plateauMaison suivie
+     * derrière, contrairement à "échange"/"choix") sort à son tour du
+     * hors-périmètre ci-dessus — cliquable comme les autres (data-manuel),
+     * ouvre une popup générique de confirmation (contexte 'confirmation'
+     * de StrategieService.demanderChoix, réutilisé tel quel) invitant à
+     * résoudre l'effet à la main sur le plateau physique ; Valider marque
+     * juste le cadre comme fait (GameService.appliquerCadreManuel, aucun
+     * delta), affiché "✓ Fait (à la main)". Générique à tout futur cadre
+     * "gain" du catalogue, pas figé sur ce seul cadre.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -1479,11 +1524,14 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain');
 
           var statutHtml = '';
           var actions = [];
           if (estPlacementNeantAdjacent) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
+          } else if (estManuel) {
+            if (applique) statutHtml = '<p class="cadre-statut">✓ Fait (à la main)</p>';
           } else if (applique) {
             if (applique.resume) {
               statutHtml = '<p class="cadre-statut">✓ Appliqué (' + applique.resume + ')</p>';
@@ -1496,10 +1544,11 @@
             actions = actionsCadre_(cadre);
           }
 
-          var cliquable = !applique && (estPlacementNeantAdjacent || actions.length);
+          var cliquable = !applique && (estPlacementNeantAdjacent || estManuel || actions.length);
           var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
+          var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"');
           var attributsCarte = cliquable
-            ? ' data-ordre="' + cadre.ordre + '"' + (estPlacementNeantAdjacent ? ' data-placement="1"' : ' data-resolution="1"') + ' role="button" tabindex="0"'
+            ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
             : '';
 
           return '<div class="cadre-carte ' + classeCarte + '"' + attributsCarte + '>' +
@@ -1528,6 +1577,19 @@
         var declencher = function () {
           if (carteEl.classList.contains('cadre-carte-en-cours')) return;
           ouvrirPopupCadreEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-manuel="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
         };
         carteEl.addEventListener('click', declencher);
         carteEl.addEventListener('keydown', function (evenement) {
