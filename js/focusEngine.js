@@ -1,7 +1,30 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 5 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ * Version 6 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : automatisation "augmenter_population_pure"/"etablir_guilde_banquier")
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+ * utilisateur : "automatiser augmentez une population pure ... et
+ * etablir un guilde banquier -> idem que etablir une guilde sauf que
+ * banquier est preselectionné dans la ddl et en lecture seule") : 2
+ * nouvelles clés reconnues par resoudreCle_, même principe que
+ * construire_installation/etablir_guilde (Effet UNIQUEMENT, signe > 0) :
+ * - 'etablir_guilde_banquier' ajoutée à CATEGORIE_PAR_CLE_CONSTRUIRE_
+ *   ('guilde', même popup 'construire' que etablir_guilde) + nouvelle
+ *   TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = { etablir_guilde_banquier: 'banquiers' }
+ *   — demanderChoix({type:'construire', ..., typeForce}) transmis à la
+ *   popup (strategieService.js), qui restreint alors le <select> Type à
+ *   cette seule option et le désactive (lecture seule) au lieu de laisser
+ *   le joueur choisir librement.
+ * - 'augmenter_population_pure' : nouveau cas dédié, demanderChoix({type:
+ *   'augmenter_population_pure', ...}) — la popup fait la sélection du
+ *   secteur (SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure,
+ *   secteurService.js v6) et écrit directement via SecteurService.
+ *   augmenterPopulationPure au moment de la validation (même pattern que
+ *   construire/regrouper/envahir : focusEngine reste pur, aucun accès DB
+ *   ici, resoudreCle_ relaie juste le résumé dans le journal).
+ * js/gameService.js/index.html (cleFocusEnginePourOptionCadre_ dupliquée
+ * dans les 2 fichiers), js/strategieService.js (popup, v21).
  *
  * 19/08/2026 (retour utilisateur : "on a dû perdre cette possibilité lors
  * du portage en PWA, il y a des actions de focus qui placent des guildes
@@ -215,7 +238,19 @@ var FocusEngine = (function () {
   ];
   var CATEGORIE_PAR_CLE_CONSTRUIRE_ = {
     construire_installation: 'installation', installation: 'installation',
-    etablir_guilde: 'guilde', guilde: 'guilde'
+    etablir_guilde: 'guilde', guilde: 'guilde',
+    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : même popup
+    // 'construire' (catégorie 'guilde') que etablir_guilde, avec le type
+    // forcé sur "Banquiers" (voir TYPE_FORCE_PAR_CLE_CONSTRUIRE_ ci-dessous).
+    etablir_guilde_banquier: 'guilde'
+  };
+  // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : clé de
+  // CLES_CONSTRUIRE -> type forcé (présélectionné et non modifiable côté
+  // popup 'construire', strategieService.js) — absent pour les clés dont
+  // le type reste au libre choix du joueur (etablir_guilde/
+  // construire_installation, comportement inchangé).
+  var TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = {
+    etablir_guilde_banquier: 'banquiers'
   };
   var CLES_CONSTRUIRE = Object.keys(CATEGORIE_PAR_CLE_CONSTRUIRE_);
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
@@ -345,6 +380,26 @@ var FocusEngine = (function () {
       return Promise.resolve(demanderChoix({
         type: 'construire',
         categorie: CATEGORIE_PAR_CLE_CONSTRUIRE_[cle],
+        typeForce: TYPE_FORCE_PAR_CLE_CONSTRUIRE_[cle],
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
+    }
+
+    // --- Augmenter une Population Pure : Effet UNIQUEMENT (signe > 0).
+    // Ouvre une popup dédiée (secteur possédé, non Corrompu, Population < 6
+    // — voir SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure)
+    // qui appelle directement SecteurService.augmenterPopulationPure et
+    // persiste en IndexedDB AU MOMENT de la validation (même pattern que
+    // construire/regrouper/envahir ci-dessus — focusEngine reste pur,
+    // aucun accès DB ici). ---
+    if (cle === 'augmenter_population_pure' && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'augmenter_population_pure',
         source: source,
         partieId: etat.partieId
       })).then(function (reponse) {

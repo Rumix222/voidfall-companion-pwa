@@ -112,7 +112,7 @@
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Activez 1 cube OU augmentez une Population Pure ou établissez une Guilde de Banquiers.",
+        "texte": "Activez 1 cube OU augmentez une Population Pure OU établissez une Guilde de Banquiers.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "activer_cube", "valeur": 1 },
           { "cle": "augmenter_population_pure", "valeur": 1 },
@@ -143,7 +143,7 @@
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut avancer sur une piste de Civilisation.",
+        "texte": "Avancez sur une piste de Civilisation.",
         "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "avancer_civilisation", "valeur": 1 } ] }
       }
     ],
@@ -173,7 +173,7 @@
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut soit déployer 1 cube sur son Secteur-Mère, soit améliorer un jeton Gloire.",
+        "texte": "Déployez 1 cube sur votre Secteur-Mère OU améliorez un jeton Gloire.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "deployer_cube", "valeur": 1, "cible": "secteur_mere" },
           { "cle": "ameliorer_gloire", "valeur": 1 }
@@ -339,7 +339,7 @@
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut dépenser jusqu'à 6 Science de sa réserve pour gagner autant de Crédits.",
+        "texte": "Dépensez jusqu'à 6 Science pour gagner autant de Crédits.",
         "effet": { "type": "echange", "mode": "proportionnel", "cout": { "cle": "science", "plafond": 6 }, "gain": { "cle": "credit", "ratio": "1_pour_1_avec_cout" } }
       }
     ],
@@ -578,7 +578,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut produire deux ressources différentes.",
+        "texte": "Produisez deux ressources différentes.",
         "effet": { "type": "choix", "mode": "unique", "options": [ { "cle": "produire_type_ressource", "valeur": 2 } ] }
       },
       {

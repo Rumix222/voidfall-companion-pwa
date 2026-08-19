@@ -712,6 +712,84 @@
  * hors périmètre (repli générique existant, pas de régression).
  * js/focusEngine.js (v5), js/strategieService.js (v19), js/gameService.js
  * (v14), index.html. Aucun changement css/style.css.
+ *
+ * 19/08/2026 (correctif Piège n°1 bis, retour utilisateur : "Établir
+ * Guilde ne fonctionne pas sur Event C") : le lot précédent (v.15) était
+ * fonctionnellement correct (vérifié dans un environnement à cache neuf)
+ * mais service-worker.js recopiait parfois une version PÉRIMÉE d'un
+ * fichier dans le nouveau cache lors de l'installation — cache.addAll(urls)
+ * est soumis au cache HTTP du navigateur (étage différent du Cache Storage
+ * du Service Worker, que le mécanisme d'auto-réparation d'index.html vide
+ * pourtant bien avant de recharger) : si ce cache HTTP tenait encore
+ * l'ancien js/focusEngine.js pour "frais", il était re-servi tel quel.
+ * Corrigé : chaque fichier précaché est désormais récupéré avec
+ * `fetch(url, { cache: 'reload' })` (ignore le cache HTTP en lecture, même
+ * principe que le ?bust= déjà utilisé par js/catalogueSync.js), garantit
+ * un contenu réseau réel au moment de l'installation. service-worker.js
+ * (v15) — seul fichier modifié, changement d'octets indispensable pour que
+ * la détection native du navigateur ET l'auto-réparation se déclenchent
+ * sur ce déploiement-ci.
+ *
+ * 19/08/2026 (retour utilisateur — "Installation et guilde ne sont pas
+ * rafraîchit lorsque je clique sur l'onglet secteur") : Établir une
+ * Guilde/Construire une Installation écrivent bien sur secteursPartie
+ * (déjà vérifié), mais l'onglet Secteurs n'était jamais explicitement
+ * rappelé pour se re-rendre — App.afficherEcran ne re-rend rien tout seul
+ * au changement d'onglet (Piège n°2, voir CLAUDE.md), donc l'onglet
+ * affichait son dernier rendu, périmé. Ajout de App.renderSecteurs(...)
+ * après résolution : dans appliquerCadreFocusEngineEtRafraichir_
+ * (index.html — chemin Cadre d'Événement galactique, ex. Événement C
+ * Cycle 1 Cadre 2) et dans jouerAction_ (js/strategieService.js — chemin
+ * Focus, systématique après CHAQUE action plutôt que de détecter au cas
+ * par cas laquelle touche les secteurs : couvre aussi regrouper/envahir/
+ * deployer_cube, qui avaient le même défaut avant ce correctif, jamais
+ * remarqué jusqu'ici). js/strategieService.js (v20), index.html. Aucun
+ * changement gameService.js/secteurService.js/focusEngine.js (la donnée
+ * était déjà correctement persistée, seul l'affichage était en cause).
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 1 "Nous sommes la
+ * résistance", retour utilisateur : "premier effet nombre cube et gloire
+ * pas rafraichit quand on va dans onglet secteur") : le Cadre 1 (cube_neant
+ * + gloire) réutilise le pattern générique "placement" (Cadres 1 des
+ * Événements A/B/C, App.renderSecteurs déjà appelé) — le vrai bug n'était
+ * pas un défaut de rafraîchissement mais une absence d'écriture :
+ * cube_neant/gloire manquaient dans CHAMP_ELEMENT_PLACEMENT_
+ * (js/secteurService.js), la popup validait donc sans rien persister sur
+ * secteursPartie. Ajout des 2 clés (gloire avec un nouveau mode `valeur:
+ * true` — jetonGloire stocke la valeur du jeton, pas une quantité,
+ * contrairement à cube_neant/prime/liberation qui s'incrémentent).
+ * js/secteurService.js (v5). Aucun changement index.html/gameService.js
+ * (le câblage générique du Cadre 1 "placement" couvrait déjà D sans code
+ * spécifique, comme prévu).
+ *
+ * 19/08/2026 (Piège n°2, retour utilisateur — "une bonne fois pour toute,
+ * rafraichir toute les données secteurs lorsqu'on clique sur l'onglet
+ * secteurs") : au lieu de compter sur chaque action qui mute
+ * secteursPartie pour explicitement rappeler App.renderSecteurs (plusieurs
+ * oublis déjà rencontrés — Construire/Établir, Événement D Cadre 1, avant
+ * ça regrouper/envahir/deployer_cube), App.afficherEcran('secteurs')
+ * rappelle désormais systématiquement renderEcranSecteurs_ à chaque clic
+ * sur l'onglet Secteurs, même principe déjà en place pour l'onglet Combat.
+ * Les rappels explicites existants restent (utiles si l'écran Secteurs
+ * est déjà affiché au moment de l'action). index.html.
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+ * utilisateur : "automatiser augmentez une population pure : choisir
+ * secteur dans DDL parmi secteur eligible (non corrompu)" / "etablir un
+ * guilde banquier -> idem que etablir une guilde sauf que banquier est
+ * preselectionné dans la ddl et en lecture seul") : 2 des 3 options du
+ * Cadre 2 automatisées (la 3ᵉ, "Activer 1 cube", l'était déjà) — même
+ * mécanisme générique que Construire une Installation/Établir une Guilde
+ * (cleFocusEnginePourOptionCadre_ -> FocusEngine.resoudreCle_ -> popup
+ * demanderChoix dédiée qui écrit directement sur secteursPartie), aucun
+ * code spécifique à l'Événement D. augmenter_population_pure : nouvelle
+ * popup 'augmenter_population_pure' (secteur possédé, non Corrompu,
+ * Population < 6 — docs-rules-secteurs.md §3). etablir_guilde_banquier :
+ * réutilise la popup 'construire' existante avec un nouveau paramètre
+ * `typeForce` ('banquiers') qui restreint et désactive le <select> Type.
+ * js/secteurService.js (v6), js/focusEngine.js (v6), js/gameService.js
+ * (v15), js/strategieService.js (v21), index.html
+ * (LABEL_OPTION_CONSTRUIRE_ renommé LABEL_OPTION_FOCUSENGINE_).
  */
 
-var APP_VERSION = '20260819.15';
+var APP_VERSION = '20260819.19';

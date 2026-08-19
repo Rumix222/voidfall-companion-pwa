@@ -1,7 +1,39 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 4 — 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du Domineum")
+ * Version 6 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 "augmenter une Population Pure")
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+ * utilisateur : "automatiser augmentez une population pure : choisir
+ * secteur dans DDL parmi secteur eligible (non corrompu)") : nouvelles
+ * fonctions obtenirSecteursEligiblesAugmenterPopulationPure(partieId)/
+ * augmenterPopulationPure(partieId, numero) — même principe que
+ * construire ci-dessous (revalidation complète avant écriture, jamais
+ * confiance à l'appelant). Éligibilité (docs-rules-secteurs.md §3) : un
+ * secteur qui appartient au joueur (appartientAuJoueur_), non Corrompu
+ * (la Population d'un secteur Corrompu ne peut pas être modifiée), avec
+ * une Population non nulle (certains secteurs spéciaux n'ont pas de dé
+ * Population du tout) et strictement inférieure à 6 (plafond de la
+ * règle). js/focusEngine.js (nouvelle clé 'augmenter_population_pure',
+ * v6), js/gameService.js/index.html (cleFocusEnginePourOptionCadre_),
+ * js/strategieService.js (nouveau contexte demanderChoix
+ * 'augmenter_population_pure', v21).
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 1 "Nous sommes la
+ * résistance", retour utilisateur : "premier effet nombre cube et gloire
+ * pas rafraichit quand on va dans onglet secteur") : cadre "placement"
+ * (cube_neant + gloire) déjà câblé génériquement côté index.html/
+ * gameService.js (voir Cadres 1 des Événements A/B), mais cube_neant et
+ * gloire étaient absents de CHAMP_ELEMENT_PLACEMENT_ — placerElementsNeant
+ * Adjacent ignorait donc ces 2 clés (`if (!info) return`) : la popup se
+ * validait normalement mais n'écrivait RIEN sur secteursPartie, d'où
+ * l'impression d'un défaut de rafraîchissement (en réalité aucune donnée à
+ * afficher). cube_neant ajouté en jeton standard (incrémente pnNeant,
+ * comme prime/liberation) ; gloire ajouté avec un nouveau flag `valeur:
+ * true` (au lieu d'incrémenter, affecte directement jetonGloire — ce champ
+ * stocke la VALEUR du jeton posé, pas une quantité, voir index.html
+ * LABEL_JETON_SECTEUR/ligneSecteurHTML_ et js/strategieService.js
+ * résolution 'envahir').
  *
  * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
  * Domineum") : nouveau type de cadre "placement_multiple" (data/catalogue/
@@ -326,6 +358,40 @@ var SecteurService = (function () {
   }
 
   /**
+   * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, "augmenter une
+   * Population Pure") : secteurs éligibles pour ajouter 1 au dé Population
+   * — un secteur possédé par le joueur (appartientAuJoueur_), non Corrompu,
+   * avec une Population renseignée (certains secteurs spéciaux n'en ont
+   * pas) et strictement inférieure à 6 (docs-rules-secteurs.md §3).
+   */
+  function obtenirSecteursEligiblesAugmenterPopulationPure(partieId) {
+    return obtenirSecteurs(partieId).then(function (secteurs) {
+      return secteurs
+        .filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu && s.population !== null && s.population < 6; })
+        .map(function (s) { return { numero: s.numero }; });
+    });
+  }
+
+  /**
+   * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : ajoute 1 au
+   * dé Population du secteur choisi — revalide l'éligibilité à neuf
+   * (jamais confiance à l'appelant, même principe que construire
+   * ci-dessus) avant d'écrire.
+   */
+  function augmenterPopulationPure(partieId, numero) {
+    return obtenirSecteursEligiblesAugmenterPopulationPure(partieId).then(function (eligibles) {
+      if (!eligibles.some(function (e) { return e.numero === numero; })) {
+        throw new Error('Secteur ' + numero + ' non éligible (doit être un secteur Pur que vous possédez, avec une Population inférieure à 6).');
+      }
+      return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+        if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
+        secteur.population = (secteur.population || 0) + 1;
+        return DB.put('secteursPartie', secteur).then(function () { return secteur; });
+      });
+    });
+  }
+
+  /**
    * 17/08/2026 (Session 12) : portage direct de la RPC
    * secteur_deployer_cube (rpc.json). AUCUNE validation côté RPC d'origine
    * (ni existence du secteur, ni stock) — portage fidèle : un type
@@ -644,7 +710,17 @@ var SecteurService = (function () {
     // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
     // Domineum") : premier cadre à poser un jeton Prime (jeton, comme
     // Libération, aucun emplacement Installation/Guilde consommé).
-    prime: { champ: 'jetonPrime', categorie: 'jeton' }
+    prime: { champ: 'jetonPrime', categorie: 'jeton' },
+    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 1 "Nous sommes
+    // la résistance") : cube_neant incrémente pnNeant (comme les autres
+    // jetons ci-dessus, aucun emplacement consommé — le secteur ciblé a
+    // déjà pnNeant > 0, voir le filtre d'éligibilité plus bas, on y ajoute
+    // simplement le cube posé). gloire est différent : jetonGloire stocke
+    // la VALEUR du jeton posé (pas une quantité, voir index.html
+    // LABEL_JETON_SECTEUR/ligneSecteurHTML_) — `valeur: true` fait que
+    // placerElementsNeantAdjacent AFFECTE ce champ au lieu de l'incrémenter.
+    cube_neant: { champ: 'pnNeant', categorie: 'jeton' },
+    gloire: { champ: 'jetonGloire', categorie: 'jeton', valeur: true }
   };
 
   /**
@@ -755,7 +831,7 @@ var SecteurService = (function () {
           var info = CHAMP_ELEMENT_PLACEMENT_[cle];
           if (!info) return;
           var quantite = Number(elements[cle]) || 0;
-          secteur[info.champ] = (secteur[info.champ] || 0) + quantite;
+          secteur[info.champ] = info.valeur ? quantite : (secteur[info.champ] || 0) + quantite;
         });
         return DB.put('secteursPartie', secteur).then(function () { return secteur; });
       });
@@ -882,6 +958,8 @@ var SecteurService = (function () {
     regrouper: regrouper,
     envahirResoudre: envahirResoudre,
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
+    obtenirSecteursEligiblesAugmenterPopulationPure: obtenirSecteursEligiblesAugmenterPopulationPure,
+    augmenterPopulationPure: augmenterPopulationPure,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,

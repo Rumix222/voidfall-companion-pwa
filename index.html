@@ -750,6 +750,22 @@
      * simplement jamais l'occasion d'être rappelée. Corrigé ici : rappel
      * de CombatVueService.afficher() (état 'combat', partie déjà ouverte)
      * à chaque clic sur l'onglet Combat.
+     *
+     * 19/08/2026 (Piège n°2, retour utilisateur — "une bonne fois pour
+     * toute, rafraichir toute les données secteurs lorsqu'on clique sur
+     * l'onglet secteurs") : même traitement pour l'onglet Secteurs que
+     * pour Combat ci-dessus — au lieu de compter sur CHAQUE action qui
+     * mute secteursPartie pour explicitement rappeler App.renderSecteurs
+     * (nombreux oublis constatés : Construire/Établir, Événement D Cadre
+     * 1, et avant ça regrouper/envahir/deployer_cube), rappel systématique
+     * de renderEcranSecteurs_ à chaque clic sur l'onglet Secteurs lui-même
+     * — filet de sécurité générique qui rend la classe de bug impossible
+     * pour ce chemin (navigation vers l'onglet), quelle que soit l'action
+     * qui a modifié les secteurs entretemps. Les rappels explicites déjà
+     * en place après chaque action (jouerAction_, appliquerCadre*EtRafraichir_)
+     * restent utiles pour l'écran Secteurs s'il est DÉJÀ affiché au moment
+     * de l'action (pas de clic d'onglet dans ce cas) — donc conservés,
+     * l'un ne remplace pas l'autre.
      */
     function afficherEcran(nom) {
       document.querySelectorAll('.screen').forEach(function (ecran) {
@@ -761,6 +777,9 @@
       });
       if (nom === 'combat' && partieCourante && typeof CombatVueService !== 'undefined') {
         CombatVueService.afficher(partieCourante);
+      }
+      if (nom === 'secteurs' && partieCourante) {
+        renderEcranSecteurs_(partieCourante);
       }
     }
 
@@ -1177,9 +1196,10 @@
      * toujours "manuellement" jamais "à la main"/parenthèses imbriquées).
      * Fallback générique (humaniserCleCadre_) pour toute clé non
      * répertoriée ici, plutôt que de rendre le cadre bloqué — vide pour
-     * l'instant (etablir_guilde/construire_installation, ses 2 entrées
-     * d'origine, sont automatisées depuis le 19/08/2026, voir
-     * LABEL_OPTION_CONSTRUIRE_/cleFocusEnginePourOptionCadre_ ci-dessous) :
+     * l'instant (etablir_guilde/construire_installation/
+     * etablir_guilde_banquier/augmenter_population_pure sont automatisées,
+     * voir LABEL_OPTION_FOCUSENGINE_/cleFocusEnginePourOptionCadre_
+     * ci-dessous) :
      * conservé prêt à accueillir une future clé réellement non
      * automatisable.
      */
@@ -1263,6 +1283,11 @@
         if (!option.cible) return 'deployer_cube';
       }
       if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
+      // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+      // utilisateur) : etablir_guilde_banquier (même popup 'construire'
+      // que etablir_guilde, type "Banquiers" forcé) / augmenter_population_pure
+      // (nouvelle popup dédiée) — voir focusEngine.js (v6).
+      if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
       return null;
     }
 
@@ -1279,15 +1304,19 @@
     }
 
     // 19/08/2026 (Construire une Installation / Établir une Guilde
-    // portées) : libellés (bouton, infinitif) pour les 2 clés
-    // etablir_guilde/construire_installation reconnues par
-    // cleFocusEnginePourOptionCadre_ — le détail (secteur + type choisis)
-    // n'apparaît qu'après résolution, dans le statut "✓ Appliqué (...)"
-    // (resume dérivé du journal FocusEngine, voir
-    // GameService.appliquerCadreChoixFocusEngine).
-    var LABEL_OPTION_CONSTRUIRE_ = {
+    // portées) : libellés (bouton, infinitif) pour les clés reconnues par
+    // cleFocusEnginePourOptionCadre_ en dehors des cubes (libelleOptionCube_
+    // ci-dessus) — le détail (secteur + type choisis) n'apparaît qu'après
+    // résolution, dans le statut "✓ Appliqué (...)" (resume dérivé du
+    // journal FocusEngine, voir GameService.appliquerCadreChoixFocusEngine).
+    // Renommé LABEL_OPTION_CONSTRUIRE_ -> LABEL_OPTION_FOCUSENGINE_ le
+    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) à l'ajout de
+    // augmenter_population_pure, qui n'est pas une construction.
+    var LABEL_OPTION_FOCUSENGINE_ = {
       etablir_guilde: 'Établir une Guilde',
-      construire_installation: 'Construire une Installation'
+      construire_installation: 'Construire une Installation',
+      etablir_guilde_banquier: 'Établir une Guilde de Banquiers',
+      augmenter_population_pure: 'Augmenter une Population Pure'
     };
 
     /**
@@ -1295,10 +1324,11 @@
      * portées) : dispatche le libellé de bouton d'une option de cadre
      * "choix" automatisée via FocusEngine selon la clé reconnue par
      * cleFocusEnginePourOptionCadre_ — cube (libelleOptionCube_, déjà
-     * existant) ou construction (LABEL_OPTION_CONSTRUIRE_, nouveau).
+     * existant) ou LABEL_OPTION_FOCUSENGINE_ (toute autre mécanique
+     * automatisée : construction, Population Pure...).
      */
     function libelleOptionFocusEngine_(option, cleFocusEngine) {
-      if (LABEL_OPTION_CONSTRUIRE_[cleFocusEngine]) return LABEL_OPTION_CONSTRUIRE_[cleFocusEngine];
+      if (LABEL_OPTION_FOCUSENGINE_[cleFocusEngine]) return LABEL_OPTION_FOCUSENGINE_[cleFocusEngine];
       return libelleOptionCube_(option, cleFocusEngine);
     }
 
@@ -1350,6 +1380,15 @@
           if (!resultat || resultat.annule) { bouton.disabled = false; return; }
           partieCourante = resultat;
           renderEvenementCycle_(resultat);
+          // 19/08/2026 (retour utilisateur — "Installation et guilde ne
+          // sont pas rafraîchit lorsque je clique sur l'onglet secteur") :
+          // depuis que cette fonction sert aussi les options
+          // etablir_guilde/construire_installation (en plus des cubes,
+          // qui ne touchent jamais secteursPartie), un rappel explicite à
+          // App.renderSecteurs est nécessaire — App.afficherEcran ne
+          // re-rend rien tout seul (Piège n°2, voir CLAUDE.md), l'onglet
+          // Secteurs restait donc affiché avec son dernier rendu, périmé.
+          App.renderSecteurs(resultat);
           StrategieService.afficher(resultat);
         })
         .catch(function (erreur) {

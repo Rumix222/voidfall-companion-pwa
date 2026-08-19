@@ -1,7 +1,16 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 14 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ * Version 15 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : automatisation "augmenter_population_pure"/"etablir_guilde_banquier")
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+ * utilisateur) : cleFocusEnginePourOptionCadre_ reconnaît désormais aussi
+ * { cle: 'augmenter_population_pure' } et { cle: 'etablir_guilde_banquier' }
+ * (identité — FocusEngine.resoudreCle_ les reconnaît telles quelles, voir
+ * focusEngine.js v6) — même mécanisme générique qu'etablir_guilde/
+ * construire_installation ci-dessous, aucun autre changement dans ce
+ * fichier (appliquerCadreChoixFocusEngine reste inchangée, entièrement
+ * générique sur la clé retournée ici).
  *
  * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
  * retour utilisateur : "on a dû perdre cette possibilité lors du portage
@@ -554,6 +563,7 @@ var GameService = (function () {
       if (!option.cible) return 'deployer_cube';
     }
     if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
+    if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
     return null;
   }
 

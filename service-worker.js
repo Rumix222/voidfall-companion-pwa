@@ -1,6 +1,26 @@
 /**
  * service-worker.js
- * Version 14 — 2026-08-19
+ * Version 15 — 2026-08-19
+ * 19/08/2026 (correctif Piège n°1 bis — retour utilisateur : "Établir
+ * Guilde ne fonctionne pas sur Event C", alors que le code lui-même était
+ * correct, vérifié dans un environnement de test à cache garanti neuf) :
+ * self.addEventListener('install', ...) utilisait cache.addAll(urls), qui
+ * fait un fetch() standard par URL — soumis au cache HTTP du navigateur
+ * (étage DIFFÉRENT du Cache Storage du Service Worker). Si ce cache HTTP
+ * tenait encore une réponse "fraîche" pour un fichier (ex. js/focusEngine.js,
+ * chargé une première fois AVANT un correctif), ce install recopiait cette
+ * version périmée dans le NOUVEAU CACHE_NOM — le mécanisme d'auto-
+ * réparation (index.html, ajouté la veille) désinstalle pourtant bien
+ * l'ancien Service Worker et vide le Cache Storage avant de recharger, ce
+ * qui déclenche ce install, mais celui-ci pouvait quand même re-servir du
+ * périmé pour cette raison précise. Corrigé : chaque fichier est
+ * maintenant récupéré avec `fetch(url, { cache: 'reload' })` (ignore le
+ * cache HTTP en lecture, force un aller-retour réseau réel) avant d'être
+ * écrit dans le Cache Storage — même principe que le paramètre anti-cache
+ * ?bust= déjà utilisé ailleurs (js/catalogueSync.js, fetch de version.js
+ * dans index.html). N'affecte QUE l'étape d'installation (le fetch handler
+ * cache-first, lui, reste inchangé) — IndexedDB non concerné.
+ *
  * 19/08/2026 (correctif Piège n°1 — mises à jour non détectées) : ce
  * fichier n'avait pas changé au niveau octet depuis la Version 13
  * (2026-08-18), alors qu'APP_VERSION avait déjà été incrémenté 11 fois
@@ -131,7 +151,30 @@ self.addEventListener('install', function (evenement) {
   evenement.waitUntil(
     caches.open(CACHE_NOM)
       .then(function (cache) {
-        return cache.addAll(FICHIERS_A_METTRE_EN_CACHE);
+        // 19/08/2026 (Piège n°1 bis — mise en cache d'un fichier déjà
+        // périmé côté navigateur) : cache.addAll(urls) fait un fetch()
+        // "normal" par URL, donc soumis au cache HTTP du navigateur (pas
+        // le Cache Storage du Service Worker, un autre étage) — si ce
+        // cache HTTP contenait déjà une réponse "fraîche" pour ex.
+        // js/focusEngine.js (issue d'un chargement précédent, AVANT un
+        // correctif), ce install re-cache cette version PÉRIMÉE dans le
+        // nouveau CACHE_NOM au lieu du contenu réellement à jour — bug
+        // constaté en pratique : le mécanisme d'auto-réparation
+        // (index.html) désinstalle bien l'ancien Service Worker et vide le
+        // Cache Storage, ce qui déclenche CE install, mais celui-ci pouvait
+        // rater la mise à jour d'un fichier si le cache HTTP du navigateur
+        // le tenait encore pour "frais". Chaque fichier est donc récupéré
+        // ici avec `{ cache: 'reload' }` (force un aller-retour réseau réel,
+        // ignore le cache HTTP en lecture — même principe que le paramètre
+        // anti-cache ?bust= déjà utilisé par js/catalogueSync.js et le
+        // fetch de version.js dans index.html) avant d'être écrit dans le
+        // Cache Storage — garantit que CACHE_NOM contient toujours le
+        // contenu réseau réel au moment de l'installation.
+        return Promise.all(FICHIERS_A_METTRE_EN_CACHE.map(function (url) {
+          return fetch(url, { cache: 'reload' }).then(function (reponse) {
+            return cache.put(url, reponse);
+          });
+        }));
       })
       .then(function () {
         // Fait passer le nouveau Service Worker en "actif" sans attendre

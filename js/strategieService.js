@@ -1,7 +1,37 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 19 — 19/08/2026 (Construire une Installation / Établir une Guilde portées)
+ * Version 21 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : popup "augmenter_population_pure" + typeForce sur "construire")
+ *
+ * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+ * utilisateur : "automatiser augmentez une population pure ... et
+ * etablir un guilde banquier -> idem que etablir une guilde sauf que
+ * banquier est preselectionné dans la ddl et en lecture seul") :
+ * - nouveau contexte demanderChoix 'augmenter_population_pure' (secteur
+ *   possédé, non Corrompu, Population < 6 — SecteurService.
+ *   obtenirSecteursEligiblesAugmenterPopulationPure/augmenterPopulationPure,
+ *   secteurService.js v6), même gabarit minimal que
+ *   'placement_secteur_neant_adjacent'.
+ * - contexte 'construire' accepte désormais un `typeForce` optionnel
+ *   (restreint + désactive le <select> Type) pour etablir_guilde_banquier
+ *   (focusEngine.js TYPE_FORCE_PAR_CLE_CONSTRUIRE_).
+ * Câblé générique via cleFocusEnginePourOptionCadre_/
+ * GameService.appliquerCadreChoixFocusEngine (gameService.js v15,
+ * index.html) — aucun code spécifique à l'Événement D dans ce fichier.
+ *
+ * 19/08/2026 (retour utilisateur — "Installation et guilde ne sont pas
+ * rafraîchit lorsque je clique sur l'onglet secteur") : jouerAction_ (jouer
+ * une carte Focus) appelle désormais App.renderSecteurs(partieFraiche)
+ * après CHAQUE action résolue (en plus de afficher(partieFraiche) déjà en
+ * place) — App.afficherEcran ne re-rend rien tout seul au changement
+ * d'onglet (Piège n°2, voir CLAUDE.md), l'onglet Secteurs restait donc
+ * affiché avec son dernier rendu pour toute action Focus écrivant
+ * directement sur secteursPartie (construire_installation/etablir_guilde,
+ * mais aussi regrouper/envahir/deployer_cube, qui avaient le même défaut
+ * avant ce correctif — jamais remarqué jusqu'ici). Rappel systématique
+ * plutôt que de détecter au cas par cas quelle action a touché les
+ * secteurs (peu coûteux, idempotent). index.html (appliquerCadreFocusEngineEtRafraichir_,
+ * même correctif côté Cadre d'Événement galactique).
  *
  * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
  * retour utilisateur : mécanique perdue lors du portage GAS -> PWA)
@@ -1359,6 +1389,17 @@ var StrategieService = (function () {
       })
       .then(function (partieFraiche) {
         afficher(partieFraiche);
+        // 19/08/2026 (retour utilisateur — "Installation et guilde ne sont
+        // pas rafraîchit lorsque je clique sur l'onglet secteur") : une
+        // action Focus peut écrire directement sur secteursPartie
+        // (construire_installation/etablir_guilde, regrouper, envahir,
+        // deployer_cube — toutes hors du diff plateauMaison, voir
+        // focusEngine.js) sans qu'afficher() ci-dessus ne le sache —
+        // App.afficherEcran ne re-rend rien tout seul en changeant
+        // d'onglet (Piège n°2, voir CLAUDE.md) : rappel systématique,
+        // peu coûteux et idempotent, plutôt que de détecter au cas par
+        // cas quelle action a touché les secteurs.
+        App.renderSecteurs(partieFraiche);
       })
       .catch(function (erreur) {
         window.alert('Échec de l\'action : ' + erreur.message);
@@ -2216,6 +2257,16 @@ var StrategieService = (function () {
         // SecteurService.construire au clic sur Valider (comme regrouper/
         // envahir/deployer_cube) — resolve({ detail }) pour le journal, ou
         // { annule: true } sur Annuler.
+        //
+        // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+        // utilisateur : "etablir un guilde banquier -> idem que etablir
+        // une guilde sauf que banquier est preselectionné dans la ddl et
+        // en lecture seul") : `contexte.typeForce` optionnel (cle de
+        // TYPES_GUILDE_CONSTRUIRE_/TYPES_INSTALLATION_CONSTRUIRE_, voir
+        // focusEngine.js TYPE_FORCE_PAR_CLE_CONSTRUIRE_) — restreint le
+        // <select> Type à cette seule option et le désactive (`disabled`,
+        // valeur toujours lisible via `.value` malgré l'attribut) plutôt
+        // que de laisser le joueur choisir librement.
         var estInstallation = contexte.categorie === 'installation';
         titre.textContent = estInstallation ? 'Construire une Installation' : 'Établir une Guilde';
         contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
@@ -2225,6 +2276,9 @@ var StrategieService = (function () {
 
         var partieConstruire = partieAffichee;
         var typesConstruire = estInstallation ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
+        if (contexte.typeForce) {
+          typesConstruire = typesConstruire.filter(function (t) { return t.cle === contexte.typeForce; });
+        }
 
         SecteurService.obtenirSecteursEligiblesConstruction(partieConstruire.id, contexte.categorie)
           .then(function (eligibles) {
@@ -2240,7 +2294,7 @@ var StrategieService = (function () {
                 return '<option value="' + e.numero + '">Secteur ' + e.numero + (e.emplacementsLibres === 1 ? ' ❗' : '') + '</option>';
               }).join('') +
               '</select>' +
-              '<select id="construire-select-type" class="modal-choix-select" style="margin-top:8px;">' +
+              '<select id="construire-select-type" class="modal-choix-select" style="margin-top:8px;"' + (contexte.typeForce ? ' disabled' : '') + '>' +
               typesConstruire.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') +
               '</select>';
 
@@ -2264,6 +2318,62 @@ var StrategieService = (function () {
                 .catch(function (erreur) {
                   btnValider.disabled = false;
                   window.alert('Échec de la construction : ' + erreur.message);
+                });
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+      } else if (contexte.type === 'augmenter_population_pure') {
+        // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
+        // utilisateur : "automatiser augmentez une population pure :
+        // choisir secteur dans DDL parmi secteur eligible (non
+        // corrompu)") : popup dédiée pour la clé Focus/Cadre
+        // "augmenter_population_pure" (voir focusEngine.js) — même
+        // gabarit minimal que 'placement_secteur_neant_adjacent' (un seul
+        // <select> de secteurs, "Secteur N", aucune information
+        // supplémentaire répétée). Réutilise SecteurService.
+        // obtenirSecteursEligiblesAugmenterPopulationPure/
+        // augmenterPopulationPure (secteurService.js v6). Persiste
+        // directement via SecteurService.augmenterPopulationPure au clic
+        // sur Valider (comme construire ci-dessus) — resolve({ detail })
+        // pour le journal, ou { annule: true } sur Annuler.
+        titre.textContent = 'Choisir un secteur';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partiePopulation = partieAffichee;
+
+        SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure(partiePopulation.id)
+          .then(function (eligibles) {
+            if (!eligibles.length) {
+              contenu.innerHTML = '<p class="hint">Aucun secteur Pur (non Corrompu) avec une Population inférieure à 6 actuellement.</p>';
+              return;
+            }
+
+            contenu.innerHTML = '' +
+              '<select id="population-select-secteur" class="modal-choix-select">' +
+              eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + '</option>'; }).join('') +
+              '</select>';
+
+            btnValider.hidden = false;
+            btnValider.textContent = 'Augmenter';
+            btnValider.onclick = function () {
+              var numero = Number(document.getElementById('population-select-secteur').value);
+              btnValider.disabled = true;
+
+              SecteurService.augmenterPopulationPure(partiePopulation.id, numero)
+                .then(function () {
+                  fermerModale_();
+                  btnValider.disabled = false;
+                  resolve({ detail: 'Population du Secteur ' + numero + ' augmentée de 1.', numero: numero });
+                })
+                .catch(function (erreur) {
+                  btnValider.disabled = false;
+                  window.alert('Échec de l\'augmentation de Population : ' + erreur.message);
                 });
             };
           }).catch(function (erreur) {
