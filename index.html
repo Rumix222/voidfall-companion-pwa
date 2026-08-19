@@ -1123,8 +1123,14 @@
     var LABEL_RESSOURCE_CADRE_ = {
       nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel', credit: 'Crédit', science: 'Science'
     };
+    // 18/08/2026 (retour utilisateur) : "Par joueur" et "Une fois" retirés
+    // (bruit visuel — la plupart des cadres sont "par_joueur" ou "unique",
+    // le badge n'apportait pas d'information utile). Les 3 résolutions
+    // restantes (permanent/collectif/retardement, moins fréquentes et
+    // significatives pour savoir QUAND résoudre le cadre) gardent leur
+    // badge.
     var LABEL_RESOLUTION_CADRE_ = {
-      par_joueur: 'Par joueur', unique: 'Une fois', permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
+      permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
     };
 
     // 18/08/2026 (Simplification UI Événement galactique) : LABEL_ELEMENT_

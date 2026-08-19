@@ -1,7 +1,15 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 15 — 18/08/2026 (Simplification UI Événement galactique — suite)
+ * Version 16 — 18/08/2026 (retour utilisateur — fallback titre popup placement)
+ *
+ * 18/08/2026 (retour utilisateur) : fallback de titre par défaut de la
+ * popup 'placement_secteur_neant_adjacent' ("Choisir un secteur du
+ * Néant", jamais affiché en pratique car l'appelant passe toujours
+ * contexte.titre = 'Choisir un secteur') aligné sur ce même libellé, par
+ * cohérence. Le retrait du label "Secteur du Néant" au-dessus de la ddl
+ * et l'espacement ajouté (.modal-choix-select, session précédente,
+ * commentaire ci-dessous) restent inchangés — déjà en place.
  *
  * 18/08/2026 (Simplification UI Événement galactique — suite, retour
  * utilisateur + Cadre 1 générique) :
@@ -2059,7 +2067,7 @@ var StrategieService = (function () {
         // permet de résoudre n'importe quel cadre "placement" du
         // catalogue (ex. Événement B Cycle 1 Cadre 1 : jeton Libération +
         // Défense de Secteur) avec ce même contexte, sans nouveau code.
-        titre.textContent = contexte.titre || 'Choisir un secteur du Néant';
+        titre.textContent = contexte.titre || 'Choisir un secteur';
         contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
         btnValider.hidden = true;
         btnAnnuler.hidden = false;

@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 33 — 2026-08-18
+ * Version 34 — 2026-08-18
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -14,6 +14,17 @@
  * Sans ce changement, le Service Worker n'est jamais réinstallé et
  * l'ancien contenu reste servi indéfiniment (voir en-tête de
  * service-worker.js pour le détail du mécanisme).
+ *
+ * 18/08/2026 (retour utilisateur) : badges "Par joueur"/"Une fois"
+ * retirés (bruit visuel, la majorité des cadres sont dans l'un de ces
+ * deux cas — LABEL_RESOLUTION_CADRE_ ne garde plus que permanent/
+ * collectif/retardement, index.html v33). Popup de placement : le
+ * fallback de titre par défaut ("Choisir un secteur du Néant", jamais
+ * affiché en pratique — l'appelant passe toujours un titre explicite)
+ * aligné sur "Choisir un secteur" par cohérence avec le titre réellement
+ * utilisé (js/strategieService.js v19) — le retrait du label "Secteur du
+ * Néant"/l'espacement sous la ddl (retour utilisateur précédent, déjà
+ * livrés) restent en place, confirmés inchangés.
  *
  * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
  * générique, Événement B Cycle 1 : "activer 1 cube / déployer 1 cube
@@ -512,4 +523,4 @@
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
  */
 
-var APP_VERSION = '20260818.9';
+var APP_VERSION = '20260818.10';
