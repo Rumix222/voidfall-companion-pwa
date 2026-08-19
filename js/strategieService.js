@@ -1,7 +1,7 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 16 — 18/08/2026 (retour utilisateur — fallback titre popup placement)
+ * Version 17 — 19/08/2026 (retour utilisateur — ligne Cube éditable + bouton Activer)
  *
  * 18/08/2026 (retour utilisateur) : fallback de titre par défaut de la
  * popup 'placement_secteur_neant_adjacent' ("Choisir un secteur du
@@ -499,6 +499,10 @@ var StrategieService = (function () {
   // Puissance Navale (inactif + actif + déployé), identique pour toutes
   // les maisons — voir strategie.html GAS, NB_CUBES_TOTAL.
   var NB_CUBES_TOTAL = 14;
+  // Dernier total de Cube déployé calculé par renderCubes_ (dérivé des
+  // secteurs) — conservé pour recalculer Cube inactif en local (input Actif
+  // édité à la main / bouton Activer) sans re-solliciter SecteurService.
+  var dernierTotalDeployeCubes_ = 0;
   // État local des 5 emplacements Gloire (null = vide, 1-5 = valeur du
   // jeton) — reconstruit depuis partie.plateauMaison.gloire à chaque
   // afficher(), comme les autres blocs de cet écran.
@@ -598,9 +602,9 @@ var StrategieService = (function () {
    * principales sont en plus rafraîchies en direct par
    * majRappelRessourceAffiche_ (appelée depuis le listener 'input' de
    * #ressources-principales, écran Plat. maison — voir renderRessources_
-   * ci-dessus). Cube actif n'a pas de saisie directe sur cet écran
-   * (modifié uniquement via les actions Focus/Secteurs) : seulement
-   * rafraîchi à chaque afficher(), comme le reste de l'écran.
+   * ci-dessus). Cube actif est également rafraîchi en direct depuis la ligne
+   * Cube (saisie directe ou bouton Activer, voir majAffichageCubes_/
+   * renderCubes_ plus bas), en plus des actions Focus/Secteurs.
    */
   function rappelChipHTML_(cle, valeur) {
     return '<div class="rappel-chip">' +
@@ -735,18 +739,54 @@ var StrategieService = (function () {
       RESSOURCES_PRODUCTION.forEach(function (cle) { niveauxProduction[cle] = totaux[cle]; });
       majNiveauxAffiches_();
 
+      dernierTotalDeployeCubes_ = totalDeploye;
       var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - totalDeploye);
 
       container.innerHTML =
         '<div class="ligne-cubes">' +
         '<span class="ligne-cubes-titre">Cube</span>' +
-        '<span class="ligne-cubes-item">Inactif <strong>' + cubeInactif + '</strong></span>' +
-        '<span class="ligne-cubes-item">Actif <strong>' + cubeActif + '</strong></span>' +
+        '<span class="ligne-cubes-item">Inactif <strong id="cube-inactif-valeur">' + cubeInactif + '</strong></span>' +
+        '<span class="ligne-cubes-item">Actif ' +
+        '<input type="number" step="1" min="0" class="cube-actif-input" id="cube-actif-input" value="' + cubeActif + '">' +
+        '</span>' +
         '<span class="ligne-cubes-item">Déployé <strong>' + totalDeploye + '</strong></span>' +
         '</div>';
+
+      document.getElementById('cube-actif-input').addEventListener('input', function () {
+        persisterCubeActif_(this.value);
+        majAffichageCubes_();
+      });
     }).catch(function () {
       // Silencieux — garde le dernier rendu plutôt que de bloquer l'écran.
     });
+  }
+
+  /**
+   * Persiste Cube actif (saisie directe sur Plat. maison, en plus des
+   * actions Focus/Secteurs qui le modifiaient jusqu'ici seules) — même
+   * sauvegarde différée que les jetons (persisterJeton_).
+   */
+  function persisterCubeActif_(valeurBrute) {
+    var n = Math.max(0, Math.min(NB_CUBES_TOTAL, Number(valeurBrute) || 0));
+    if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.cubeActif = n;
+    sauvegarderPlateauMaisonDifferee_({ cubeActif: n });
+  }
+
+  /**
+   * Recale Inactif/l'input Actif après une saisie directe, sans reconstruire
+   * toute la ligne (garde le focus de l'input).
+   */
+  function majAffichageCubes_() {
+    var pm = (partieAffichee && partieAffichee.plateauMaison) || {};
+    var cubeActif = pm.cubeActif || 0;
+    var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - dernierTotalDeployeCubes_);
+
+    var elInactif = document.getElementById('cube-inactif-valeur');
+    var elInput = document.getElementById('cube-actif-input');
+    if (elInactif) elInactif.textContent = cubeInactif;
+    if (elInput && elInput !== document.activeElement) elInput.value = cubeActif;
+
+    majRappelRessourceAffiche_('cubeActif', cubeActif);
   }
 
   function majNiveauxAffiches_() {

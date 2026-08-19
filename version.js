@@ -570,6 +570,52 @@
  * catalogue" pouvait resservir une réponse HTTP mise en cache par le
  * navigateur au lieu du fichier à jour, même après une mise à jour bien
  * déployée (APP_VERSION incrémenté, Service Worker réinstallé).
+ *
+ * 19/08/2026 (retours utilisateur — écran Nouvelle partie + Plat. maison) :
+ * - Écran Nouvelle partie : ddl Maison triée par complexité croissante
+ *   (js/setupService.js, peuplerListes_) ; étoiles ★/☆ (au lieu de ⭐/☆,
+ *   tailles incohérentes car l'une est un glyphe emoji et l'autre un
+ *   glyphe texte) ; case "Reproduire une partie physique déjà en cours"
+ *   relibellée "Partie déjà en cours" ; texte sous la case, une fois
+ *   cochée, raccourci en "Renseigner les éléments de départ" (index.html).
+ * - Onglet Plat. maison, ligne Cube : espacement augmenté (gap 10px ->
+ *   18px, scroll horizontal si besoin plutôt que retour à la ligne, même
+ *   convention que .nav-ecrans) ; Cube actif devient éditable directement
+ *   (input, même sauvegarde différée que les jetons Commerce/Prime/
+ *   Libération) — js/strategieService.js (renderCubes_ +
+ *   persisterCubeActif_/majAffichageCubes_, nouvelles), css/style.css
+ *   (.ligne-cubes/.cube-actif-input).
+ *
+ * 19/08/2026 (retour utilisateur, suite) : l'input Cube actif était trop
+ * large — repris à l'identique du gabarit .jeton-input (Commerce/Prime/
+ * Libération, largeur 34px) au lieu d'un style dédié plus imposant ;
+ * bouton "Activer" retiré (décision utilisateur — l'input éditable seul
+ * suffit) : js/strategieService.js, css/style.css.
+ *
+ * 19/08/2026 (retour utilisateur, suite) : ligne Cube — les 4 éléments
+ * (titre + Inactif/Actif/Déployé) étaient regroupés à gauche malgré le
+ * gap augmenté ; `justify-content: space-between` ajouté à .ligne-cubes
+ * pour qu'ils se répartissent sur toute la largeur de la ligne :
+ * css/style.css.
+ *
+ * 19/08/2026 (retour utilisateur — jetons Prime/Libération/Gloire absents
+ * du tableau Secteurs) : ces 3 champs existent bien par secteur
+ * (secteursPartie.jetonPrime/jetonLiberation/jetonGloire, posés par
+ * SecteurService.envahirResoudre en cas de victoire) mais
+ * ligneSecteurHTML_ ne les affichait jamais — nouvelle colonne "Jetons"
+ * (entre Gard. et Action, même convention que Guildes/Installations/
+ * Flotte : n'affiche que les valeurs non nulles via listeNonNulle_,
+ * nouveau dico LABEL_JETON_SECTEUR) : index.html.
+ *
+ * 19/08/2026 (retour utilisateur, correctif immédiat) : jetonGloire n'est
+ * PAS un compteur comme jetonPrime/jetonLiberation — c'est la VALEUR (1-5)
+ * du jeton Gloire posé sur le secteur, recopiée telle quelle dans un
+ * emplacement de plateauMaison.gloire lors d'une invasion réussie (voir
+ * js/strategieService.js, etatGloire[i] = jetonGloire). L'affichage
+ * "N× Gloire" du lot précédent laissait croire à N jetons — corrigé en
+ * "Gloire (N)" (N = la valeur), sorti de LABEL_JETON_SECTEUR/
+ * listeNonNulle_ (qui reste correct pour Prime/Libération, de vrais
+ * compteurs) : index.html.
  */
 
-var APP_VERSION = '20260819.6';
+var APP_VERSION = '20260819.11';

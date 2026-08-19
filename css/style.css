@@ -1,6 +1,6 @@
 /**
  * css/style.css
- * Version 14 — 17/08/2026 (Lot F — corrections mineures)
+ * Version 15 — 19/08/2026 (retour utilisateur — espacement ligne Cube + input/bouton Activer)
  *
  * 17/08/2026 (Lot F — corrections mineures) : nouvelles classes
  * .ligne-cubes/-titre/-item (ligne Cube inactif/actif/déployé compactée
@@ -808,22 +808,46 @@ input:disabled {
 }
 .ligne-cubes {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   font-size: 0.78rem;
   color: var(--color-text-muted);
 }
+.ligne-cubes::-webkit-scrollbar { display: none; }
 .ligne-cubes-titre {
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--color-text);
   text-transform: uppercase;
   letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+.ligne-cubes-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ligne-cubes-item strong {
   color: var(--color-coral);
   font-weight: 700;
+}
+.ligne-cubes-item .cube-actif-input {
+  width: 34px;
+  padding: 3px 2px;
+  border: 1px solid var(--color-coral);
+  border-radius: 6px;
+  color: var(--color-coral);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  background: rgba(255, 107, 82, 0.08);
 }
 
 /* 17/08/2026 (Session 10 — restauration IHM) : Gloire — 5 emplacements,

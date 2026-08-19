@@ -4,12 +4,12 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": null,
-        "texte": "Chaque joueur place une Défense de Secteur et une Guilde de Scientifiques dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez une Défense de Secteur et une Guilde de Scientifiques dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "defense_secteur": 1, "guilde_scientifique": 1 } }
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": null,
-        "texte": "Chaque joueur peut soit dépenser 1 Science pour gagner une Technologie de base, soit gagner 3 Crédits.",
+        "texte": "Dépensez 1 Science pour gagner une Technologie de base OU gagnez 3 Crédits.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cout": { "science": 1 }, "gain": { "technologie_base": 1 } },
           { "gain": { "credit": 3 } }
@@ -34,7 +34,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez un jeton Libération et une Défense de Secteur dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "liberation": 1, "defense_secteur": 1 } }
       },
       {
@@ -45,7 +45,7 @@
       },
       {
         "ordre": 3, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut soit activer 1 cube, soit déployer 1 cube sur son Secteur-Mère.",
+        "texte": "Activez 1 cube OU déployer 1 cube sur votre Secteur-Mère.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "activer_cube", "valeur": 1 },
           { "cle": "deployer_cube", "valeur": 1, "cible": "secteur_mere" }
@@ -70,7 +70,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer un jeton Prime dans le secteur du Néant adjacent avec la Population la plus basse, puis placer un jeton Libération et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée. Si un seul secteur du Néant est adjacent aux secteurs d'un joueur, il doit y placer tous les jetons (Prime, Libération et Défense de Secteur).",
+        "texte": "Placez un jeton Prime dans le secteur du Néant adjacent avec la Population la plus basse, puis placez un jeton Libération et une Défense de Secteur dans le secteur du Néant adjacent avec la Population la plus élevée. Si un seul secteur du Néant est adjacent à vose secteurs, placez tous les jetons (Prime, Libération et Défense de Secteur).",
         "effet": {
           "type": "placement_multiple", "zone": "secteur_neant_adjacent",
           "placements": [
@@ -82,7 +82,7 @@
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut soit établir une Guilde, soit construire une Installation.",
+        "texte": "Etablissez une Guilde OU construisez une Installation.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "etablir_guilde", "valeur": 1 },
           { "cle": "construire_installation", "valeur": 1 }
@@ -107,12 +107,12 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer 1 cube du Néant et un jeton Gloire de valeur 1 dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez 1 cube du Néant et un jeton Gloire de valeur 1 dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "gloire": 1 } }
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
-        "texte": "Chaque joueur peut choisir d'activer 1 cube ou augmenter une Population Pure ou établir une Guilde de Banquiers.",
+        "texte": "Activez 1 cube OU augmentez une Population Pure ou établissez une Guilde de Banquiers.",
         "effet": { "type": "choix", "mode": "exclusif", "options": [
           { "cle": "activer_cube", "valeur": 1 },
           { "cle": "augmenter_population_pure", "valeur": 1 },
@@ -138,7 +138,7 @@
     "cadres": [
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
-        "texte": "Chaque joueur doit placer une Guilde de Banquiers et 1 cube du Néant dans un secteur du Néant adjacent à l'un de ses secteurs.",
+        "texte": "Placez une Guilde de Banquiers et 1 cube du Néant dans un secteur du Néant adjacent à l'un de vos secteurs.",
         "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquier": 1, "cube_neant": 1 } }
       },
       {

@@ -1,7 +1,7 @@
 /**
  * setupService.js
  * Écran "Créer une partie" — Voidfall Companion PWA
- * Version 1 — 17/08/2026
+ * Version 2 — 19/08/2026 (retour utilisateur — tri maisons par complexité + étoiles ★/☆)
  *
  * Portage de setup.html (GAS, Version 2 — 10/08/2026) : logique de
  * l'écran de création de partie (choix manuel/aléatoire, mise en place
@@ -60,10 +60,14 @@ var SetupService = (function () {
   function peuplerListes_(maisons) {
     maisonsCache = maisons;
 
+    var maisonsTriees = maisons.slice().sort(function (a, b) {
+      return (Number(a.complexite) || 0) - (Number(b.complexite) || 0);
+    });
+
     var selectMaison = document.getElementById('select-maison');
-    selectMaison.innerHTML = maisons.map(function (m) {
+    selectMaison.innerHTML = maisonsTriees.map(function (m) {
       var niveau = Number(m.complexite) || 0;
-      var etoiles = '⭐'.repeat(niveau) + '☆'.repeat(Math.max(0, 4 - niveau));
+      var etoiles = '★'.repeat(niveau) + '☆'.repeat(Math.max(0, 4 - niveau));
       return '<option value="' + m.nom + '">' + etoiles + '  ' + m.nom + '</option>';
     }).join('');
 

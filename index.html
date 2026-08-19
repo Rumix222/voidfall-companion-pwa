@@ -75,11 +75,11 @@
 
       <label class="case-mise-en-place-manuelle">
         <input type="checkbox" id="check-mise-en-place-manuelle">
-        Reproduire une partie physique déjà en cours
+        Partie déjà en cours
       </label>
 
       <div id="bloc-mise-en-place-manuelle" class="setup-bloc-imbrique" hidden>
-        <p class="hint">Renseigne ce que tu as déjà tiré/choisi sur table : la technologie de départ, les 4 maisons déchues, puis les 3 de leurs technologies qui ne rapportent pas d'Influence.</p>
+        <p class="hint">Renseigner les éléments de départ</p>
 
         <label for="select-techno-depart-manuelle">Technologie de départ</label>
         <select id="select-techno-depart-manuelle">
@@ -1771,6 +1771,17 @@
       pnCorvette: 'Corvette', pnSentinelle: 'Sentinelle', pnDestroyer: 'Destroyer',
       pnCuirasse: 'Cuirassé', pnPorteVaisseau: 'Porte-Vaisseau'
     };
+    // jetonPrime/jetonLiberation : vrais compteurs (nombre de jetons face
+    // cachée sur le secteur). jetonGloire est différent — comme sur la
+    // fiche Maison (plateauMaison.gloire, valeurs 1-5 par emplacement), ce
+    // champ stocke la VALEUR du jeton Gloire posé sur le secteur (voir
+    // js/strategieService.js, résolution 'envahir' : etatGloire[i] =
+    // jetonGloire, la valeur est recopiée telle quelle dans un emplacement
+    // Gloire de la fiche Maison) — pas une quantité, donc à afficher à part
+    // ("Gloire (2)"), jamais au format "N× Gloire" du reste du tableau.
+    var LABEL_JETON_SECTEUR = {
+      jetonPrime: 'Prime', jetonLiberation: 'Libération'
+    };
 
     function listeNonNulle_(secteur, dico) {
       return Object.keys(dico)
@@ -1785,6 +1796,9 @@
       var flotte = listeNonNulle_(secteur, LABEL_PN);
       if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Cube néant';
       flotte = flotte || '—';
+      var jetons = listeNonNulle_(secteur, LABEL_JETON_SECTEUR);
+      if (secteur.jetonGloire > 0) jetons = (jetons ? jetons + ', ' : '') + 'Gloire (' + secteur.jetonGloire + ')';
+      jetons = jetons || '—';
       var action = secteur.corrompu
         ? '<button type="button" class="btn btn-secondary btn-retirer-corruption" data-numero="' + secteur.numero + '" style="font-size:0.72rem;padding:4px 8px;">Retirer</button>'
         : '—';
@@ -1796,6 +1810,7 @@
         '<td>' + installations + '</td>' +
         '<td>' + flotte + '</td>' +
         '<td>' + (secteur.nombreGardien || 0) + '</td>' +
+        '<td>' + jetons + '</td>' +
         '<td>' + action + '</td>' +
         '</tr>';
     }
@@ -1963,7 +1978,7 @@
 
         var lignes = secteurs.map(ligneSecteurHTML_).join('');
         conteneur.innerHTML = '<table class="table-secteurs"><thead><tr>' +
-          '<th>N°</th><th>Pop.</th><th>Guildes</th><th>Installations</th><th>Flotte</th><th>Gard.</th><th>Action</th>' +
+          '<th>N°</th><th>Pop.</th><th>Guildes</th><th>Installations</th><th>Flotte</th><th>Gard.</th><th>Jetons</th><th>Action</th>' +
           '</tr></thead><tbody>' + lignes + '</tbody></table>';
 
         Array.prototype.forEach.call(conteneur.querySelectorAll('.btn-retirer-corruption'), function (btn) {
