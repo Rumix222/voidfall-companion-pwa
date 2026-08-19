@@ -521,6 +521,13 @@
  *
  * 16/08/2026 : incrémenté suite à l'ajout de js/db.js et
  * js/catalogueSync.js à FICHIERS_A_METTRE_EN_CACHE (Phase 1 migration).
+ *
+ * 19/08/2026 (correctif) : js/setupService.js avait été écrasé par erreur
+ * par le contenu de js/secteurService.js dans un commit précédent ("event
+ * b") — SetupService n'existait plus (ReferenceError au chargement,
+ * écran "Créer une partie" mort). Contenu de setupService.js restauré à
+ * sa dernière version valide (secteurService.js n'a pas été affecté,
+ * aucune régression côté Événement B).
  */
 
-var APP_VERSION = '20260818.10';
+var APP_VERSION = '20260819.1';
