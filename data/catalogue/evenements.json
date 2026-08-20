@@ -139,7 +139,7 @@
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
         "texte": "Placez une Guilde de Banquiers et 1 cube du Néant dans un secteur du Néant adjacent à l'un de vos secteurs.",
-        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquier": 1, "cube_neant": 1 } }
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquiers": 1, "cube_neant": 1 } }
       },
       {
         "ordre": 2, "obligatoire": false, "resolution": "par_joueur",
@@ -362,7 +362,7 @@
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
         "texte": "Placez 1 cube du Néant et une Guilde de Banquiers dans un secteur du Néant adjacent à l'un de vos secteurs.",
-        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "guilde_banquier": 1 } }
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "cube_neant": 1, "guilde_banquiers": 1 } }
       },
       {
         "ordre": 2, "obligatoire": true, "resolution": "unique",
@@ -811,7 +811,7 @@
       {
         "ordre": 1, "obligatoire": true, "resolution": "par_joueur",
         "texte": "Chaque joueur doit placer une Guilde de Banquiers, 1 cube du Néant et une Défense de Secteur dans un secteur du Néant adjacent à l'un de ses secteurs.",
-        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquier": 1, "cube_neant": 1, "defense_secteur": 1 } }
+        "effet": { "type": "placement", "zone": "secteur_neant_adjacent", "elements": { "guilde_banquiers": 1, "cube_neant": 1, "defense_secteur": 1 } }
       },
       {
         "ordre": 2, "obligatoire": true, "resolution": "par_joueur",

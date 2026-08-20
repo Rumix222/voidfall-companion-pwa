@@ -121,18 +121,22 @@ test('placement générique — Cadre 1 style Événement B (jeton + installatio
     });
 });
 
-// 20/08/2026 (EVOLUTION 2 — anomalie mise à jour Guilde Secteur, voir
-// TODO.md) : régression pour le bug constaté sur l'Événement E Cycle 1
-// Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du Néant...",
-// data/catalogue/evenements.json : { guilde_banquier: 1, cube_neant: 1 })
-// — CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) avait la clé au pluriel
-// ("guilde_banquiers"), jamais reconnue par cette clé au singulier
-// utilisée par le catalogue : le cube (clé reconnue) s'appliquait tandis
-// que la Guilde (clé inconnue, ignorée silencieusement par
-// placerElementsNeantAdjacent) était perdue sans erreur. Couvre aussi
-// implicitement les 2 autres cadres du catalogue qui partagent la même
-// clé (Événement B Cycle 2 Cadre 1, Événement E Cycle 3 Cadre 1).
-test('placement générique — Événement E Cycle 1 Cadre 1 (guilde_banquier singulier + cube_neant)', function () {
+// 20/08/2026 (correctif — anomalie mise à jour Guilde Secteur, voir
+// TODO.md EVOLUTION 2) : régression pour le bug constaté sur l'Événement
+// E Cycle 1 Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du
+// Néant..."). Root cause réelle : data/catalogue/evenements.json
+// écrivait "guilde_banquier" (SINGULIER, coquille) alors que
+// CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) n'a jamais reconnu que la
+// forme au PLURIEL ("guilde_banquiers", cohérente avec guilde_fermiers/
+// guilde_ingenieurs/guilde_mineurs) : le cube (clé reconnue) s'appliquait
+// tandis que la Guilde (clé inconnue, ignorée silencieusement par
+// placerElementsNeantAdjacent) était perdue sans erreur. Corrigé côté
+// DONNÉE (les 3 occurrences fautives d'evenements.json renommées en
+// "guilde_banquiers" — retour utilisateur : préférence pour corriger la
+// donnée plutôt que le code face à un écart de convention de nommage) ;
+// secteurService.js est resté/est revenu à sa forme d'origine (plurielle).
+// Ce test reflète donc désormais la clé CORRIGÉE du catalogue.
+test('placement générique — Événement E Cycle 1 Cadre 1 (guilde_banquiers + cube_neant)', function () {
   var fixtures = { parties: {}, scenarioSecteurs: [], typesSecteur: [], secteursPartie: [] };
   fixtures.parties[PARTIE_ID] = { scenarioId: 'scn1' };
   fixtures.typesSecteur = [{ id: 't1', nombreInstallationMax: 1, nombreGuildeMax: 1 }];
@@ -152,7 +156,7 @@ test('placement générique — Événement E Cycle 1 Cadre 1 (guilde_banquier s
   var db = creerDB(Object.assign({ adjacences: [{ scenarioId: 'scn1', numeroA: 1, numeroB: 2 }] }, fixtures));
   var SecteurService = chargerSecteurService(db);
 
-  return SecteurService.placerElementsNeantAdjacent(PARTIE_ID, 2, { guilde_banquier: 1, cube_neant: 1 })
+  return SecteurService.placerElementsNeantAdjacent(PARTIE_ID, 2, { guilde_banquiers: 1, cube_neant: 1 })
     .then(function (secteur) {
       assert.strictEqual(secteur.guildeBanquiers, 1, 'la Guilde de Banquiers doit être posée (bug : était ignorée)');
       assert.strictEqual(secteur.pnNeant, 2, 'le cube du Néant (1 déjà présent + 1 posé) doit être 2');

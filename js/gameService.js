@@ -1,7 +1,21 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 17 — 20/08/2026 (EVOLUTION 7 — cleFocusEnginePourOptionCadre_ pour avancer_civilisation*)
+ * Version 18 — 20/08/2026 (correctif — appliquerCadreChoixFocusEngine, lecture-fusion-écriture sur l'écriture finale plateauMaison)
+ *
+ * 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO : "je ne
+ * vois pas l'effet de l'avancement de la piste civilisation dans
+ * l'onglet plateau maison") : appliquerCadreChoixFocusEngine ne
+ * réutilise plus `lignePlateauMaison` (capturée AVANT FocusEngine.
+ * resoudreEffet) pour l'écriture finale — un DB.put bâti sur ce
+ * snapshot périmé écrasait toute écriture DIRECTE faite sur plateauMaison
+ * PENDANT la résolution par une popup imbriquée (avancer_civilisation,
+ * EVOLUTION 7 ; retirer_corruption/Technologie, EVOLUTION 5), en
+ * violation de la règle #1 du projet (lecture-fusion-écriture
+ * systématique, voir CLAUDE.md). Relit désormais une ligne fraîche juste
+ * avant de fusionner les champs suivis par focusEngine.js — voir
+ * version.js pour le détail complet et le nouveau test dédié
+ * (gameService_cadre_ecriture_imbriquee_test.js).
  *
  * 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
  * voir TODO.md) : cleFocusEnginePourOptionCadre_ reconnaît désormais
@@ -1535,7 +1549,6 @@ var GameService = (function () {
 
             var champs = {};
             resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
-            Object.keys(champs).forEach(function (champ) { lignePlateauMaison[champ] = champs[champ]; });
 
             var resume = resultatEffet.journal.map(function (ligne) {
               var prefixe = source + ' : ';
@@ -1545,8 +1558,37 @@ var GameService = (function () {
             evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
             partie.evenements[cleCycle] = evenementCycle;
 
+            // 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO
+            // : "avancé sur une piste de Civilisation" mais l'effet de
+            // Case n'apparaissait pas sur Plat. maison) : NE PLUS
+            // réutiliser `lignePlateauMaison` (capturée tout en haut,
+            // AVANT FocusEngine.resoudreEffet) pour l'écriture finale.
+            // Certaines options (avancer_civilisation — EVOLUTION 7 ;
+            // retirer_corruption, option Technologie — EVOLUTION 5)
+            // écrivent DIRECTEMENT sur plateauMaison PENDANT la
+            // résolution, via une popup imbriquée qui appelle elle-même
+            // GameService.majPlateauMaison/majCivilisation (toutes deux
+            // lecture-fusion-écriture, sûres) — un DB.put bâti sur le
+            // snapshot périmé de `lignePlateauMaison` écrasait ces
+            // écritures avec les anciennes valeurs (violation de la
+            // règle #1 du projet, "lecture-fusion-écriture systématique :
+            // ne jamais écraser un champ non concerné par la modification
+            // en cours" — voir CLAUDE.md). Corrigé en relisant une ligne
+            // FRAÎCHE juste avant de fusionner uniquement `champs` (les
+            // mutations suivies par focusEngine.js pour L'ACTION DIRECTE
+            // du cadre — cube/ressources — jamais celles d'une popup
+            // imbriquée, qui persiste déjà elle-même). Si `champs` est
+            // vide (rien à écrire côté focusEngine, ex. avancer_civilisation
+            // seule sans coût), aucune écriture superflue.
+            var ecrirePlateauMaison = Object.keys(champs).length
+              ? DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+                Object.keys(champs).forEach(function (champ) { ligneFraiche[champ] = champs[champ]; });
+                return DB.put('plateauMaison', ligneFraiche);
+              })
+              : Promise.resolve();
+
             return Promise.all([
-              DB.put('plateauMaison', lignePlateauMaison),
+              ecrirePlateauMaison,
               GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
             ]).then(function () {
               return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {

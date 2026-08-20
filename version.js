@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 41 — 2026-08-20
+ * Version 42 — 2026-08-20
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -1017,6 +1017,59 @@
  * dédié pour le nouveau contexte de popup lui-même (strategieService.js
  * n'a pas de suite de tests — DOM-heavy, dette connue déjà signalée dans
  * CLAUDE.md, cohérent avec les évolutions précédentes).
+ *
+ * 20/08/2026 (correctifs — retour utilisateur sur EVOLUTION 7 + préférence
+ * générale "corriger la donnée plutôt que le code") :
+ *
+ * 1) BUG — "j'avance sur une piste de Civilisation (Cadre d'Événement),
+ * mais l'effet de la nouvelle case (testé : activer un cube + gagner 1
+ * Crédit et 1 Science) n'apparaît pas sur Plat. maison". Root cause :
+ * GameService.appliquerCadreChoixFocusEngine (js/gameService.js, v18)
+ * capturait `lignePlateauMaison` UNE SEULE FOIS tout en haut (avant
+ * FocusEngine.resoudreEffet), puis réécrivait cet instantané tel quel à
+ * la fin (DB.put brut, pas lecture-fusion-écriture) — alors que la popup
+ * imbriquée 'avancer_civilisation' (EVOLUTION 7) ET l'option Technologie
+ * de 'retirer_corruption' (EVOLUTION 5) écrivent DIRECTEMENT sur
+ * plateauMaison PENDANT la résolution (via GameService.majPlateauMaison/
+ * majCivilisation, elles-mêmes lecture-fusion-écriture, donc sûres) :
+ * l'écriture finale du cadre écrasait ces changements avec les valeurs
+ * d'avant, violant la règle #1 du projet (CLAUDE.md, "lecture-fusion-
+ * écriture systématique"). Corrigé en relisant une ligne FRAÎCHE juste
+ * avant de fusionner uniquement les champs suivis par focusEngine.js lui-
+ * même (l'action DIRECTE du cadre — jamais ceux d'une popup imbriquée,
+ * qui persiste déjà elle-même). Nouveau fichier de test dédié
+ * gameService_cadre_ecriture_imbriquee_test.js (2 cas — le premier
+ * reproduit fidèlement le bug via un `demanderChoix` factice qui écrit
+ * sur plateauMaison avant de résoudre, exactement comme le fait la
+ * vraie popup ; vérifié qu'il échoue bien sur l'ancien code et passe sur
+ * le correctif — attention portée au mock DB : un DB.get() DOIT cloner,
+ * sans quoi le bug reste invisible en test, comme en IndexedDB réel).
+ *
+ * 2) UX — "le résultat Appliqué (...) est trop verbeux, ne pas mettre le
+ * log (case 1 ...) ici" : js/strategieService.js (v24) — le résumé de la
+ * popup 'avancer_civilisation' n'inclut plus `effetJournal` (le détail
+ * technique de l'effet en cascade de la nouvelle case) ; il ne reste que
+ * "Piste X : niveau A → B — texte de la case", même format concis que le
+ * bouton "Avancer" manuel de l'écran Focus.
+ *
+ * 3) DONNÉE plutôt que CODE — retour utilisateur : "si c'est un écart de
+ * convention de nommage, je préfère mettre à jour les données plutôt que
+ * bidouiller le code". S'applique à EVOLUTION 2 (20/08/2026, plus tôt
+ * cette session) : CHAMP_ELEMENT_PLACEMENT_ (js/secteurService.js, v9)
+ * REVIENT à sa forme d'origine (4 clés Guilde au PLURIEL — "guilde_
+ * fermiers"/"guilde_ingenieurs"/"guilde_mineurs"/"guilde_banquiers",
+ * seule "guilde_scientifique" au singulier, convention déjà majoritaire
+ * avant EVOLUTION 2) ; la véritable anomalie — 3 occurrences de la
+ * coquille "guilde_banquier" (singulier) dans data/catalogue/
+ * evenements.json (Événement E Cycle 1 Cadre 1, Événement B Cycle 2
+ * Cadre 1, Événement E Cycle 3 Cadre 1) — est corrigée directement dans
+ * la DONNÉE ("guilde_banquier" -> "guilde_banquiers"), diff minimal
+ * (3 lignes), JSON revalidé. test_secteurService_placement.js mis à jour
+ * en conséquence (fixture + assertions sur la clé corrigée). Confirmé
+ * avec l'utilisateur : EVOLUTION 3 ("augmenter_population" reconnue en
+ * plus d'"augmenter_population_pure") N'EST PAS concernée — pas un écart
+ * de convention mais un vrai synonyme légitime (une seule mécanique
+ * possible, "on ne peut pas augmenter une population non pure").
  */
 
-var APP_VERSION = '20260820.7';
+var APP_VERSION = '20260820.8';

@@ -1,7 +1,18 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 23 — 20/08/2026 (EVOLUTION 7 — popup "avancer_civilisation" + correctifs LABEL_OPTION_FOCUSENGINE_/cleFocusEnginePourOptionCadre_)
+ * Version 24 — 20/08/2026 (correctif — résumé "avancer_civilisation" simplifié, log de case retiré)
+ *
+ * 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO : "le
+ * résultat Appliqué (...) est trop verbeux, ne pas mettre le log
+ * (case 1 ...) ici") : validerAvancementPiste_ (contexte
+ * 'avancer_civilisation') n'ajoute plus `resultat.effetJournal` au
+ * `detail` résolu — ne reste que "Piste X : niveau A → B — texte de la
+ * case", même format concis que le bouton "Avancer" manuel de l'écran
+ * Focus (avancerPiste_, qui journalise séparément effetJournal dans le
+ * journal "Actions réalisées", pas dans un statut "✓ Appliqué (...)" de
+ * Cadre — bien plus contraint en place). "déjà au niveau maximum" aligné
+ * sur le libellé déjà utilisé ailleurs ("déjà au maximum").
  *
  * 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
  * voir TODO.md) : nouveau contexte demanderChoix 'avancer_civilisation' —
@@ -2647,12 +2658,23 @@ var StrategieService = (function () {
               fermerModale_();
               btnValider.disabled = false;
               if (resultat.dejaMaximum) {
-                resolve({ detail: 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : déjà au niveau maximum.', piste: piste });
+                resolve({ detail: 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : déjà au maximum.', piste: piste });
                 return;
               }
+              // 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7
+              // KO : "le résultat Appliqué (...) est trop verbeux, ne pas
+              // mettre le log (case 1 ...) ici") : `resultat.effetJournal`
+              // (le détail de l'effet de la nouvelle case — rappel
+              // manuel, retirer_corruption, avance_rapide, etc., voir
+              // CivilisationService.avancerPiste) N'EST PLUS ajouté ici —
+              // seuls le niveau atteint et le texte de la case restent,
+              // même format concis que le bouton "Avancer" manuel de
+              // l'écran Focus (avancerPiste_ ci-dessus, qui journalise
+              // séparément effetJournal dans le journal "Actions
+              // réalisées" — jamais dans un statut "✓ Appliqué (...)" de
+              // Cadre, bien plus contraint en place).
               var detail = 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' \u2192 ' + resultat.nouveauNiveau +
-                (resultat.texte ? ' \u2014 ' + resultat.texte : '') +
-                (resultat.effetJournal && resultat.effetJournal.length ? ' (' + resultat.effetJournal.join(' ') + ')' : '');
+                (resultat.texte ? ' \u2014 ' + resultat.texte : '');
               resolve({ detail: detail, piste: piste });
             })
             .catch(function (erreur) {

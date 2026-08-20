@@ -1,7 +1,7 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 8 — 20/08/2026 (EVOLUTION 5 — obtenirSecteursEligiblesRetraitCorruption)
+ * Version 9 — 20/08/2026 (correctif — CHAMP_ELEMENT_PLACEMENT_ Guilde revenu au pluriel, fix déplacé côté données)
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure : choisir
@@ -719,36 +719,29 @@ var SecteurService = (function () {
    * consomme un emplacement Installation/Guilde (limité par
    * typesSecteur.nombreInstallationMax/nombreGuildeMax) ou se pose
    * librement (jeton, categorie 'jeton', aucune limite d'emplacement).
+   *
+   * 20/08/2026 (correctif — retour utilisateur : "je préfère mettre à
+   * jour les données plutôt que bidouiller le code" pour un écart de
+   * convention de nommage) : la table ci-dessous REVIENT à sa forme
+   * d'origine (4 clés Guilde au PLURIEL, seule "guilde_scientifique" au
+   * singulier — convention déjà majoritaire ici avant EVOLUTION 2).
+   * L'anomalie "Événement E Cycle 1 Cadre 1" restait bien réelle
+   * ("guilde_banquier", singulier, absent de cette table), mais corrigée
+   * cette fois côté DONNÉE (data/catalogue/evenements.json, 3 occurrences
+   * "guilde_banquier" -> "guilde_banquiers") plutôt que côté code — voir
+   * version.js pour le détail. EVOLUTION 2 (20/08/2026, plus tôt cette
+   * session) avait fait l'inverse (singulier ici) ; ce correctif revient
+   * dessus.
    */
-  // 20/08/2026 (EVOLUTION 2 — anomalie mise à jour Guilde Secteur, voir
-  // TODO.md) : les 4 clés Guilde étaient au pluriel ("guilde_fermiers",
-  // ...) alors que data/catalogue/evenements.json (cadre.effet.elements)
-  // les écrit au SINGULIER — seul "guilde_scientifique" (déjà singulier)
-  // correspondait, ce qui expliquait le bug constaté sur l'Événement E
-  // Cycle 1 Cadre 1 ("guilde_banquier" du catalogue, absent de cette
-  // table) : placerElementsNeantAdjacent/obtenirSecteursEligiblesPlacement
-  // NeantAdjacent ignorent silencieusement toute clé inconnue (`if
-  // (!info) return;`), donc le cube du Néant (cube_neant, clé reconnue)
-  // s'appliquait bien tandis que la Guilde de Banquiers, non reconnue,
-  // était purement et simplement perdue — aucune erreur remontée, d'où
-  // l'absence totale d'alerte malgré une popup de résolution "réussie".
-  // "guilde_banquier" (singulier) est aussi utilisé par 2 AUTRES cadres
-  // du catalogue non encore rencontrés en jeu (Événement B Cycle 2 Cadre
-  // 1, Événement E Cycle 3 Cadre 1 — même bug latent, corrigé au passage
-  // par ce même changement). fermiers/ingenieurs/mineurs mis au singulier
-  // par cohérence avec ce même principe, bien qu'aucun cadre du catalogue
-  // ne les utilise encore à ce jour (futurs Cadres Cycle 2/3, TODO.md) —
-  // vérifié : aucune régression possible, ces 2 clés au pluriel n'étaient
-  // référencées nulle part ailleurs dans le projet (recherche globale).
   var CHAMP_ELEMENT_PLACEMENT_ = {
     defense_secteur: { champ: 'installationDefenseSecteur', categorie: 'installation' },
     chantier_naval: { champ: 'installationChantierNaval', categorie: 'installation' },
     base_stellaire: { champ: 'installationBaseStellaire', categorie: 'installation' },
     guilde_scientifique: { champ: 'guildeScientifiques', categorie: 'guilde' },
-    guilde_fermier: { champ: 'guildeFermiers', categorie: 'guilde' },
-    guilde_ingenieur: { champ: 'guildeIngenieurs', categorie: 'guilde' },
-    guilde_mineur: { champ: 'guildeMineurs', categorie: 'guilde' },
-    guilde_banquier: { champ: 'guildeBanquiers', categorie: 'guilde' },
+    guilde_fermiers: { champ: 'guildeFermiers', categorie: 'guilde' },
+    guilde_ingenieurs: { champ: 'guildeIngenieurs', categorie: 'guilde' },
+    guilde_mineurs: { champ: 'guildeMineurs', categorie: 'guilde' },
+    guilde_banquiers: { champ: 'guildeBanquiers', categorie: 'guilde' },
     liberation: { champ: 'jetonLiberation', categorie: 'jeton' },
     // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
     // Domineum") : premier cadre à poser un jeton Prime (jeton, comme
