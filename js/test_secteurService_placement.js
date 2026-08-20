@@ -120,3 +120,41 @@ test('placement générique — Cadre 1 style Événement B (jeton + installatio
       assert.strictEqual(secteur.guildeFermiers, 1, 'la Guilde de Fermiers déjà posée ne doit pas être touchée');
     });
 });
+
+// 20/08/2026 (EVOLUTION 2 — anomalie mise à jour Guilde Secteur, voir
+// TODO.md) : régression pour le bug constaté sur l'Événement E Cycle 1
+// Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du Néant...",
+// data/catalogue/evenements.json : { guilde_banquier: 1, cube_neant: 1 })
+// — CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) avait la clé au pluriel
+// ("guilde_banquiers"), jamais reconnue par cette clé au singulier
+// utilisée par le catalogue : le cube (clé reconnue) s'appliquait tandis
+// que la Guilde (clé inconnue, ignorée silencieusement par
+// placerElementsNeantAdjacent) était perdue sans erreur. Couvre aussi
+// implicitement les 2 autres cadres du catalogue qui partagent la même
+// clé (Événement B Cycle 2 Cadre 1, Événement E Cycle 3 Cadre 1).
+test('placement générique — Événement E Cycle 1 Cadre 1 (guilde_banquier singulier + cube_neant)', function () {
+  var fixtures = { parties: {}, scenarioSecteurs: [], typesSecteur: [], secteursPartie: [] };
+  fixtures.parties[PARTIE_ID] = { scenarioId: 'scn1' };
+  fixtures.typesSecteur = [{ id: 't1', nombreInstallationMax: 1, nombreGuildeMax: 1 }];
+  fixtures.scenarioSecteurs = [
+    { scenarioId: 'scn1', numero: 1, type: 't1' },
+    { scenarioId: 'scn1', numero: 2, type: 't1' }
+  ];
+  fixtures.secteursPartie = [
+    { numero: 1, pnNeant: 0, installationDefenseSecteur: 0, installationChantierNaval: 0, installationBaseStellaire: 0,
+      guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0, guildeBanquiers: 0, guildeScientifiques: 0,
+      pnCorvette: 1, pnSentinelle: 0, pnDestroyer: 0, pnCuirasse: 0, pnPorteVaisseau: 0 },
+    { numero: 2, pnNeant: 1, installationDefenseSecteur: 0, installationChantierNaval: 0, installationBaseStellaire: 0,
+      guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0, guildeBanquiers: 0, guildeScientifiques: 0,
+      pnCorvette: 0, pnSentinelle: 0, pnDestroyer: 0, pnCuirasse: 0, pnPorteVaisseau: 0 }
+  ];
+
+  var db = creerDB(Object.assign({ adjacences: [{ scenarioId: 'scn1', numeroA: 1, numeroB: 2 }] }, fixtures));
+  var SecteurService = chargerSecteurService(db);
+
+  return SecteurService.placerElementsNeantAdjacent(PARTIE_ID, 2, { guilde_banquier: 1, cube_neant: 1 })
+    .then(function (secteur) {
+      assert.strictEqual(secteur.guildeBanquiers, 1, 'la Guilde de Banquiers doit être posée (bug : était ignorée)');
+      assert.strictEqual(secteur.pnNeant, 2, 'le cube du Néant (1 déjà présent + 1 posé) doit être 2');
+    });
+});

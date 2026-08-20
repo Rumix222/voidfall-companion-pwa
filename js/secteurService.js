@@ -1,7 +1,7 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 6 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 "augmenter une Population Pure")
+ * Version 8 — 20/08/2026 (EVOLUTION 5 — obtenirSecteursEligiblesRetraitCorruption)
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure : choisir
@@ -373,6 +373,29 @@ var SecteurService = (function () {
   }
 
   /**
+   * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+   * TODO.md) : secteurs éligibles pour l'option "Secteur" de la popup de
+   * choix de retirer_corruption — un secteur possédé par le joueur
+   * (appartientAuJoueur_, "avec un de nos cube de puissance" per TODO.md)
+   * ET actuellement Corrompu. Même gabarit que
+   * obtenirSecteursEligiblesAugmenterPopulationPure ci-dessus. Ne
+   * remplace PAS la permissivité existante de retirerCorruption
+   * (ci-dessous, utilisée telle quelle par le bouton "Retirer" déjà en
+   * place écran Secteurs, sans cette restriction de possession — pas de
+   * changement de comportement pour ce bouton) : cette liste ne sert
+   * qu'à peupler le <select> de la nouvelle popup 'retirer_corruption'
+   * (strategieService.js), qui appelle ensuite retirerCorruption comme
+   * n'importe quel autre appelant.
+   */
+  function obtenirSecteursEligiblesRetraitCorruption(partieId) {
+    return obtenirSecteurs(partieId).then(function (secteurs) {
+      return secteurs
+        .filter(function (s) { return appartientAuJoueur_(s) && s.corrompu; })
+        .map(function (s) { return { numero: s.numero }; });
+    });
+  }
+
+  /**
    * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : ajoute 1 au
    * dé Population du secteur choisi — revalide l'éligibilité à neuf
    * (jamais confiance à l'appelant, même principe que construire
@@ -697,15 +720,35 @@ var SecteurService = (function () {
    * typesSecteur.nombreInstallationMax/nombreGuildeMax) ou se pose
    * librement (jeton, categorie 'jeton', aucune limite d'emplacement).
    */
+  // 20/08/2026 (EVOLUTION 2 — anomalie mise à jour Guilde Secteur, voir
+  // TODO.md) : les 4 clés Guilde étaient au pluriel ("guilde_fermiers",
+  // ...) alors que data/catalogue/evenements.json (cadre.effet.elements)
+  // les écrit au SINGULIER — seul "guilde_scientifique" (déjà singulier)
+  // correspondait, ce qui expliquait le bug constaté sur l'Événement E
+  // Cycle 1 Cadre 1 ("guilde_banquier" du catalogue, absent de cette
+  // table) : placerElementsNeantAdjacent/obtenirSecteursEligiblesPlacement
+  // NeantAdjacent ignorent silencieusement toute clé inconnue (`if
+  // (!info) return;`), donc le cube du Néant (cube_neant, clé reconnue)
+  // s'appliquait bien tandis que la Guilde de Banquiers, non reconnue,
+  // était purement et simplement perdue — aucune erreur remontée, d'où
+  // l'absence totale d'alerte malgré une popup de résolution "réussie".
+  // "guilde_banquier" (singulier) est aussi utilisé par 2 AUTRES cadres
+  // du catalogue non encore rencontrés en jeu (Événement B Cycle 2 Cadre
+  // 1, Événement E Cycle 3 Cadre 1 — même bug latent, corrigé au passage
+  // par ce même changement). fermiers/ingenieurs/mineurs mis au singulier
+  // par cohérence avec ce même principe, bien qu'aucun cadre du catalogue
+  // ne les utilise encore à ce jour (futurs Cadres Cycle 2/3, TODO.md) —
+  // vérifié : aucune régression possible, ces 2 clés au pluriel n'étaient
+  // référencées nulle part ailleurs dans le projet (recherche globale).
   var CHAMP_ELEMENT_PLACEMENT_ = {
     defense_secteur: { champ: 'installationDefenseSecteur', categorie: 'installation' },
     chantier_naval: { champ: 'installationChantierNaval', categorie: 'installation' },
     base_stellaire: { champ: 'installationBaseStellaire', categorie: 'installation' },
     guilde_scientifique: { champ: 'guildeScientifiques', categorie: 'guilde' },
-    guilde_fermiers: { champ: 'guildeFermiers', categorie: 'guilde' },
-    guilde_ingenieurs: { champ: 'guildeIngenieurs', categorie: 'guilde' },
-    guilde_mineurs: { champ: 'guildeMineurs', categorie: 'guilde' },
-    guilde_banquiers: { champ: 'guildeBanquiers', categorie: 'guilde' },
+    guilde_fermier: { champ: 'guildeFermiers', categorie: 'guilde' },
+    guilde_ingenieur: { champ: 'guildeIngenieurs', categorie: 'guilde' },
+    guilde_mineur: { champ: 'guildeMineurs', categorie: 'guilde' },
+    guilde_banquier: { champ: 'guildeBanquiers', categorie: 'guilde' },
     liberation: { champ: 'jetonLiberation', categorie: 'jeton' },
     // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
     // Domineum") : premier cadre à poser un jeton Prime (jeton, comme
@@ -960,6 +1003,7 @@ var SecteurService = (function () {
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
     obtenirSecteursEligiblesAugmenterPopulationPure: obtenirSecteursEligiblesAugmenterPopulationPure,
     augmenterPopulationPure: augmenterPopulationPure,
+    obtenirSecteursEligiblesRetraitCorruption: obtenirSecteursEligiblesRetraitCorruption,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,

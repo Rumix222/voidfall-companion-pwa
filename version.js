@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 34 — 2026-08-18
+ * Version 40 — 2026-08-20
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -790,6 +790,182 @@
  * js/secteurService.js (v6), js/focusEngine.js (v6), js/gameService.js
  * (v15), js/strategieService.js (v21), index.html
  * (LABEL_OPTION_CONSTRUIRE_ renommé LABEL_OPTION_FOCUSENGINE_).
+ *
+ * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : le texte de
+ * résultat d'un Cadre d'Événement galactique affiché après "✓ Appliqué ("
+ * (renderCadresEvenement_, index.html) est désormais abrégé — "Population"
+ * -> "Pop.", "Secteur" -> "Sec.", noms de ressource/Guilde abrégés à 3
+ * lettres et colorés comme sur Plat. maison (ex. "Fermiers" -> "Fer." en
+ * vert Nourriture), "augmentée de 1"/"établie sur" remplacés par un
+ * préfixe "+1" (ex. "Population du Secteur 1 augmentée de 1" -> "+1 Pop.
+ * Sec. 1", "Guilde Fermiers établie sur le Secteur 1" -> "+1 Guilde Fer.
+ * Sec. 1"). 2 nouvelles fonctions dédiées à ce seul rendu
+ * (abregerResumeCadre_ pour cadresAppliques[ordre].resume,
+ * libelleDeltaCadreAbrege_/libelleRessourceAbregeeHTML_ pour .delta) —
+ * libelleDeltaCadre_/LABEL_RESSOURCE_CADRE_/libelleActionCadre_ restent
+ * INCHANGÉES (libellé des boutons, non concerné) et le texte source
+ * (strategieService.js/focusEngine.js/gameService.js) n'est pas modifié
+ * (le journal Focus "Actions réalisées" affiche donc toujours le texte
+ * complet, non abrégé — hors périmètre de cette évolution). Décision
+ * assistant à valider : le même principe "+1"/"Sec." est aussi appliqué
+ * au résumé "Installation <Label> construite sur le Secteur N" (non
+ * demandé explicitement par TODO.md, mais cohérent avec la règle
+ * générale) — Label d'Installation non abrégé/non coloré (pas de
+ * ressource associée). index.html.
+ *
+ * 20/08/2026 (EVOLUTION 2 — anomalie mise à jour Guilde Secteur, voir
+ * TODO.md) : correctif CHAMP_ELEMENT_PLACEMENT_ (js/secteurService.js) —
+ * 4 des 5 clés Guilde étaient au pluriel ("guilde_fermiers",
+ * "guilde_ingenieurs", "guilde_mineurs", "guilde_banquiers") alors que
+ * data/catalogue/evenements.json (cadre.effet.elements) les écrit
+ * toujours au SINGULIER (seul "guilde_scientifique", déjà singulier,
+ * fonctionnait). Un cadre "placement" (obtenirSecteursEligiblesPlacement
+ * NeantAdjacent/placerElementsNeantAdjacent) ignore silencieusement toute
+ * clé `elements` inconnue (aucune erreur remontée) : sur l'Événement E
+ * Cycle 1 Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du Néant..."),
+ * cube_neant (clé reconnue) s'appliquait normalement tandis que
+ * guilde_banquier (clé catalogue, absente de la table au pluriel) était
+ * purement perdu — d'où le cube visible mais la Guilde absente de l'onglet
+ * Secteurs, malgré une popup de résolution "réussie". Même bug latent
+ * repéré (recherche globale sur le catalogue) et corrigé au passage sur 2
+ * autres cadres non encore rencontrés en jeu : Événement B Cycle 2 Cadre
+ * 1, Événement E Cycle 3 Cadre 1 (même clé "guilde_banquier"). fermiers/
+ * ingenieurs/mineurs alignés au singulier par cohérence avec ce même
+ * principe (catalogue) même si aucun cadre ne les utilise encore
+ * aujourd'hui — vérifié sans risque de régression (ces clés au pluriel
+ * n'étaient référencées nulle part ailleurs dans le projet). Nouveau test
+ * de régression dédié (test_secteurService_placement.js) reproduisant
+ * exactement le cadre buggé. js/secteurService.js (v7).
+ *
+ * 20/08/2026 (EVOLUTION 3 — effet "Augmentez une Population Pure" de
+ * piste Civilisation/Focus, voir TODO.md) : js/focusEngine.js
+ * (resoudreCle_) reconnaît désormais aussi la clé "augmenter_population"
+ * (SANS "_pure") — c'est la seule forme utilisée par data/catalogue/
+ * pistesCivilisation.json ET focus.json (jamais "_pure", qui reste
+ * propre à evenements.json), jusqu'ici NON reconnue : elle retombait
+ * silencieusement sur le repli générique "effet non chiffré — à
+ * appliquer manuellement" au lieu d'ouvrir la popup de sélection de
+ * secteur déjà existante (contexte 'augmenter_population_pure',
+ * strategieService.js, EVOLUTION D Cycle 1 Cadre 2). Un seul point de
+ * correction couvre les 2 usages demandés : CivilisationService.
+ * avancerPiste (avancement d'une piste de Civilisation) ET FocusEngine.
+ * jouerActionEtPersister (action Focus), qui délèguent tous deux à ce
+ * même resoudreCle_ — vérifié par un test manuel de bout en bout
+ * (avancerPiste -> demanderChoix({type:'augmenter_population_pure'})
+ * bien appelé). "augmenter_population_up_to" (variante "jusqu'à N fois"
+ * du catalogue focus.json) reste HORS PÉRIMÈTRE, comme les autres
+ * variantes _up_to déjà notées dans focusEngine.js — repli générique
+ * inchangé, pas de régression. 3 nouveaux tests dans focusEngine_test.js
+ * (succès, annulé, choix inclusif mixant les 2 clés). js/focusEngine.js
+ * (v7). Aucun changement gameService.js/index.html/strategieService.js
+ * (cleFocusEnginePourOptionCadre_ ne concerne QUE les Cadres "choix"
+ * d'Événement galactique, qui utilisent déjà exclusivement la forme
+ * "_pure" — vérifié sur tout evenements.json, rien à y changer).
+ *
+ * 20/08/2026 (EVOLUTION 4 — effet manuel de piste Civilisation, voir
+ * TODO.md) : js/civilisationService.js (avancerPiste) affiche désormais
+ * un rappel temporaire (popup `demanderChoix({type:'confirmation'})`,
+ * même mécanisme déjà utilisé côté Cadre "gain" d'Événement galactique —
+ * index.html) chaque fois que l'Effet résolu d'une case retombe sur une
+ * clé non automatisée par focusEngine.js (détecté via le suffixe commun
+ * "— à appliquer manuellement." de la ligne de journal correspondante,
+ * sans dupliquer la liste des clés non automatisées — focusEngine.js
+ * reste seul juge de ce qui l'est ou non, et n'est PAS modifié par cette
+ * évolution). Texte dédié pour "gagner_technologie" ("Choisir une
+ * technologie [de base ou avancée] manuellement", selon la valeur — base
+ * seule, ou tableau ["base","amelioree"], les 2 seules formes présentes
+ * dans data/catalogue/pistesCivilisation.json) et "gagner_programme"
+ * ("Choisir un programme [<type>] manuellement", type omis pour la
+ * valeur numérique générique) ; repli générique (texte imprimé de la
+ * case) pour toute autre clé non automatisée (ex. retirer_corruption).
+ * Journal Focus ("Actions réalisées") simplifié UNIQUEMENT pour ces 2
+ * clés ("technologie choisie manuellement"/"programme choisi
+ * manuellement" — accord "choisi" masculin corrigé pour "programme",
+ * TODO.md écrivait "choisie" pour les 2 lignes d'exemple, coquille
+ * probable — pas de rappel du choix base/avancée ni du type de
+ * Programme, comme demandé) ; toute autre clé garde son texte technique
+ * existant, inchangé. Purement informatif : n'affecte jamais la
+ * persistance (déjà faite avant l'affichage du rappel). Scope strictement
+ * limité à avancerPiste (piste Civilisation) — AUCUN changement
+ * focusEngine.js, donc aucun effet sur les actions Focus (qui appellent
+ * le même resoudreCle_ mais n'affichent jamais ce rappel). Nouveau
+ * fichier de test dédié civilisationService_test.js (7 cas — le module
+ * en était dépourvu jusqu'ici, dette connue signalée dans CLAUDE.md) :
+ * effet automatisé sans rappel, gagner_technologie (2 formes),
+ * gagner_programme (2 formes), clé générique hors périmètre (journal
+ * inchangé), et choice inclusif où seule une option automatisée est
+ * choisie (aucun rappel). js/civilisationService.js (v2).
+ *
+ * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+ * TODO.md) : "retirer_corruption" retirée de CLES_SECTEUR_HORS_PERIMETRE
+ * (js/focusEngine.js v8) — nouveau cas dédié qui délègue à
+ * demanderChoix({type:'retirer_corruption'}), même principe que
+ * construire/augmenter_population_pure. Nouvelle popup dédiée
+ * (js/strategieService.js v22, contexte 'retirer_corruption') : menu de
+ * CIBLES possibles, chacune affichée seulement si éligible — Secteur
+ * possédé Corrompu (nouvelle SecteurService.
+ * obtenirSecteursEligiblesRetraitCorruption, js/secteurService.js v8 —
+ * persiste via SecteurService.retirerCorruption déjà existante, sans
+ * changer son comportement historique côté bouton "Retirer" de l'écran
+ * Secteurs, non restreint) ; Piste de Civilisation Corrompue s'il y en a
+ * au moins une, choix si plusieurs (CivilisationService.
+ * definirCorruption(..., false) déjà existante — PAS
+ * avancerPisteCorrompue, mécanique différente : celle-ci avance la piste
+ * d'une case sans bénéfice, non demandé ici) ; Programme, toujours
+ * proposée et résolue manuellement (Corruption de Programme non suivie
+ * en base) ; Technologie "Chambres de décontamination", si possédée ET
+ * au moins 1 Corruption stockée dessus. Ce dernier point introduit un
+ * nouveau jeton manuel plateauMaison.corruptionChambreDecontamination
+ * (CHAMPS_PLATEAU_MAISON_AUTORISES + partie.plateauMaison,
+ * js/gameService.js v16 ; jetonInputHTML_/persisterJeton_/renderJetons_,
+ * js/strategieService.js — affiché sur Plat. maison uniquement si la
+ * Technologie est possédée) : cette évolution n'automatise QUE le
+ * RETRAIT (décrément) — la mécanique qui AJOUTE une Corruption sur cette
+ * case au lieu d'un secteur/piste/Programme reste hors périmètre,
+ * incrémentée à la main comme Commerce/Prime/Libération. Bonus mineur :
+ * cleFocusEnginePourOptionCadre_ (js/gameService.js) reconnaît aussi
+ * { cle: 'retirer_corruption' } pour un futur Cadre "choix" d'Événement
+ * galactique utilisant cette clé au format simple (aucun cadre du
+ * catalogue actuel n'est concerné — vérifié sur evenements.json, les
+ * occurrences existantes sont soit dans des objectifs (non automatisés,
+ * mécanisme séparé), soit dans des structures "échange"/"gain" complexes
+ * hors du pattern "choix" simple déjà automatisé). Témoin "clé secteur
+ * hors périmètre" des tests existants (focusEngine_test.js,
+ * civilisationService_test.js) basculé de "retirer_corruption" (portée
+ * par ce lot) vers "effet_secteur" (toujours hors périmètre). 5 nouveaux
+ * tests au total (focusEngine_test.js ×2, civilisationService_test.js ×1
+ * bout-en-bout depuis une piste, secteurService_actions_test.js ×1
+ * d'éligibilité) — 52/52 tests passent sur l'ensemble de la suite,
+ * aucune régression.
+ *
+ * 20/08/2026 (EVOLUTION 6 — effet "avance_rapide" de piste Civilisation,
+ * voir TODO.md) : "simplement incrémenter le niveau de la piste
+ * concernée" — js/civilisationService.js (v3, avancerPiste) incrémente
+ * désormais AUTOMATIQUEMENT la piste d'un niveau supplémentaire quand
+ * l'effet de la case résolue est "avance_rapide", SANS résoudre l'effet
+ * de la nouvelle case atteinte (même principe qu'avancerPisteCorrompue,
+ * déjà existante, qui avance aussi sans bénéfice de case). Détecté via le
+ * même signal qu'EVOLUTION 4 (suffixe "à appliquer manuellement." du
+ * journal FocusEngine) — "avance_rapide" reste volontairement dans
+ * CLES_CIVILISATION_HORS_PERIMETRE côté focusEngine.js (aucune mutation
+ * de piste ne pourrait de toute façon transiter par son diff générique,
+ * limité aux ressources/cubeActif/jetons — voir focusEngine.js en-tête) :
+ * AUCUN changement focusEngine.js, scope strictement limité à
+ * avancerPiste. "avance_rapide" n'apparaît d'ailleurs QUE dans
+ * data/catalogue/pistesCivilisation.json (jamais evenements.json/
+ * focus.json, vérifié), donc aucun risque pour Focus/Événements. Piste
+ * déjà au niveau maximum au moment de l'avance_rapide : aucune écriture
+ * supplémentaire, journal adapté en conséquence. Une SEULE mutation de
+ * champNiveau empilée dans la pile d'annulation (ancien -> niveau final,
+ * jamais l'étape intermédiaire) pour qu'"Annuler" revienne correctement
+ * en un coup, malgré 2 écritures DB successives (AnnulationService.
+ * annulerDerniere_ applique ses mutations dans l'ordre, sans inversion :
+ * 2 mutations sur le même champ s'écraseraient l'une l'autre au lieu de
+ * revenir à l'ancien niveau — piège identifié et évité). 3 nouveaux tests
+ * dans civilisationService_test.js (incrément simple, une seule mutation
+ * empilée / Annuler correct, piste déjà au maximum) — 11/11 tests du
+ * fichier passent, 88/95 sur l'ensemble de la suite (7 échecs restants :
+ * mêmes échecs préexistants du baseline, aucune régression).
  */
 
-var APP_VERSION = '20260819.19';
+var APP_VERSION = '20260820.6';

@@ -1142,6 +1142,19 @@
     var LABEL_RESSOURCE_CADRE_ = {
       nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel', credit: 'Crédit', science: 'Science'
     };
+
+    // 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : couleurs des
+    // 5 ressources (mêmes valeurs que CHAMP_RESSOURCE/RESSOURCES_TOUTES de
+    // strategieService.js — Plat. maison — dupliquées ici par convention,
+    // même principe que TYPES_INSTALLATION_CONSTRUIRE_/TYPES_GUILDE_
+    // CONSTRUIRE_ un peu plus haut dans strategieService.js) — utilisées
+    // uniquement par libelleRessourceAbregeeHTML_/libelleDeltaCadreAbrege_
+    // ci-dessous, pour le texte "✓ Appliqué (...)" (jamais pour le libellé
+    // des boutons, qui garde le nom complet — voir libelleActionCadre_/
+    // libelleDeltaCadre_, inchangées).
+    var COULEUR_RESSOURCE_CADRE_ = {
+      nourriture: '#49b867', energie: '#f8a21b', materiel: '#ec0d69', credit: '#d1a671', science: '#06afe5'
+    };
     // 18/08/2026 (retour utilisateur) : "Par joueur" et "Une fois" retirés
     // (bruit visuel — la plupart des cadres sont "par_joueur" ou "unique",
     // le badge n'apportait pas d'information utile). Les 3 résolutions
@@ -1165,6 +1178,91 @@
         var valeur = delta[cle];
         return (valeur > 0 ? '+' : '') + valeur + ' ' + (LABEL_RESSOURCE_CADRE_[cle] || cle);
       }).join(', ');
+    }
+
+    /**
+     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) :
+     * libelleDeltaCadre_/LABEL_RESSOURCE_CADRE_ ci-dessus restent
+     * INCHANGÉS (encore utilisés tels quels par libelleActionCadre_ pour
+     * le libellé des BOUTONS, ex. "Gagner 3 Crédits" — hors périmètre de
+     * cette évolution, qui ne concerne que le texte affiché une fois le
+     * cadre "✓ Appliqué (...)"). libelleRessourceAbregeeHTML_/
+     * libelleDeltaCadreAbrege_ sont une variante dédiée à ce seul texte de
+     * résultat : nom de ressource abrégé à 3 lettres + "." (ex. "Crédit"
+     * -> "Cré.") coloré comme sur Plat. maison (COULEUR_RESSOURCE_CADRE_).
+     */
+    function libelleRessourceAbregeeHTML_(cle) {
+      var nom = LABEL_RESSOURCE_CADRE_[cle] || cle;
+      var couleur = COULEUR_RESSOURCE_CADRE_[cle];
+      var abrege = nom.slice(0, 3) + '.';
+      return couleur ? '<span style="color:' + couleur + '">' + abrege + '</span>' : abrege;
+    }
+
+    function libelleDeltaCadreAbrege_(delta) {
+      return Object.keys(delta || {}).map(function (cle) {
+        var valeur = delta[cle];
+        return (valeur > 0 ? '+' : '') + valeur + ' ' + libelleRessourceAbregeeHTML_(cle);
+      }).join(', ');
+    }
+
+    // 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : couleur par
+    // Guilde = couleur de la ressource qu'elle produit (portage direct de
+    // GUILDE_VERS_RESSOURCE, strategieService.js — Fermiers/Nourriture,
+    // Ingénieurs/Énergie, Mineurs/Matériel, Banquiers/Crédit,
+    // Scientifiques/Science), dupliquée ici par convention (voir
+    // COULEUR_RESSOURCE_CADRE_ ci-dessus). Clés = labels EXACTS de
+    // TYPES_GUILDE_CONSTRUIRE_ (strategieService.js), tels qu'ils
+    // apparaissent dans le texte "Guilde <Label> établie sur le Secteur N"
+    // (resume de GameService.appliquerCadreChoixFocusEngine).
+    var COULEUR_PAR_GUILDE_CADRE_ = {
+      Fermiers: '#49b867', Ingénieurs: '#f8a21b', Mineurs: '#ec0d69', Banquiers: '#d1a671', Scientifiques: '#06afe5'
+    };
+
+    /**
+     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : abrège
+     * spécifiquement le texte de `cadresAppliques[ordre].resume` (voir
+     * GameService.appliquerCadreChoixFocusEngine) pour l'affichage
+     * "✓ Appliqué (...)" d'un Cadre d'Événement galactique (renderCadresEvenement_
+     * ci-dessous) — le texte SOURCE (strategieService.js contextes
+     * 'construire'/'augmenter_population_pure', focusEngine.js, gameService.js)
+     * n'est PAS modifié : il reste affiché tel quel dans le journal Focus
+     * ("Actions réalisées", #ressources-journal — StrategieService.
+     * renderJournal_), qui réutilise le même `resume`/journal FocusEngine
+     * hors du contexte Événement galactique et est hors périmètre de cette
+     * évolution. Reconnaît uniquement les 2 gabarits produits à ce jour par
+     * ce chemin (voir strategieService.js) :
+     * - "Population du Secteur N augmentée de 1" -> "+1 Pop. Sec. N"
+     * - "Guilde <Label> établie sur le Secteur N" -> "+1 Guilde <Label
+     *   abrégé coloré> Sec. N"
+     * - "Installation <Label> construite sur le Secteur N" -> "+1
+     *   Installation <Label> Sec. N" (même principe "+1"/"Sec.", décision
+     *   assistant non explicitement demandée par TODO.md — à valider :
+     *   une Installation n'étant pas associée à une ressource, son Label
+     *   reste en toutes lettres, non coloré).
+     * Tout texte de resume qui ne correspond à AUCUN de ces 3 gabarits
+     * (ex. cube "+1 cube(s) activé(s)", ou un `resume` manuel du type "X
+     * résolu manuellement") ressort inchangé (regex sans correspondance).
+     */
+    function abregerResumeCadre_(resume) {
+      if (!resume) return resume;
+      var texte = resume;
+
+      texte = texte.replace(/Population du Secteur (\d+) augmentée de (\d+)/g, function (m, numero, valeur) {
+        return '+' + valeur + ' Pop. Sec. ' + numero;
+      });
+
+      texte = texte.replace(/Guilde (\S+) établie sur le Secteur (\d+)/g, function (m, nomGuilde, numero) {
+        var couleur = COULEUR_PAR_GUILDE_CADRE_[nomGuilde];
+        var abrege = nomGuilde.slice(0, 3) + '.';
+        var abregeHtml = couleur ? '<span style="color:' + couleur + '">' + abrege + '</span>' : abrege;
+        return '+1 Guilde ' + abregeHtml + ' Sec. ' + numero;
+      });
+
+      texte = texte.replace(/Installation (.+?) construite sur le Secteur (\d+)/g, function (m, nomInstallation, numero) {
+        return '+1 Installation ' + nomInstallation + ' Sec. ' + numero;
+      });
+
+      return texte;
     }
 
     // 19/08/2026 (retour utilisateur) : seul le Crédit se pluralise en
@@ -1829,6 +1927,16 @@
      * retour utilisateur : "Appliqué" toujours préféré à "Fait",
      * "manuellement" à "à la main" — voir mémoire projet). Générique à
      * tout futur cadre "gain" du catalogue, pas figé sur ce seul cadre.
+     *
+     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : le texte
+     * "✓ Appliqué (...)" passe désormais par abregerResumeCadre_(applique.
+     * resume) / libelleDeltaCadreAbrege_(applique.delta) (au lieu de
+     * applique.resume brut / libelleDeltaCadre_) — Population/Secteur
+     * abrégés ("Pop."/"Sec."), noms de ressource/Guilde abrégés à 3
+     * lettres et colorés comme sur Plat. maison, "augmentée de 1"/"établie
+     * sur" remplacés par un préfixe "+1". Rendu seulement, aucune donnée
+     * persistée modifiée (cadresAppliques[ordre].resume/.delta inchangés
+     * en base) — voir JSDoc de ces 2 fonctions plus haut dans ce fichier.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -1871,11 +1979,11 @@
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (manuellement)</p>';
           } else if (applique) {
             if (applique.resume) {
-              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + applique.resume + ')</p>';
+              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + abregerResumeCadre_(applique.resume) + ')</p>';
             } else {
               statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
-                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ' / technologie choisie manuellement)</p>'
-                : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadre_(applique.delta) + ')</p>';
+                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadreAbrege_(applique.delta) + ' / technologie choisie manuellement)</p>'
+                : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadreAbrege_(applique.delta) + ')</p>';
             }
           } else {
             actions = actionsCadre_(cadre);

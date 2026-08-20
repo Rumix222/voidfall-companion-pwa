@@ -161,15 +161,21 @@ test('gagner_commerce : bonus choisi résolu récursivement (choice_repeat)', fu
   });
 });
 
-test('clé secteur hors périmètre (retirer_corruption) : ne bloque pas, journalisé', function () {
+// 20/08/2026 (EVOLUTION 5 — voir TODO.md) : "retirer_corruption" est
+// désormais portée (voir tests dédiés plus bas) — "effet_secteur" la
+// remplace comme témoin des clés secteur restant hors périmètre
+// ("rappeler_cube" écarté aussi : son nom contient "cube" et tombe dans
+// le repli générique dédié aux clés Cube, pas dans celui des clés
+// secteur — même remarque déjà faite pour "envahir" avant son portage).
+test('clé secteur hors périmètre (effet_secteur) : ne bloque pas, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
-  var action = { action: 'Retirer', effet: { retirer_corruption: 1 }, cout: { energie: 2 }, texte: '' };
+  var action = { action: 'Effet secteur', effet: { effet_secteur: 1 }, cout: { energie: 2 }, texte: '' };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
-    assert.ok(resultat.journal.some(function (l) { return l.indexOf('retirer_corruption') !== -1 && l.indexOf('non automatisé') !== -1; }));
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('effet_secteur') !== -1 && l.indexOf('non automatisé') !== -1; }));
   });
 });
 
@@ -257,6 +263,103 @@ test('regrouper : annulé (popup "Annuler") — bloque toute l\u2019action, coû
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Regrouper', effet: { regrouper: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+// 20/08/2026 (EVOLUTION 3 — voir TODO.md) : "augmenter_population" (SANS
+// "_pure") — clé utilisée par data/catalogue/pistesCivilisation.json et
+// focus.json, jusqu'ici NON reconnue (repli générique "effet non chiffré",
+// aucune popup) alors que "augmenter_population_pure" (evenements.json,
+// même mécanique) l'était déjà. Même gabarit de test que "regrouper"
+// ci-dessus.
+test('augmenter_population (piste Civilisation/Focus, sans "_pure") : succès — délègue à demanderChoix({type:"augmenter_population_pure"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { augmenter_population: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'augmenter_population_pure');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Population du Secteur 3 augmentée de 1.', numero: 3 };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Population du Secteur 3 augmentée de 1') !== -1; }));
+  });
+});
+
+test('augmenter_population : annulé (popup "Annuler") — bloque toute l\u2019action', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { augmenter_population: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+  });
+});
+
+test('augmenter_population et augmenter_population_pure : même comportement (choice inclusif "et/ou")', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  // texte contient "et/ou" -> choice inclusif (options_inclusives), les 2 clés résolues à tour de rôle
+  var action = {
+    action: 'Jouer',
+    effet: { choice: ['augmenter_population', 'augmenter_population_pure'] },
+    cout: {},
+    texte: 'Augmentez une Population Pure et/ou augmentez une Population Pure.'
+  };
+
+  var appelsPopup = 0;
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'options_inclusives') return [0, 1]; // les 2 options
+    appelsPopup++;
+    assert.strictEqual(contexte.type, 'augmenter_population_pure');
+    return { detail: 'Population du Secteur ' + appelsPopup + ' augmentée de 1.', numero: appelsPopup };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(appelsPopup, 2, 'les 2 clés (population/population_pure) doivent chacune ouvrir la popup');
+  });
+});
+
+// 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+// TODO.md) : "retirer_corruption" délègue désormais à demanderChoix
+// ({type:'retirer_corruption'}) — la popup (strategieService.js) fait le
+// choix ET la persistance (comme "regrouper"/"augmenter_population_pure"
+// ci-dessus), resoudreCle_ ne fait que relayer reponse.detail.
+test('retirer_corruption : succès — délègue à demanderChoix({type:"retirer_corruption"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_corruption: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'retirer_corruption');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Corruption retirée du Secteur 4.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Corruption retirée du Secteur 4') !== -1; }));
+  });
+});
+
+test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_corruption: 1 }, cout: { energie: 2 }, texte: '' };
 
   var demanderChoix = function () { return { annule: true }; };
 

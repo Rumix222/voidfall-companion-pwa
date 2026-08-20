@@ -1,7 +1,7 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 6 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : automatisation "augmenter_population_pure"/"etablir_guilde_banquier")
+ * Version 8 — 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption" porté, retiré de CLES_SECTEUR_HORS_PERIMETRE)
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure ... et
@@ -163,11 +163,11 @@
  * CLÉS HORS PÉRIMÈTRE — signalé explicitement (pas d'invention de logique) :
  * Certaines clés dépendent de systèmes qui n'existent PAS ENCORE dans la
  * PWA (voir secteurService.js/gameService.js, en-têtes) :
- *   - Actions sur les secteurs : rappeler_cube, retirer_corruption,
- *     construire_installation, etablir_guilde, effet_secteur
+ *   - Actions sur les secteurs : rappeler_cube, effet_secteur
  *     ("regrouper"/"regroupe" porté depuis la Session 14, "deployer_cube*"
  *     porté depuis la Session 14 suite, "envahir"/"envahir_corrompu"
- *     porté en fin de Session 14 — voir plus bas, cas dédiés dans
+ *     porté en fin de Session 14, "retirer_corruption" porté le
+ *     20/08/2026 (EVOLUTION 5) — voir plus bas, cas dédiés dans
  *     resoudreCle_)
  *     (secteurService.js PWA ne porte QUE l'instanciation/lecture pour les
  *     clés restant ci-dessus — actions hors périmètre, cf. son en-tête)
@@ -220,21 +220,28 @@ var FocusEngine = (function () {
 
   // 19/08/2026 (Construire une Installation / Établir une Guilde — retour
   // utilisateur : "on a dû perdre cette possibilité lors du portage") :
-  // "rappeler_cube"/"retirer_corruption"/"effet_secteur" restent hors
-  // périmètre (déjà branchés en formulaires dédiés écran Secteurs, session
-  // 13, pas de popup Focus/Cadre dédiée demandée pour eux) — seules les 4
-  // clés de construction/établissement générique sortent de cette liste
-  // (voir CLES_CONSTRUIRE/CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous). Les
-  // VARIANTES du catalogue (etablir_guilde_meme_secteur/_up_to/
-  // _scientifique, construire_installation_meme_secteur/_autre_secteur/
-  // _up_to — contrainte de secteur croisée avec une autre clé du même
-  // JSON, répétition "jusqu'à N fois", ou type figé) restent hors
-  // périmètre : elles retombent sur le repli générique en bas de
-  // resoudreCle_ ("effet non chiffré — à appliquer manuellement"), pas de
-  // régression, juste pas automatisées par CE lot (portée volontairement
-  // limitée au pattern décrit : secteur libre + type au choix, quantité 1).
+  // "rappeler_cube"/"effet_secteur" restent hors périmètre (déjà branchés
+  // en formulaires dédiés écran Secteurs, session 13, pas de popup Focus/
+  // Cadre dédiée demandée pour eux) — seules les 4 clés de construction/
+  // établissement générique sortent de cette liste (voir CLES_CONSTRUIRE/
+  // CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous). Les VARIANTES du catalogue
+  // (etablir_guilde_meme_secteur/_up_to/_scientifique,
+  // construire_installation_meme_secteur/_autre_secteur/_up_to —
+  // contrainte de secteur croisée avec une autre clé du même JSON,
+  // répétition "jusqu'à N fois", ou type figé) restent hors périmètre :
+  // elles retombent sur le repli générique en bas de resoudreCle_ ("effet
+  // non chiffré — à appliquer manuellement"), pas de régression, juste
+  // pas automatisées par CE lot (portée volontairement limitée au pattern
+  // décrit : secteur libre + type au choix, quantité 1).
+  //
+  // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+  // TODO.md) : "retirer_corruption" RETIRÉE de cette liste — nouveau cas
+  // dédié ci-dessous (comme construire/augmenter_population_pure), qui
+  // ouvre une popup de choix parmi les 4 cibles possibles (Secteur, Piste
+  // de Civilisation, Programme, Technologie Chambres de décontamination —
+  // voir strategieService.js, contexte 'retirer_corruption').
   var CLES_SECTEUR_HORS_PERIMETRE = [
-    'rappeler_cube', 'retirer_corruption', 'effet_secteur'
+    'rappeler_cube', 'effet_secteur'
   ];
   var CATEGORIE_PAR_CLE_CONSTRUIRE_ = {
     construire_installation: 'installation', installation: 'installation',
@@ -396,10 +403,56 @@ var FocusEngine = (function () {
     // qui appelle directement SecteurService.augmenterPopulationPure et
     // persiste en IndexedDB AU MOMENT de la validation (même pattern que
     // construire/regrouper/envahir ci-dessus — focusEngine reste pur,
-    // aucun accès DB ici). ---
-    if (cle === 'augmenter_population_pure' && signe > 0) {
+    // aucun accès DB ici).
+    //
+    // 20/08/2026 (EVOLUTION 3 — voir TODO.md) : "augmenter_population"
+    // (SANS "_pure") reconnue en plus de "augmenter_population_pure" —
+    // c'est la clé utilisée par data/catalogue/pistesCivilisation.json ET
+    // focus.json (jamais "_pure", forme réservée au seul catalogue
+    // evenements.json) ; jusqu'ici non reconnue, elle retombait sur le
+    // repli générique "effet non chiffré — à appliquer manuellement",
+    // alors que la mécanique est IDENTIQUE (secteur Pur, Population < 6,
+    // même popup). Comme CivilisationService.avancerPiste ET
+    // FocusEngine.jouerActionEtPersister (actions Focus) délèguent tous
+    // deux à CE même resoudreCle_, ce point unique couvre les 2 usages
+    // demandés ("piste civilisation ou focus") sans code spécifique à
+    // l'un ou l'autre. "augmenter_population_up_to" (variante "jusqu'à N
+    // fois" du catalogue focus.json) reste HORS PÉRIMÈTRE — comme les
+    // autres variantes _up_to/_meme_secteur déjà notées plus haut dans ce
+    // fichier — et retombe donc sur le repli générique, journalisé en
+    // avertissement, pas de régression. ---
+    if ((cle === 'augmenter_population_pure' || cle === 'augmenter_population') && signe > 0) {
       return Promise.resolve(demanderChoix({
         type: 'augmenter_population_pure',
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
+    }
+
+    // --- Retirer une Corruption : Effet UNIQUEMENT (signe > 0). Ouvre une
+    // popup dédiée (contexte 'retirer_corruption', strategieService.js)
+    // qui laisse le joueur choisir PARMI JUSQU'À 4 cibles possibles
+    // (TODO.md, EVOLUTION 5) : un Secteur qu'il possède et Corrompu
+    // (SecteurService.obtenirSecteursEligiblesRetraitCorruption/
+    // retirerCorruption), une piste de Civilisation actuellement
+    // Corrompue s'il y en a au moins une (CivilisationService.
+    // definirCorruption(..., false) — PAS avancerPisteCorrompue, mécanique
+    // différente), un Programme (toujours proposé, non automatisé — la
+    // Corruption d'un Programme n'est pas suivie en base, résolution
+    // manuelle comme le reste des Programmes), ou la Technologie "Chambres
+    // de décontamination" si le joueur la possède ET qu'elle stocke au
+    // moins 1 Corruption (nouveau jeton manuel corruptionChambreDecontamination,
+    // voir gameService.js/strategieService.js). La popup fait le choix ET
+    // la persistance (comme construire/regrouper/envahir/augmenter_
+    // population_pure ci-dessus — focusEngine reste pur, aucun accès DB
+    // ici) ; resoudreCle_ relaie juste le résumé dans le journal. ---
+    if (cle === 'retirer_corruption' && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'retirer_corruption',
         source: source,
         partieId: etat.partieId
       })).then(function (reponse) {

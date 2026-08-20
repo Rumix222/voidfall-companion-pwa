@@ -1,7 +1,15 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 15 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : automatisation "augmenter_population_pure"/"etablir_guilde_banquier")
+ * Version 16 — 20/08/2026 (EVOLUTION 5 — CHAMPS_PLATEAU_MAISON_AUTORISES + cleFocusEnginePourOptionCadre_ pour retirer_corruption)
+ *
+ * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+ * TODO.md) : CHAMPS_PLATEAU_MAISON_AUTORISES accepte désormais
+ * 'corruptionChambreDecontamination' (nouveau jeton manuel, voir
+ * strategieService.js) et cleFocusEnginePourOptionCadre_ reconnaît
+ * { cle: 'retirer_corruption' } — même mécanisme générique
+ * qu'augmenter_population_pure/etablir_guilde ci-dessus, aucun autre
+ * changement dans ce fichier.
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur) : cleFocusEnginePourOptionCadre_ reconnaît désormais aussi
@@ -262,7 +270,18 @@ var GameService = (function () {
     'ressourceCredit', 'ressourceScience', 'influence', 'cubeActif',
     'jetonPrime', 'jetonLiberation', 'jetonCommerce', 'gloire',
     'programme1', 'programme2', 'programme3', 'programme4',
-    'technologiesObtenues', 'technologiesAvanceesChoisies'
+    'technologiesObtenues', 'technologiesAvanceesChoisies',
+    // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+    // TODO.md) : compteur manuel des Corruptions actuellement stockées
+    // sur la Technologie "Chambres de décontamination" (jeton simple,
+    // même principe que jetonPrime/jetonLiberation — voir
+    // strategieService.js, jetonInputHTML_/persisterJeton_). Le jeu ne
+    // gagne PAS automatiquement de Corruption sur cette case (mécanique
+    // de stockage non automatisée, hors périmètre de cette évolution qui
+    // ne porte que le RETRAIT) : l'incrémenter reste manuel, le
+    // décrémenter peut désormais se faire via l'effet retirer_corruption
+    // (FocusEngine.js) si le joueur possède la Technologie.
+    'corruptionChambreDecontamination'
   ];
 
   // ------------------------------------------------------------
@@ -564,6 +583,11 @@ var GameService = (function () {
     }
     if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
     if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
+    // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+    // TODO.md) : même mécanisme générique — FocusEngine.resoudreCle_
+    // reconnaît nativement 'retirer_corruption' (focusEngine.js v8),
+    // identité comme les autres clés ci-dessus.
+    if (option.cle === 'retirer_corruption') return option.cle;
     return null;
   }
 
@@ -674,7 +698,12 @@ var GameService = (function () {
       jetonLiberation: pm.jetonLiberation || 0,
       jetonCommerce: pm.jetonCommerce || [],
       gloire: pm.gloire || [],
-      programmes: [pm.programme1 || null, pm.programme2 || null, pm.programme3 || null, pm.programme4 || null]
+      programmes: [pm.programme1 || null, pm.programme2 || null, pm.programme3 || null, pm.programme4 || null],
+      // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+      // TODO.md) : nouveau jeton manuel (Corruption(s) actuellement
+      // stockée(s) sur la Technologie "Chambres de décontamination") —
+      // voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
+      corruptionChambreDecontamination: pm.corruptionChambreDecontamination || 0
     };
 
     return partie;

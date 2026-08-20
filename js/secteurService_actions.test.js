@@ -178,6 +178,26 @@ test('retirerCorruption : passe corrompu à false', function () {
   });
 });
 
+// 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+// TODO.md) : obtenirSecteursEligiblesRetraitCorruption — seuls les
+// secteurs POSSÉDÉS (appartientAuJoueur_) ET Corrompus sont éligibles.
+test('obtenirSecteursEligiblesRetraitCorruption : ne retourne que les secteurs possédés ET Corrompus', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  // Secteur 1 : possédé (pnCorvette > 0, pnNeant 0) ET Corrompu -> éligible
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 2, corrompu: true });
+  // Secteur 2 : possédé mais PAS Corrompu -> non éligible
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, corrompu: false });
+  // Secteur 3 : Corrompu mais du Néant (non possédé) -> non éligible
+  db._stores.secteursPartie['p1|3'] = secteurDeBase_({ numero: 3, pnCorvette: 0, pnNeant: 3, corrompu: true });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesRetraitCorruption('p1').then(function (eligibles) {
+    assert.strictEqual(eligibles.length, 1);
+    assert.strictEqual(eligibles[0].numero, 1);
+  });
+});
+
 // ---------------------------------------------------------------
 // regrouper
 // ---------------------------------------------------------------

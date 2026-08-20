@@ -1,7 +1,27 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 21 — 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2 : popup "augmenter_population_pure" + typeForce sur "construire")
+ * Version 22 — 20/08/2026 (EVOLUTION 5 — popup "retirer_corruption" + jeton manuel Chambres de décontamination)
+ *
+ * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+ * TODO.md) : nouveau contexte demanderChoix 'retirer_corruption' — menu
+ * de cibles (Secteur possédé Corrompu/Piste de Civilisation Corrompue/
+ * Programme manuel/Technologie Chambres de décontamination), chacune
+ * affichée seulement si éligible. Réutilise SecteurService.
+ * obtenirSecteursEligiblesRetraitCorruption/retirerCorruption
+ * (secteurService.js v8) et CivilisationService.definirCorruption (déjà
+ * existante — PAS avancerPisteCorrompue, mécanique différente). Nouveau
+ * jeton manuel 'chambreDecontamination' (jetonInputHTML_/persisterJeton_/
+ * renderJetons_, même gabarit que Commerce/Prime/Libération), affiché sur
+ * Plat. maison uniquement si le joueur possède cette Technologie — décompte
+ * les Corruptions qu'elle stocke ; seul le RETRAIT est automatisé par
+ * cette évolution, le GAIN (redirection d'une Corruption vers cette
+ * Technologie au lieu d'un secteur/piste/Programme) reste hors périmètre,
+ * incrémenté à la main comme les autres jetons de cette grille.
+ * js/gameService.js (v16 — partie.plateauMaison.corruptionChambreDecontamination
+ * + CHAMPS_PLATEAU_MAISON_AUTORISES), js/secteurService.js (v8),
+ * js/focusEngine.js (v8 — 'retirer_corruption' retirée de
+ * CLES_SECTEUR_HORS_PERIMETRE).
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure ... et
@@ -735,6 +755,21 @@ var StrategieService = (function () {
     } else if (cle === 'liberation') {
       champs.jetonLiberation = n;
       if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.jetonLiberation = n;
+    } else if (cle === 'chambreDecontamination') {
+      // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+      // TODO.md) : jeton manuel — la mécanique qui AJOUTE une Corruption
+      // sur cette case (au lieu d'un secteur/piste/Programme, quand le
+      // joueur possède la Technologie "Chambres de décontamination")
+      // reste hors périmètre de cette évolution (qui ne porte que le
+      // RETRAIT, voir contexte 'retirer_corruption' plus bas) : ce compte
+      // reste incrémenté à la main par le joueur, comme Commerce/Prime/
+      // Libération ci-dessus. Plafonné à 2 (3 si Technologie améliorée —
+      // ligne.ameliore.storage.corruption_max, voir data/catalogue/
+      // technologies.json) côté règle du jeu, non forcé ici (même
+      // principe que les autres jetons de cette grille, jamais plafonnés
+      // côté UI).
+      champs.corruptionChambreDecontamination = n;
+      if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.corruptionChambreDecontamination = n;
     } else {
       return;
     }
@@ -745,10 +780,18 @@ var StrategieService = (function () {
     var pm = partie.plateauMaison || {};
     var nbCommerce = Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0;
     var jetons = document.getElementById('ressources-jetons');
+    var possedeChambreDecontamination = nomsTechnologiesJoueur_(partie).indexOf('chambres de décontamination') !== -1;
     jetons.innerHTML =
       jetonInputHTML_('commerce', 'Commerce', nbCommerce) +
       jetonInputHTML_('prime', 'Prime', pm.jetonPrime || 0) +
-      jetonInputHTML_('liberation', 'Libération', pm.jetonLiberation || 0);
+      jetonInputHTML_('liberation', 'Libération', pm.jetonLiberation || 0) +
+      // 20/08/2026 (EVOLUTION 5, voir TODO.md) : jeton affiché seulement
+      // si le joueur possède la Technologie concernée (sinon aucune
+      // pertinence — grille jamais alourdie pour rien, même principe que
+      // le reste de cet écran).
+      (possedeChambreDecontamination
+        ? jetonInputHTML_('chambreDecontamination', 'Corr. Chambres déconta.', pm.corruptionChambreDecontamination || 0)
+        : '');
 
     Array.prototype.forEach.call(jetons.querySelectorAll('.jeton-input'), function (input) {
       input.addEventListener('change', function () {
@@ -2377,6 +2420,160 @@ var StrategieService = (function () {
                 });
             };
           }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+      } else if (contexte.type === 'retirer_corruption') {
+        // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
+        // TODO.md) : popup à 2 niveaux — un menu de CIBLES possibles,
+        // chacune affichée seulement si réellement éligible :
+        // - "Secteur" : au moins un secteur possédé (SecteurService.
+        //   obtenirSecteursEligiblesRetraitCorruption, secteurService.js
+        //   v8) et Corrompu -> <select>, persiste via SecteurService.
+        //   retirerCorruption (déjà existante, inchangée).
+        // - "Piste de Civilisation" : au moins une piste marquée
+        //   Corrompue (partie.civilisation.corrompues, voir gameService.js/
+        //   assemblerPartie_) -> résolution directe si une seule, <select>
+        //   si plusieurs ; persiste via CivilisationService.
+        //   definirCorruption(..., false) — PAS avancerPisteCorrompue,
+        //   mécanique différente (celle-ci avance la piste d'une case sans
+        //   le bénéfice, ce qui n'est pas ce que demande cet effet).
+        // - "Programme" : TOUJOURS proposée (la Corruption d'un Programme
+        //   n'est pas suivie en base — hors périmètre, résolution manuelle
+        //   comme le reste des Programmes, cf. TODO.md "a appliquer
+        //   manuellement").
+        // - "Technologie — Chambres de décontamination" : seulement si le
+        //   joueur possède cette Technologie (nomsTechnologiesJoueur_) ET
+        //   qu'elle stocke au moins 1 Corruption (nouveau jeton manuel
+        //   plateauMaison.corruptionChambreDecontamination — voir
+        //   gameService.js/renderJetons_ plus haut ; la mécanique qui
+        //   AJOUTE une Corruption sur cette case reste hors périmètre,
+        //   incrémentée manuellement par le joueur comme les autres
+        //   jetons de cette grille).
+        // Si aucune des 4 n'est éligible (secteur/piste/techno) — ne
+        // devrait jamais arriver, "Programme" étant toujours disponible.
+        titre.textContent = 'Retirer une Corruption';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieCorruption = partieAffichee;
+        var pistesCorrompues = CivilisationService.PISTES.filter(function (p) {
+          return !!(partieCorruption.civilisation && partieCorruption.civilisation.corrompues && partieCorruption.civilisation.corrompues[p]);
+        });
+        var possedeChambreDecontamination = nomsTechnologiesJoueur_(partieCorruption).indexOf('chambres de décontamination') !== -1;
+        var corruptionStockee = (partieCorruption.plateauMaison && partieCorruption.plateauMaison.corruptionChambreDecontamination) || 0;
+
+        function afficherMenuCibles_(eligiblesSecteurs) {
+          var options = [];
+          if (eligiblesSecteurs.length) options.push({ cle: 'secteur', label: 'Secteur' });
+          if (pistesCorrompues.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+          options.push({ cle: 'programme', label: 'Programme', sousTexte: 'à retirer manuellement' });
+          if (possedeChambreDecontamination && corruptionStockee > 0) {
+            options.push({ cle: 'techno', label: 'Chambres de décontamination', sousTexte: corruptionStockee + ' Corruption(s) stockée(s)' });
+          }
+
+          btnValider.hidden = true;
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            options.map(function (o) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-cle="' + o.cle + '">' +
+                o.label + (o.sousTexte ? '<br><span class="cadre-action-sous-texte">' + o.sousTexte + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var cle = btn.dataset.cle;
+              if (cle === 'secteur') return afficherSousSelectSecteur_(eligiblesSecteurs);
+              if (cle === 'piste') return afficherSousSelectPiste_();
+              if (cle === 'programme') {
+                fermerModale_();
+                resolve({ detail: 'Corruption retirée d\u2019un Programme (manuellement).' });
+                return;
+              }
+              if (cle === 'techno') {
+                btn.disabled = true;
+                var champs = { corruptionChambreDecontamination: corruptionStockee - 1 };
+                GameService.majPlateauMaison(partieCorruption.id, champs)
+                  .then(function () {
+                    partieCorruption.plateauMaison.corruptionChambreDecontamination = corruptionStockee - 1;
+                    fermerModale_();
+                    resolve({ detail: 'Corruption retirée de Chambres de décontamination (reste ' + (corruptionStockee - 1) + ').' });
+                  })
+                  .catch(function (erreur) {
+                    btn.disabled = false;
+                    window.alert('Échec du retrait : ' + erreur.message);
+                  });
+              }
+            });
+          });
+        }
+
+        function afficherSousSelectSecteur_(eligibles) {
+          titre.textContent = 'Retirer une Corruption — Secteur';
+          contenu.innerHTML = '' +
+            '<select id="corruption-select-secteur" class="modal-choix-select">' +
+            eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Retirer';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('corruption-select-secteur').value);
+            btnValider.disabled = true;
+            SecteurService.retirerCorruption(partieCorruption.id, numero)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Corruption retirée du Secteur ' + numero + '.', numero: numero });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du retrait : ' + erreur.message);
+              });
+          };
+        }
+
+        function afficherSousSelectPiste_() {
+          if (pistesCorrompues.length === 1) {
+            var piste = pistesCorrompues[0];
+            CivilisationService.definirCorruption(partieCorruption.id, piste, false)
+              .then(function () {
+                fermerModale_();
+                resolve({ detail: 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[piste] + '.', piste: piste });
+              })
+              .catch(function (erreur) {
+                window.alert('Échec du retrait : ' + erreur.message);
+              });
+            return;
+          }
+          titre.textContent = 'Retirer une Corruption — Piste de Civilisation';
+          contenu.innerHTML = '' +
+            '<select id="corruption-select-piste" class="modal-choix-select">' +
+            pistesCorrompues.map(function (p) { return '<option value="' + p + '">' + CivilisationService.NOM_PISTE[p] + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Retirer';
+          btnValider.onclick = function () {
+            var pisteChoisie = document.getElementById('corruption-select-piste').value;
+            btnValider.disabled = true;
+            CivilisationService.definirCorruption(partieCorruption.id, pisteChoisie, false)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[pisteChoisie] + '.', piste: pisteChoisie });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du retrait : ' + erreur.message);
+              });
+          };
+        }
+
+        SecteurService.obtenirSecteursEligiblesRetraitCorruption(partieCorruption.id)
+          .then(function (eligiblesSecteurs) { afficherMenuCibles_(eligiblesSecteurs); })
+          .catch(function (erreur) {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
