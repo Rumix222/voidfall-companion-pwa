@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 40 — 2026-08-20
+ * Version 41 — 2026-08-20
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -966,6 +966,57 @@
  * empilée / Annuler correct, piste déjà au maximum) — 11/11 tests du
  * fichier passent, 88/95 sur l'ensemble de la suite (7 échecs restants :
  * mêmes échecs préexistants du baseline, aucune régression).
+ *
+ * 20/08/2026 (EVOLUTION 7 — effet d'Événement/Focus "avancer sur une
+ * piste de Civilisation", voir TODO.md) : "avancer_civilisation" (piste
+ * au choix) et "avancer_civilisation_societe"/"_gouvernement"/"_economie"
+ * (piste imposée) retirées de CLES_CIVILISATION_HORS_PERIMETRE
+ * (js/focusEngine.js v9) — nouveau cas dédié qui délègue à
+ * demanderChoix({type:'avancer_civilisation', piste}), même principe que
+ * construire/retirer_corruption. Nouvelle popup dédiée
+ * (js/strategieService.js v23, contexte 'avancer_civilisation') :
+ * "piste non précisée" -> menu des 3 pistes, chacune avec son niveau
+ * actuel (X/NIVEAU_MAX) et un aperçu de la PROCHAINE case (réutilise
+ * CivilisationService.obtenirDetailPistes, déjà chargé/mis en cache côté
+ * écran Focus pour le même besoin) ; "piste précisée" -> même aperçu pour
+ * cette seule piste, un bouton "Avancer". À la validation, délègue
+ * directement à CivilisationService.avancerPiste (déjà existante — même
+ * moteur que le bouton "Avancer" manuel de l'écran Focus), qui gère SEULE
+ * tout l'enchaînement en cascade demandé par TODO.md (choix "et/ou"
+ * imbriqués, rappel manuel EVOLUTION 4, retirer_corruption EVOLUTION 5,
+ * avance_rapide EVOLUTION 6 — tous déjà pris en charge en interne par
+ * avancerPiste depuis les évolutions précédentes, aucun code
+ * supplémentaire nécessaire ici pour cet enchaînement). Un refus (choix
+ * annulé) sur un effet imbriqué N'ANNULE PAS l'avancement de piste déjà
+ * acquis (avancerPiste ne rejette jamais sa Promise) — resolve({detail})
+ * couvre donc aussi ce cas ; la popup n'est annulable qu'AVANT
+ * validation. js/gameService.js (v17 — cleFocusEnginePourOptionCadre_
+ * reconnaît aussi ces 4 clés pour un Cadre "choix", ex. Événement E
+ * Cycle 1 Cadre 2, seul cas au format simple du catalogue actuel —
+ * vérifié sur evenements.json/focus.json).
+ *
+ * Correctif EVOLUTION 5 découvert au passage (index.html) :
+ * cleFocusEnginePourOptionCadre_/LABEL_OPTION_FOCUSENGINE_ — la copie
+ * locale d'index.html (dupliquée de gameService.js "pour savoir si le
+ * cadre est cliquable") avait été oubliée lors de l'ajout de
+ * 'retirer_corruption' (EVOLUTION 5) : un Cadre "choix" portant sur
+ * cette clé n'était donc PAS reconnu comme cliquable côté rendu (malgré
+ * GameService.appliquerCadreChoixFocusEngine déjà prêt à la résoudre), et
+ * son libellé de bouton serait de toute façon tombé sur libelleOptionCube_
+ * ("Déployer N cube(s)", faux, faute d'entrée dans
+ * LABEL_OPTION_FOCUSENGINE_). Corrigé au passage, en même temps que
+ * l'ajout des 4 nouvelles clés de cette évolution.
+ *
+ * 4 nouveaux tests dans focusEngine_test.js (piste au choix, piste
+ * imposée "gouvernement", les 2 autres pistes imposées "societe"/
+ * "economie", annulé) — 26/26 tests du fichier passent, 92/99 sur
+ * l'ensemble de la suite (7 échecs restants : mêmes échecs préexistants
+ * du baseline test_gameService_cadreChoixCube.js — dette déjà connue,
+ * méthode renommée appliquerCadreChoixCube -> appliquerCadreChoixFocusEngine
+ * avant cette session, non corrigée ici, hors périmètre). Aucun test
+ * dédié pour le nouveau contexte de popup lui-même (strategieService.js
+ * n'a pas de suite de tests — DOM-heavy, dette connue déjà signalée dans
+ * CLAUDE.md, cohérent avec les évolutions précédentes).
  */
 
-var APP_VERSION = '20260820.6';
+var APP_VERSION = '20260820.7';

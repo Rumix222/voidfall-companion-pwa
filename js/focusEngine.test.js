@@ -370,6 +370,77 @@ test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019act
   });
 });
 
+// 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
+// voir TODO.md) : "avancer_civilisation" (piste au choix) et les 3
+// variantes "avancer_civilisation_<piste>" (piste imposée) délèguent
+// désormais à demanderChoix({type:'avancer_civilisation', piste}) — la
+// popup (strategieService.js) fait le choix ET la persistance (comme
+// "regrouper"/"retirer_corruption" ci-dessus), resoudreCle_ ne fait que
+// relayer reponse.detail.
+test('avancer_civilisation (piste au choix) : succès — délègue à demanderChoix avec piste:null, journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'avancer_civilisation');
+    assert.strictEqual(contexte.piste, null);
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Piste Gouvernement : niveau 1 \u2192 2 \u2014 Gagnez un Programme.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Piste Gouvernement : niveau 1') !== -1; }));
+  });
+});
+
+test('avancer_civilisation_gouvernement (piste imposée) : succès — délègue à demanderChoix avec piste:"gouvernement"', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation_gouvernement: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'avancer_civilisation');
+    assert.strictEqual(contexte.piste, 'gouvernement');
+    return { detail: 'Piste Gouvernement : niveau 2 \u2192 3.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('niveau 2 \u2192 3') !== -1; }));
+  });
+});
+
+test('avancer_civilisation_societe / avancer_civilisation_economie : piste imposée correcte pour chacune', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var pistesRecues = [];
+  var demanderChoix = function (contexte) { pistesRecues.push(contexte.piste); return { detail: 'ok' }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, { action: 'Jouer', effet: { avancer_civilisation_societe: 1 }, cout: {}, texte: '' }, demanderChoix)
+    .then(function () {
+      return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, { action: 'Jouer', effet: { avancer_civilisation_economie: 1 }, cout: {}, texte: '' }, demanderChoix);
+    })
+    .then(function () {
+      assert.deepStrictEqual(pistesRecues, ['societe', 'economie']);
+    });
+});
+
+test('avancer_civilisation : annulé (popup "Annuler") — bloque toute l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 test('deployer_cube (mode libre) : succès — cubeActif ET coût ressource débités, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };

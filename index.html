@@ -1386,6 +1386,18 @@
       // que etablir_guilde, type "Banquiers" forcé) / augmenter_population_pure
       // (nouvelle popup dédiée) — voir focusEngine.js (v6).
       if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
+      // 20/08/2026 (EVOLUTION 5 — retirer_corruption — correctif : cette
+      // copie locale avait été oubliée lors de l'ajout côté gameService.js,
+      // rendant un Cadre "choix" portant sur cette clé non cliquable en
+      // pratique malgré GameService.appliquerCadreChoixFocusEngine déjà
+      // prêt à la résoudre. EVOLUTION 7 — mêmes clés qu'ajoutées côté
+      // gameService.js (avancer_civilisation au choix + 3 variantes piste
+      // imposée), voir focusEngine.js v9.
+      if (option.cle === 'retirer_corruption') return option.cle;
+      if (option.cle === 'avancer_civilisation' || option.cle === 'avancer_civilisation_societe' ||
+        option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
+        return option.cle;
+      }
       return null;
     }
 
@@ -1414,7 +1426,21 @@
       etablir_guilde: 'Établir une Guilde',
       construire_installation: 'Construire une Installation',
       etablir_guilde_banquier: 'Établir une Guilde de Banquiers',
-      augmenter_population_pure: 'Augmenter une Population Pure'
+      augmenter_population_pure: 'Augmenter une Population Pure',
+      // 20/08/2026 (EVOLUTION 5 — correctif, voir cleFocusEnginePourOptionCadre_
+      // ci-dessus) : sans cette entrée, un Cadre "retirer_corruption"
+      // serait retombé sur libelleOptionCube_ ("Déployer N cube(s)",
+      // libellé faux) faute de correspondance ici.
+      retirer_corruption: 'Retirer une Corruption',
+      // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de
+      // Civilisation", voir TODO.md) : 1 libellé par variante — la piste
+      // précise (si imposée) reste visible sur le bouton, le détail
+      // (niveau atteint) n'apparaît qu'après résolution dans le statut
+      // "✓ Appliqué (...)", comme les autres options ci-dessus.
+      avancer_civilisation: 'Avancer sur une piste de Civilisation',
+      avancer_civilisation_societe: 'Avancer sur la piste Société',
+      avancer_civilisation_gouvernement: 'Avancer sur la piste Gouvernement',
+      avancer_civilisation_economie: 'Avancer sur la piste Économie'
     };
 
     /**

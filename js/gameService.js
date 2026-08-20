@@ -1,7 +1,15 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 16 — 20/08/2026 (EVOLUTION 5 — CHAMPS_PLATEAU_MAISON_AUTORISES + cleFocusEnginePourOptionCadre_ pour retirer_corruption)
+ * Version 17 — 20/08/2026 (EVOLUTION 7 — cleFocusEnginePourOptionCadre_ pour avancer_civilisation*)
+ *
+ * 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
+ * voir TODO.md) : cleFocusEnginePourOptionCadre_ reconnaît désormais
+ * { cle: 'avancer_civilisation' } (piste au choix) et { cle:
+ * 'avancer_civilisation_societe'/'_gouvernement'/'_economie' } (piste
+ * imposée) — même mécanisme générique qu'augmenter_population_pure/
+ * retirer_corruption ci-dessus, identité (focusEngine.js v9 les
+ * reconnaît nativement).
  *
  * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
  * TODO.md) : CHAMPS_PLATEAU_MAISON_AUTORISES accepte désormais
@@ -588,6 +596,15 @@ var GameService = (function () {
     // reconnaît nativement 'retirer_corruption' (focusEngine.js v8),
     // identité comme les autres clés ci-dessus.
     if (option.cle === 'retirer_corruption') return option.cle;
+    // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
+    // voir TODO.md) : même mécanisme générique — FocusEngine.resoudreCle_
+    // reconnaît nativement 'avancer_civilisation' (piste au choix) et
+    // 'avancer_civilisation_societe'/'_gouvernement'/'_economie' (piste
+    // imposée), focusEngine.js v9.
+    if (option.cle === 'avancer_civilisation' || option.cle === 'avancer_civilisation_societe' ||
+      option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
+      return option.cle;
+    }
     return null;
   }
 

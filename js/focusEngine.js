@@ -1,7 +1,7 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 8 — 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption" porté, retiré de CLES_SECTEUR_HORS_PERIMETRE)
+ * Version 9 — 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation" porté, retiré de CLES_CIVILISATION_HORS_PERIMETRE)
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure ... et
@@ -171,10 +171,14 @@
  *     resoudreCle_)
  *     (secteurService.js PWA ne porte QUE l'instanciation/lecture pour les
  *     clés restant ci-dessus — actions hors périmètre, cf. son en-tête)
- *   - Civilisation : avancer_civilisation*, avancer_piste_corrompue
- *     (CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js exclut
- *     explicitement civSociete/civGouvernement/civEconomie — "leurs
- *     propres fonctions dédiées, portées en Phase 3/5" : pas encore faites)
+ *   - Civilisation : avance_rapide, avancer_civilisation_moins_avancee,
+ *     avancer_piste_corrompue ("avancer_civilisation"/"avancer_
+ *     civilisation_societe"/"_gouvernement"/"_economie" portées le
+ *     20/08/2026, EVOLUTION 7 — voir plus bas, cas dédié dans
+ *     resoudreCle_ ; CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js
+ *     exclut toujours civSociete/civGouvernement/civEconomie, mais
+ *     CivilisationService.avancerPiste — appelée depuis la popup, pas
+ *     depuis ce fichier — a ses propres fonctions dédiées pour ces champs)
  *   - Production : produire_ressource, produire_deux_ressources,
  *     produire_<ressource> (niveauxProduction dépend d'un calcul agrégé
  *     sur secteursPartie — population × guildes — non porté côté PWA)
@@ -267,10 +271,35 @@ var FocusEngine = (function () {
     deploy_cube: 'libre',
     deployer_cube_secteur_mere: 'secteur_mere'
   };
+  // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste [de Civilisation]",
+  // voir TODO.md) : "avancer_civilisation" (piste au choix) et
+  // "avancer_civilisation_societe"/"_gouvernement"/"_economie" (piste
+  // imposée) RETIRÉES de cette liste — nouveau cas dédié ci-dessous (comme
+  // construire/retirer_corruption), qui ouvre une popup de choix/aperçu
+  // (contexte 'avancer_civilisation', strategieService.js) puis délègue à
+  // CivilisationService.avancerPiste, seule source de vérité pour cette
+  // mécanique (déjà utilisée par le bouton "Avancer" de l'écran Focus).
+  // "avance_rapide" reste ICI (résolue différemment, en aval, à
+  // l'intérieur même de CivilisationService.avancerPiste — voir son
+  // en-tête, EVOLUTION 6 — jamais via resoudreCle_, cette clé n'apparaît
+  // d'ailleurs que sur une case déjà en cours d'avancement, jamais comme
+  // effet Focus/Cadre à résoudre isolément). "avancer_civilisation_moins_
+  // avancee"/"avancer_piste_corrompue" restent hors périmètre (fonctions
+  // dédiées existantes — CivilisationService.avancerPisteMoinsAvancee/
+  // avancerPisteCorrompue — mais aucune popup Focus/Cadre demandée pour
+  // elles à ce jour, hors périmètre de cette évolution).
   var CLES_CIVILISATION_HORS_PERIMETRE = [
-    'avancer_civilisation_societe', 'avancer_civilisation_gouvernement', 'avancer_civilisation_economie',
-    'avancer_civilisation', 'avance_rapide', 'avancer_civilisation_moins_avancee', 'avancer_piste_corrompue'
+    'avance_rapide', 'avancer_civilisation_moins_avancee', 'avancer_piste_corrompue'
   ];
+  // Clé Focus/Cadre -> piste imposée (identifiant CivilisationService.PISTES)
+  // — absente pour "avancer_civilisation" (piste au choix, voir
+  // contexte.piste === null côté popup).
+  var PISTE_PAR_CLE_AVANCER_CIVILISATION_ = {
+    avancer_civilisation_societe: 'societe',
+    avancer_civilisation_gouvernement: 'gouvernement',
+    avancer_civilisation_economie: 'economie'
+  };
+  var CLES_AVANCER_CIVILISATION_ = ['avancer_civilisation'].concat(Object.keys(PISTE_PAR_CLE_AVANCER_CIVILISATION_));
 
   // Bonus Commerce — 6 bonus fixes du livret (portés tels quels depuis
   // strategie.html, var BONUS_COMMERCE). Données de règles statiques, donc
@@ -453,6 +482,37 @@ var FocusEngine = (function () {
     if (cle === 'retirer_corruption' && signe > 0) {
       return Promise.resolve(demanderChoix({
         type: 'retirer_corruption',
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
+    }
+
+    // --- Avancer sur une piste de Civilisation : Effet UNIQUEMENT (signe
+    // > 0). Ouvre une popup dédiée (contexte 'avancer_civilisation',
+    // strategieService.js) qui affiche, pour la ou les piste(s) candidate(s)
+    // (TODO.md, EVOLUTION 7) — piste imposée (PISTE_PAR_CLE_AVANCER_
+    // CIVILISATION_) OU au choix (contexte.piste === null, "avancer_
+    // civilisation") — le niveau actuel (X/NIVEAU_MAX) et un aperçu de la
+    // PROCHAINE case, avant Annuler/Valider. À la validation, la popup
+    // appelle directement CivilisationService.avancerPiste (persistance
+    // ET résolution de l'effet de la nouvelle case atteinte, laquelle
+    // PEUT À SON TOUR ouvrir une ou plusieurs popups imbriquées —
+    // demanderChoix relayé tel quel par avancerPiste, comme pour n'importe
+    // quel autre effet : choix "et/ou", rappel manuel EVOLUTION 4,
+    // retirer_corruption EVOLUTION 5, avance_rapide EVOLUTION 6 — déjà
+    // tous gérés par avancerPiste elle-même, aucun code supplémentaire
+    // nécessaire ici pour cet enchaînement). Comme construire/retirer_
+    // corruption ci-dessus, la popup fait le choix ET la persistance
+    // (focusEngine reste pur, aucun accès DB ici) ; resoudreCle_ relaie
+    // juste le résumé dans le journal. ---
+    if (CLES_AVANCER_CIVILISATION_.indexOf(cle) !== -1 && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'avancer_civilisation',
+        piste: PISTE_PAR_CLE_AVANCER_CIVILISATION_[cle] || null,
         source: source,
         partieId: etat.partieId
       })).then(function (reponse) {

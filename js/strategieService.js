@@ -1,7 +1,23 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 22 — 20/08/2026 (EVOLUTION 5 — popup "retirer_corruption" + jeton manuel Chambres de décontamination)
+ * Version 23 — 20/08/2026 (EVOLUTION 7 — popup "avancer_civilisation" + correctifs LABEL_OPTION_FOCUSENGINE_/cleFocusEnginePourOptionCadre_)
+ *
+ * 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
+ * voir TODO.md) : nouveau contexte demanderChoix 'avancer_civilisation' —
+ * piste au choix (contexte.piste === null : menu des 3 pistes, chacune
+ * avec son niveau X/NIVEAU_MAX et un aperçu de la prochaine case) ou
+ * imposée (contexte.piste renseigné : même aperçu, un seul bouton
+ * "Avancer"). Réutilise CivilisationService.obtenirDetailPistes (déjà
+ * chargé/mis en cache pour "prochaines cases" côté écran Focus,
+ * obtenirDetailPistesCache_) et CivilisationService.avancerPiste (déjà
+ * existante — même moteur que le bouton "Avancer" manuel de l'écran
+ * Focus) pour la persistance ET la résolution en cascade de l'effet de
+ * la nouvelle case (choix imbriqués, rappel manuel, retirer_corruption,
+ * avance_rapide — tous déjà gérés par avancerPiste elle-même, aucun code
+ * supplémentaire ici). js/gameService.js (v17), js/focusEngine.js (v9),
+ * index.html (correctif LABEL_OPTION_FOCUSENGINE_/cleFocusEnginePourOptionCadre_
+ * — voir en-tête index.html pour le détail).
  *
  * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
  * TODO.md) : nouveau contexte demanderChoix 'retirer_corruption' — menu
@@ -2577,6 +2593,102 @@ var StrategieService = (function () {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
+
+      } else if (contexte.type === 'avancer_civilisation') {
+        // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de
+        // Civilisation" d'Événement galactique/Focus, voir TODO.md) :
+        // popup pour les clés focusEngine.js "avancer_civilisation"
+        // (piste au choix, contexte.piste === null) / "avancer_
+        // civilisation_societe"/"_gouvernement"/"_economie" (piste
+        // imposée, contexte.piste renseigné) — affiche pour chaque piste
+        // candidate son niveau actuel (X/NIVEAU_MAX) et un aperçu de la
+        // PROCHAINE case (celle qui serait atteinte), réutilise
+        // CivilisationService.obtenirDetailPistes (déjà chargé/mis en
+        // cache pour "prochaines cases" — voir obtenirDetailPistesCache_/
+        // texteProchainesCasesHTML_ plus haut, écran Focus). À la
+        // validation, appelle CivilisationService.avancerPiste
+        // directement (persistance ET résolution de l'effet de la
+        // nouvelle case — qui peut À SON TOUR ouvrir une ou plusieurs
+        // popups imbriquées : demanderChoix est relayé tel quel, choix
+        // "et/ou", rappel manuel EVOLUTION 4, retirer_corruption EVOLUTION
+        // 5, avance_rapide EVOLUTION 6 — déjà tous enchaînés
+        // automatiquement par avancerPiste elle-même, aucun code
+        // supplémentaire nécessaire ici pour cet enchaînement). Un refus
+        // (choix annulé) sur un effet imbriqué N'ANNULE PAS l'avancement
+        // de piste déjà acquis (avancerPiste renvoie effetSucces:false
+        // SANS jamais rejeter la Promise) — resolve({detail}) couvre donc
+        // aussi ce cas, jamais {annule:true} : cette popup n'est
+        // annulable qu'AVANT validation (bouton Annuler), pas après.
+        titre.textContent = contexte.piste
+          ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste]
+          : 'Avancer sur une piste de Civilisation';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieCivilisation = partieAffichee;
+        var nomMaisonCivilisation = partieCivilisation.joueur ? partieCivilisation.joueur.nom : null;
+        var civActuelle = partieCivilisation.civilisation || {};
+
+        function apercuProchaineCase_(detail, piste) {
+          var niveau = civActuelle[piste] || 0;
+          if (niveau >= CivilisationService.NIVEAU_MAX) return 'Piste déjà au niveau maximum.';
+          var cases = (detail && detail[piste]) || [];
+          var entree = cases[niveau]; // case niveau+1 (index niveau, 0-based)
+          return entree ? ('Case ' + entree.case + ' — ' + (entree.texte || '(aucun texte)')) : '';
+        }
+
+        function validerAvancementPiste_(piste, boutonDeclencheur) {
+          if (boutonDeclencheur) boutonDeclencheur.disabled = true;
+          btnValider.disabled = true;
+          CivilisationService.avancerPiste(partieCivilisation.id, nomMaisonCivilisation, piste, demanderChoix)
+            .then(function (resultat) {
+              fermerModale_();
+              btnValider.disabled = false;
+              if (resultat.dejaMaximum) {
+                resolve({ detail: 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : déjà au niveau maximum.', piste: piste });
+                return;
+              }
+              var detail = 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' \u2192 ' + resultat.nouveauNiveau +
+                (resultat.texte ? ' \u2014 ' + resultat.texte : '') +
+                (resultat.effetJournal && resultat.effetJournal.length ? ' (' + resultat.effetJournal.join(' ') + ')' : '');
+              resolve({ detail: detail, piste: piste });
+            })
+            .catch(function (erreur) {
+              if (boutonDeclencheur) boutonDeclencheur.disabled = false;
+              btnValider.disabled = false;
+              window.alert('Échec de l\'avancement : ' + erreur.message);
+            });
+        }
+
+        obtenirDetailPistesCache_(nomMaisonCivilisation).then(function (detail) {
+          if (contexte.piste) {
+            var piste = contexte.piste;
+            var niveau = civActuelle[piste] || 0;
+            contenu.innerHTML = '<p class="hint">Niveau actuel : ' + niveau + '/' + CivilisationService.NIVEAU_MAX + '</p>' +
+              '<p class="hint">' + apercuProchaineCase_(detail, piste) + '</p>';
+            btnValider.hidden = niveau >= CivilisationService.NIVEAU_MAX;
+            btnValider.textContent = 'Avancer';
+            btnValider.onclick = function () { validerAvancementPiste_(piste, null); };
+            return;
+          }
+
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            CivilisationService.PISTES.map(function (piste) {
+              var niveau = civActuelle[piste] || 0;
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-piste="' + piste + '">' +
+                CivilisationService.NOM_PISTE[piste] + ' \u2014 niveau ' + niveau + '/' + CivilisationService.NIVEAU_MAX +
+                '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, piste) + '</span>' +
+                '</button>';
+            }).join('') + '</div>';
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () { validerAvancementPiste_(btn.dataset.piste, btn); });
+          });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des pistes de Civilisation : ' + erreur.message);
+        });
 
       } else if (contexte.type === 'resoudre_cadre_evenement') {
         // 18/08/2026 (Simplification UI Événement galactique, point 6) :
