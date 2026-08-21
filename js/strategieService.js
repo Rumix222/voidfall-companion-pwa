@@ -1,7 +1,44 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 25 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — nouveau contexte 'placement_critere')
+ * Version 27 — 21/08/2026 (gain d'Influence variable — nouveau contexte 'influence_secteur', calcul déterministe sans choix utilisateur)
+ *
+ * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
+ * secteur Pur", voir focusEngine.js v12 — CLES_INFLUENCE_SECTEUR_) :
+ * nouveau contexte demanderChoix 'influence_secteur' — contrairement à
+ * tous les autres contextes de ce fichier, AUCUN choix utilisateur : le
+ * montant est entièrement déterminé par l'état du plateau
+ * (SecteurService.obtenirAgregatsInfluenceSecteursPurs, secteurService.js
+ * v12), la popup se contente d'un calcul + fermeture immédiate (voir son
+ * JSDoc inline pour le détail des 9 formules couvertes et les 2 nouvelles
+ * tables CHAMP_GUILDE_PAR_CLE_INFLUENCE_/LABEL_GUILDE_INFLUENCE_).
+ * "influence_valeur_gloire"/"influence_par_technologie_amelioree" restent
+ * en revanche résolues entièrement en pur côté focusEngine.js (aucun
+ * changement ici) — voir focusEngine.js v12 pour la raison (aucune donnée
+ * secteur nécessaire pour ces deux-là). Hors périmètre volontaire cette
+ * session (voir focusEngine.js v12) : "influence_par_cube_neant"/
+ * "influence_population_secteur" (liées à l'issue d'une invasion) et
+ * "evaluer_influence_programme_pur" (texte libre non structuré,
+ * programmes.json).
+ *
+ * 21/08/2026 (effet "Gagner une Corruption", voir
+ * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) : nouveau
+ * contexte demanderChoix 'gagner_corruption' — miroir de
+ * 'retirer_corruption' ci-dessous, inversé (place plutôt que retire),
+ * avec en plus un mécanisme de restriction optionnel (contexte.
+ * ciblesAutorisees/ciblesRepli/exclureTechno) pour les Cadres d'Événement
+ * galactique dont l'effet catalogue précise une cible (voir son JSDoc
+ * inline pour le détail complet). Comble le "hors périmètre" du GAIN de
+ * Corruption laissé ouvert par l'EVOLUTION 5 ci-dessous (seul le retrait
+ * avait été automatisé à l'époque). Réutilise SecteurService.
+ * obtenirSecteursEligiblesGainCorruption/placerCorruption (secteurService.js
+ * v11), CivilisationService.definirCorruption(..., true) (déjà existante),
+ * et une nouvelle technologieChambreDecontamination_ (capacité réelle de
+ * la carte — 2 emplacements, 3 si améliorée, contrairement au retrait qui
+ * ne fait que décompter). GameService.appliquerCadreGainCorruption
+ * (gameService.js, nouveau) est le seul appelant qui restreint les
+ * cibles ; FocusEngine.resoudreCle_ ("gain_corruption", focusEngine.js
+ * v11) les laisse toutes ouvertes.
  *
  * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : nouveau contexte
  * demanderChoix 'placement_critere' — secteur déterminé par un `critere`
@@ -576,6 +613,40 @@ var StrategieService = (function () {
     (partie.technologiesObtenues || []).forEach(function (t) { if (t) noms.push(t.nom); });
     return noms.map(function (n) { return (n || '').trim().toLowerCase(); });
   }
+
+  /**
+   * 21/08/2026 (effet "Gagner une Corruption", voir
+   * docs-rules-corruption-gardiens-refuges-technoConsume.md §1 — "La carte
+   * [Chambres de décontamination] peut accueillir 2 marqueurs (3 si
+   * améliorée)") : contrairement à nomsTechnologiesJoueur_ ci-dessus (qui
+   * ne renvoie que des noms), cherche l'objet Technologie complet du
+   * joueur (départ OU l'un des 5 emplacements obtenus — .amelioree porté
+   * par chacun, voir GameService.definirTechnologieAmelioree/
+   * definirTechnologieAvanceeAmelioree) pour en déduire la capacité
+   * réelle. `null` si le joueur ne possède pas cette Technologie.
+   */
+  function technologieChambreDecontamination_(partie) {
+    var candidats = [];
+    if (partie.joueur && partie.joueur.technologieDepart && partie.joueur.technologieDepart.nom) {
+      candidats.push(partie.joueur.technologieDepart);
+    }
+    (partie.technologiesObtenues || []).forEach(function (t) { if (t && t.nom) candidats.push(t); });
+    return candidats.filter(function (t) { return (t.nom || '').trim().toLowerCase() === 'chambres de décontamination'; })[0] || null;
+  }
+
+  // 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/
+  // cube/secteur Pur") : clé Guilde du catalogue ("scientifique_pur",
+  // "banquier_pur"...), rencontrée dans le tableau `influence_par_guilde`
+  // de focus.json -> champ SecteurService.obtenirAgregatsInfluenceSecteursPurs
+  // correspondant (secteurService.js v12, objet `guildesPures`) + libellé
+  // affiché dans le détail du calcul (popup 'influence_secteur' ci-dessous).
+  var CHAMP_GUILDE_PAR_CLE_INFLUENCE_ = {
+    fermier_pur: 'fermiers', ingenieur_pur: 'ingenieurs', mineur_pur: 'mineurs',
+    banquier_pur: 'banquiers', scientifique_pur: 'scientifiques'
+  };
+  var LABEL_GUILDE_INFLUENCE_ = {
+    fermiers: 'Fermiers', ingenieurs: 'Ingénieurs', mineurs: 'Mineurs', banquiers: 'Banquiers', scientifiques: 'Scientifiques'
+  };
 
   // Corvette toujours disponible, les autres types nécessitent la
   // Technologie de même nom (voir TECH_VAISSEAU).
@@ -2682,6 +2753,271 @@ var StrategieService = (function () {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
+
+      } else if (contexte.type === 'gagner_corruption') {
+        // 21/08/2026 (effet "Gagner une Corruption", voir
+        // docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
+        // miroir de 'retirer_corruption' ci-dessus, INVERSÉ — un menu de
+        // CIBLES possibles pour PLACER la Corruption gagnée, chacune
+        // affichée seulement si réellement éligible :
+        // - "Secteur" : un secteur possédé (SecteurService.
+        //   obtenirSecteursEligiblesGainCorruption, secteurService.js v11
+        //   — possédé, PAS Corrompu, ET pas le Secteur-Mère, immunisé) ->
+        //   <select>, persiste via SecteurService.placerCorruption.
+        // - "Piste de Civilisation" : une piste PAS encore Corrompue ->
+        //   résolution directe si une seule, <select> si plusieurs ;
+        //   persiste via CivilisationService.definirCorruption(..., true).
+        // - "Programme" : comme pour le retrait, TOUJOURS proposée dès
+        //   qu'autorisée (la Corruption d'un Programme n'est pas suivie en
+        //   base) — résolution manuelle.
+        // - "Technologie — Chambres de décontamination" : si le joueur la
+        //   possède ET qu'il reste au moins un emplacement libre (2, 3 si
+        //   améliorée — technologieChambreDecontamination_ ci-dessus).
+        //
+        // `contexte.ciblesAutorisees`/`contexte.ciblesRepli` (tableaux
+        // parmi 'secteur'/'piste'/'programme'/'techno') restreignent le
+        // menu — utilisés par GameService.appliquerCadreGainCorruption
+        // (gameService.js) pour un Cadre d'Événement galactique dont
+        // l'effet précise une cible (catalogue : "cible"/"cible_options" +
+        // "repli" éventuel — priorité STRICTE : le groupe "repli" n'est
+        // proposé QUE si aucune cible du 1er groupe n'est éligible ;
+        // "Programme" fait exception, toujours proposée dès qu'autorisée
+        // dans l'un OU l'autre groupe, jamais bloquante — cohérent avec le
+        // reste de cette popup). Non fournis (appel FocusEngine "sans
+        // précision", gain_corruption) : les 4 cibles sont ouvertes, aucun
+        // repli. `contexte.exclureTechno` (catalogue : "restriction":
+        // "stockage_chambres_decontamination_interdit") retire la
+        // Technologie des deux groupes.
+        titre.textContent = 'Gagner une Corruption';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieCorruptionGain = partieAffichee;
+        var pistesNonCorrompues = CivilisationService.PISTES.filter(function (p) {
+          return !(partieCorruptionGain.civilisation && partieCorruptionGain.civilisation.corrompues && partieCorruptionGain.civilisation.corrompues[p]);
+        });
+        var techChambreGain = technologieChambreDecontamination_(partieCorruptionGain);
+        var maxChambreGain = techChambreGain ? (techChambreGain.amelioree ? 3 : 2) : 0;
+        var corruptionStockeeGain = (partieCorruptionGain.plateauMaison && partieCorruptionGain.plateauMaison.corruptionChambreDecontamination) || 0;
+        var chambreDisponibleGain = !!techChambreGain && corruptionStockeeGain < maxChambreGain;
+
+        var tier1 = contexte.ciblesAutorisees || ['secteur', 'piste', 'programme', 'techno'];
+        var tier2 = contexte.ciblesRepli || [];
+        if (contexte.exclureTechno) {
+          tier1 = tier1.filter(function (c) { return c !== 'techno'; });
+          tier2 = tier2.filter(function (c) { return c !== 'techno'; });
+        }
+        var programmeAutorise = tier1.indexOf('programme') !== -1 || tier2.indexOf('programme') !== -1;
+        var tier1SansProgramme = tier1.filter(function (c) { return c !== 'programme'; });
+        var tier2SansProgramme = tier2.filter(function (c) { return c !== 'programme'; });
+
+        function optionsEligibles_(cibles, eligiblesSecteurs) {
+          var options = [];
+          if (cibles.indexOf('secteur') !== -1 && eligiblesSecteurs.length) options.push({ cle: 'secteur', label: 'Secteur' });
+          if (cibles.indexOf('piste') !== -1 && pistesNonCorrompues.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+          if (cibles.indexOf('techno') !== -1 && chambreDisponibleGain) {
+            options.push({ cle: 'techno', label: 'Chambres de décontamination', sousTexte: (maxChambreGain - corruptionStockeeGain) + ' emplacement(s) libre(s)' });
+          }
+          return options;
+        }
+
+        function afficherMenuCibles_(eligiblesSecteurs) {
+          var options = optionsEligibles_(tier1SansProgramme, eligiblesSecteurs);
+          if (!options.length && tier2SansProgramme.length) options = optionsEligibles_(tier2SansProgramme, eligiblesSecteurs);
+          if (programmeAutorise) options.push({ cle: 'programme', label: 'Programme', sousTexte: 'à placer manuellement' });
+
+          if (!options.length) {
+            fermerModale_();
+            resolve({ annule: true });
+            return;
+          }
+
+          btnValider.hidden = true;
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            options.map(function (o) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-cle="' + o.cle + '">' +
+                o.label + (o.sousTexte ? '<br><span class="cadre-action-sous-texte">' + o.sousTexte + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var cle = btn.dataset.cle;
+              if (cle === 'secteur') return afficherSousSelectSecteur_(eligiblesSecteurs);
+              if (cle === 'piste') return afficherSousSelectPiste_();
+              if (cle === 'programme') {
+                fermerModale_();
+                resolve({ detail: 'Corruption placée sur un emplacement de Programme (manuellement).' });
+                return;
+              }
+              if (cle === 'techno') {
+                btn.disabled = true;
+                var champs = { corruptionChambreDecontamination: corruptionStockeeGain + 1 };
+                GameService.majPlateauMaison(partieCorruptionGain.id, champs)
+                  .then(function () {
+                    partieCorruptionGain.plateauMaison.corruptionChambreDecontamination = corruptionStockeeGain + 1;
+                    fermerModale_();
+                    resolve({ detail: 'Corruption placée sur Chambres de décontamination (' + (corruptionStockeeGain + 1) + '/' + maxChambreGain + ').' });
+                  })
+                  .catch(function (erreur) {
+                    btn.disabled = false;
+                    window.alert('Échec du placement : ' + erreur.message);
+                  });
+              }
+            });
+          });
+        }
+
+        function afficherSousSelectSecteur_(eligibles) {
+          titre.textContent = 'Gagner une Corruption — Secteur';
+          contenu.innerHTML = '' +
+            '<select id="corruption-gain-select-secteur" class="modal-choix-select">' +
+            eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Placer';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('corruption-gain-select-secteur').value);
+            btnValider.disabled = true;
+            SecteurService.placerCorruption(partieCorruptionGain.id, numero)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Corruption placée sur le Secteur ' + numero + '.', numero: numero });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du placement : ' + erreur.message);
+              });
+          };
+        }
+
+        function afficherSousSelectPiste_() {
+          if (pistesNonCorrompues.length === 1) {
+            var piste = pistesNonCorrompues[0];
+            CivilisationService.definirCorruption(partieCorruptionGain.id, piste, true)
+              .then(function () {
+                fermerModale_();
+                resolve({ detail: 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[piste] + '.', piste: piste });
+              })
+              .catch(function (erreur) {
+                window.alert('Échec du placement : ' + erreur.message);
+              });
+            return;
+          }
+          titre.textContent = 'Gagner une Corruption — Piste de Civilisation';
+          contenu.innerHTML = '' +
+            '<select id="corruption-gain-select-piste" class="modal-choix-select">' +
+            pistesNonCorrompues.map(function (p) { return '<option value="' + p + '">' + CivilisationService.NOM_PISTE[p] + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Placer';
+          btnValider.onclick = function () {
+            var pisteChoisie = document.getElementById('corruption-gain-select-piste').value;
+            btnValider.disabled = true;
+            CivilisationService.definirCorruption(partieCorruptionGain.id, pisteChoisie, true)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[pisteChoisie] + '.', piste: pisteChoisie });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du placement : ' + erreur.message);
+              });
+          };
+        }
+
+        SecteurService.obtenirSecteursEligiblesGainCorruption(partieCorruptionGain.id)
+          .then(function (eligiblesSecteurs) { afficherMenuCibles_(eligiblesSecteurs); })
+          .catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+      } else if (contexte.type === 'influence_secteur') {
+        // 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/
+        // cube/secteur Pur", voir focusEngine.js v12 — CLES_INFLUENCE_SECTEUR_) :
+        // AUCUN choix utilisateur ici (montant entièrement déterminé par
+        // l'état du plateau) — calcule via SecteurService.
+        // obtenirAgregatsInfluenceSecteursPurs (secteurService.js v12) puis
+        // ferme la popup, résout {montant, detail} — même principe que la
+        // résolution directe "une seule option" déjà en place ci-dessus
+        // (retirer_corruption/gagner_corruption, piste unique). La popup
+        // reste néanmoins visible brièvement ("Calcul en cours…", Annuler
+        // disponible en cas d'erreur de chargement) : même contrat que
+        // toutes les autres entrées de ce fichier (modal.hidden = false
+        // inconditionnel en fin de fonction, voir plus bas).
+        //
+        // contexte.formule = la clé focusEngine.js (une des 9 de
+        // CLES_INFLUENCE_SECTEUR_), contexte.valeur = le multiplicateur
+        // catalogue (nombre), SAUF pour "influence_par_guilde" où c'est un
+        // tableau de clés Guilde (CHAMP_GUILDE_PAR_CLE_INFLUENCE_ ci-dessus,
+        // chaque Guilde valant implicitement 1 Influence — pas de
+        // multiplicateur numérique pour cette clé précise, vérifié sur
+        // tout focus.json).
+        titre.textContent = 'Gagner de l’Influence';
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieInfluence = partieAffichee;
+        SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieInfluence.id).then(function (agregats) {
+          var formule = contexte.formule;
+          var valeur = contexte.valeur;
+          var montant = 0;
+          var detail = '';
+
+          if (formule === 'influence_par_guilde') {
+            var clesGuilde = Array.isArray(valeur) ? valeur : [];
+            var labels = [];
+            clesGuilde.forEach(function (cleGuilde) {
+              var champ = CHAMP_GUILDE_PAR_CLE_INFLUENCE_[cleGuilde];
+              if (!champ) return;
+              montant += agregats.guildesPures[champ] || 0;
+              labels.push(LABEL_GUILDE_INFLUENCE_[champ]);
+            });
+            detail = montant + ' Influence (Guildes Pures de ' + labels.join('/') + ' — ' + montant + ' au total).';
+          } else if (formule === 'influence_par_guilde_pure') {
+            montant = valeur * agregats.guildesPures.total;
+            detail = montant + ' Influence (' + agregats.guildesPures.total + ' Guilde(s) Pure(s) × ' + valeur + ').';
+          } else if (formule === 'influence_par_guilde_scientifique_pure') {
+            montant = valeur * agregats.guildesPures.scientifiques;
+            detail = montant + ' Influence (' + agregats.guildesPures.scientifiques + ' Guilde(s) de Scientifiques Pures × ' + valeur + ').';
+          } else if (formule === 'influence_par_installation_pure') {
+            montant = valeur * agregats.installationsPuresTotal;
+            detail = montant + ' Influence (' + agregats.installationsPuresTotal + ' Installation(s) Pure(s) × ' + valeur + ').';
+          } else if (formule === 'influence_par_cube_secteur_pur') {
+            montant = valeur * agregats.cubesSecteurPurTotal;
+            detail = montant + ' Influence (' + agregats.cubesSecteurPurTotal + ' cube(s) sur secteurs Purs × ' + valeur + ').';
+          } else if (formule === 'influence_par_cube_secteur_pur_et_fiche') {
+            var cubeActifFiche = (partieInfluence.plateauMaison && partieInfluence.plateauMaison.cubeActif) || 0;
+            var totalCubes = agregats.cubesSecteurPurTotal + cubeActifFiche;
+            montant = valeur * totalCubes;
+            detail = montant + ' Influence (' + totalCubes + ' cube(s) — ' + agregats.cubesSecteurPurTotal +
+              ' sur secteurs Purs + ' + cubeActifFiche + ' actif(s) sur la fiche Maison — × ' + valeur + ').';
+          } else if (formule === 'influence_par_secteur_pur') {
+            montant = valeur * agregats.nombreSecteurPur;
+            detail = montant + ' Influence (' + agregats.nombreSecteurPur + ' secteur(s) Pur(s) × ' + valeur + ').';
+          } else if (formule === 'influence_par_secteur_pur_avec_guilde') {
+            montant = valeur * agregats.nombreSecteurPurAvecGuilde;
+            detail = montant + ' Influence (' + agregats.nombreSecteurPurAvecGuilde + ' secteur(s) Pur(s) avec Guilde × ' + valeur + ').';
+          } else if (formule === 'influence_par_secteur_pur_population_6') {
+            montant = valeur * agregats.nombreSecteurPurPopulation6;
+            detail = montant + ' Influence (' + agregats.nombreSecteurPurPopulation6 + ' secteur(s) Pur(s) à Population 6 × ' + valeur + ').';
+          } else {
+            detail = '0 Influence (formule "' + formule + '" inconnue).';
+          }
+
+          fermerModale_();
+          resolve({ montant: montant, detail: detail });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du calcul d’Influence : ' + erreur.message);
+        });
 
       } else if (contexte.type === 'avancer_civilisation') {
         // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de

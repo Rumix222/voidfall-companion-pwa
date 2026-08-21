@@ -51,7 +51,7 @@ function creerDbFactice_() {
 
 function creerContexte_() {
   var ctx = { console: console, Promise: Promise, JSON: JSON };
-  chargerDansContexte_('/home/claude/focusEngine.js', ctx);
+  chargerDansContexte_(__dirname + '/focusEngine.js', ctx);
   return ctx;
 }
 
@@ -158,6 +158,40 @@ test('gagner_commerce : bonus choisi résolu récursivement (choice_repeat)', fu
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(appelsChoixRepete, 2);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceNourriture, 7); // +1 deux fois
+  });
+});
+
+test('gagner_prime : crédite jetonPrime directement (case "Gagnez un jeton Prime.")', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Prime', effet: { gagner_prime: 1 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('prime') !== -1 && l.indexOf('non automatisé') === -1; }));
+  });
+});
+
+// 21/08/2026 (retour utilisateur — Événement E Cycle 1 Cadre 2 : "Avancer
+// piste civilisation -> avance rapide -> gagner un jeton commerce ->
+// gagner un jeton prime, ça s'est mal passé") : reproduit la chaîne
+// complète — le Bonus Commerce "Gagnez un jeton Prime." (index 4 de
+// BONUS_COMMERCE) doit réellement créditer jetonPrime, pas juste
+// journaliser un rappel manuel.
+test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonPrime', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Commerce', effet: { gagner_commerce: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'bonus_commerce');
+    return { indexChoisi: 4 }; // "Gagnez un jeton Prime."
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
   });
 });
 
@@ -370,6 +404,139 @@ test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019act
   });
 });
 
+// 21/08/2026 (effet "Gagner une Corruption", voir docs-rules-corruption-
+// gardiens-refuges-technoConsume.md) : "gain_corruption" délègue à
+// demanderChoix({type:'gagner_corruption'}) — miroir exact de
+// retirer_corruption ci-dessus, même contrat (la popup fait le choix ET
+// la persistance, resoudreCle_ ne fait que relayer reponse.detail).
+test('gain_corruption : succès — délègue à demanderChoix({type:"gagner_corruption"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { gain_corruption: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'gagner_corruption');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Corruption placée sur le Secteur 4.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Corruption placée sur le Secteur 4') !== -1; }));
+  });
+});
+
+test('gain_corruption : annulé (popup "Annuler") — bloque toute l’action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { gain_corruption: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+// 21/08/2026 (gain d'Influence variable, voir docs-architecture-pwa.md) :
+// "influence_valeur_gloire" résolue entièrement en pur — aucun
+// demanderChoix appelé (demanderChoixSansPopup_ jetterait si c'était le
+// cas), somme des jetons Gloire (null ignorés).
+test('influence_valeur_gloire : somme des jetons Gloire créditée, résolue en pur (aucun demanderChoix)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { influence_valeur_gloire: 1 }, cout: {}, texte: '' };
+  var plateau = Object.assign({}, PLATEAU_BASE, { gloire: [3, null, 5, null, 2] });
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 20); // 10 (initial) + 10 (3+5+2)
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('+10 influence') !== -1 && l.indexOf('Gloire') !== -1; }));
+  });
+});
+
+// 21/08/2026 (gain d'Influence variable) : "influence_par_technologie_amelioree"
+// résolue entièrement en pur — combine les 3 sources de Technologies
+// possédées (départ, emplacements obtenus, avancées choisies).
+test('influence_par_technologie_amelioree : combine les 3 sources, résolue en pur (aucun demanderChoix)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { influence_par_technologie_amelioree: 6 }, cout: {}, texte: '' };
+  var plateau = Object.assign({}, PLATEAU_BASE, {
+    technologieDepart: 'Chambres de décontamination', technologieDepartAmelioree: true,
+    technologiesObtenues: [{ nom: 'Cuirassés', amelioree: true }, null, { nom: 'Boucliers', amelioree: false }, null, null],
+    technologiesAvanceesChoisies: ['Torpilles', null, null, null],
+    technologiesAvanceesAmeliorees: { Torpilles: true }
+  });
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    // 3 améliorées : départ + Cuirassés (obtenue) + Torpilles (avancée) ; Boucliers non améliorée ignorée.
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 28); // 10 (initial) + 18 (3 × 6)
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('+18 influence') !== -1 && l.indexOf('3 technologie(s) améliorée(s)') !== -1; }));
+  });
+});
+
+// 21/08/2026 (gain d'Influence variable) : les 9 clés "influence_par_*"
+// nécessitant un comptage sur les secteurs délèguent à
+// demanderChoix({type:'influence_secteur'}) — calcul déterministe, aucun
+// choix utilisateur, la popup (strategieService.js) fait le calcul ET
+// résout {montant, detail}.
+test('influence_par_guilde_pure : délègue à demanderChoix({type:"influence_secteur"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { influence_par_guilde_pure: 2 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'influence_secteur');
+    assert.strictEqual(contexte.formule, 'influence_par_guilde_pure');
+    assert.strictEqual(contexte.valeur, 2);
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { montant: 8, detail: '8 Influence (4 Guilde(s) Pure(s) × 2).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 18); // 10 + 8
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('4 Guilde(s) Pure(s)') !== -1; }));
+  });
+});
+
+// "influence_par_guilde" a une forme différente (tableau de clés Guilde,
+// pas un nombre) — transmis tel quel à la popup via contexte.valeur.
+test('influence_par_guilde : transmet le tableau de clés Guilde tel quel', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { influence_par_guilde: ['scientifique_pur', 'banquier_pur'] }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.formule, 'influence_par_guilde');
+    assert.strictEqual(JSON.stringify(contexte.valeur), JSON.stringify(['scientifique_pur', 'banquier_pur']));
+    return { montant: 3, detail: '3 Influence (Guildes Pures de Scientifiques/Banquiers — 3 au total).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 13); // 10 + 3
+  });
+});
+
+test('influence_par_secteur_pur : annulé (popup "Annuler") — bloque toute l’action', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { influence_par_secteur_pur: 2 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
 // voir TODO.md) : "avancer_civilisation" (piste au choix) et les 3
 // variantes "avancer_civilisation_<piste>" (piste imposée) délèguent
@@ -534,7 +701,7 @@ test("annulation en chaîne : dernière puis avant-dernière", function () {
   var ctx = creerContexte_();
   var dbFactice = creerDbFactice_();
   ctx.DB = dbFactice;
-  chargerDansContexte_('/home/claude/annulationService.js', ctx);
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
 
   return dbFactice.put('plateauMaison', Object.assign({}, PLATEAU_BASE)).then(function () {
     return ctx.AnnulationService.empiler('partie-test', {
@@ -575,7 +742,7 @@ test('pile limitée à 10 entrées par partie', function () {
   var ctx = creerContexte_();
   var dbFactice = creerDbFactice_();
   ctx.DB = dbFactice;
-  chargerDansContexte_('/home/claude/annulationService.js', ctx);
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
 
   var chaine = dbFactice.put('plateauMaison', Object.assign({}, PLATEAU_BASE));
   for (var i = 0; i < 13; i++) {

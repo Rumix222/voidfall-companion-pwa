@@ -6,6 +6,10 @@
  * Simule un DB en mémoire (même forme que DB : get/getAll/put) pour ne
  * dépendre ni du navigateur ni d'IndexedDB réel. Charge le fichier réel
  * via vm, comme focusEngine_test.js.
+ *
+ * ⚠️ Comparaisons de tableaux/objets renvoyés par le code chargé en vm :
+ * JSON.stringify plutôt qu'assert.deepStrictEqual (voir
+ * secteurService_actions.test.js pour l'explication du "realm" vm).
  */
 
 var assert = require('assert');
@@ -75,7 +79,7 @@ function lignePlateauMaison_(partieId, extra) {
 
 function creerContexte_(db) {
   var ctx = { console: console, Promise: Promise, JSON: JSON, Object: Object, DB: db };
-  chargerDansContexte_('/home/claude/work/gameService.js', ctx);
+  chargerDansContexte_(__dirname + '/gameService.js', ctx);
   return ctx;
 }
 
@@ -157,8 +161,8 @@ test('actionsSimplesCadre : extrait un delta ressources d\'un cadre "choix" simp
 
   var actions = ctx.GameService.actionsSimplesCadre(cadre);
   assert.strictEqual(actions.length, 2);
-  assert.deepStrictEqual(actions[0], { index: 0, delta: { science: -1, credit: 3 } });
-  assert.deepStrictEqual(actions[1], { index: 1, delta: { science: 2 } });
+  assert.strictEqual(JSON.stringify(actions[0]), JSON.stringify({ index: 0, delta: { science: -1, credit: 3 } }));
+  assert.strictEqual(JSON.stringify(actions[1]), JSON.stringify({ index: 1, delta: { science: 2 } }));
 });
 
 test('actionsSimplesCadre : ignore les options hors périmètre (secteur, Gloire, Technologie...)', function () {
@@ -169,7 +173,7 @@ test('actionsSimplesCadre : ignore les options hors périmètre (secteur, Gloire
     effet: { type: 'placement', zone: 'secteur_neant_adjacent', elements: { defense_secteur: 1 } }
   };
 
-  assert.deepStrictEqual(ctx.GameService.actionsSimplesCadre(cadre), []);
+  assert.strictEqual(JSON.stringify(ctx.GameService.actionsSimplesCadre(cadre)), '[]');
 });
 
 test('actionsSimplesCadre : ignore les cadres permanents/collectifs/à retardement', function () {
@@ -180,7 +184,7 @@ test('actionsSimplesCadre : ignore les cadres permanents/collectifs/à retardeme
     effet: { type: 'choix', mode: 'exclusif', options: [ { cle: 'science', valeur: 2 } ] }
   };
 
-  assert.deepStrictEqual(ctx.GameService.actionsSimplesCadre(cadre), []);
+  assert.strictEqual(JSON.stringify(ctx.GameService.actionsSimplesCadre(cadre)), '[]');
 });
 
 test('appliquerCadreEffet : applique le delta ressources et marque le cadre résolu', function () {

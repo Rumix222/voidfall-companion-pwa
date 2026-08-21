@@ -1,7 +1,21 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 10 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — clé "guilde" générique dans CHAMP_ELEMENT_PLACEMENT_)
+ * Version 12 — 21/08/2026 (gain d'Influence variable "par Guilde/Installation/cube/secteur Pur" — obtenirAgregatsInfluenceSecteursPurs)
+ *
+ * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
+ * secteur Pur", voir focusEngine.js v12) : nouvelle
+ * obtenirAgregatsInfluenceSecteursPurs — un seul aller DB, comptage en
+ * mémoire des Guildes/Installations/cubes/secteurs "Purs" du joueur (voir
+ * son JSDoc ci-dessous pour le détail complet). Consommée par le contexte
+ * demanderChoix 'influence_secteur' (strategieService.js v27).
+ *
+ * 21/08/2026 (effet "Gagner une Corruption", voir
+ * docs-rules-corruption-gardiens-refuges-technoConsume.md) : nouvelles
+ * obtenirSecteursEligiblesGainCorruption/placerCorruption, miroir de
+ * obtenirSecteursEligiblesRetraitCorruption/retirerCorruption — voir leur
+ * JSDoc ci-dessous pour le détail (immunité du Secteur-Mère à la
+ * Corruption, seule différence structurelle avec le retrait).
  *
  * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
  * cube du Néant... OU placez un jeton Gloire de valeur 2 et une Défense
@@ -469,6 +483,99 @@ var SecteurService = (function () {
       if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
       secteur.corrompu = false;
       return DB.put('secteursPartie', secteur).then(function () { return { ok: true }; });
+    });
+  }
+
+  /**
+   * 21/08/2026 (effet "Gagner une Corruption", voir
+   * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) : secteurs
+   * éligibles pour l'option "Secteur" de la popup de choix de
+   * gagner_corruption — miroir d'obtenirSecteursEligiblesRetraitCorruption
+   * ci-dessus, mais INVERSÉ (un secteur possédé, PAS encore Corrompu) ET
+   * avec une contrainte supplémentaire absente du retrait : le
+   * Secteur-Mère standard est immunisé à la Corruption ("sauf un secteur
+   * immunisé à la Corruption, comme un Secteur-Mère standard", §1) — donc
+   * exclu ici via obtenirSecteurMere(scenarioId), jamais éligible en
+   * gain (alors qu'il ne peut de toute façon jamais être Corrompu, donc
+   * cette exclusion ne change rien à obtenirSecteursEligiblesRetraitCorruption).
+   */
+  function obtenirSecteursEligiblesGainCorruption(partieId) {
+    return Promise.all([DB.get('parties', partieId), obtenirSecteurs(partieId)]).then(function (resultats) {
+      var ligneP = resultats[0], secteurs = resultats[1];
+      return obtenirSecteurMere(ligneP ? ligneP.scenarioId : null).then(function (numeroSecteurMere) {
+        return secteurs
+          .filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu && s.numero !== numeroSecteurMere; })
+          .map(function (s) { return { numero: s.numero }; });
+      });
+    });
+  }
+
+  /**
+   * 21/08/2026 (effet "Gagner une Corruption") : miroir de
+   * retirerCorruption ci-dessus — place la Corruption (secteur.corrompu =
+   * true) au lieu de la retirer. Même permissivité (aucune revalidation
+   * d'éligibilité ici, comme retirerCorruption) : c'est
+   * obtenirSecteursEligiblesGainCorruption ci-dessus qui peuple le
+   * <select> de la popup 'gagner_corruption' (strategieService.js).
+   */
+  function placerCorruption(partieId, numero) {
+    return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+      if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
+      secteur.corrompu = true;
+      return DB.put('secteursPartie', secteur).then(function () { return { ok: true }; });
+    });
+  }
+
+  /**
+   * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/
+   * cube/secteur Pur") : agrège, sur tous les secteurs "Purs" du joueur
+   * (appartientAuJoueur_ ET !corrompu — même définition que "Pur" déjà
+   * utilisée par obtenirSecteursEligiblesAugmenterPopulationPure/
+   * obtenirSecteursEligiblesGainCorruption ci-dessus), les compteurs
+   * nécessaires aux formules d'Influence de focus.json/pistesCivilisation.json
+   * (voir focusEngine.js — CLES_INFLUENCE_SECTEUR_) : nombre de secteurs
+   * Purs, nombre de secteurs Purs avec au moins une Guilde, nombre de
+   * secteurs Purs à Population 6, total de Guildes Pures (par type et
+   * toutes confondues), total d'Installations Pures, total de cubes de
+   * Puissance Navale sur secteurs Purs (totalPn_, quel que soit le type
+   * de vaisseau). Un seul aller DB (obtenirSecteurs), tout le reste est
+   * un simple comptage en mémoire — appelée par le contexte demanderChoix
+   * 'influence_secteur' (strategieService.js), qui sait quelle formule
+   * appliquer à quel compteur.
+   */
+  function obtenirAgregatsInfluenceSecteursPurs(partieId) {
+    return obtenirSecteurs(partieId).then(function (secteurs) {
+      var purs = secteurs.filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu; });
+
+      var guildesPures = { fermiers: 0, ingenieurs: 0, mineurs: 0, banquiers: 0, scientifiques: 0, total: 0 };
+      var installationsPuresTotal = 0;
+      var cubesSecteurPurTotal = 0;
+      var nombreSecteurPurAvecGuilde = 0;
+      var nombreSecteurPurPopulation6 = 0;
+
+      purs.forEach(function (s) {
+        var guildesSecteur = (s.guildeFermiers || 0) + (s.guildeIngenieurs || 0) + (s.guildeMineurs || 0) +
+          (s.guildeBanquiers || 0) + (s.guildeScientifiques || 0);
+        guildesPures.fermiers += s.guildeFermiers || 0;
+        guildesPures.ingenieurs += s.guildeIngenieurs || 0;
+        guildesPures.mineurs += s.guildeMineurs || 0;
+        guildesPures.banquiers += s.guildeBanquiers || 0;
+        guildesPures.scientifiques += s.guildeScientifiques || 0;
+        guildesPures.total += guildesSecteur;
+        installationsPuresTotal += (s.installationChantierNaval || 0) + (s.installationDefenseSecteur || 0) + (s.installationBaseStellaire || 0);
+        cubesSecteurPurTotal += totalPn_(s);
+        if (guildesSecteur > 0) nombreSecteurPurAvecGuilde++;
+        if (s.population === 6) nombreSecteurPurPopulation6++;
+      });
+
+      return {
+        nombreSecteurPur: purs.length,
+        nombreSecteurPurAvecGuilde: nombreSecteurPurAvecGuilde,
+        nombreSecteurPurPopulation6: nombreSecteurPurPopulation6,
+        guildesPures: guildesPures,
+        installationsPuresTotal: installationsPuresTotal,
+        cubesSecteurPurTotal: cubesSecteurPurTotal
+      };
     });
   }
 
@@ -1026,6 +1133,9 @@ var SecteurService = (function () {
     obtenirSecteursEligiblesAugmenterPopulationPure: obtenirSecteursEligiblesAugmenterPopulationPure,
     augmenterPopulationPure: augmenterPopulationPure,
     obtenirSecteursEligiblesRetraitCorruption: obtenirSecteursEligiblesRetraitCorruption,
+    obtenirSecteursEligiblesGainCorruption: obtenirSecteursEligiblesGainCorruption,
+    placerCorruption: placerCorruption,
+    obtenirAgregatsInfluenceSecteursPurs: obtenirAgregatsInfluenceSecteursPurs,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,

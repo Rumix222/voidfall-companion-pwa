@@ -1,7 +1,26 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 20 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — appliquerCadreChoixPlacement, choix entre 2 placements alternatifs)
+ * Version 21 — 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement galactique — appliquerCadreGainCorruption/cadreGainCorruptionAutomatisable)
+ *
+ * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
+ * galactique — type "gain", voir docs-rules-corruption-gardiens-refuges-
+ * technoConsume.md §1) : nouvelles cadreGainCorruptionAutomatisable/
+ * appliquerCadreGainCorruption + resolveur privé
+ * resoudreCiblesCadreGainCorruption_/CIBLE_KIND_MAP_GAIN_CORRUPTION_ (voir
+ * leur JSDoc pour le détail complet — quelles cibles catalogue sont
+ * automatisées, lesquelles restent volontairement manuelles). Sort du
+ * hors-périmètre "Cadre gain -> toujours manuel" (en place depuis le
+ * 19/08/2026) les Cadres dont la cible est un choix personnel de
+ * placement (secteur/piste/Programme/Technologie Chambres de
+ * décontamination), en réutilisant la même popup 'gagner_corruption'
+ * (strategieService.js v26) que la clé FocusEngine "gain_corruption"
+ * (focusEngine.js v11), avec un mécanisme de restriction de cibles
+ * (ciblesAutorisees/ciblesRepli/exclureTechno) que cette dernière ne
+ * fournit pas (rien à restreindre pour un Focus/une case de piste).
+ * index.html (nouvelle catégorie de cadre "estGainCorruption", en plus de
+ * placement/placement_multiple/manuel/résolution — voir renderCadresEvenement_
+ * et appliquerCadreGainCorruptionEtRafraichir_).
  *
  * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : nouvelle méthode
  * appliquerCadreChoixPlacement (+ construireResumePlacementChoix_,
@@ -646,6 +665,82 @@ var GameService = (function () {
     // (déterministe).
     if (option.cle === 'ameliorer_gloire') return option.cle;
     return null;
+  }
+
+  // ------------------------------------------------------------
+  // 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
+  // galactique — type "gain", data/catalogue/evenements.json — voir
+  // docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
+  // resoudreCiblesCadreGainCorruption_ traduit le vocabulaire de cible du
+  // catalogue ("cible"/"cible_options"/"repli"/"restriction") vers les 4
+  // cibles concrètes reconnues par la popup 'gagner_corruption'
+  // (strategieService.js) — 'secteur'/'piste'/'programme'/'techno'. Volon-
+  // tairement CONSERVATEUR : retourne `null` (cadre non automatisable, la
+  // main appelante (index.html) reste alors sur l'existant appliquerCadreManuel,
+  // AUCUNE régression) dès que :
+  // - `effet.elements` contient autre chose que "corruption" seule (cadre
+  //   composé, ex. "Augmentez la Population... Ensuite placez une
+  //   Corruption sur CE secteur" — cible contextuelle non modélisable ici) ;
+  // - `effet.effet_conditionnel` est présent (Événement G Cycle 1 Cadre 1 —
+  //   "si la Corruption est placée sur une piste... le joueur doit avancer
+  //   sur cette piste" — CivilisationService.avancerPisteCorrompue existe
+  //   mais DÉCOCHE la piste en avançant, sémantique différente de ce que
+  //   demande ce Cadre précis ; laissé manuel plutôt que de risquer un
+  //   comportement de piste de Civilisation incorrect) ;
+  // - une cible (primaire OU de repli) ne correspond à aucune entrée
+  //   connue — notamment "offre_programme" (case précise du plateau des
+  //   Programmes, jamais suivie en base — reste manuel, comme demandé) et
+  //   "chaque_offre_programme_non_corrompue"/"meme_secteur_que_etape_
+  //   precedente" (effets sur plusieurs cibles/contextuels, hors périmètre).
+  // Vérifié sur tout evenements.json : ce filtre couvre exactement les
+  // Cadres "gain" corruption dont la cible est un choix personnel du
+  // joueur parmi secteur/piste/Programme/Technologie (avec repli éventuel),
+  // et exclut tout le reste — aucune automatisation approximative.
+  // ------------------------------------------------------------
+  var CIBLE_KIND_MAP_GAIN_CORRUPTION_ = {
+    piste_civilisation: ['piste'],
+    secteur_au_choix: ['secteur'],
+    emplacement_programme: ['programme'],
+    fiche_maison: ['piste', 'programme'],
+    carte_technologie_chambres_decontamination: ['techno']
+  };
+
+  function traduireCiblesGainCorruption_(cibles) {
+    var resultat = [];
+    for (var i = 0; i < cibles.length; i++) {
+      var mappees = CIBLE_KIND_MAP_GAIN_CORRUPTION_[cibles[i]];
+      if (!mappees) return null;
+      resultat = resultat.concat(mappees);
+    }
+    return resultat;
+  }
+
+  function resoudreCiblesCadreGainCorruption_(effet) {
+    if (!effet || effet.type !== 'gain' || effet.effet_conditionnel) return null;
+    var elements = effet.elements || {};
+    var clesElements = Object.keys(elements);
+    if (clesElements.length !== 1 || clesElements[0] !== 'corruption' || typeof elements.corruption !== 'number' || elements.corruption < 1) {
+      return null;
+    }
+
+    var ciblesPrimaires = effet.cible ? [effet.cible] : (Array.isArray(effet.cible_options) ? effet.cible_options : null);
+    if (!ciblesPrimaires || !ciblesPrimaires.length) return null;
+    var tier1 = traduireCiblesGainCorruption_(ciblesPrimaires);
+    if (!tier1) return null;
+
+    var tier2 = [];
+    if (effet.repli && Array.isArray(effet.repli.cibles_possibles)) {
+      var tier2Traduit = traduireCiblesGainCorruption_(effet.repli.cibles_possibles);
+      if (!tier2Traduit) return null;
+      tier2 = tier2Traduit;
+    }
+
+    return {
+      quantite: elements.corruption,
+      ciblesAutorisees: tier1,
+      ciblesRepli: tier2,
+      exclureTechno: effet.restriction === 'stockage_chambres_decontamination_interdit'
+    };
   }
 
   /**
@@ -1737,6 +1832,106 @@ var GameService = (function () {
               });
             });
           });
+      });
+    },
+
+    /**
+     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
+     * galactique — voir resoudreCiblesCadreGainCorruption_ ci-dessus)
+     * true si le Cadre est automatisable pour ce gain (secteur/piste/
+     * Programme/Technologie, avec repli éventuel) — utilisée par
+     * index.html pour décider si ce Cadre "gain" doit ouvrir la popup
+     * dédiée (appliquerCadreGainCorruption ci-dessous) ou rester sur
+     * l'existant appliquerCadreManuel (offre_programme, cadre composé,
+     * effet_conditionnel — voir JSDoc de resoudreCiblesCadreGainCorruption_).
+     */
+    cadreGainCorruptionAutomatisable: function (cadre) {
+      return !!resoudreCiblesCadreGainCorruption_(cadre && cadre.effet);
+    },
+
+    /**
+     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
+     * galactique, voir resoudreCiblesCadreGainCorruption_ ci-dessus et
+     * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
+     * applique un cadre "type":"gain" dont l'effet ne porte QUE sur
+     * "corruption" et dont la cible est automatisable (sinon,
+     * cadreGainCorruptionAutomatisable renvoie false et l'appelant —
+     * index.html — reste sur GameService.appliquerCadreManuel, cette
+     * fonction n'est même pas invoquée). Répète `quantite` fois l'appel à
+     * demanderChoix({type:'gagner_corruption', ...}) — chaque popup fait
+     * SA PROPRE persistance (secteur/piste/Technologie — comme
+     * appliquerCadreChoixFocusEngine/retirer_corruption ci-dessus,
+     * focusEngine.js) ; cette fonction ne fait qu'accumuler les résumés et
+     * marquer le cadre appliqué à la fin (même garde-fou anti-double-
+     * application que les autres appliquerCadre* de ce fichier).
+     *
+     * Un "Annuler" sur la TOUTE PREMIÈRE popup (rien encore placé) résout
+     * `{annule:true}` — le cadre n'est PAS marqué appliqué, cohérent avec
+     * appliquerCadreChoixFocusEngine. Un "Annuler" APRÈS au moins une
+     * Corruption déjà placée (`quantite` > 1 — un seul Cadre du catalogue
+     * à ce jour, "Gagnez deux Corruption... sur des emplacements de
+     * Programme") marque le cadre appliqué avec le résumé PARTIEL obtenu
+     * plutôt que de rejeter : les Corruptions déjà placées sont réellement
+     * sur le plateau (persistées par la/les popup(s) déjà résolue(s)) —
+     * les laisser sans marquer le cadre permettrait au joueur de rouvrir
+     * le Cadre et d'en placer au-delà de ce que la carte autorise.
+     */
+    appliquerCadreGainCorruption: function (partieId, cycle, ordreCadre, demanderChoix) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        var config = resoudreCiblesCadreGainCorruption_(cadre && cadre.effet);
+        if (!config) throw new Error('Ce cadre n’est pas automatisable pour le gain de Corruption.');
+
+        var source = 'Cadre #' + ordreCadre;
+        var details = [];
+        var annuleSansRien = false;
+        var repetitions = [];
+        for (var i = 0; i < config.quantite; i++) repetitions.push(i);
+
+        return repetitions.reduce(function (promesse) {
+          return promesse.then(function (arreter) {
+            if (arreter) return true;
+            return Promise.resolve(demanderChoix({
+              type: 'gagner_corruption',
+              source: source,
+              partieId: partieId,
+              ciblesAutorisees: config.ciblesAutorisees,
+              ciblesRepli: config.ciblesRepli,
+              exclureTechno: config.exclureTechno
+            })).then(function (reponse) {
+              if (!reponse || reponse.annule) {
+                if (!details.length) annuleSansRien = true;
+                return true;
+              }
+              details.push(reponse.detail);
+              return false;
+            });
+          });
+        }, Promise.resolve(false)).then(function () {
+          if (annuleSansRien) return { annule: true };
+
+          evenementCycle.cadresAppliques[ordreCadre] = { resume: details.join(' '), le: new Date().toISOString() };
+          partie.evenements[cleCycle] = evenementCycle;
+
+          return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+            .then(function () {
+              return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+                return assemblerPartie_(r2[0], r2[1]);
+              });
+            });
+        });
       });
     },
 

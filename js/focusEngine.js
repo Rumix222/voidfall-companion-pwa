@@ -1,7 +1,39 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 9 — 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation" porté, retiré de CLES_CIVILISATION_HORS_PERIMETRE)
+ * Version 12 — 21/08/2026 (gain d'Influence variable — "influence_valeur_gloire"/"influence_par_technologie_amelioree" résolues en pur, 9 clés "influence_par_*" secteur déléguées à demanderChoix({type:'influence_secteur'}))
+ *
+ * 21/08/2026 (retour utilisateur : "Implémenter le gain d'influence, il y
+ * en a à plusieurs endroits, gagner de l'influence fait incrémenter le
+ * compteur d'influence visible sur le plateau maison") : la clé simple
+ * "influence" (montant fixe) était déjà automatisée (CLES_SIMPLES), mais
+ * pas les formules VARIABLES rencontrées dans focus.json/pistesCivilisation.json
+ * ("influence_valeur_gloire", "influence_par_technologie_amelioree", et 9
+ * clés "influence_par_guilde", "influence_par_installation_pure",
+ * "influence_par_cube_secteur_pur" et "influence_par_secteur_pur" (et
+ * leurs variantes) — toutes tombaient sur le repli générique non automatisé.
+ * Périmètre de cette session (voir CIBLE_KIND_MAP_GAIN_CORRUPTION_-like
+ * discussion avec l'utilisateur) : uniquement les formules calculables
+ * depuis l'état du plateau (Gloire/Technologies/secteurs), PAS les 2 clés
+ * liées à l'issue d'un combat ("influence_par_cube_neant",
+ * "influence_population_secteur" — dépendent du popup Envahir) ni
+ * "evaluer_influence_programme_pur" (texte libre non structuré côté
+ * programmes.json) — ces 3 restent hors périmètre, non automatisées,
+ * comme avant. Nouvelles SecteurService.obtenirAgregatsInfluenceSecteursPurs
+ * (secteurService.js v12) + nouveau contexte demanderChoix
+ * 'influence_secteur' (strategieService.js v27, calcul déterministe sans
+ * choix utilisateur — même principe que la résolution directe "une seule
+ * option" déjà en place pour retirer_corruption/gagner_corruption).
+ *
+ * 21/08/2026 (effet "Gagner une Corruption", voir
+ * docs-rules-corruption-gardiens-refuges-technoConsume.md) : nouveau cas
+ * "gain_corruption" dans resoudreCle_, miroir exact de "retirer_corruption"
+ * — voir son commentaire dédié plus bas pour le détail des 4 cibles
+ * possibles et le partage de la popup 'gagner_corruption' avec le Cadre
+ * d'Événement galactique "gain" (GameService.appliquerCadreGainCorruption,
+ * nouveau, gameService.js), qui restreint les cibles proposées selon le
+ * catalogue (cible/cible_options/repli) plutôt que de les laisser toutes
+ * ouvertes.
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure ... et
@@ -313,6 +345,16 @@ var FocusEngine = (function () {
     { label: 'Gagnez 1 Science.', effet: { science: 1 } }
   ];
 
+  // 21/08/2026 (Gain d'Influence variable "par Guilde/Installation/cube/
+  // secteur Pur", voir docs-architecture-pwa.md) : clés dont le montant
+  // dépend d'un comptage sur secteursPartie — voir le cas dédié dans
+  // resoudreCle_ ci-dessous pour le détail.
+  var CLES_INFLUENCE_SECTEUR_ = [
+    'influence_par_guilde', 'influence_par_guilde_pure', 'influence_par_guilde_scientifique_pure',
+    'influence_par_installation_pure', 'influence_par_cube_secteur_pur', 'influence_par_cube_secteur_pur_et_fiche',
+    'influence_par_secteur_pur', 'influence_par_secteur_pur_avec_guilde', 'influence_par_secteur_pur_population_6'
+  ];
+
   var CHAMPS_DIFF_SUIVIS = [
     'ressourceNourriture', 'ressourceEnergie', 'ressourceMateriel',
     'ressourceCredit', 'ressourceScience', 'influence', 'cubeActif',
@@ -360,6 +402,88 @@ var FocusEngine = (function () {
       etat[champ] = Math.max(0, etat[champ] + signe * valeur);
       journal.push(source + ' : ' + (signe > 0 ? '+' : '−') + valeur + ' ' + cle + '.');
       return Promise.resolve(true);
+    }
+
+    // --- gagner_prime : alias de la clé simple "prime" (jetonPrime) —
+    // rencontré tel quel dans pistesCivilisation.json ("Gagnez un/deux
+    // jeton(s) Prime.") et dans BONUS_COMMERCE ci-dessous ("Gagnez un
+    // jeton Prime.", cle gagner_commerce -> popup Bonus Commerce ->
+    // resoudreJsonInterne_ récursif sur { gagner_prime: 1 }) — jusqu'ici
+    // retombait sur le repli générique (non automatisé) faute de cas
+    // dédié, contrairement à "prime" (bare) déjà couvert par CLES_SIMPLES
+    // ci-dessus. Contrairement à gagner_technologie/gagner_programme, pas
+    // de choix utilisateur requis ici : automatisable à l'identique de
+    // "prime". ---
+    if (cle === 'gagner_prime' && typeof valeur === 'number') {
+      etat.jetonPrime = Math.max(0, etat.jetonPrime + signe * valeur);
+      journal.push(source + ' : ' + (signe > 0 ? '+' : '−') + valeur + ' prime.');
+      return Promise.resolve(true);
+    }
+
+    // --- Gagner de l'Influence : "valeur totale de Gloire" — Effet
+    // UNIQUEMENT (signe > 0, comme le reste des gains d'Influence
+    // variable ci-dessous). `etat.gloire` (array de 5 cases, null ou
+    // valeur du jeton posé) est déjà présent sur `etat` (= la ligne
+    // plateauMaison brute, voir focusEngine.resoudreEffet plus bas) :
+    // résolue entièrement ICI, en pur, contrairement aux formules "par
+    // secteur" plus bas (nécessitent SecteurService, donc demanderChoix). ---
+    if (cle === 'influence_valeur_gloire' && signe > 0) {
+      var sommeGloire = (etat.gloire || []).reduce(function (s, v) { return s + (Number(v) || 0); }, 0);
+      etat.influence = Math.max(0, etat.influence + sommeGloire);
+      journal.push(source + ' : +' + sommeGloire + ' influence (valeur totale de Gloire).');
+      return Promise.resolve(true);
+    }
+
+    // --- Gagner de l'Influence : "N par Technologie améliorée" — Effet
+    // UNIQUEMENT (signe > 0). Comme influence_valeur_gloire ci-dessus,
+    // entièrement résolue en pur : les 3 sources de Technologies
+    // possédées (départ, 5 emplacements obtenus, 4 avancées choisies)
+    // sont TOUTES des champs plateauMaison bruts déjà présents sur `etat`
+    // (technologieDepart/technologieDepartAmelioree — GameService.
+    // definirTechnologieAmelioree ; technologiesObtenues[].amelioree —
+    // même fonction, cible=index ; technologiesAvanceesChoisies +
+    // technologiesAvanceesAmeliorees[nom] — GameService.
+    // definirTechnologieAvanceeAmelioree), aucun accès DB nécessaire. ---
+    if (cle === 'influence_par_technologie_amelioree' && signe > 0 && typeof valeur === 'number') {
+      var nombreTechnologiesAmeliorees = 0;
+      if (etat.technologieDepart && etat.technologieDepartAmelioree) nombreTechnologiesAmeliorees++;
+      (etat.technologiesObtenues || []).forEach(function (t) { if (t && t.amelioree) nombreTechnologiesAmeliorees++; });
+      (etat.technologiesAvanceesChoisies || []).forEach(function (nom) {
+        if (nom && etat.technologiesAvanceesAmeliorees && etat.technologiesAvanceesAmeliorees[nom]) nombreTechnologiesAmeliorees++;
+      });
+      var gainTechnologiesAmeliorees = valeur * nombreTechnologiesAmeliorees;
+      etat.influence = Math.max(0, etat.influence + gainTechnologiesAmeliorees);
+      journal.push(source + ' : +' + gainTechnologiesAmeliorees + ' influence (' + nombreTechnologiesAmeliorees + ' technologie(s) améliorée(s) × ' + valeur + ').');
+      return Promise.resolve(true);
+    }
+
+    // --- Gagner de l'Influence : formules "N par Guilde/Installation/
+    // cube/secteur Pur" — Effet UNIQUEMENT (signe > 0). Contrairement aux
+    // 2 cas ci-dessus, nécessitent un comptage sur secteursPartie
+    // (SecteurService.obtenirAgregatsInfluenceSecteursPurs, secteurService.js
+    // v12) — hors de portée de focusEngine (pur, aucun accès DB) : ouvre
+    // une popup dédiée (contexte 'influence_secteur', strategieService.js)
+    // qui calcule le montant ET l'affiche brièvement (aucun choix
+    // utilisateur, juste un calcul déterministe — même principe que la
+    // résolution directe "une seule piste éligible" de retirer_corruption/
+    // gagner_corruption ci-dessous, qui ferme la popup sans interaction).
+    // "influence_par_guilde" a une forme différente des 8 autres : `valeur`
+    // est un tableau de clés Guilde ("scientifique_pur", "banquier_pur"...)
+    // plutôt qu'un nombre — chaque Guilde valant implicitement 1 Influence,
+    // transmis tel quel à la popup qui sait l'interpréter. ---
+    if (CLES_INFLUENCE_SECTEUR_.indexOf(cle) !== -1 && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'influence_secteur',
+        formule: cle,
+        valeur: valeur,
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        etat.influence = Math.max(0, etat.influence + (Number(reponse.montant) || 0));
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
     }
 
     // --- Déploiement de cube (Effet UNIQUEMENT — signe > 0, comme le
@@ -482,6 +606,38 @@ var FocusEngine = (function () {
     if (cle === 'retirer_corruption' && signe > 0) {
       return Promise.resolve(demanderChoix({
         type: 'retirer_corruption',
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
+    }
+
+    // --- Gagner une Corruption : Effet UNIQUEMENT (signe > 0). Miroir de
+    // retirer_corruption ci-dessus — ouvre une popup dédiée (contexte
+    // 'gagner_corruption', strategieService.js) qui laisse le joueur
+    // choisir PARMI les cibles éligibles (voir docs-rules-corruption-
+    // gardiens-refuges-technoConsume.md §1) : un Secteur qu'il possède,
+    // Pur et non immunisé (SecteurService.obtenirSecteursEligiblesGainCorruption/
+    // placerCorruption), une piste de Civilisation pas encore Corrompue
+    // (CivilisationService.definirCorruption(..., true)), un Programme
+    // (toujours proposé, non automatisé — même limitation que
+    // retirer_corruption, la Corruption d'un Programme n'étant pas suivie
+    // en base), ou la Technologie "Chambres de décontamination" si le
+    // joueur la possède ET qu'il reste au moins un emplacement libre (2,
+    // 3 si améliorée — plateauMaison.corruptionChambreDecontamination).
+    // Catalogue vérifié : "gain_corruption" n'apparaît jamais avec une
+    // valeur > 1 (contrairement à certains Cadres d'Événement galactique,
+    // hors périmètre de focusEngine.js — voir GameService.
+    // appliquerCadreGainCorruption, qui réutilise la même popup avec des
+    // cibles restreintes/un repli issus du catalogue). La popup fait le
+    // choix ET la persistance (focusEngine reste pur, aucun accès DB
+    // ici) ; resoudreCle_ relaie juste le résumé dans le journal. ---
+    if (cle === 'gain_corruption' && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'gagner_corruption',
         source: source,
         partieId: etat.partieId
       })).then(function (reponse) {

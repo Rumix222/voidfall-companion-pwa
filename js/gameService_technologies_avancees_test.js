@@ -82,7 +82,7 @@ function lignePlateauMaison_(partieId, extra) {
 
 function creerContexte_(db) {
   var ctx = { console: console, Promise: Promise, JSON: JSON, Object: Object, Number: Number, DB: db, FocusService: { obtenirCarteHeroiqueParNom: function () { return Promise.reject(new Error('non utilisé')); } } };
-  chargerDansContexte_('/home/claude/work/gameService.js', ctx);
+  chargerDansContexte_(__dirname + '/gameService.js', ctx);
   return ctx;
 }
 

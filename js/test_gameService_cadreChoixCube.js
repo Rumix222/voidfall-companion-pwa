@@ -1,4 +1,4 @@
-// Test fumée node --test pour GameService.appliquerCadreChoixCube (Cadre 3
+// Test fumée node --test pour GameService.appliquerCadreChoixFocusEngine (Cadre 3
 // générique, Événement B Cycle 1 — "activer 1 cube / déployer 1 cube sur le
 // Secteur-Mère") — mock DB minimal en mémoire (vm, pas de dépendance npm),
 // même principe que test_secteurService_placement.js. Charge le VRAI
@@ -85,13 +85,13 @@ test('Cadre 3 — activer 1 cube (pas de popup imbriquée)', function () {
 
   var demanderChoixFactice = function () { throw new Error('demanderChoix ne devrait pas être appelé pour activer_cube'); };
 
-  return GameService.appliquerCadreChoixCube(PARTIE_ID, 1, 3, 0, demanderChoixFactice)
+  return GameService.appliquerCadreChoixFocusEngine(PARTIE_ID, 1, 3, 0, demanderChoixFactice)
     .then(function (partieMaj) {
       assert.strictEqual(partieMaj.plateauMaison.cubeActif, 4, 'cubeActif doit passer de 3 à 4');
       assert.ok(partieMaj.evenements.cycle1.cadresAppliques[3], 'le cadre doit être marqué appliqué');
       assert.ok(/cube/i.test(partieMaj.evenements.cycle1.cadresAppliques[3].resume), 'le résumé doit mentionner le cube');
       // Deuxième appel => doit échouer (déjà appliqué)
-      return GameService.appliquerCadreChoixCube(PARTIE_ID, 1, 3, 0, demanderChoixFactice).then(
+      return GameService.appliquerCadreChoixFocusEngine(PARTIE_ID, 1, 3, 0, demanderChoixFactice).then(
         function () { throw new Error('aurait dû rejeter (déjà appliqué)'); },
         function (erreur) { assert.ok(/déjà été appliqué/.test(erreur.message)); }
       );
@@ -109,7 +109,7 @@ test('Cadre 3 — déployer 1 cube sur le Secteur-Mère (popup imbriquée annul�
     return Promise.resolve({ annule: true });
   };
 
-  return GameService.appliquerCadreChoixCube(PARTIE_ID, 1, 3, 1, demanderChoixAnnule)
+  return GameService.appliquerCadreChoixFocusEngine(PARTIE_ID, 1, 3, 1, demanderChoixAnnule)
     .then(function (resultat) {
       assert.strictEqual(resultat.annule, true);
       // Le cadre ne doit PAS être marqué appliqué après une annulation
@@ -129,21 +129,21 @@ test('Cadre 3 — déployer 1 cube sur le Secteur-Mère (validé => cubeActif d�
     return Promise.resolve({ totalCubes: 1, coutParRessource: {}, detail: '1× Corvette → Secteur 7', mouvements: [] });
   };
 
-  return GameService.appliquerCadreChoixCube(PARTIE_ID, 1, 3, 1, demanderChoixValide)
+  return GameService.appliquerCadreChoixFocusEngine(PARTIE_ID, 1, 3, 1, demanderChoixValide)
     .then(function (partieMaj) {
       assert.strictEqual(partieMaj.plateauMaison.cubeActif, 2, 'cubeActif doit passer de 3 à 2 (1 cube déployé)');
       assert.ok(partieMaj.evenements.cycle1.cadresAppliques[3]);
     });
 });
 
-test('cleFocusEnginePourOptionCadre_ (indirect, via appliquerCadreChoixCube) — option inconnue rejetée', function () {
+test('cleFocusEnginePourOptionCadre_ (indirect, via appliquerCadreChoixFocusEngine) — option inconnue rejetée', function () {
   var fixture = creerFixtureBase();
   fixture.lignePartie.etatJson.evenements.cycle1.cadres[0].effet.options.push({ cle: 'autre_chose', valeur: 1 });
   var ctx = creerSandbox(fixture);
   var GameService = ctx.sandbox.GameService;
 
-  return GameService.appliquerCadreChoixCube(PARTIE_ID, 1, 3, 2, function () { return Promise.resolve({}); }).then(
+  return GameService.appliquerCadreChoixFocusEngine(PARTIE_ID, 1, 3, 2, function () { return Promise.resolve({}); }).then(
     function () { throw new Error('aurait dû rejeter (option non reconnue)'); },
-    function (erreur) { assert.ok(/Option de cube introuvable/.test(erreur.message)); }
+    function (erreur) { assert.ok(/Option automatisable introuvable/.test(erreur.message)); }
   );
 });

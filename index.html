@@ -1562,6 +1562,39 @@
     }
 
     /**
+     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
+     * galactique — voir GameService.appliquerCadreGainCorruption/
+     * cadreGainCorruptionAutomatisable ci-dessus, gameService.js) : ouvre
+     * la (ou les, si `quantite` > 1) popup(s) 'gagner_corruption'
+     * (StrategieService.demanderChoix, contexte construit côté
+     * GameService à partir de la cible catalogue) puis rafraîchit l'écran.
+     * `resultat.annule` (Annuler sur la TOUTE PREMIÈRE popup, rien encore
+     * placé — seul cas où GameService.appliquerCadreGainCorruption renvoie
+     * `{annule:true}`, voir son JSDoc) n'est pas une erreur : réactive
+     * juste le cadre, sans rafraîchir (rien n'a été persisté). Un
+     * "Annuler" APRÈS au moins un placement réussi (cadre à `quantite` > 1)
+     * ne renvoie PAS `{annule:true}` — le cadre est marqué appliqué avec
+     * le résumé partiel obtenu, et passe donc normalement par le
+     * rafraîchissement ci-dessous.
+     */
+    function appliquerCadreGainCorruptionEtRafraichir_(partie, cycle, ordre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreGainCorruption(partie.id, cycle, ordre, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
      * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
      * une Guilde OU construisez une Installation") : applique l'option
      * choisie sans mécanique automatisée (voir LABEL_OPTION_CADRE_MANUELLE_/
@@ -2079,7 +2112,18 @@
           // SecteurService.resoudrePlacementMultipleNeantAdjacent), pas un
           // libre choix comme "placement" simple.
           var estPlacementMultiple = !!(cadre.effet && cadre.effet.type === 'placement_multiple');
-          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain');
+          // 21/08/2026 (effet "Gagner une Corruption", voir
+          // GameService.resoudreCiblesCadreGainCorruption_/
+          // cadreGainCorruptionAutomatisable) : un cadre "gain" dont la
+          // cible est automatisable (secteur/piste/Programme/Technologie,
+          // avec repli éventuel — jamais "offre_programme" ou un cadre
+          // composé, voir son JSDoc) sort du hors-périmètre "estManuel"
+          // ci-dessous — reste manuel SEULEMENT si non automatisable
+          // (inchangé pour tous les autres cadres "gain" du catalogue,
+          // aucune régression).
+          var estGainCorruption = !!(cadre.effet && cadre.effet.type === 'gain' &&
+            typeof GameService !== 'undefined' && GameService.cadreGainCorruptionAutomatisable(cadre));
+          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain') && !estGainCorruption;
 
           var statutHtml = '';
           var actions = [];
@@ -2106,10 +2150,11 @@
             actions = actionsCadre_(cadre);
           }
 
-          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || actions.length);
+          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || estGainCorruption || actions.length);
           var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
           var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' :
-            (estPlacementMultiple ? ' data-placement-multiple="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"'));
+            (estPlacementMultiple ? ' data-placement-multiple="1"' :
+              (estGainCorruption ? ' data-gain-corruption="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"')));
           var attributsCarte = cliquable
             ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
             : '';
@@ -2166,6 +2211,19 @@
         var declencher = function () {
           if (carteEl.classList.contains('cadre-carte-en-cours')) return;
           appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-gain-corruption="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreGainCorruptionEtRafraichir_(partie, cycle, ordre, pseudoBoutonCarte_(carteEl));
         };
         carteEl.addEventListener('click', declencher);
         carteEl.addEventListener('keydown', function (evenement) {

@@ -1195,6 +1195,76 @@
  * revalidation serveur, type de Guilde manquant rejeté, garde-fou anti-
  * double-application) — 104/111 sur l'ensemble de la suite (7 échecs
  * restants : mêmes échecs préexistants du baseline, aucune régression).
+ *
+ * 21/08/2026 (retour utilisateur : "Événement E Cycle 1 Cadre 2 —
+ * Avancer piste civilisation -> avance rapide -> gagner un jeton
+ * commerce -> gagner un jeton prime, ça s'est mal passé") : la clé
+ * "gagner_prime" (pistesCivilisation.json, et Bonus Commerce —
+ * gagner_commerce ouvre une popup de 6 bonus fixes dont "Gagnez un
+ * jeton Prime.", resolu récursivement) retombait sur le repli générique
+ * non automatisé de FocusEngine.resoudreCle_ (aucun cas dédié, contrairement
+ * à la clé simple "prime" déjà couverte par CLES_SIMPLES) — le jeton
+ * Prime n'était donc jamais réellement crédité en bout de chaîne, juste
+ * signalé "à appliquer manuellement". Nouveau cas dédié dans
+ * focusEngine.js (v10) : "gagner_prime" traité comme alias de "prime"
+ * (jetonPrime, déjà dans CHAMPS_DIFF_SUIVIS — diff/persistance
+ * inchangées). Corrige aussi bien l'avancement direct sur une case
+ * "Gagnez un/deux jeton(s) Prime." que le sous-choix Bonus Commerce.
+ *
+ * 21/08/2026 (implémentation "Gagner une Corruption", voir nouveau
+ * docs/docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
+ * nouveau contexte demanderChoix 'gagner_corruption' (strategieService.js
+ * v26) — popup miroir de 'retirer_corruption', menu de cibles (Secteur
+ * possédé non Corrompu et non immunisé/Piste de Civilisation non
+ * Corrompue/Programme manuel/Technologie Chambres de décontamination —
+ * capacité réelle 2, 3 si améliorée), chacune affichée seulement si
+ * éligible. Nouvelles SecteurService.obtenirSecteursEligiblesGainCorruption/
+ * placerCorruption (secteurService.js v11, miroir du retrait). Branchée à
+ * 2 endroits :
+ * - FocusEngine.resoudreCle_ (focusEngine.js v11) : nouvelle clé
+ *   "gain_corruption" (Focus/pistes de Civilisation) — les 4 cibles sont
+ *   ouvertes, "sans précision".
+ * - GameService.appliquerCadreGainCorruption/cadreGainCorruptionAutomatisable
+ *   (gameService.js v21) : un Cadre d'Événement galactique "type":"gain"
+ *   dont l'effet précise une cible catalogue (cible/cible_options/repli)
+ *   automatisable (secteur_au_choix/piste_civilisation/emplacement_
+ *   programme/fiche_maison/carte_technologie_chambres_decontamination)
+ *   ouvre désormais la même popup avec ces cibles restreintes en priorité
+ *   stricte (repli seulement si le 1er groupe est intégralement
+ *   inéligible), au lieu de systématiquement retomber sur
+ *   appliquerCadreManuel. Reste volontairement manuel (aucune régression) :
+ *   "offre_programme" (comme demandé), les cadres à cible composée/
+ *   contextuelle ("chaque_offre_programme_non_corrompue",
+ *   "meme_secteur_que_etape_precedente") et le seul cadre avec un
+ *   `effet_conditionnel` (Événement G Cycle 1 — la piste de Civilisation
+ *   doit en plus avancer sans bénéfice, mécanique volontairement pas
+ *   automatisée cette session, voir JSDoc de resoudreCiblesCadreGainCorruption_).
+ * index.html : nouvelle catégorie de cadre "estGainCorruption" (à côté de
+ * placement/placement_multiple/manuel/résolution) + appliquerCadreGainCorruptionEtRafraichir_.
+ *
+ * 21/08/2026 (retour utilisateur : "Implémenter le gain d'influence, il y
+ * en a à plusieurs endroits") : la clé simple "influence" (montant fixe)
+ * était déjà automatisée, mais pas les formules VARIABLES de focus.json/
+ * pistesCivilisation.json. Périmètre retenu avec l'utilisateur : les
+ * formules calculables depuis l'état du plateau (Gloire/Technologies/
+ * secteurs) — PAS celles liées à l'issue d'un combat ni la Technologie
+ * dont l'Influence dépend du texte libre d'un Programme (voir focusEngine.js
+ * v12 pour le détail précis du périmètre exclu).
+ * - "influence_valeur_gloire" (somme des jetons Gloire) et
+ *   "influence_par_technologie_amelioree" (Technologies améliorées,
+ *   3 sources combinées) : résolues entièrement en pur dans
+ *   FocusEngine.resoudreCle_ (focusEngine.js v12), aucun accès DB requis
+ *   (tout est déjà sur `etat` = la ligne plateauMaison brute).
+ * - Les 9 clés "influence_par_guilde", "influence_par_installation_pure",
+ *   "influence_par_cube_secteur_pur" et "influence_par_secteur_pur" (et
+ *   leurs variantes, comptage sur secteursPartie) : nouvelle
+ *   SecteurService.obtenirAgregatsInfluenceSecteursPurs (secteurService.js
+ *   v12) + nouveau contexte demanderChoix 'influence_secteur'
+ *   (strategieService.js v27) — calcul déterministe SANS choix utilisateur
+ *   (contrairement à tous les autres contextes de ce fichier), la popup
+ *   s'affiche brièvement puis se ferme d'elle-même une fois le montant
+ *   calculé, comme la résolution directe déjà en place pour une piste
+ *   Corrompue unique (retirer_corruption).
  */
 
-var APP_VERSION = '20260821.2';
+var APP_VERSION = '20260821.5';

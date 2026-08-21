@@ -62,7 +62,7 @@ function secteurDeBase_(extra) {
 
 function creerContexte_(db) {
   var ctx = { console: console, Promise: Promise, JSON: JSON, Object: Object, Math: Math, DB: db };
-  chargerDansContexte_('/home/claude/work/secteurService.js', ctx);
+  chargerDansContexte_(__dirname + '/secteurService.js', ctx);
   return ctx;
 }
 
@@ -195,6 +195,85 @@ test('obtenirSecteursEligiblesRetraitCorruption : ne retourne que les secteurs p
   return ctx.SecteurService.obtenirSecteursEligiblesRetraitCorruption('p1').then(function (eligibles) {
     assert.strictEqual(eligibles.length, 1);
     assert.strictEqual(eligibles[0].numero, 1);
+  });
+});
+
+// ---------------------------------------------------------------
+// placerCorruption / obtenirSecteursEligiblesGainCorruption
+// ---------------------------------------------------------------
+
+test('placerCorruption : passe corrompu à true', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ corrompu: false });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.placerCorruption('p1', 1).then(function () {
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].corrompu, true);
+  });
+});
+
+// 21/08/2026 (effet "Gagner une Corruption", voir docs-rules-corruption-
+// gardiens-refuges-technoConsume.md §1) : miroir INVERSÉ d'obtenirSecteursEligiblesRetraitCorruption
+// — secteurs POSSÉDÉS ET PAS Corrompus, à l'exclusion du Secteur-Mère
+// (immunisé à la Corruption, "sauf un secteur immunisé... comme un
+// Secteur-Mère standard", §1) — seule différence structurelle avec le
+// retrait, qui n'a pas besoin de cette exclusion (un Secteur-Mère ne peut
+// de toute façon jamais être Corrompu).
+test('obtenirSecteursEligiblesGainCorruption : ne retourne que les secteurs possédés, PAS Corrompus, hors Secteur-Mère', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  db._stores.scenarioSecteurs['s1|4'] = { scenarioId: 's1', numero: 4, type: 'secteur_mere' };
+  // Secteur 1 : possédé (pnCorvette > 0, pnNeant 0) ET PAS Corrompu -> éligible
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 2, corrompu: false });
+  // Secteur 2 : possédé mais DÉJÀ Corrompu -> non éligible
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, corrompu: true });
+  // Secteur 3 : non Corrompu mais du Néant (non possédé) -> non éligible
+  db._stores.secteursPartie['p1|3'] = secteurDeBase_({ numero: 3, pnCorvette: 0, pnNeant: 3, corrompu: false });
+  // Secteur 4 : possédé, PAS Corrompu, mais Secteur-Mère -> non éligible (immunisé)
+  db._stores.secteursPartie['p1|4'] = secteurDeBase_({ numero: 4, pnCorvette: 3, corrompu: false });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesGainCorruption('p1').then(function (eligibles) {
+    assert.strictEqual(eligibles.length, 1);
+    assert.strictEqual(eligibles[0].numero, 1);
+  });
+});
+
+// ---------------------------------------------------------------
+// obtenirAgregatsInfluenceSecteursPurs
+// ---------------------------------------------------------------
+
+// 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
+// secteur Pur", voir focusEngine.js) : agrégats calculés UNIQUEMENT sur
+// les secteurs "Purs" (possédés ET pas Corrompus) — un secteur Corrompu
+// ou du Néant (non possédé) ne doit compter dans AUCUN agrégat, même s'il
+// porte des Guildes/Installations/cubes.
+test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes/secteurs sur les secteurs Purs uniquement', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  // Secteur 1 : Pur, avec Guildes (2 Fermiers, 1 Scientifique), 1 Installation, population 6.
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({
+    numero: 1, pnCorvette: 2, corrompu: false, population: 6,
+    guildeFermiers: 2, guildeScientifiques: 1, installationDefenseSecteur: 1
+  });
+  // Secteur 2 : Pur, sans Guilde, population 3 (pas 6).
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 3, corrompu: false, population: 3 });
+  // Secteur 3 : possédé mais Corrompu -> ignoré malgré ses Guildes/cubes.
+  db._stores.secteursPartie['p1|3'] = secteurDeBase_({ numero: 3, pnCorvette: 5, corrompu: true, guildeBanquiers: 3 });
+  // Secteur 4 : du Néant (non possédé) -> ignoré.
+  db._stores.secteursPartie['p1|4'] = secteurDeBase_({ numero: 4, pnCorvette: 0, pnNeant: 4, corrompu: false, guildeMineurs: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirAgregatsInfluenceSecteursPurs('p1').then(function (agregats) {
+    assert.strictEqual(agregats.nombreSecteurPur, 2); // secteurs 1 et 2
+    assert.strictEqual(agregats.nombreSecteurPurAvecGuilde, 1); // secteur 1 seulement
+    assert.strictEqual(agregats.nombreSecteurPurPopulation6, 1); // secteur 1 seulement
+    assert.strictEqual(agregats.guildesPures.fermiers, 2);
+    assert.strictEqual(agregats.guildesPures.scientifiques, 1);
+    assert.strictEqual(agregats.guildesPures.banquiers, 0); // secteur 3 (Corrompu) exclu
+    assert.strictEqual(agregats.guildesPures.total, 3);
+    assert.strictEqual(agregats.installationsPuresTotal, 1);
+    assert.strictEqual(agregats.cubesSecteurPurTotal, 5); // 2 (secteur 1) + 3 (secteur 2)
   });
 });
 

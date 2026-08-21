@@ -83,7 +83,7 @@ function lignePlateauMaison_(partieId, extra) {
 
 function creerContexte_(db, focusService) {
   var ctx = { console: console, Promise: Promise, JSON: JSON, Object: Object, DB: db, FocusService: focusService || creerFocusServiceFactice_([]) };
-  chargerDansContexte_('/home/claude/work/gameService.js', ctx);
+  chargerDansContexte_(__dirname + '/gameService.js', ctx);
   return ctx;
 }
 
