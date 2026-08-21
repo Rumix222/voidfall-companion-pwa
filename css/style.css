@@ -918,6 +918,43 @@ input:disabled {
   box-shadow: 0 0 2px rgba(255,255,255,0.5);
 }
 
+/* 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
+   mal") : bloc "Corruption" (plateauMaison.corruptionMaison) affiché à
+   gauche d'Influence — .plateau-influence-ligne place les 2 blocs côte à
+   côte (ils gardent chacun leur propre bordure/label .plateau-influence),
+   .losange-corail reprend .losange-argente en corail (couleur Corruption
+   dans le reste de l'app — voir .piste-civilisation-corrompue). */
+.plateau-influence-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.plateau-influence-ligne .plateau-influence {
+  flex: 1 1 140px;
+  margin-top: 0;
+}
+.losange-corail {
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(135deg, #ff8a65, var(--color-coral));
+  transform: rotate(45deg);
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 2px rgba(255,107,82,0.5);
+}
+.plateau-influence .ressource-case-input {
+  width: 64px;
+  padding: 5px 4px;
+  border: 1px solid var(--color-coral);
+  border-radius: 6px;
+  color: var(--color-coral);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-align: center;
+  background: rgba(255, 107, 82, 0.08);
+}
+
 .ressources-journal {
   margin-top: 14px;
 }

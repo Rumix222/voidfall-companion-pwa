@@ -1,7 +1,29 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 30 — 21/08/2026 (correctif — 'ameliorer_gloire' lit etatGloire au lieu de partieAffichee.plateauMaison.gloire, périmé après un clic manuel sur un emplacement Gloire)
+ * Version 31 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 : popup 'gagner_corruption'/toggleCorruption_/retirer_corruption informés)
+ *
+ * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
+ * du mal") :
+ * - Cadre 1 : quand la popup 'gagner_corruption' est ouverte avec
+ *   `contexte.avancerPisteApresPlacement` (gameService.js —
+ *   appliquerCadreGainCorruption, cadre non manuel désormais pour ce
+ *   Cadre précis, voir sa JSDoc) ET que la cible choisie est "Piste de
+ *   Civilisation", un second appel à CivilisationService.
+ *   avancerPisteSansEffet (civilisationService.js v5) avance
+ *   immédiatement cette même piste d'une case, sans résoudre son effet —
+ *   exactement le comportement imprimé sur la carte. Hors de ce contexte
+ *   précis (Focus "gain_corruption" générique, focusEngine.js), le
+ *   drapeau est absent : comportement inchangé.
+ * - Cadre 2 (permanent) : nouvel helper evenementConserveCorruptionActif_
+ *   (vrai quand l'Événement choisi pour le cycle en cours a le code "G")
+ *   — utilisé par toggleCorruption_ et les 2 branches "Piste de
+ *   Civilisation" du contexte 'retirer_corruption' pour transmettre
+ *   `options.conserverCorruptionRetiree` à CivilisationService.
+ *   definirCorruption : le compteur plateauMaison.corruptionMaison n'est
+ *   alors PAS décrémenté au retrait (Corruption gardée en zone
+ *   personnelle jusqu'à l'Évaluation) — un petit message est ajouté au
+ *   journal pour le signaler (resultat.corruptionMaisonConservee).
  *
  * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
  * secteur Pur", voir focusEngine.js v12 — CLES_INFLUENCE_SECTEUR_) :
@@ -665,6 +687,22 @@ var StrategieService = (function () {
   // lecture catalogue par maison — voir CivilisationService.obtenirDetailPistes).
   var detailPistesCache = {};
 
+  /**
+   * 21/08/2026 (Événement galactique G, Cycle 1 — Cadre 2 "Le visage du
+   * mal", permanent : "chaque fois que vous retirez une Corruption, ...
+   * gardez-la dans votre zone de jeu personnelle ... jusqu'à la phase
+   * Évaluation") : vrai quand l'Événement choisi pour le CYCLE EN COURS
+   * (partie.cycleNum) a le code "G" — seul signal utilisé pour activer
+   * `options.conserverCorruptionRetiree` (CivilisationService.
+   * definirCorruption, civilisationService.js v5) sur un retrait de
+   * Corruption d'une piste de Civilisation. `partie.evenements` peut être
+   * absent (partie sans Événement choisi) — repli silencieux sur `false`.
+   */
+  function evenementConserveCorruptionActif_(partie) {
+    var evenementCycle = partie && partie.evenements && partie.evenements['cycle' + partie.cycleNum];
+    return !!(evenementCycle && evenementCycle.code === 'G');
+  }
+
   // Portage direct de LIBELLES_OPTIONS (strategie.html GAS) — clés brutes
   // -> texte lisible pour les popups de choix. Repli sur la clé brute si
   // absente d'ici (vocabulaire déjà en français, reste lisible).
@@ -1258,8 +1296,14 @@ var StrategieService = (function () {
 
   function toggleCorruption_(piste, valeur, cb) {
     cb.disabled = true;
-    CivilisationService.definirCorruption(partieAffichee.id, piste, valeur)
-      .then(function () { return App.rafraichirPartieCourante(); })
+    var options = !valeur ? { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieAffichee) } : null;
+    CivilisationService.definirCorruption(partieAffichee.id, piste, valeur, options)
+      .then(function (resultat) {
+        if (resultat && resultat.corruptionMaisonConservee) {
+          journal.push('Piste ' + LABEL_PISTE[piste] + ' : Corruption retirée, mais le compteur de Corruption (plateau maison) n’est pas décrémenté — Événement « Le visage du mal » actif ce cycle (la Corruption reste dans votre zone personnelle jusqu’à l’Évaluation).');
+        }
+        return App.rafraichirPartieCourante();
+      })
       .then(function (partieFraiche) { afficher(partieFraiche); })
       .catch(function (erreur) {
         window.alert('Échec : ' + erreur.message);
@@ -2654,6 +2698,17 @@ var StrategieService = (function () {
         });
         var possedeChambreDecontamination = nomsTechnologiesJoueur_(partieCorruption).indexOf('chambres de décontamination') !== -1;
         var corruptionStockee = (partieCorruption.plateauMaison && partieCorruption.plateauMaison.corruptionChambreDecontamination) || 0;
+        // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 — voir
+        // en-tête de fichier) : options transmises à definirCorruption(...,
+        // false) pour les 2 branches "piste" ci-dessous (afficherSousSelectPiste_).
+        var optionsRetraitPiste_ = { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieCorruption) };
+        function detailRetraitPiste_(piste, resultat) {
+          var base = 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[piste] + '.';
+          if (resultat && resultat.corruptionMaisonConservee) {
+            base += ' Compteur de Corruption (plateau maison) conservé — Événement « Le visage du mal » actif ce cycle.';
+          }
+          return base;
+        }
 
         function afficherMenuCibles_(eligiblesSecteurs) {
           var options = [];
@@ -2727,10 +2782,10 @@ var StrategieService = (function () {
         function afficherSousSelectPiste_() {
           if (pistesCorrompues.length === 1) {
             var piste = pistesCorrompues[0];
-            CivilisationService.definirCorruption(partieCorruption.id, piste, false)
-              .then(function () {
+            CivilisationService.definirCorruption(partieCorruption.id, piste, false, optionsRetraitPiste_)
+              .then(function (resultat) {
                 fermerModale_();
-                resolve({ detail: 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[piste] + '.', piste: piste });
+                resolve({ detail: detailRetraitPiste_(piste, resultat), piste: piste });
               })
               .catch(function (erreur) {
                 window.alert('Échec du retrait : ' + erreur.message);
@@ -2747,11 +2802,11 @@ var StrategieService = (function () {
           btnValider.onclick = function () {
             var pisteChoisie = document.getElementById('corruption-select-piste').value;
             btnValider.disabled = true;
-            CivilisationService.definirCorruption(partieCorruption.id, pisteChoisie, false)
-              .then(function () {
+            CivilisationService.definirCorruption(partieCorruption.id, pisteChoisie, false, optionsRetraitPiste_)
+              .then(function (resultat) {
                 fermerModale_();
                 btnValider.disabled = false;
-                resolve({ detail: 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[pisteChoisie] + '.', piste: pisteChoisie });
+                resolve({ detail: detailRetraitPiste_(pisteChoisie, resultat), piste: pisteChoisie });
               })
               .catch(function (erreur) {
                 btnValider.disabled = false;
@@ -2907,13 +2962,34 @@ var StrategieService = (function () {
           };
         }
 
+        // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 1 — voir
+        // en-tête de fichier) : place la Corruption sur `piste` puis,
+        // quand `contexte.avancerPisteApresPlacement` est vrai (transmis
+        // par GameService.appliquerCadreGainCorruption pour ce Cadre
+        // précis — jamais pour un gain_corruption Focus générique),
+        // enchaîne CivilisationService.avancerPisteSansEffet sur cette
+        // même piste ("le joueur doit avancer sur cette piste [en
+        // ignorant le bénéfice de la case atteinte]", sauf déjà au
+        // maximum — "la case la plus à droite"). Résout le texte de détail
+        // combiné, pour les 2 branches (piste unique/select) ci-dessous.
+        function placerCorruptionSurPiste_(piste) {
+          return CivilisationService.definirCorruption(partieCorruptionGain.id, piste, true).then(function () {
+            var base = 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[piste] + '.';
+            if (!contexte.avancerPisteApresPlacement) return base;
+            return CivilisationService.avancerPisteSansEffet(partieCorruptionGain.id, piste).then(function (resultatAvance) {
+              if (resultatAvance.dejaMaximum) return base + ' Piste déjà au niveau maximum, pas d’avancement.';
+              return base + ' Piste avancée d’une case (niveau ' + resultatAvance.ancienNiveau + ' → ' + resultatAvance.nouveauNiveau + ', sans bénéfice de case).';
+            });
+          });
+        }
+
         function afficherSousSelectPiste_() {
           if (pistesNonCorrompues.length === 1) {
             var piste = pistesNonCorrompues[0];
-            CivilisationService.definirCorruption(partieCorruptionGain.id, piste, true)
-              .then(function () {
+            placerCorruptionSurPiste_(piste)
+              .then(function (detail) {
                 fermerModale_();
-                resolve({ detail: 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[piste] + '.', piste: piste });
+                resolve({ detail: detail, piste: piste });
               })
               .catch(function (erreur) {
                 window.alert('Échec du placement : ' + erreur.message);
@@ -2930,11 +3006,11 @@ var StrategieService = (function () {
           btnValider.onclick = function () {
             var pisteChoisie = document.getElementById('corruption-gain-select-piste').value;
             btnValider.disabled = true;
-            CivilisationService.definirCorruption(partieCorruptionGain.id, pisteChoisie, true)
-              .then(function () {
+            placerCorruptionSurPiste_(pisteChoisie)
+              .then(function (detail) {
                 fermerModale_();
                 btnValider.disabled = false;
-                resolve({ detail: 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[pisteChoisie] + '.', piste: pisteChoisie });
+                resolve({ detail: detail, piste: pisteChoisie });
               })
               .catch(function (erreur) {
                 btnValider.disabled = false;

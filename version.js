@@ -1339,6 +1339,27 @@
  * ajout manuel d'un jeton valeur 1 SANS action intermédiaire, puis
  * "Améliorer un jeton Gloire" — persiste désormais bien [2,2,null,null,null]
  * en IndexedDB au lieu d'écraser en [3,null,null,null,null]).
+ *
+ * 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres
+ * 1 et 2, voir en-têtes de civilisationService.js v5/gameService.js v22/
+ * strategieService.js v31/index.html v23) :
+ * - Cadre 1 ("Gagnez une Corruption sur un emplacement de Programme ou sur
+ *   une piste de Civilisation. Si la Corruption est placée sur une
+ *   piste... le joueur doit avancer sur cette piste [en ignorant le
+ *   bénéfice de la case atteinte]") : désormais automatisé via la popup
+ *   'gagner_corruption' existante — choix Programme (manuel) ou Piste de
+ *   Civilisation (marque la piste Corrompue puis l'avance d'une case sans
+ *   résoudre son effet, sauf déjà au maximum).
+ * - Cadre 2 (permanent : "chaque fois que vous retirez une Corruption,
+ *   gardez-la dans votre zone de jeu personnelle... jusqu'à la phase
+ *   Évaluation") : nouveau compteur plateauMaison.corruptionMaison,
+ *   affiché sur Plat. maison à gauche d'Influence (champ numérique
+ *   modifiable) — mis à jour automatiquement au marquage/démarquage
+ *   Corrompue d'une piste de Civilisation ; tenu manuellement pour les
+ *   Programmes/Chambres de décontamination. Tant que cet Événement est
+ *   actif pour le cycle en cours, un retrait de Corruption sur une piste
+ *   ne décrémente PAS ce compteur (petit message ajouté au journal pour
+ *   le signaler).
  */
 
-var APP_VERSION = '20260821.8';
+var APP_VERSION = '20260821.9';

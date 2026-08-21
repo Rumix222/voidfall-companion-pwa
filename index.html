@@ -325,7 +325,7 @@
       <div id="technologies-obtenues-liste"></div>
     </div>
 
-    <h2 class="section-title" style="margin-top:22px;">Influence</h2>
+    <h2 class="section-title" style="margin-top:22px;">Corruption et Influence</h2>
     <div class="game-block" id="plateau-influence-bloc"></div>
   </section>
 
@@ -546,7 +546,29 @@
 <script>
   /**
    * index.html (script inline)
-   * Version 22 — 17/08/2026 (Lot J — corrections mineures, écran Combat)
+   * Version 23 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2, compteur Corruption plateau maison)
+   *
+   * 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
+   * mal", voir gameService.js v22/civilisationService.js v5/
+   * strategieService.js v31) : renderEcranPlateauMaison_ affiche
+   * désormais un nouveau bloc "Corruption" (plateauMaison.corruptionMaison,
+   * champ numérique modifiable) juste à gauche d'"Influence" — écran
+   * Plat. maison, section renommée "Corruption et Influence"
+   * (#plateau-influence-bloc). Le Cadre 1 de cet Événement (choix "Programme
+   * ou piste de Civilisation") n'a nécessité aucun changement ici : il
+   * passe déjà par la popup 'gagner_corruption' générique (voir
+   * appliquerCadreGainCorruptionEtRafraichir_ ci-dessous, inchangée).
+   * Correctif découvert en testant ce Cadre 2 dans le Browser pane : le
+   * `select.onchange` du choix d'Événement galactique (renderEvenementCycle_
+   * ci-dessous) ne rafraîchissait que `partieCourante` (ce fichier) —
+   * StrategieService.afficher n'était JAMAIS rappelé, laissant son propre
+   * `partieAffichee` périmé (ancien Événement) tant qu'aucune autre action
+   * Focus/Plat. maison n'intervenait entre-temps (Piège n°2, CLAUDE.md).
+   * Sans conséquence visible jusqu'ici (rien sur Plat. maison ne dépendait
+   * de l'Événement en cours) — mais evenementConserveCorruptionActif_
+   * (strategieService.js v31) en dépend désormais directement : un appel à
+   * StrategieService.afficher(partieMaj) est ajouté après chaque
+   * changement d'Événement réussi.
    *
    * 17/08/2026 (Lot J — corrections mineures, écran Combat) : voir
    * commentaire de App.afficherEcran ci-dessous — les vaisseaux
@@ -988,13 +1010,40 @@
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
       var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
+      var corruptionMaison = (partie.plateauMaison || {}).corruptionMaison || 0;
 
       champTexte_('technologie-depart-plateau-maison', techDepart.nom ?
         techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—');
 
+      // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
+      // mal", voir gameService.js/civilisationService.js) : nouveau bloc
+      // "Corruption" (plateauMaison.corruptionMaison) à gauche d'Influence
+      // — champ numérique modifiable (mis à jour automatiquement par
+      // CivilisationService.definirCorruption pour les pistes de
+      // Civilisation ; à ajuster manuellement ici pour les Programmes/
+      // Chambres de décontamination). Régénéré à chaque rendu comme le
+      // reste de cet écran — voir Piège n°2, CLAUDE.md.
       document.getElementById('plateau-influence-bloc').innerHTML =
+        '<div class="plateau-influence-ligne">' +
+        '<div class="plateau-influence"><label><span class="losange-corail"></span> Corruption</label>' +
+        '<input type="number" step="1" min="0" class="ressource-case-input" id="corruption-maison-input" value="' + corruptionMaison + '"></div>' +
         '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
-        '<span class="ressource-case-valeur">' + influence + '</span></div>';
+        '<span class="ressource-case-valeur">' + influence + '</span></div>' +
+        '</div>';
+
+      var inputCorruptionMaison = document.getElementById('corruption-maison-input');
+      if (inputCorruptionMaison) {
+        inputCorruptionMaison.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputCorruptionMaison.value) || 0));
+          inputCorruptionMaison.value = n;
+          GameService.majPlateauMaison(partie.id, { corruptionMaison: n })
+            .then(function () { partie.plateauMaison.corruptionMaison = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputCorruptionMaison.value = corruptionMaison;
+            });
+        };
+      }
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
@@ -2321,6 +2370,18 @@
               partieCourante = partieMaj;
               select.disabled = false;
               renderEvenementCycle_(partieMaj);
+              // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le
+              // visage du mal", voir strategieService.js v31 —
+              // evenementConserveCorruptionActif_) : StrategieService garde
+              // son propre `partieAffichee` en cache (Piège n°2, CLAUDE.md),
+              // jamais rafraîchi automatiquement par ce select — un
+              // changement d'Événement galactique influence pourtant
+              // désormais le comportement du retrait de Corruption sur
+              // Plat. maison. Sans cet appel, `partieAffichee` resterait
+              // périmé (ancien Événement) jusqu'à la prochaine action qui
+              // rafraîchit StrategieService, ce qui aurait pu laisser
+              // passer/bloquer à tort la conservation du compteur.
+              if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
             })
             .catch(function (erreur) {
               select.disabled = false;

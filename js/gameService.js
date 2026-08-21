@@ -1,7 +1,31 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 21 — 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement galactique — appliquerCadreGainCorruption/cadreGainCorruptionAutomatisable)
+ * Version 22 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 automatisés)
+ *
+ * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
+ * du mal") :
+ * - Cadre 1 : resoudreCiblesCadreGainCorruption_ reconnaît désormais un
+ *   `effet_conditionnel` quand — et SEULEMENT quand — il correspond
+ *   exactement au gabarit de ce Cadre (voir
+ *   conditionAvancerPisteSiCorrompue_ ci-dessous : si_cible
+ *   "piste_civilisation", condition "marqueur_pas_case_la_plus_a_droite",
+ *   consequence.cle "avancer_piste_civilisation" valeur 1) — auparavant
+ *   tout effet_conditionnel rendait le Cadre non automatisable (voir
+ *   ancien commentaire ci-dessous, conservé pour le reste du filtre).
+ *   `config.avancerPisteApresPlacement` (nouveau) transmis jusqu'à la
+ *   popup 'gagner_corruption' (strategieService.js) via
+ *   appliquerCadreGainCorruption : quand la cible choisie est "piste", la
+ *   popup appelle en plus CivilisationService.avancerPisteSansEffet sur
+ *   cette même piste (civilisationService.js v5).
+ * - Cadre 2 (permanent) : nouveau champ manuel 'corruptionMaison' dans
+ *   CHAMPS_PLATEAU_MAISON_AUTORISES/assemblerPartie_ (compteur de
+ *   Corruption sur la fiche Maison, tenu à jour automatiquement par
+ *   CivilisationService.definirCorruption pour les pistes de Civilisation
+ *   — voir civilisationService.js v5 — et manuellement par le joueur pour
+ *   les Programmes/Chambres de décontamination, comme le reste de ces 2
+ *   sources). Affiché sur l'écran Plat. maison à gauche d'Influence (voir
+ *   index.html, renderEcranPlateauMaison_).
  *
  * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
  * galactique — type "gain", voir docs-rules-corruption-gardiens-refuges-
@@ -343,7 +367,16 @@ var GameService = (function () {
     // ne porte que le RETRAIT) : l'incrémenter reste manuel, le
     // décrémenter peut désormais se faire via l'effet retirer_corruption
     // (FocusEngine.js) si le joueur possède la Technologie.
-    'corruptionChambreDecontamination'
+    'corruptionChambreDecontamination',
+    // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Permanent au
+    // Cycle 1", voir en-tête de fichier) : compteur générique du nombre de
+    // Corruptions actuellement sur la fiche Maison — tenu à jour
+    // automatiquement par CivilisationService.definirCorruption pour les
+    // pistes de Civilisation (via majCivilisation, voir CHAMPS_CIVILISATION_
+    // AUTORISES ci-dessous) ; whitelisté ICI en plus pour permettre la
+    // saisie manuelle directe (Programmes/Chambres de décontamination,
+    // hors périmètre automatisé — champ éditable, strategieService.js).
+    'corruptionMaison'
   ];
 
   // ------------------------------------------------------------
@@ -681,12 +714,15 @@ var GameService = (function () {
   // - `effet.elements` contient autre chose que "corruption" seule (cadre
   //   composé, ex. "Augmentez la Population... Ensuite placez une
   //   Corruption sur CE secteur" — cible contextuelle non modélisable ici) ;
-  // - `effet.effet_conditionnel` est présent (Événement G Cycle 1 Cadre 1 —
-  //   "si la Corruption est placée sur une piste... le joueur doit avancer
-  //   sur cette piste" — CivilisationService.avancerPisteCorrompue existe
-  //   mais DÉCOCHE la piste en avançant, sémantique différente de ce que
-  //   demande ce Cadre précis ; laissé manuel plutôt que de risquer un
-  //   comportement de piste de Civilisation incorrect) ;
+  // - `effet.effet_conditionnel` est présent ET ne correspond PAS
+  //   exactement au gabarit reconnu par conditionAvancerPisteSiCorrompue_
+  //   ci-dessous (Événement G Cycle 1 Cadre 1 — "si la Corruption est
+  //   placée sur une piste... le joueur doit avancer sur cette piste [en
+  //   ignorant le bénéfice de la case atteinte]" — SEUL effet_conditionnel
+  //   automatisé à ce jour, via CivilisationService.avancerPisteSansEffet,
+  //   civilisationService.js v5 — qui n'a PAS la sémantique de
+  //   avancerPisteCorrompue, laquelle décoche la piste en avançant ; tout
+  //   AUTRE effet_conditionnel reste hors périmètre, laissé manuel) ;
   // - une cible (primaire OU de repli) ne correspond à aucune entrée
   //   connue — notamment "offre_programme" (case précise du plateau des
   //   Programmes, jamais suivie en base — reste manuel, comme demandé) et
@@ -715,8 +751,28 @@ var GameService = (function () {
     return resultat;
   }
 
+  // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 1 — voir en-tête de
+  // fichier) : reconnaît EXACTEMENT le gabarit imprimé sur cette carte —
+  // "si_cible":"piste_civilisation", "condition":"marqueur_pas_case_la_
+  // plus_a_droite", "consequence":{"cle":"avancer_piste_civilisation",
+  // "valeur":1,...} (voir data/catalogue/evenements.json) — et rien
+  // d'autre, pour ne prendre AUCUN risque sur un futur Cadre au vocabulaire
+  // similaire mais à la sémantique différente (aucune autre carte du
+  // catalogue n'utilise "effet_conditionnel" à ce jour, vérifié sur tout
+  // evenements.json).
+  function conditionAvancerPisteSiCorrompue_(effetConditionnel) {
+    return !!effetConditionnel &&
+      effetConditionnel.si_cible === 'piste_civilisation' &&
+      effetConditionnel.condition === 'marqueur_pas_case_la_plus_a_droite' &&
+      !!effetConditionnel.consequence &&
+      effetConditionnel.consequence.cle === 'avancer_piste_civilisation' &&
+      Number(effetConditionnel.consequence.valeur) === 1;
+  }
+
   function resoudreCiblesCadreGainCorruption_(effet) {
-    if (!effet || effet.type !== 'gain' || effet.effet_conditionnel) return null;
+    if (!effet || effet.type !== 'gain') return null;
+    var avancerPisteApresPlacement = conditionAvancerPisteSiCorrompue_(effet.effet_conditionnel);
+    if (effet.effet_conditionnel && !avancerPisteApresPlacement) return null;
     var elements = effet.elements || {};
     var clesElements = Object.keys(elements);
     if (clesElements.length !== 1 || clesElements[0] !== 'corruption' || typeof elements.corruption !== 'number' || elements.corruption < 1) {
@@ -739,7 +795,8 @@ var GameService = (function () {
       quantite: elements.corruption,
       ciblesAutorisees: tier1,
       ciblesRepli: tier2,
-      exclureTechno: effet.restriction === 'stockage_chambres_decontamination_interdit'
+      exclureTechno: effet.restriction === 'stockage_chambres_decontamination_interdit',
+      avancerPisteApresPlacement: avancerPisteApresPlacement
     };
   }
 
@@ -889,7 +946,10 @@ var GameService = (function () {
       // TODO.md) : nouveau jeton manuel (Corruption(s) actuellement
       // stockée(s) sur la Technologie "Chambres de décontamination") —
       // voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
-      corruptionChambreDecontamination: pm.corruptionChambreDecontamination || 0
+      corruptionChambreDecontamination: pm.corruptionChambreDecontamination || 0,
+      // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 — voir
+      // en-tête de fichier) : compteur de Corruption sur la fiche Maison.
+      corruptionMaison: pm.corruptionMaison || 0
     };
 
     return partie;
@@ -1308,7 +1368,13 @@ var GameService = (function () {
     majCivilisation: function (partieId, champs) {
       var CHAMPS_CIVILISATION_AUTORISES = [
         'civSociete', 'civGouvernement', 'civEconomie',
-        'civCorrompueSociete', 'civCorrompueGouvernement', 'civCorrompueEconomie'
+        'civCorrompueSociete', 'civCorrompueGouvernement', 'civCorrompueEconomie',
+        // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2, voir
+        // en-tête de fichier) : CivilisationService.definirCorruption
+        // ajuste corruptionMaison dans le MÊME appel que le marqueur
+        // Corrompue qui vient de changer (une seule écriture) — whitelisté
+        // ici en plus de CHAMPS_PLATEAU_MAISON_AUTORISES (saisie manuelle).
+        'corruptionMaison'
       ];
       var filtre = {};
       Object.keys(champs || {}).forEach(function (cle) {
@@ -1909,7 +1975,8 @@ var GameService = (function () {
               partieId: partieId,
               ciblesAutorisees: config.ciblesAutorisees,
               ciblesRepli: config.ciblesRepli,
-              exclureTechno: config.exclureTechno
+              exclureTechno: config.exclureTechno,
+              avancerPisteApresPlacement: config.avancerPisteApresPlacement
             })).then(function (reponse) {
               if (!reponse || reponse.annule) {
                 if (!details.length) annuleSansRien = true;

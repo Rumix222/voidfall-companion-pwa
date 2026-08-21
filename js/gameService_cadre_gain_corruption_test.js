@@ -226,6 +226,89 @@ test('appliquerCadreGainCorruption : quantité 2, les deux réussissent — rés
   });
 });
 
+// ---------------------------------------------------------------
+// 21/08/2026 (Événement galactique G, Cycle 1, Cadre 1 "Le visage du mal" —
+// voir en-tête de fichier gameService.js v22) : effet_conditionnel reconnu
+// UNIQUEMENT quand il correspond exactement au gabarit de ce Cadre.
+// ---------------------------------------------------------------
+
+test('cadreGainCorruptionAutomatisable : effet_conditionnel EXACT du Cadre G/Cycle1/1 -> true', function () {
+  var ctx = creerSandbox_(creerFixture_({}));
+  var GameService = ctx.sandbox.GameService;
+
+  assert.strictEqual(GameService.cadreGainCorruptionAutomatisable({
+    effet: {
+      type: 'gain', cible_options: ['emplacement_programme', 'piste_civilisation'], elements: { corruption: 1 },
+      effet_conditionnel: {
+        si_cible: 'piste_civilisation', condition: 'marqueur_pas_case_la_plus_a_droite',
+        consequence: { cle: 'avancer_piste_civilisation', valeur: 1, note: 'ignorer_le_benefice_de_la_case_atteinte' }
+      }
+    }
+  }), true);
+});
+
+test('cadreGainCorruptionAutomatisable : effet_conditionnel proche mais DIFFÉRENT (autre cle/valeur/condition) -> false', function () {
+  var ctx = creerSandbox_(creerFixture_({}));
+  var GameService = ctx.sandbox.GameService;
+
+  assert.strictEqual(GameService.cadreGainCorruptionAutomatisable({
+    effet: {
+      type: 'gain', cible_options: ['emplacement_programme', 'piste_civilisation'], elements: { corruption: 1 },
+      effet_conditionnel: { si_cible: 'piste_civilisation', condition: 'autre_condition', consequence: { cle: 'avancer_piste_civilisation', valeur: 1 } }
+    }
+  }), false, 'condition différente');
+
+  assert.strictEqual(GameService.cadreGainCorruptionAutomatisable({
+    effet: {
+      type: 'gain', cible_options: ['emplacement_programme', 'piste_civilisation'], elements: { corruption: 1 },
+      effet_conditionnel: { si_cible: 'piste_civilisation', condition: 'marqueur_pas_case_la_plus_a_droite', consequence: { cle: 'autre_chose', valeur: 1 } }
+    }
+  }), false, 'cle de conséquence différente');
+
+  assert.strictEqual(GameService.cadreGainCorruptionAutomatisable({
+    effet: {
+      type: 'gain', cible_options: ['emplacement_programme', 'piste_civilisation'], elements: { corruption: 1 },
+      effet_conditionnel: { si_cible: 'piste_civilisation', condition: 'marqueur_pas_case_la_plus_a_droite', consequence: { cle: 'avancer_piste_civilisation', valeur: 2 } }
+    }
+  }), false, 'valeur différente');
+});
+
+test('appliquerCadreGainCorruption : Cadre G/Cycle1/1 — transmet avancerPisteApresPlacement=true à la popup', function () {
+  var ctx = creerSandbox_(creerFixture_({
+    type: 'gain', cible_options: ['emplacement_programme', 'piste_civilisation'], elements: { corruption: 1 },
+    effet_conditionnel: {
+      si_cible: 'piste_civilisation', condition: 'marqueur_pas_case_la_plus_a_droite',
+      consequence: { cle: 'avancer_piste_civilisation', valeur: 1 }
+    }
+  }));
+  var GameService = ctx.sandbox.GameService;
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'gagner_corruption');
+    assert.strictEqual(contexte.avancerPisteApresPlacement, true);
+    assert.strictEqual(JSON.stringify(contexte.ciblesAutorisees), JSON.stringify(['programme', 'piste']));
+    return { detail: 'Corruption placée sur la piste Gouvernement (piste Corrompue). Piste avancée d’une case.', piste: 'gouvernement' };
+  };
+
+  return GameService.appliquerCadreGainCorruption(PARTIE_ID, 1, 1, demanderChoix).then(function (partieMaj) {
+    assert.ok(partieMaj.evenements.cycle1.cadresAppliques[1]);
+  });
+});
+
+test('appliquerCadreGainCorruption : cadre sans effet_conditionnel — avancerPisteApresPlacement=false transmis à la popup', function () {
+  var ctx = creerSandbox_(creerFixture_({ type: 'gain', cible: 'piste_civilisation', elements: { corruption: 1 } }));
+  var GameService = ctx.sandbox.GameService;
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.avancerPisteApresPlacement, false);
+    return { detail: 'Corruption placée sur la piste Économie.', piste: 'economie' };
+  };
+
+  return GameService.appliquerCadreGainCorruption(PARTIE_ID, 1, 1, demanderChoix).then(function (partieMaj) {
+    assert.ok(partieMaj.evenements.cycle1.cadresAppliques[1]);
+  });
+});
+
 test('appliquerCadreGainCorruption : cadre non automatisable (offre_programme) — rejette explicitement', function () {
   var ctx = creerSandbox_(creerFixture_({ type: 'gain', cible: 'offre_programme', cible_detail: 'programme_force', elements: { corruption: 1 } }));
   var GameService = ctx.sandbox.GameService;

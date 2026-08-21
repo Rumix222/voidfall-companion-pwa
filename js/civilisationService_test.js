@@ -275,3 +275,89 @@ test('choice inclusif "et/ou" où seule une option automatisée est choisie : au
     assert.ok(!resultat.effetJournal.some(function (l) { return l.indexOf('à appliquer manuellement') !== -1; }));
   });
 });
+
+// ---------------------------------------------------------------
+// 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
+// du mal", voir en-tête de fichier) : definirCorruption/avancerPisteSansEffet
+// — jusqu'ici entièrement hors périmètre de ce fichier de test (voir
+// commentaire d'en-tête d'origine).
+// ---------------------------------------------------------------
+
+test('definirCorruption : place une Corruption -> +1 sur corruptionMaison', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ corruptionMaison: 2 });
+
+  return ctx.sandbox.CivilisationService.definirCorruption(PARTIE_ID, 'gouvernement', true).then(function (resultat) {
+    assert.strictEqual(resultat.corrompue, true);
+    assert.strictEqual(resultat.corruptionMaison, 3);
+    assert.strictEqual(resultat.corruptionMaisonConservee, false);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civCorrompueGouvernement, true);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].corruptionMaison, 3);
+  });
+});
+
+test('definirCorruption : retire une Corruption -> -1 sur corruptionMaison (sans option)', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ corruptionMaison: 2, civCorrompueSociete: true });
+
+  return ctx.sandbox.CivilisationService.definirCorruption(PARTIE_ID, 'societe', false).then(function (resultat) {
+    assert.strictEqual(resultat.corrompue, false);
+    assert.strictEqual(resultat.corruptionMaison, 1);
+    assert.strictEqual(resultat.corruptionMaisonConservee, false);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].corruptionMaison, 1);
+  });
+});
+
+// 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2, permanent : "chaque
+// fois que vous retirez une Corruption... gardez-la dans votre zone de jeu
+// personnelle... jusqu'à la phase Évaluation") : options.conserverCorruptionRetiree
+// (fourni par l'appelant — strategieService.js — quand ce Cadre est actif
+// pour le cycle en cours) empêche la décrémentation du compteur.
+test('definirCorruption : retrait + conserverCorruptionRetiree -> corruptionMaison INCHANGÉ, corruptionMaisonConservee=true', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ corruptionMaison: 2, civCorrompueEconomie: true });
+
+  return ctx.sandbox.CivilisationService.definirCorruption(PARTIE_ID, 'economie', false, { conserverCorruptionRetiree: true }).then(function (resultat) {
+    assert.strictEqual(resultat.corrompue, false);
+    assert.strictEqual(resultat.corruptionMaisonConservee, true);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].corruptionMaison, 2, 'le compteur ne doit PAS être décrémenté');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civCorrompueEconomie, false, 'la piste cesse néanmoins d’être marquée Corrompue');
+  });
+});
+
+test('definirCorruption : idempotent (même état demandé deux fois) -> corruptionMaison ne bouge pas la 2e fois', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ corruptionMaison: 1, civCorrompueSociete: true });
+
+  return ctx.sandbox.CivilisationService.definirCorruption(PARTIE_ID, 'societe', true).then(function (resultat) {
+    assert.strictEqual(resultat.corruptionMaison, 1, 'déjà Corrompue -> aucune mutation du compteur');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].corruptionMaison, 1);
+  });
+});
+
+test('avancerPisteSansEffet : avance d’une case, ne résout AUCUN effet de case, ne touche pas au marqueur Corrompue', function () {
+  var ctx = creerContexte_([
+    { type: 'Standard', piste: 'Gouvernement', caseNumero: 2, texte: 'Gagnez 20 Influence.', effet: JSON.stringify({ influence: 20 }) }
+  ]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 1, civCorrompueGouvernement: true });
+
+  return ctx.sandbox.CivilisationService.avancerPisteSansEffet(PARTIE_ID, 'gouvernement').then(function (resultat) {
+    assert.strictEqual(resultat.ancienNiveau, 1);
+    assert.strictEqual(resultat.nouveauNiveau, 2);
+    assert.strictEqual(resultat.dejaMaximum, false);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civGouvernement, 2);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].influence, 0, 'le bénéfice de la case 2 (+20 Influence) ne doit PAS être appliqué');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civCorrompueGouvernement, true, 'le marqueur Corrompue doit rester tel quel (contrairement à avancerPisteCorrompue)');
+  });
+});
+
+test('avancerPisteSansEffet : piste déjà au maximum -> no-op, dejaMaximum=true', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 7 });
+
+  return ctx.sandbox.CivilisationService.avancerPisteSansEffet(PARTIE_ID, 'economie').then(function (resultat) {
+    assert.strictEqual(resultat.dejaMaximum, true);
+    assert.strictEqual(resultat.nouveauNiveau, 7);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 7);
+  });
+});

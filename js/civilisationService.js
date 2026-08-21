@@ -1,7 +1,35 @@
 /**
  * civilisationService.js
  * Pistes de Civilisation — Voidfall Companion PWA
- * Version 4 — 20/08/2026 (correctif — avance_rapide fait maintenant gagner le bonus de la case atteinte, pas seulement le niveau)
+ * Version 5 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 : avancerPisteSansEffet + compteur plateauMaison.corruptionMaison)
+ *
+ * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
+ * du mal") :
+ * - Cadre 1 ("Gagnez une Corruption sur un emplacement de Programme ou sur
+ *   une piste de Civilisation. Si la Corruption est placée sur une piste
+ *   et que son marqueur n'est pas dans la case la plus à droite, le joueur
+ *   doit avancer sur cette piste [en ignorant le bénéfice de la case
+ *   atteinte]") : nouvelle fonction avancerPisteSansEffet — avance une
+ *   piste précise d'une case sans résoudre l'effet de la case ET SANS
+ *   décocher "Corrompue" (contrairement à avancerPisteCorrompue, qui
+ *   décoche — sémantique différente, voir sa JSDoc). Reste no-op si la
+ *   piste est déjà au niveau maximum ("case la plus à droite" = rien à
+ *   avancer, correspond exactement à la condition du Cadre). Câblée côté
+ *   gameService.js (resoudreCiblesCadreGainCorruption_ reconnaît
+ *   désormais cet effet_conditionnel précis) et strategieService.js
+ *   (popup 'gagner_corruption', option "piste").
+ * - Cadre 2 (permanent au Cycle 1 : "chaque fois que vous retirez une
+ *   Corruption, ... gardez-la dans votre zone de jeu personnelle ...
+ *   jusqu'à la phase Évaluation") : definirCorruption tient désormais à
+ *   jour un nouveau compteur générique plateauMaison.corruptionMaison
+ *   (Corruptions actuellement sur la fiche Maison — utile au-delà de ce
+ *   seul Cadre, voir CHAMPS_PLATEAU_MAISON_AUTORISES/gameService.js) :
+ *   +1/-1 automatique quand une piste de Civilisation devient/cesse
+ *   d'être Corrompue ; le retrait peut être empêché de décrémenter via
+ *   `options.conserverCorruptionRetiree` (fourni par l'appelant quand ce
+ *   Cadre est actif pour le cycle en cours). Programmes/Chambres de
+ *   décontamination restent hors périmètre (compteur ajusté manuellement
+ *   par le joueur pour ces 2 sources, comme le reste de leurs jetons).
  *
  * 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
  * doit faire gagner le bonus de la case atteinte") : avancerPiste
@@ -465,13 +493,59 @@ var CivilisationService = (function () {
   }
 
   /**
-   * Coche/décoche la piste "Corrompue" — marqueur manuel, aucun effet.
+   * Coche/décoche la piste "Corrompue" — marqueur manuel, aucun effet de
+   * case.
+   *
+   * 21/08/2026 (Événement galactique G, Cycle 1 — Cadre 2 "Permanent au
+   * Cycle 1 : ... gardez [la Corruption retirée] dans votre zone de jeu
+   * personnelle... jusqu'à la phase Évaluation") : tient désormais aussi à
+   * jour `plateauMaison.corruptionMaison` — compteur générique du nombre
+   * de Corruptions actuellement sur la fiche Maison du joueur (pistes de
+   * Civilisation Corrompues ; Programmes/Chambres de décontamination
+   * restent hors périmètre, ajustés manuellement par le joueur — voir
+   * CHAMPS_PLATEAU_MAISON_AUTORISES, gameService.js). +1 quand une piste
+   * devient Corrompue, -1 quand elle cesse de l'être — SAUF si l'appelant
+   * fournit `options.conserverCorruptionRetiree` (Cadre G ci-dessus actif
+   * pour le cycle en cours) : le compteur n'est alors PAS décrémenté au
+   * retrait (`resultat.corruptionMaisonConservee` renvoyé à `true`, pour
+   * que l'appelant — strategieService.js — affiche un petit rappel dans le
+   * journal). Ne mute le compteur QUE si l'état Corrompue change
+   * réellement (idempotent si appelé deux fois avec la même valeur).
    */
-  function definirCorruption(partieId, piste, valeur) {
+  function definirCorruption(partieId, piste, valeur, options) {
     if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
-    var champs = {};
-    champs[CHAMP_CORROMPUE[piste]] = !!valeur;
-    return GameService.majCivilisation(partieId, champs);
+    options = options || {};
+    var nouvelleValeur = !!valeur;
+
+    return DB.get('plateauMaison', partieId).then(function (pm) {
+      if (!pm) throw new Error('Plateau maison introuvable (partie ' + partieId + ').');
+      var champCorrompue = CHAMP_CORROMPUE[piste];
+      var etaitCorrompue = !!pm[champCorrompue];
+
+      var champs = {};
+      champs[champCorrompue] = nouvelleValeur;
+
+      var corruptionMaisonConservee = false;
+      if (etaitCorrompue !== nouvelleValeur) {
+        var compteurActuel = pm.corruptionMaison || 0;
+        if (nouvelleValeur) {
+          champs.corruptionMaison = compteurActuel + 1;
+        } else if (options.conserverCorruptionRetiree) {
+          corruptionMaisonConservee = true;
+        } else {
+          champs.corruptionMaison = Math.max(0, compteurActuel - 1);
+        }
+      }
+
+      return GameService.majCivilisation(partieId, champs).then(function () {
+        return {
+          piste: piste,
+          corrompue: nouvelleValeur,
+          corruptionMaison: (champs.corruptionMaison !== undefined) ? champs.corruptionMaison : (pm.corruptionMaison || 0),
+          corruptionMaisonConservee: corruptionMaisonConservee
+        };
+      });
+    });
   }
 
   /**
@@ -509,6 +583,43 @@ var CivilisationService = (function () {
   }
 
   /**
+   * 21/08/2026 (Événement galactique G, Cycle 1 — Cadre 1 "Le visage du
+   * mal" : "Si la Corruption est placée sur une piste et que son marqueur
+   * n'est pas dans la case la plus à droite, le joueur doit avancer sur
+   * cette piste [et donc ignorer le bénéfice rapporté par la case qu'il
+   * atteint]") : avance une piste précise d'une case SANS résoudre l'effet
+   * de la case (contrairement à avancerPiste ci-dessus) et SANS toucher au
+   * marqueur "Corrompue" (contrairement à avancerPisteCorrompue ci-dessus,
+   * qui décoche — ici la Corruption qui vient d'être placée doit rester).
+   * Ne fait rien si la piste est déjà au niveau maximum ("la case la plus
+   * à droite" — rien à avancer, correspond exactement à la condition du
+   * Cadre). Empile une entrée d'annulation comme les fonctions sœurs.
+   */
+  function avancerPisteSansEffet(partieId, piste) {
+    if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
+
+    return DB.get('plateauMaison', partieId).then(function (pm) {
+      if (!pm) throw new Error('Plateau maison introuvable (partie ' + partieId + ').');
+      var champNiveau = CHAMP_NIVEAU[piste];
+      var ancien = pm[champNiveau] || 0;
+      if (ancien >= NIVEAU_MAX) {
+        return { piste: piste, ancienNiveau: ancien, nouveauNiveau: ancien, dejaMaximum: true };
+      }
+      var nouveau = ancien + 1;
+
+      var champs = {};
+      champs[champNiveau] = nouveau;
+
+      return GameService.majCivilisation(partieId, champs).then(function () {
+        var mutations = [{ champ: champNiveau, avant: ancien, apres: nouveau }];
+        return AnnulationService.empiler(partieId, { source: 'Piste avancée sans bénéfice — ' + NOM_PISTE[piste], mutations: mutations });
+      }).then(function () {
+        return { piste: piste, ancienNiveau: ancien, nouveauNiveau: nouveau, dejaMaximum: false };
+      });
+    });
+  }
+
+  /**
    * Détail complet (texte des 7 cases) des 3 pistes pour une maison —
    * donnée de référence statique, une seule lecture du store catalogue
    * pour les 21 cases (même optimisation que côté GAS).
@@ -541,6 +652,7 @@ var CivilisationService = (function () {
     avancerPisteMoinsAvancee: avancerPisteMoinsAvancee,
     definirCorruption: definirCorruption,
     avancerPisteCorrompue: avancerPisteCorrompue,
+    avancerPisteSansEffet: avancerPisteSansEffet,
     obtenirDetailPistes: obtenirDetailPistes
   };
 })();
