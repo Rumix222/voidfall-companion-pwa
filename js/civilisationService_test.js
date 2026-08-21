@@ -79,56 +79,66 @@ test('effet simple (influence) : aucun rappel, demanderChoix jamais appelé', fu
 // voir TODO.md) : "simplement incrémenter le niveau de la piste
 // concernée" — la piste avance d'UN niveau supplémentaire (en plus de
 // l'avancement normal), sans résoudre l'effet de la nouvelle case.
-test('avance_rapide : incrémente la piste d\'un niveau supplémentaire (case 1 -> niveau 2 au total)', function () {
+// 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
+// doit faire gagner le bonus de la case atteinte") : avance_rapide
+// résout désormais l'EFFET de la case suivante (plus seulement son
+// niveau).
+test('avance_rapide : fait gagner le BONUS de la case atteinte (pas seulement le niveau)', function () {
   var ctx = creerContexte_([
-    { type: 'Standard', piste: 'Économie', caseNumero: 1, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) }
+    { type: 'Standard', piste: 'Économie', caseNumero: 1, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) },
+    { type: 'Standard', piste: 'Économie', caseNumero: 2, texte: 'Gagnez 3 Crédits.', effet: JSON.stringify({ credit: 3 }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 0 });
 
-  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé (avance_rapide entièrement automatisé).'); };
+  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé (aucune des 2 cases n\'en a besoin).'); };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'economie', demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.effetSucces, true);
     assert.strictEqual(resultat.ancienNiveau, 0);
-    assert.strictEqual(resultat.nouveauNiveau, 2, 'avancement normal (0->1) + avance_rapide (1->2)');
-    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 2, 'persisté en base');
-    assert.strictEqual(resultat.effetJournal.length, 1);
-    assert.ok(resultat.effetJournal[0].indexOf('Avance rapide') !== -1);
-    assert.ok(resultat.effetJournal[0].indexOf('niveau 2') !== -1);
+    assert.strictEqual(resultat.nouveauNiveau, 2, 'avancement normal (0->1, avance_rapide) puis case 2 (1->2, +3 Crédits)');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 2, 'niveau persisté en base');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].ressourceCredit, 3, 'le BONUS (+3 Crédits) de la case 2 doit être appliqué et persisté');
+    assert.ok(resultat.texte.indexOf('Avance rapide') !== -1 && resultat.texte.indexOf('Gagnez 3 Crédits') !== -1, 'texte concatène les 2 cases traversées');
+    assert.ok(resultat.effetJournal.some(function (l) { return l.indexOf('la piste avance encore') !== -1; }));
+    assert.ok(resultat.effetJournal.some(function (l) { return l.indexOf('+3 credit') !== -1; }), 'le journal doit refléter le gain de la case 2');
   });
 });
 
-test('avance_rapide : une seule mutation empilée (ancien -> niveau final), Annuler revient directement à l\'ancien niveau', function () {
+test('avance_rapide : chaîne sur 2 sauts consécutifs (case 1 et 2 toutes deux avance_rapide, bonus gagné sur la case 3)', function () {
   var ctx = creerContexte_([
-    { type: 'Standard', piste: 'Société', caseNumero: 3, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) }
+    { type: 'Standard', piste: 'Gouvernement', caseNumero: 1, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) },
+    { type: 'Standard', piste: 'Gouvernement', caseNumero: 2, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) },
+    { type: 'Standard', piste: 'Gouvernement', caseNumero: 3, texte: 'Gagnez 5 Influence.', effet: JSON.stringify({ influence: 5 }) }
   ]);
-  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civSociete: 2 });
-
-  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé.'); };
-
-  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'societe', demanderChoix).then(function (resultat) {
-    assert.strictEqual(resultat.nouveauNiveau, 4); // 2 -> 3 (normal) -> 4 (avance_rapide)
-    assert.strictEqual(ctx.appelsAnnulation.length, 1);
-    var mutations = ctx.appelsAnnulation[0].mutations;
-    assert.strictEqual(mutations.length, 1, 'une seule mutation pour civSociete, pas deux');
-    assert.strictEqual(mutations[0].champ, 'civSociete');
-    assert.strictEqual(mutations[0].avant, 2);
-    assert.strictEqual(mutations[0].apres, 4);
-  });
-});
-
-test('avance_rapide : piste déjà au niveau maximum -> aucun incrément supplémentaire, journal l\'indique', function () {
-  var ctx = creerContexte_([
-    { type: 'Standard', piste: 'Gouvernement', caseNumero: 7, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) }
-  ]);
-  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 6 });
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 0 });
 
   var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé.'); };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'gouvernement', demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.nouveauNiveau, 3, '0 -> 1 (avance_rapide) -> 2 (avance_rapide) -> 3 (+5 Influence)');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civGouvernement, 3);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].influence, 5);
+    assert.strictEqual(ctx.appelsAnnulation.length, 1);
+    var mutations = ctx.appelsAnnulation[0].mutations;
+    var mutationNiveau = mutations.filter(function (m) { return m.champ === 'civGouvernement'; });
+    assert.strictEqual(mutationNiveau.length, 1, 'une seule mutation pour civGouvernement, même après 2 sauts');
+    assert.strictEqual(mutationNiveau[0].avant, 0);
+    assert.strictEqual(mutationNiveau[0].apres, 3);
+  });
+});
+
+test('avance_rapide : piste déjà au niveau maximum en cours de chaîne -> s\'arrête, journal l\'indique', function () {
+  var ctx = creerContexte_([
+    { type: 'Standard', piste: 'Société', caseNumero: 7, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) }
+  ]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civSociete: 6 });
+
+  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé.'); };
+
+  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'societe', demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.nouveauNiveau, 7, 'plafonné à NIVEAU_MAX, pas 8');
-    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civGouvernement, 7);
-    assert.ok(resultat.effetJournal[0].indexOf('maximum') !== -1);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civSociete, 7);
+    assert.ok(resultat.effetJournal.some(function (l) { return l.indexOf('maximum') !== -1; }));
   });
 });
 

@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 42 — 2026-08-20
+ * Version 45 — 2026-08-21
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -1070,6 +1070,131 @@
  * plus d'"augmenter_population_pure") N'EST PAS concernée — pas un écart
  * de convention mais un vrai synonyme légitime (une seule mécanique
  * possible, "on ne peut pas augmenter une population non pure").
+ *
+ * 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
+ * doit faire gagner le bonus de la case atteinte") : js/civilisationService.js
+ * (v4) — avancerPiste résout désormais l'EFFET de la case suivante quand
+ * l'effet résolu est "avance_rapide" (pas seulement son niveau, comme la
+ * première version de EVOLUTION 6 le faisait — lecture initiale de
+ * TODO.md "simplement incrémenter le niveau", corrigée par ce retour).
+ * Nouvelle fonction récursive resoudreCaseEtChainerAvanceRapide_ : résout
+ * une case, PUIS enchaîne automatiquement sur la case suivante tant que
+ * l'effet résolu est encore "avance_rapide" (chaîne à profondeur
+ * illimitée, plafonnée par NIVEAU_MAX — vérifié sur tout data/catalogue/
+ * pistesCivilisation.json : "avance_rapide" n'est jamais combinée à un
+ * autre effet sur la même case, donc chaque case de la chaîne enchaîne
+ * encore OU résout un effet normal, jamais les deux). Toutes les
+ * mutations d'effet (ressources/cube/etc.) de CHAQUE case traversée sont
+ * appliquées ET persistées au fil de la chaîne. Une SEULE mutation de
+ * champNiveau reste empilée dans la pile d'annulation (ancien -> niveau
+ * FINAL, aucune étape intermédiaire), pour qu'"Annuler" revienne
+ * correctement en un coup quel que soit le nombre de sauts — vérifié sur
+ * une chaîne à 2 sauts. `resultat.texte` concatène désormais les textes
+ * de TOUTES les cases traversées (plus seulement celui de la première).
+ * Un effet manuel (EVOLUTION 4) ou retirer_corruption (EVOLUTION 5) sur
+ * une case atteinte par avance_rapide déclenche normalement sa propre
+ * popup/rappel, comme n'importe quelle case atteinte classiquement. 3
+ * tests réécrits dans civilisationService_test.js (gain effectif du
+ * bonus, chaîne à 2 sauts consécutifs, déjà au maximum en cours de
+ * chaîne) — 11/11 tests du fichier passent, 94/101 sur l'ensemble de la
+ * suite (7 échecs restants : mêmes échecs préexistants du baseline).
+ *
+ * 21/08/2026 (nouvelle demande — "Implémenter améliorer un jeton
+ * gloire") : effet "ameliorer_gloire" ("il faut incrémenter la valeur de
+ * notre plus petit jeton gloire. Si je n'ai pas de jeton gloire de
+ * valeur inférieure à 5 l'effet ne fait rien.") résolu directement dans
+ * js/focusEngine.js (v10, resoudreCle_) — Effet uniquement, signe > 0,
+ * entièrement déterministe : incrémente le plus petit jeton Gloire
+ * possédé de valeur < 5 ; si aucun n'est éligible (aucun jeton posé, ou
+ * tous déjà à 5), l'effet réussit sans rien modifier. AUCUNE popup
+ * nécessaire (contrairement à construire/retirer_corruption/avancer_
+ * civilisation, qui exigent un vrai choix du joueur ou touchent une
+ * autre table que plateauMaison) : résolu en une passe, pure, sur
+ * `etat.gloire`.
+ *
+ * 'gloire' (tableau de 5 emplacements, null = vide) ajoutée à
+ * CHAMPS_DIFF_SUIVIS — piège identifié et corrigé au passage :
+ * diffChamps_ comparait ses champs par référence stricte (`!==`), or
+ * resoudreJson_ CLONE systématiquement tout l'état (cloner_, JSON deep
+ * clone) avant résolution ; un tableau cloné a TOUJOURS une référence
+ * différente de l'original même si son CONTENU est identique — un `!==`
+ * brut aurait donc signalé "gloire" comme muté à CHAQUE action, même
+ * celles qui ne touchent jamais Gloire (pollution de la pile
+ * d'annulation avec des entrées fantômes, écriture DB superflue à
+ * chaque fois). Corrigé en comparant par CONTENU (JSON.stringify) plutôt
+ * que par référence — reste strictement équivalent à `!==` pour les
+ * champs scalaires déjà suivis (aucune régression). Ce piège était
+ * invisible sans un test dédié : 2 des 4 nouveaux tests de
+ * focusEngine_test.js vérifient spécifiquement ce point (vérifié qu'ils
+ * échouent bien sur le `!==` brut et passent sur le correctif).
+ *
+ * cleFocusEnginePourOptionCadre_ (js/gameService.js v19 + copie locale
+ * index.html — les 2 mises à jour ensemble cette fois, leçon retenue de
+ * l'oubli EVOLUTION 5/7) reconnaît { cle: 'ameliorer_gloire' } pour le
+ * seul Cadre "choix" simple du catalogue actuel qui l'utilise (Événement
+ * F Cycle 1 Cadre 2 — vérifié sur evenements.json, les autres occurrences
+ * sont dans des objectifs ou des structures "libre"/"echange" hors du
+ * pattern simple déjà automatisé). LABEL_OPTION_FOCUSENGINE_ (index.html)
+ * complétée. 4 nouveaux tests dans focusEngine_test.js (incrément du
+ * plus petit jeton, aucun jeton éligible — 2 sous-cas, égalité entre
+ * jetons, non-régression sur une action qui ne touche pas Gloire) + 1
+ * nouveau test bout-en-bout dans gameService_cadre_ecriture_imbriquee_test.js
+ * (persistance via un Cadre "choix") — 99/106 sur l'ensemble de la
+ * suite (7 échecs restants : mêmes échecs préexistants du baseline).
+ *
+ * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
+ * cube du Néant dans le secteur du Néant adjacent avec la Population la
+ * plus basse OU placez un jeton Gloire de valeur 2 et une Défense de
+ * Secteur dans le secteur du Néant adjacent avec la Population la plus
+ * élevée.") : nouveau gabarit de cadre — un `type: 'choix'` dont chaque
+ * option est elle-même `type: 'placement'` avec un `critere` de
+ * Population (distinct de "placement"/"placement_multiple" existants,
+ * qui n'offrent jamais de choix entre plusieurs placements alternatifs).
+ *
+ * js/secteurService.js (v10) : nouvelle clé GÉNÉRIQUE "guilde" dans
+ * CHAMP_ELEMENT_PLACEMENT_ (type au choix du joueur, sans `champ` —
+ * résolu en "guilde_<type>" avant tout appel à
+ * placerElementsNeantAdjacent, qui ne la reçoit donc jamais telle
+ * quelle ; suffit tel quel à obtenirSecteursEligiblesPlacementNeantAdjacent,
+ * qui compte par `categorie`, jamais par `champ` précis). Filet de
+ * sécurité ajouté à placerElementsNeantAdjacent : ignore désormais aussi
+ * silencieusement toute entrée sans `champ`.
+ *
+ * js/gameService.js (v20) : nouvelle méthode appliquerCadreChoixPlacement
+ * (+ construireResumePlacementChoix_/LABEL_TYPE_GUILDE_RESUME_) —
+ * résout la clé générique "guilde" via `typeGuildeChoisi`, revalide
+ * intégralement le secteur choisi côté serveur (réutilise
+ * SecteurService.resoudrePlacementMultipleNeantAdjacent en enveloppant
+ * l'option dans un `placements` à 1 entrée, aucune duplication de la
+ * logique de calcul des candidats par critère de Population), même
+ * garde-fou anti-double-application qu'appliquerCadrePlacement/
+ * appliquerCadrePlacementMultiple.
+ *
+ * js/strategieService.js (v25) : nouveau contexte demanderChoix
+ * 'placement_critere' — secteur déterminé par le critère (candidats
+ * recalculés à l'affichage), second <select> de type de Guilde
+ * (TYPES_GUILDE_CONSTRUIRE_, réutilisé) si l'élément "guilde" est
+ * générique. Résout {numero, type} SANS persister (contrairement à
+ * 'construire'/'retirer_corruption') : la revalidation et l'écriture
+ * sont laissées à GameService.appliquerCadreChoixPlacement.
+ *
+ * index.html : actionsCadre_ reconnaît désormais une option `type:
+ * 'placement'` au sein d'un cadre "choix" (LABEL_ELEMENT_PLACEMENT_CADRE_/
+ * libelleOptionPlacementChoix_ — ex. "Guilde + cube du Néant (Population
+ * la plus basse)") ; ouvrirPopupCadreEtRafraichir_/nouvelle
+ * resoudreOptionPlacementCritereEtRafraichir_ câblent la popup
+ * 'placement_critere' puis GameService.appliquerCadreChoixPlacement,
+ * même pattern que les autres résolutions de cadre. Le rendu du statut
+ * "✓ Appliqué (...)" une fois résolu réutilise tel quel le chemin
+ * générique existant (cadresAppliques[ordre].resume), aucun changement
+ * nécessaire dans renderCadresEvenement_.
+ *
+ * Nouveau fichier de test dédié gameService_cadre_placement_choix_test.js
+ * (5 cas : les 2 options résolues correctement chacune sur le bon
+ * secteur, secteur ne correspondant pas au critère rejeté par la
+ * revalidation serveur, type de Guilde manquant rejeté, garde-fou anti-
+ * double-application) — 104/111 sur l'ensemble de la suite (7 échecs
+ * restants : mêmes échecs préexistants du baseline, aucune régression).
  */
 
-var APP_VERSION = '20260820.8';
+var APP_VERSION = '20260821.2';

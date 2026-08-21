@@ -1283,6 +1283,39 @@
       population_min: 'Population la plus basse', population_max: 'Population la plus élevée'
     };
 
+    // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
+    // cube du Néant... OU placez un jeton Gloire de valeur 2 et une
+    // Défense de Secteur...") : libellés courts pour les `elements` d'une
+    // option `type: 'placement'` d'un cadre "choix" — voir
+    // libelleOptionPlacementChoix_ ci-dessous. "guilde" reste générique
+    // ici (le type précis n'est choisi qu'au moment du placement, popup
+    // 'placement_critere') ; "gloire" affiche sa valeur entre parenthèses
+    // (ex. "jeton Gloire (2)"), traité à part ci-dessous plutôt qu'ici.
+    var LABEL_ELEMENT_PLACEMENT_CADRE_ = {
+      guilde: 'Guilde', cube_neant: 'cube du Néant', defense_secteur: 'Défense de Secteur',
+      chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
+      liberation: 'jeton Libération', prime: 'jeton Prime'
+    };
+
+    /**
+     * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : libellé de bouton (menu
+     * "Choisir un effet") pour une option `type: 'placement'` — ex.
+     * "Guilde + cube du Néant (Population la plus basse)". Le détail
+     * (secteur choisi, type de Guilde) n'apparaît qu'après résolution,
+     * dans le statut "✓ Appliqué (...)" (GameService.
+     * construireResumePlacementChoix_).
+     */
+    function libelleOptionPlacementChoix_(option) {
+      var parties = Object.keys(option.elements || {}).map(function (cle) {
+        var valeur = Number(option.elements[cle]) || 0;
+        if (cle === 'gloire') return 'jeton Gloire (' + valeur + ')';
+        var label = LABEL_ELEMENT_PLACEMENT_CADRE_[cle] || cle;
+        return valeur > 1 ? valeur + ' ' + label : label;
+      });
+      var critereLabel = LABEL_CRITERE_PLACEMENT_[option.critere];
+      return parties.join(' + ') + (critereLabel ? ' (' + critereLabel + ')' : '');
+    }
+
     /**
      * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
      * une Guilde OU construisez une Installation") : filet de sécurité
@@ -1398,6 +1431,9 @@
         option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
         return option.cle;
       }
+      // 21/08/2026 (effet "Améliorer un jeton Gloire") : même mécanisme
+      // générique — focusEngine.js v10.
+      if (option.cle === 'ameliorer_gloire') return option.cle;
       return null;
     }
 
@@ -1440,7 +1476,11 @@
       avancer_civilisation: 'Avancer sur une piste de Civilisation',
       avancer_civilisation_societe: 'Avancer sur la piste Société',
       avancer_civilisation_gouvernement: 'Avancer sur la piste Gouvernement',
-      avancer_civilisation_economie: 'Avancer sur la piste Économie'
+      avancer_civilisation_economie: 'Avancer sur la piste Économie',
+      // 21/08/2026 (effet "Améliorer un jeton Gloire") : le détail (quel
+      // jeton, quelle valeur) n'apparaît qu'après résolution, dans le
+      // statut "✓ Appliqué (...)", comme les autres options ci-dessus.
+      ameliorer_gloire: 'Améliorer un jeton Gloire'
     };
 
     /**
@@ -1829,6 +1869,20 @@
 
       if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
         cadre.effet.options.forEach(function (option, indexOption) {
+          // 21/08/2026 (Événement F, Cycle 1, Cadre 1) : option `type:
+          // 'placement'` (avec `critere` de Population) au sein d'un
+          // cadre "choix" — nouveau gabarit, distinct des options
+          // {cle, valeur} ci-dessous (cleFocusEnginePourOptionCadre_) qui
+          // n'ont pas de `critere`/secteur à choisir. Vérifié en premier
+          // (une option de ce type n'a jamais de `cle`, les blocs
+          // suivants la laisseraient de toute façon passer).
+          if (option.type === 'placement' && option.elements) {
+            actions.push({
+              proportionnel: false, placementChoix: true, indexOption: indexOption,
+              label: libelleOptionPlacementChoix_(option)
+            });
+            return;
+          }
           if (optionTechnologieViaScience_(option)) {
             actions.push({
               proportionnel: false, technologie: true, coutScience: option.cout.science,
@@ -1884,6 +1938,8 @@
           appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
         } else if (choisie.focusEngine) {
           appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.placementChoix) {
+          resoudreOptionPlacementCritereEtRafraichir_(partie, cycle, ordre, cadre, choisie.indexOption, bouton);
         } else if (choisie.manuel) {
           appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, choisie.indexOption, choisie.resume, bouton);
         } else if (choisie.proportionnel) {
@@ -1899,6 +1955,41 @@
       }).catch(function (erreur) {
         bouton.disabled = false;
         window.alert('Échec de la résolution du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
+     * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : résout UNE option
+     * `type: 'placement'` d'un cadre "choix" (voir actionsCadre_/
+     * libelleOptionPlacementChoix_ ci-dessus) — ouvre la popup dédiée
+     * 'placement_critere' (StrategieService, secteur déterminé par
+     * `option.critere`, second <select> de type de Guilde si l'élément
+     * "guilde" est générique), puis persiste via GameService.
+     * appliquerCadreChoixPlacement (revalide tout côté SecteurService,
+     * jamais confiance à cette popup) — même pattern que
+     * appliquerCadrePlacementEtRafraichir_/
+     * appliquerCadreFocusEngineEtRafraichir_ ci-dessus.
+     */
+    function resoudreOptionPlacementCritereEtRafraichir_(partie, cycle, ordre, cadre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      var option = cadre.effet.options[indexOption];
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'placement_critere',
+        titre: 'Choisir un secteur',
+        option: option
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreChoixPlacement(partie.id, cycle, ordre, indexOption, resultat.numero, resultat.type)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
       });
     }
 

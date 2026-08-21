@@ -1,7 +1,28 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 18 — 20/08/2026 (correctif — appliquerCadreChoixFocusEngine, lecture-fusion-écriture sur l'écriture finale plateauMaison)
+ * Version 20 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — appliquerCadreChoixPlacement, choix entre 2 placements alternatifs)
+ *
+ * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : nouvelle méthode
+ * appliquerCadreChoixPlacement (+ construireResumePlacementChoix_,
+ * LABEL_TYPE_GUILDE_RESUME_) — applique un cadre `type: 'choix'` dont
+ * chaque option est elle-même `type: 'placement'` avec un `critere` de
+ * Population (nouveau gabarit, hors périmètre de "placement"/
+ * "placement_multiple" existants, qui n'offrent jamais de choix entre
+ * plusieurs placements alternatifs). Résout la clé générique "guilde"
+ * (secteurService.js v10) en "guilde_<type>" via `typeGuildeChoisi`,
+ * revalide intégralement le secteur choisi (jamais confiance à
+ * l'appelant, réutilise SecteurService.resoudrePlacementMultipleNeantAdjacent
+ * en enveloppant l'option dans un `placements` à 1 entrée). Voir
+ * strategieService.js (nouveau contexte 'placement_critere') et
+ * index.html (actionsCadre_/ouvrirPopupCadreEtRafraichir_) pour le
+ * câblage complet.
+ *
+ * 21/08/2026 (effet "Améliorer un jeton Gloire") : cleFocusEnginePourOptionCadre_
+ * reconnaît désormais { cle: 'ameliorer_gloire' } — même mécanisme
+ * générique qu'avancer_civilisation/retirer_corruption ci-dessus,
+ * identité (focusEngine.js v10 la reconnaît nativement, résolue sans
+ * popup).
  *
  * 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO : "je ne
  * vois pas l'effet de l'avancement de la piste civilisation dans
@@ -619,7 +640,46 @@ var GameService = (function () {
       option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
       return option.cle;
     }
+    // 21/08/2026 (effet "Améliorer un jeton Gloire") : même mécanisme
+    // générique — FocusEngine.resoudreCle_ reconnaît nativement
+    // 'ameliorer_gloire' (focusEngine.js v10), résolue sans popup
+    // (déterministe).
+    if (option.cle === 'ameliorer_gloire') return option.cle;
     return null;
+  }
+
+  /**
+   * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : construit le texte
+   * "✓ Appliqué (...)" pour GameService.appliquerCadreChoixPlacement
+   * ci-dessous — `elements` est le dict RÉSOLU (jamais la clé générique
+   * "guilde", toujours "guilde_<type>" une fois le type choisi). Pas de
+   * tentative de réutiliser abregerResumeCadre_ (index.html, EVOLUTION 1)
+   * : ses gabarits reconnus ("Population du Secteur N augmentée de...",
+   * "Guilde X établie sur...") ne correspondent pas à ce nouveau cas
+   * (plusieurs éléments combinés en un seul placement) — texte déjà
+   * concis nativement, laissé tel quel (abregerResumeCadre_ le laisse de
+   * toute façon passer inchangé si aucun de ses gabarits ne correspond).
+   */
+  var LABEL_TYPE_GUILDE_RESUME_ = {
+    fermiers: 'Fermiers', ingenieurs: 'Ingénieurs', mineurs: 'Mineurs', banquiers: 'Banquiers', scientifiques: 'Scientifiques'
+  };
+  function construireResumePlacementChoix_(elements, numero) {
+    var parties = Object.keys(elements || {}).map(function (cle) {
+      var valeur = Number(elements[cle]) || 0;
+      if (cle.indexOf('guilde_') === 0) {
+        var type = cle.slice('guilde_'.length);
+        return 'Guilde ' + (LABEL_TYPE_GUILDE_RESUME_[type] || type);
+      }
+      if (cle === 'cube_neant') return valeur + ' cube' + (valeur > 1 ? 's' : '') + ' du Néant';
+      if (cle === 'gloire') return 'jeton Gloire ' + valeur;
+      if (cle === 'defense_secteur') return 'Défense de Secteur';
+      if (cle === 'chantier_naval') return 'Chantier Naval';
+      if (cle === 'base_stellaire') return 'Base Stellaire';
+      if (cle === 'liberation') return valeur + ' jeton(s) Libération';
+      if (cle === 'prime') return valeur + ' jeton(s) Prime';
+      return cle;
+    });
+    return parties.join(' + ') + ' \u2192 Secteur ' + numero + '.';
   }
 
   /**
@@ -1416,6 +1476,87 @@ var GameService = (function () {
           partie.evenements[cleCycle] = evenementCycle;
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
         });
+      }).then(function () {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
+          return assemblerPartie_(r2[0], r2[1]);
+        });
+      });
+    },
+
+    /**
+     * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
+     * cube du Néant dans le secteur du Néant adjacent avec la Population
+     * la plus basse OU placez un jeton Gloire de valeur 2 et une Défense
+     * de Secteur dans le secteur du Néant adjacent avec la Population la
+     * plus élevée.") : applique UNE option d'un cadre `type: 'choix'`
+     * dont chaque option est elle-même `type: 'placement'` (avec un
+     * `critere` de Population — data/catalogue/evenements.json, PAS un
+     * flat {cle, valeur} comme les options automatisées par FocusEngine,
+     * voir cleFocusEnginePourOptionCadre_ ci-dessus) — nouveau gabarit de
+     * cadre, hors périmètre de "placement"/"placement_multiple" existants
+     * (ceux-ci n'offrent jamais de CHOIX entre plusieurs placements
+     * alternatifs, toujours un seul ou plusieurs SIMULTANÉS).
+     *
+     * `typeGuildeChoisi` (optionnel, une des clés de TYPES_GUILDE_CONSTRUIRE_
+     * côté strategieService.js — 'fermiers'/'ingenieurs'/'mineurs'/
+     * 'banquiers'/'scientifiques') résout la clé GÉNÉRIQUE "guilde" de
+     * l'option (type au choix du joueur, voir CHAMP_ELEMENT_PLACEMENT_,
+     * secteurService.js v10) en "guilde_<type>" avant tout appel à
+     * SecteurService.placerElementsNeantAdjacent — qui ne reçoit donc
+     * jamais la clé générique. Revalide intégralement le `numeroSecteur`
+     * reçu (jamais confiance à l'appelant, même principe qu'
+     * appliquerCadrePlacement/appliquerCadrePlacementMultiple ci-dessus) :
+     * recalcule les candidats pour CE critère via SecteurService.
+     * resoudrePlacementMultipleNeantAdjacent (réutilisée telle quelle, en
+     * enveloppant l'unique option dans un `placements` à 1 entrée — aucune
+     * duplication de la logique de calcul des candidats par critère de
+     * Population).
+     */
+    appliquerCadreChoixPlacement: function (partieId, cycle, ordreCadre, indexOption, numeroSecteur, typeGuildeChoisi) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
+        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
+        if (!partie) throw new Error('Partie introuvable.');
+
+        var cleCycle = 'cycle' + cycle;
+        var evenementCycle = (partie.evenements || {})[cleCycle];
+        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+        if (evenementCycle.cadresAppliques[ordreCadre]) {
+          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+        }
+
+        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        if (!option || option.type !== 'placement' || !option.elements) {
+          throw new Error('Option de placement introuvable pour ce cadre.');
+        }
+        if (typeof SecteurService === 'undefined') throw new Error('SecteurService indisponible.');
+
+        var elementsResolus = Object.assign({}, option.elements);
+        if (Object.prototype.hasOwnProperty.call(elementsResolus, 'guilde')) {
+          if (!typeGuildeChoisi) throw new Error('Type de Guilde manquant pour ce placement.');
+          elementsResolus['guilde_' + typeGuildeChoisi] = elementsResolus.guilde;
+          delete elementsResolus.guilde;
+        }
+
+        return SecteurService.resoudrePlacementMultipleNeantAdjacent(partieId, { type: 'placement_multiple', placements: [option] })
+          .then(function (resultatCandidats) {
+            var groupe = (resultatCandidats.groupes || [])[0];
+            if (!groupe || groupe.candidats.indexOf(numeroSecteur) === -1) {
+              throw new Error('Secteur ' + numeroSecteur + ' non éligible pour ce placement (Population).');
+            }
+
+            return SecteurService.placerElementsNeantAdjacent(partieId, numeroSecteur, elementsResolus).then(function () {
+              evenementCycle.cadresAppliques[ordreCadre] = {
+                resume: construireResumePlacementChoix_(elementsResolus, numeroSecteur),
+                le: new Date().toISOString()
+              };
+              partie.evenements[cleCycle] = evenementCycle;
+              return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+            });
+          });
       }).then(function () {
         return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
           return assemblerPartie_(r2[0], r2[1]);

@@ -1,7 +1,18 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 24 — 20/08/2026 (correctif — résumé "avancer_civilisation" simplifié, log de case retiré)
+ * Version 25 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — nouveau contexte 'placement_critere')
+ *
+ * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : nouveau contexte
+ * demanderChoix 'placement_critere' — secteur déterminé par un `critere`
+ * de Population (réutilise SecteurService.resoudrePlacementMultipleNeantAdjacent
+ * en enveloppant l'option dans un `placements` à 1 entrée), avec un
+ * second <select> de type de Guilde (TYPES_GUILDE_CONSTRUIRE_, réutilisé)
+ * si l'élément "guilde" est générique. Résout {numero, type} sans
+ * persister (contrairement à 'construire'/'retirer_corruption') : la
+ * revalidation ET l'écriture se font côté GameService.
+ * appliquerCadreChoixPlacement (gameService.js v20), appelé par
+ * index.html.
  *
  * 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO : "le
  * résultat Appliqué (...) est trop verbeux, ne pas mettre le log
@@ -2247,6 +2258,73 @@ var StrategieService = (function () {
           contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
           window.alert('Échec du chargement des secteurs : ' + erreur.message);
         });
+
+      } else if (contexte.type === 'placement_critere') {
+        // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde
+        // et 1 cube du Néant... OU placez un jeton Gloire de valeur 2 et
+        // une Défense de Secteur...") : popup pour UNE option d'un cadre
+        // "choix" dont chaque option est `type: 'placement'` (avec un
+        // `critere` de Population, contexte.option — data/catalogue/
+        // evenements.json), PAS un libre choix de secteur comme
+        // 'placement_secteur_neant_adjacent' ci-dessous : le secteur est
+        // déterminé par la Population des secteurs du Néant adjacents
+        // (la plus basse ou la plus élevée selon `critere`), une égalité
+        // laissant simplement plusieurs candidats au <select> — même
+        // logique de calcul que SecteurService.
+        // resoudrePlacementMultipleNeantAdjacent (réutilisée telle
+        // quelle, contexte.option enveloppée dans un `placements` à 1
+        // entrée, aucune duplication). Si `contexte.option.elements`
+        // contient la clé GÉNÉRIQUE "guilde" (type au choix du joueur,
+        // voir secteurService.js v10/CHAMP_ELEMENT_PLACEMENT_), un second
+        // <select> de type apparaît (TYPES_GUILDE_CONSTRUIRE_, même liste
+        // que la popup 'construire' ci-dessous, par cohérence). Ne
+        // persiste RIEN ici (contrairement à 'construire'/
+        // 'retirer_corruption') : résout juste {numero, type}, comme
+        // 'placement_secteur_neant_adjacent' — la revalidation ET
+        // l'écriture se font côté GameService.appliquerCadreChoixPlacement
+        // (appelé par l'appelant, index.html), qui recalcule les
+        // candidats à neuf plutôt que de faire confiance à cette popup.
+        titre.textContent = contexte.titre || 'Choisir un secteur';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partiePlacementCritere = partieAffichee;
+        var optionPlacementCritere = contexte.option || {};
+        var demandeTypeGuilde = Object.prototype.hasOwnProperty.call(optionPlacementCritere.elements || {}, 'guilde');
+
+        SecteurService.resoudrePlacementMultipleNeantAdjacent(partiePlacementCritere.id, { type: 'placement_multiple', placements: [optionPlacementCritere] })
+          .then(function (resultat) {
+            var groupe = (resultat.groupes || [])[0];
+            var candidats = groupe ? groupe.candidats : [];
+            if (!candidats.length) {
+              contenu.innerHTML = '<p class="hint">Aucun secteur du Néant adjacent à l’un de vos secteurs, avec les emplacements requis libres, ne correspond actuellement à ce critère de Population.</p>';
+              return;
+            }
+
+            contenu.innerHTML = '' +
+              '<select id="placement-critere-select-secteur" class="modal-choix-select">' +
+              candidats.map(function (numero) { return '<option value="' + numero + '">Secteur ' + numero + '</option>'; }).join('') +
+              '</select>' +
+              (demandeTypeGuilde
+                ? '<select id="placement-critere-select-type" class="modal-choix-select" style="margin-top:8px;">' +
+                  TYPES_GUILDE_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') +
+                  '</select>'
+                : '');
+
+            btnValider.hidden = false;
+            btnValider.textContent = 'Placer';
+            btnValider.onclick = function () {
+              var numero = Number(document.getElementById('placement-critere-select-secteur').value);
+              var type = demandeTypeGuilde ? document.getElementById('placement-critere-select-type').value : undefined;
+              fermerModale_();
+              resolve({ numero: numero, type: type });
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
 
       } else if (contexte.type === 'placement_secteur_neant_adjacent') {
         // 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : choix

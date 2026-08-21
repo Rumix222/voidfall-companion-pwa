@@ -1,7 +1,19 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 9 — 20/08/2026 (correctif — CHAMP_ELEMENT_PLACEMENT_ Guilde revenu au pluriel, fix déplacé côté données)
+ * Version 10 — 21/08/2026 (Événement F Cycle 1 Cadre 1 — clé "guilde" générique dans CHAMP_ELEMENT_PLACEMENT_)
+ *
+ * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
+ * cube du Néant... OU placez un jeton Gloire de valeur 2 et une Défense
+ * de Secteur...") : nouvelle clé "guilde" GÉNÉRIQUE (type au choix du
+ * joueur) dans CHAMP_ELEMENT_PLACEMENT_ — sans `champ` (résolu côté
+ * appelant en "guilde_<type>" avant tout appel à
+ * placerElementsNeantAdjacent, voir GameService.appliquerCadreChoixPlacement,
+ * index.html/strategieService.js) ; suffit à obtenirSecteursEligiblesPlacementNeantAdjacent
+ * (compte par `categorie`, jamais par `champ` précis, aucun changement
+ * nécessaire là). placerElementsNeantAdjacent ignore désormais aussi
+ * silencieusement toute entrée sans `champ` (filet de sécurité, ne
+ * devrait jamais être atteint en usage normal).
  *
  * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
  * utilisateur : "automatiser augmentez une population pure : choisir
@@ -756,7 +768,17 @@ var SecteurService = (function () {
     // LABEL_JETON_SECTEUR/ligneSecteurHTML_) — `valeur: true` fait que
     // placerElementsNeantAdjacent AFFECTE ce champ au lieu de l'incrémenter.
     cube_neant: { champ: 'pnNeant', categorie: 'jeton' },
-    gloire: { champ: 'jetonGloire', categorie: 'jeton', valeur: true }
+    gloire: { champ: 'jetonGloire', categorie: 'jeton', valeur: true },
+    // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde...")
+    // : "guilde" GÉNÉRIQUE (type au choix du joueur, pas de suffixe) —
+    // aucun `champ` (le type précis n'est connu qu'au moment du
+    // placement, résolu côté appelant AVANT d'appeler
+    // placerElementsNeantAdjacent, qui ne reçoit jamais cette clé
+    // générique telle quelle — voir GameService.appliquerCadreChoixPlacement).
+    // `categorie: 'guilde'` suffit à obtenirSecteursEligiblesPlacementNeantAdjacent
+    // (ci-dessous), qui ne compte les emplacements que par categorie, pas
+    // par champ précis.
+    guilde: { categorie: 'guilde' }
   };
 
   /**
@@ -865,7 +887,14 @@ var SecteurService = (function () {
         if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
         Object.keys(elements || {}).forEach(function (cle) {
           var info = CHAMP_ELEMENT_PLACEMENT_[cle];
-          if (!info) return;
+          // 21/08/2026 : `!info.champ` couvre les entrées GÉNÉRIQUES sans
+          // type résolu (ex. "guilde", voir CHAMP_ELEMENT_PLACEMENT_
+          // ci-dessus) — ne devrait jamais arriver ici en usage normal
+          // (le type est toujours résolu par l'appelant AVANT d'appeler
+          // cette fonction), mais ignoré silencieusement plutôt que
+          // d'écrire sur un champ "undefined", même filet de sécurité que
+          // pour une clé totalement inconnue.
+          if (!info || !info.champ) return;
           var quantite = Number(elements[cle]) || 0;
           secteur[info.champ] = info.valeur ? quantite : (secteur[info.champ] || 0) + quantite;
         });

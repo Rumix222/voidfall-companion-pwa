@@ -1,34 +1,37 @@
 /**
  * civilisationService.js
  * Pistes de Civilisation — Voidfall Companion PWA
- * Version 3 — 20/08/2026 (EVOLUTION 6 — effet "avance_rapide" automatisé, incrément supplémentaire de la piste concernée)
+ * Version 4 — 20/08/2026 (correctif — avance_rapide fait maintenant gagner le bonus de la case atteinte, pas seulement le niveau)
  *
- * 20/08/2026 (EVOLUTION 6 — effet "avance_rapide" de piste Civilisation,
- * voir TODO.md) : avancerPiste incrémente désormais AUTOMATIQUEMENT la
- * piste d'un niveau supplémentaire quand l'effet de la case résolue est
- * "avance_rapide" (voir appliquerAvanceRapideSiPresent_) — "simplement
- * incrémenter le niveau de la piste concernée" (TODO.md), SANS résoudre
- * l'effet de la nouvelle case atteinte (même principe qu'
- * avancerPisteCorrompue, qui avance aussi sans bénéfice de case). Clé
- * détectée via le même signal qu'EVOLUTION 4 (suffixe "à appliquer
- * manuellement." du journal FocusEngine, "avance_rapide" restant dans
- * CLES_CIVILISATION_HORS_PERIMETRE côté focusEngine.js — AUCUNE mutation
- * de piste ne pourrait de toute façon transiter par son diff générique,
- * limité aux ressources/cubeActif/jetons, voir focusEngine.js en-tête) :
- * scope strictement limité à avancerPiste (piste Civilisation) —
- * "avance_rapide" n'apparaît d'ailleurs QUE dans data/catalogue/
- * pistesCivilisation.json (jamais evenements.json/focus.json, vérifié),
- * donc aucun risque de régression côté Focus/Événements. Si la piste est
- * déjà au niveau maximum au moment de l'avance_rapide, aucune écriture
- * supplémentaire (journal le signale simplement). Une SEULE mutation de
- * champNiveau empilée dans la pile d'annulation (ancien -> niveau final,
- * l'étape intermédiaire `nouveau` n'y apparaît jamais) pour qu'"Annuler"
- * revienne correctement en un coup, même avec 2 écritures DB successives.
- * `nouveauNiveau` du résultat reflète désormais le niveau final (après
- * avance_rapide éventuel) — aucun changement nécessaire côté appelant
- * (strategieService.js, déjà générique sur ce champ). Nouveaux tests
- * dans civilisationService_test.js (incrément simple, cumul avec piste
- * déjà proche du maximum, déjà au maximum).
+ * 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
+ * doit faire gagner le bonus de la case atteinte") : avancerPiste
+ * (refonte de la mécanique EVOLUTION 6, voir TODO.md) résout désormais
+ * l'EFFET de la case suivante quand l'effet résolu est "avance_rapide" —
+ * la première version de cette évolution se contentait d'incrémenter le
+ * niveau ("simplement incrémenter le niveau", lecture initiale de
+ * TODO.md, corrigée par ce retour). Extraction d'une fonction récursive
+ * dédiée, resoudreCaseEtChainerAvanceRapide_, qui résout une case, PUIS
+ * — si son effet est encore "avance_rapide" — enchaîne automatiquement
+ * sur la case suivante (chaîne à profondeur illimitée, plafonnée par
+ * NIVEAU_MAX ; vérifié sur tout data/catalogue/pistesCivilisation.json :
+ * aucune case n'a jamais "avance_rapide" ET un autre effet en même
+ * temps, donc chaque case de la chaîne est soit "avance_rapide" (enchaîne
+ * encore), soit un effet normal résolu normalement — jamais les deux).
+ * Toutes les mutations d'effet (ressources/cube/etc.) de CHAQUE case
+ * traversée sont appliquées ET persistées au fil de la chaîne ; `pm` est
+ * maintenu à jour localement pour que la case suivante voie le plateau
+ * réel. Une SEULE mutation de champNiveau reste empilée dans la pile
+ * d'annulation (ancien -> niveau FINAL, aucune étape intermédiaire) pour
+ * qu'"Annuler" revienne correctement en un coup, quel que soit le nombre
+ * de sauts. `resultat.texte` concatène désormais les textes de TOUTES
+ * les cases traversées (jointes par un espace) — plus seulement celui de
+ * la première. Un effet manuel (EVOLUTION 4) ou retirer_corruption
+ * (EVOLUTION 5) sur une case ATTEINTE par avance_rapide déclenche
+ * normalement sa propre popup/rappel, comme n'importe quelle case
+ * atteinte par un avancement classique. Tests dans
+ * civilisationService_test.js réécrits pour ce nouveau comportement
+ * (gain effectif du bonus, chaîne à 2 sauts, déjà au maximum en cours de
+ * chaîne).
  *
  * 20/08/2026 (EVOLUTION 4 — effet manuel de piste Civilisation, voir
  * TODO.md) : avancerPiste affiche désormais un rappel temporaire (popup
@@ -288,24 +291,87 @@ var CivilisationService = (function () {
    * reste inchangé (pour un éventuel effet manuel resté sur la MÊME
    * case, cf. EVOLUTION 4, résolu séparément par l'appelant).
    */
-  function appliquerAvanceRapideSiPresent_(partieId, champNiveau, niveauApresAvancementNormal, journal) {
-    var lignesManuelles = extraireLignesManuelles_(journal);
-    var ligneAvanceRapide = lignesManuelles.filter(function (lm) { return lm.cle === 'avance_rapide'; })[0];
-    if (!ligneAvanceRapide) return Promise.resolve({ niveauFinal: niveauApresAvancementNormal, journal: journal });
+  /**
+   * 20/08/2026 (EVOLUTION 6 — correctif, retour utilisateur : "l'effet
+   * avance rapide doit faire gagner le bonus de la case atteinte") :
+   * résout récursivement la case au niveau `niveau` de `piste`, et
+   * CHAÎNE automatiquement sur la case SUIVANTE tant que l'effet résolu
+   * est "avance_rapide" — CETTE case suivante voit désormais son propre
+   * effet RÉSOLU (et pas seulement son niveau atteint, comme la première
+   * version de cette évolution le faisait par erreur). Toutes les
+   * mutations d'effet (ressources/cube/etc., jamais celles de
+   * `champNiveau` — gérées par une SEULE mutation entry construite par
+   * l'appelant, avancerPiste, pour un "Annuler" correct en un coup même
+   * après plusieurs sauts) sont accumulées dans `mutationsAccumulees`,
+   * déjà appliquées ET persistées au fil de la récursion. `pm` est
+   * maintenu à jour localement (par référence) pour que la case suivante
+   * voie l'état réel du plateau (ressources déjà gagnées à l'étape
+   * précédente, notamment). Retourne une Promise de
+   * { niveauFinal, succes, textes } — `textes` : tableau des textes de
+   * CHAQUE case traversée (pour construire un résumé complet côté
+   * appelant), jamais fusionné ici.
+   */
+  function resoudreCaseEtChainerAvanceRapide_(partieId, nomMaison, piste, champNiveau, niveau, pm, demanderChoix, journalAccumule, mutationsAccumulees, textesAccumules) {
+    return trouverCase_(nomMaison, piste, niveau).then(function (ligne) {
+      var champsNiveau = {};
+      champsNiveau[champNiveau] = niveau;
 
-    var journalAjuste = journal.slice();
-    var niveauSupplementaire = Math.min(NIVEAU_MAX, niveauApresAvancementNormal + 1);
+      return GameService.majCivilisation(partieId, champsNiveau).then(function () {
+        var effet = parseEffetSafe_(ligne.effet);
+        var source = 'Case ' + niveau + ' — ' + NOM_PISTE[piste];
+        var etatPourEffet = Object.assign({}, pm);
+        etatPourEffet[champNiveau] = niveau;
 
-    if (niveauSupplementaire === niveauApresAvancementNormal) {
-      journalAjuste[ligneAvanceRapide.index] = 'Avance rapide \u2014 piste d\u00e9j\u00e0 au niveau maximum.';
-      return Promise.resolve({ niveauFinal: niveauApresAvancementNormal, journal: journalAjuste });
-    }
+        return FocusEngine.resoudreEffet(etatPourEffet, effet, source, ligne.texte || '', demanderChoix).then(function (resultatEffet) {
+          var persisterRessources = Promise.resolve();
 
-    var champs = {};
-    champs[champNiveau] = niveauSupplementaire;
-    return GameService.majCivilisation(partieId, champs).then(function () {
-      journalAjuste[ligneAvanceRapide.index] = 'Avance rapide \u2014 piste avanc\u00e9e jusqu\u2019au niveau ' + niveauSupplementaire + '.';
-      return { niveauFinal: niveauSupplementaire, journal: journalAjuste };
+          if (resultatEffet.succes && resultatEffet.mutations.length) {
+            var champsEffet = {};
+            resultatEffet.mutations.forEach(function (m) {
+              champsEffet[m.champ] = resultatEffet.etatResultat[m.champ];
+              mutationsAccumulees.push(m);
+              pm[m.champ] = resultatEffet.etatResultat[m.champ];
+            });
+            persisterRessources = GameService.majPlateauMaison(partieId, champsEffet);
+          }
+
+          return persisterRessources.then(function () {
+            textesAccumules.push(ligne.texte || '');
+
+            if (!resultatEffet.succes) {
+              journalAccumule.push(source + ' : effet annul\u00e9 (choix refus\u00e9) — seul l\u2019avancement de piste est conserv\u00e9.');
+              return { niveauFinal: niveau, succes: false };
+            }
+
+            var lignesManuelles = extraireLignesManuelles_(resultatEffet.journal);
+            var ligneAvanceRapide = lignesManuelles.filter(function (lm) { return lm.cle === 'avance_rapide'; })[0];
+            var journalCase = resultatEffet.journal.slice();
+
+            if (!ligneAvanceRapide) {
+              return afficherRappelsManuelsEtAjusterJournal_(journalCase, effet, ligne.texte || '', source, demanderChoix)
+                .then(function (journalAjuste) {
+                  journalAccumule.push.apply(journalAccumule, journalAjuste);
+                  return { niveauFinal: niveau, succes: true };
+                });
+            }
+
+            var niveauSuivant = Math.min(NIVEAU_MAX, niveau + 1);
+            if (niveauSuivant === niveau) {
+              journalCase[ligneAvanceRapide.index] = 'Avance rapide \u2014 piste d\u00e9j\u00e0 au niveau maximum.';
+              journalAccumule.push.apply(journalAccumule, journalCase);
+              return { niveauFinal: niveau, succes: true };
+            }
+
+            journalCase[ligneAvanceRapide.index] = 'Avance rapide \u2014 la piste avance encore, jusqu\u2019au niveau ' + niveauSuivant + '.';
+            journalAccumule.push.apply(journalAccumule, journalCase);
+
+            return resoudreCaseEtChainerAvanceRapide_(
+              partieId, nomMaison, piste, champNiveau, niveauSuivant, pm, demanderChoix,
+              journalAccumule, mutationsAccumulees, textesAccumules
+            );
+          });
+        });
+      });
     });
   }
 
@@ -335,7 +401,10 @@ var CivilisationService = (function () {
   /**
    * Avance une piste précise d'une case (aucun effet, pas d'écriture, ne
    * fait rien si déjà au maximum) : {piste, ancienNiveau, nouveauNiveau,
-   * texte, effetJournal, effetSucces, dejaMaximum}.
+   * texte, effetJournal, effetSucces, dejaMaximum}. 20/08/2026
+   * (EVOLUTION 6, corrigée le jour même — voir en-tête de fichier) :
+   * "texte" peut désormais résumer PLUSIEURS cases si un "avance_rapide"
+   * a chaîné sur une case suivante (jointes par un espace).
    */
   function avancerPiste(partieId, nomMaison, piste, demanderChoix) {
     if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
@@ -349,78 +418,33 @@ var CivilisationService = (function () {
         return { piste: piste, ancienNiveau: ancien, nouveauNiveau: ancien, texte: '', effetJournal: [], effetSucces: true, dejaMaximum: true };
       }
       var nouveau = ancien + 1;
+      var source = 'Case ' + nouveau + ' — ' + NOM_PISTE[piste];
 
-      return trouverCase_(nomMaison, piste, nouveau).then(function (ligne) {
-        var champsNiveau = {};
-        champsNiveau[champNiveau] = nouveau;
+      var journalAccumule = [];
+      var mutationsRessources = [];
+      var textesAccumules = [];
 
-        return GameService.majCivilisation(partieId, champsNiveau).then(function () {
-          var effet = parseEffetSafe_(ligne.effet);
-          var source = 'Case ' + nouveau + ' — ' + NOM_PISTE[piste];
-          var etatPourEffet = Object.assign({}, pm);
-          etatPourEffet[champNiveau] = nouveau;
+      return resoudreCaseEtChainerAvanceRapide_(
+        partieId, nomMaison, piste, champNiveau, nouveau, Object.assign({}, pm), demanderChoix,
+        journalAccumule, mutationsRessources, textesAccumules
+      ).then(function (resultatChaine) {
+        // Une SEULE mutation de champNiveau (ancien -> niveau FINAL,
+        // jamais les étapes intermédiaires) : un "Annuler" doit revenir
+        // en un coup à `ancien`, même après plusieurs sauts avance_rapide
+        // (AnnulationService.annulerDerniere_ applique ses mutations dans
+        // l'ordre, sans inversion — 2 mutations sur le même champ
+        // s'écraseraient l'une l'autre, voir EVOLUTION 6 d'origine).
+        var mutations = [{ champ: champNiveau, avant: ancien, apres: resultatChaine.niveauFinal }].concat(mutationsRessources);
 
-          return FocusEngine.resoudreEffet(etatPourEffet, effet, source, ligne.texte || '', demanderChoix).then(function (resultatEffet) {
-            var mutations = [{ champ: champNiveau, avant: ancien, apres: nouveau }];
-            var persisterRessources = Promise.resolve();
-
-            if (resultatEffet.succes && resultatEffet.mutations.length) {
-              var champsEffet = {};
-              resultatEffet.mutations.forEach(function (m) {
-                champsEffet[m.champ] = resultatEffet.etatResultat[m.champ];
-                mutations.push(m);
-              });
-              persisterRessources = GameService.majPlateauMaison(partieId, champsEffet);
-            }
-
-            return persisterRessources.then(function () {
-              if (!resultatEffet.succes) {
-                var journalEchec = [source + ' : effet annul\u00e9 (choix refus\u00e9) — seul l\u2019avancement de piste est conserv\u00e9.'];
-                return AnnulationService.empiler(partieId, { source: source, mutations: mutations }).then(function () {
-                  return {
-                    piste: piste, ancienNiveau: ancien, nouveauNiveau: nouveau, texte: ligne.texte || '',
-                    effetJournal: journalEchec, effetSucces: false
-                  };
-                });
-              }
-
-              // 20/08/2026 (EVOLUTION 6 — voir TODO.md) : "avance_rapide"
-              // résolu AVANT d'empiler l'annulation — une seule mutation
-              // de champNiveau (mutations[0], `avant: ancien`) porte
-              // directement le niveau FINAL en `apres` (ancien -> niveau
-              // final, en sautant l'étape intermédiaire `nouveau`) : un
-              // "Annuler" applique bien mutations[0].avant en une seule
-              // écriture (AnnulationService.annulerDerniere_ fait un
-              // simple forEach, sans ordre inverse — 2 mutations
-              // successives sur le MÊME champ s'écraseraient l'une
-              // l'autre au lieu de revenir correctement à `ancien`).
-              return appliquerAvanceRapideSiPresent_(partieId, champNiveau, nouveau, resultatEffet.journal)
-                .then(function (resultatAvanceRapide) {
-                  var niveauFinal = resultatAvanceRapide.niveauFinal;
-                  mutations[0].apres = niveauFinal;
-                  var journalBrut = resultatAvanceRapide.journal;
-
-                  return AnnulationService.empiler(partieId, { source: source, mutations: mutations }).then(function () {
-                    // 20/08/2026 (EVOLUTION 4 — voir TODO.md) : rappel manuel
-                    // (popup) + simplification du journal pour gagner_technologie/
-                    // gagner_programme, voir afficherRappelsManuelsEtAjusterJournal_
-                    // ci-dessus — purement informatif, n'affecte jamais succes/
-                    // mutations (déjà persistées juste au-dessus).
-                    return afficherRappelsManuelsEtAjusterJournal_(journalBrut, effet, ligne.texte || '', source, demanderChoix)
-                      .then(function (journalAjuste) {
-                        return {
-                          piste: piste,
-                          ancienNiveau: ancien,
-                          nouveauNiveau: niveauFinal,
-                          texte: ligne.texte || '',
-                          effetJournal: journalAjuste,
-                          effetSucces: resultatEffet.succes
-                        };
-                      });
-                  });
-                });
-            });
-          });
+        return AnnulationService.empiler(partieId, { source: source, mutations: mutations }).then(function () {
+          return {
+            piste: piste,
+            ancienNiveau: ancien,
+            nouveauNiveau: resultatChaine.niveauFinal,
+            texte: textesAccumules.filter(Boolean).join(' '),
+            effetJournal: journalAccumule,
+            effetSucces: resultatChaine.succes
+          };
         });
       });
     });
