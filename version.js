@@ -1,6 +1,6 @@
 /**
  * version.js
- * Version 45 — 2026-08-21
+ * Version 47 — 2026-08-21
  * Source de vérité unique pour la version de l'application.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
@@ -1282,6 +1282,63 @@
  * elle-même (strategieService.js v28) : un seul endroit à corriger plutôt
  * que chaque appelant, qui referme définitivement ce trou pour toute
  * action future qui gagnerait de l'Influence.
+ *
+ * 21/08/2026 (correctifs — retour utilisateur, "Test evenement F cycle 1
+ * ko") : 2 bugs distincts sur les 2 effets du Cadre 2.
+ * - Effet 1 ("placez un jeton Gloire de valeur 2... ") : jetonGloire
+ *   (secteursPartie) était un simple NOMBRE (la valeur du jeton posé), qui
+ *   ne pouvait représenter qu'UN SEUL jeton par secteur — un 2e jeton
+ *   Gloire placé sur un secteur en possédant déjà un ÉCRASAIT
+ *   silencieusement le premier au lieu de s'y ajouter (rien de visible ne
+ *   changeait si les 2 valeurs étaient identiques), alors que
+ *   docs-rules-cycle-de-jeu.md §1.5.5 précise explicitement "aucune limite
+ *   au nombre de jetons Prime, Libération ou Gloire dans un secteur".
+ *   jetonGloire devient un TABLEAU de valeurs : js/secteurService.js
+ *   (v13 — ligneSecteurParDefaut_/CHAMP_ELEMENT_PLACEMENT_.gloire
+ *   (tableauValeurs)/placerElementsNeantAdjacent/envahirResoudre, avec
+ *   normalisation à la lecture d'une éventuelle ancienne sauvegarde où ce
+ *   champ était encore un nombre), index.html (ligneSecteurHTML_ — affiche
+ *   "Gloire (2, 3)" pour plusieurs jetons), js/strategieService.js (flux
+ *   'envahir' — place chaque jeton récupéré dans un emplacement Gloire
+ *   libre distinct de la fiche Maison, au lieu d'un seul).
+ * - Effet 2 ("améliorez un jeton Gloire") : cleFocusEnginePourOptionCadre_
+ *   (js/gameService.js) routait déjà cette clé vers FocusEngine, mais
+ *   FocusEngine.resoudreCle_ ne la reconnaissait PAS réellement (le
+ *   commentaire l'annonçant était erroné) — elle retombait donc sur le
+ *   repli générique "effet non chiffré", qui marque le Cadre comme
+ *   appliqué SANS RIEN modifier sur la fiche Maison. Nouveau cas dédié
+ *   dans js/focusEngine.js (v13) : comme retirer_corruption/avancer_
+ *   civilisation, délègue à une popup dédiée (contexte 'ameliorer_gloire',
+ *   js/strategieService.js) — le jeton Gloire (array) n'étant pas suivi
+ *   par CHAMPS_DIFF_SUIVIS (non diffable par ce moteur), la popup calcule
+ *   ET persiste directement (aucun choix utilisateur : cible toujours le
+ *   jeton de plus petite valeur parmi les 5 emplacements, +1 plafonné à
+ *   5) puis rafraîchit immédiatement l'affichage Gloire.
+ * Nouveaux tests dans js/gameService_cadre_placement_choix_test.js
+ * (coexistence de 2 jetons Gloire sur un même secteur).
+ *
+ * 21/08/2026 (correctif — retour utilisateur, suite immédiate au lot
+ * précédent : "j'ajoute un jeton gloire valeur 1, reviens sur plat.
+ * maison, fait l'effet améliorer jeton gloire, c'est le jeton de valeur 2
+ * qui est amélioré et je ne vois plus mon jeton de valeur 1 ... ça a
+ * fonctionné lorsque j'ai fait une autre action entre-temps") : le
+ * contexte 'ameliorer_gloire' (js/strategieService.js) lisait
+ * `partieAffichee.plateauMaison.gloire`, qui n'est réécrit qu'au prochain
+ * StrategieService.afficher() COMPLET — le clic manuel sur un emplacement
+ * Gloire (renderGloireDOM_) met à jour `etatGloire` (module var) ET la
+ * base IMMÉDIATEMENT, mais jamais `partieAffichee.plateauMaison.gloire`
+ * lui-même, qui restait donc périmé tant qu'aucune autre action n'avait
+ * redéclenché un afficher() complet (« l'autre action » qui faisait
+ * fonctionner le cas suivant, par coïncidence). Résultat : le jeton
+ * fraîchement ajouté n'existait pas dans le tableau à 5 emplacements lu,
+ * ET était écrasé par l'écriture finale (basée sur ce même tableau
+ * périmé). Corrigé en lisant `etatGloire` directement (js/strategieService.js
+ * v30) — seule source à jour en permanence pour ce champ, déjà utilisée
+ * par le flux 'envahir' pour la même raison. Reproduit et vérifié dans le
+ * Browser pane (partie fraîche, Gloire de départ [2,null,null,null,null],
+ * ajout manuel d'un jeton valeur 1 SANS action intermédiaire, puis
+ * "Améliorer un jeton Gloire" — persiste désormais bien [2,2,null,null,null]
+ * en IndexedDB au lieu d'écraser en [3,null,null,null,null]).
  */
 
-var APP_VERSION = '20260821.6';
+var APP_VERSION = '20260821.8';

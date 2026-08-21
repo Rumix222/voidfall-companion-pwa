@@ -1,7 +1,7 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 12 — 21/08/2026 (gain d'Influence variable — "influence_valeur_gloire"/"influence_par_technologie_amelioree" résolues en pur, 9 clés "influence_par_*" secteur déléguées à demanderChoix({type:'influence_secteur'}))
+ * Version 13 — 21/08/2026 (correctif — "ameliorer_gloire" réellement reconnue, déléguée à demanderChoix({type:'ameliorer_gloire'}))
  *
  * 21/08/2026 (retour utilisateur : "Implémenter le gain d'influence, il y
  * en a à plusieurs endroits, gagner de l'influence fait incrémenter le
@@ -669,6 +669,31 @@ var FocusEngine = (function () {
       return Promise.resolve(demanderChoix({
         type: 'avancer_civilisation',
         piste: PISTE_PAR_CLE_AVANCER_CIVILISATION_[cle] || null,
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        journal.push(source + ' : ' + reponse.detail);
+        return true;
+      });
+    }
+
+    // --- Améliorer un jeton Gloire : Effet UNIQUEMENT (signe > 0). Aucun
+    // choix utilisateur — cible TOUJOURS le jeton Gloire de plus petite
+    // valeur parmi ceux posés sur la fiche Maison (règle : incrémente d'1,
+    // plafonné à 5), même principe de résolution déterministe que
+    // "influence_secteur" ci-dessus. Le jeton Gloire (array, 5 emplacements)
+    // n'est PAS suivi par CHAMPS_DIFF_SUIVIS (non diffable par ce moteur au
+    // clone JSON, voir plus haut) : la popup dédiée (contexte
+    // 'ameliorer_gloire', strategieService.js) fait donc le calcul ET la
+    // persistance directement (comme retirer_corruption/avancer_civilisation
+    // ci-dessus) ; resoudreCle_ relaie juste le résumé dans le journal.
+    // S'il n'existe aucun jeton Gloire améliorable (aucun posé, ou tous déjà
+    // à la valeur maximale 5), la popup annule l'effet entier (comme
+    // n'importe quel autre effet bloquant faute de cible).
+    if (cle === 'ameliorer_gloire' && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'ameliorer_gloire',
         source: source,
         partieId: etat.partieId
       })).then(function (reponse) {

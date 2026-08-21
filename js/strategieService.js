@@ -1,7 +1,7 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 28 — 21/08/2026 (correctif — retour utilisateur : "je ne vois pas le compteur d'influence augmenter dans l'onglet plat. maison" — afficher() appelle désormais App.renderPlateauMaison, voir JSDoc inline dans la fonction)
+ * Version 30 — 21/08/2026 (correctif — 'ameliorer_gloire' lit etatGloire au lieu de partieAffichee.plateauMaison.gloire, périmé après un clic manuel sur un emplacement Gloire)
  *
  * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
  * secteur Pur", voir focusEngine.js v12 — CLES_INFLUENCE_SECTEUR_) :
@@ -2269,21 +2269,34 @@ var StrategieService = (function () {
                 .then(function (jetonsRetires) {
                   jetonsRetires = jetonsRetires || {};
 
-                  // Jeton Gloire (array, non diffable par focusEngine.js) :
-                  // persisté DIRECTEMENT ici, même pattern que le clic
+                  // Jeton(s) Gloire (array côté secteursPartie ET côté
+                  // plateauMaison, non diffable par focusEngine.js) :
+                  // persisté(s) DIRECTEMENT ici, même pattern que le clic
                   // manuel sur un emplacement (voir renderGloireDOM_
-                  // ci-dessus) — hors du flux d'annulation, comme lui.
+                  // ci-dessus) — hors du flux d'annulation, comme lui. 21/
+                  // 08/2026 (correctif — retour utilisateur) : un secteur
+                  // pouvant porter PLUSIEURS jetons Gloire (SecteurService.
+                  // envahirResoudre renvoie désormais un tableau), chacun
+                  // est placé dans un emplacement Gloire libre distinct de
+                  // la fiche Maison (au lieu d'un seul jeton auparavant).
                   var influenceGagnee = 0;
                   if (victoire) {
-                    var jetonGloire = jetonsRetires.jetonGloire || 0;
-                    if (jetonGloire > 0) {
+                    var jetonsGloireGagnes = Array.isArray(jetonsRetires.jetonGloire)
+                      ? jetonsRetires.jetonGloire
+                      : (jetonsRetires.jetonGloire ? [jetonsRetires.jetonGloire] : []);
+                    var auMoinsUnGloirePlace = false;
+                    jetonsGloireGagnes.forEach(function (valeurGloire) {
+                      if (!(valeurGloire > 0)) return;
                       var indexLibre = etatGloire.indexOf(null);
                       if (indexLibre === -1) indexLibre = etatGloire.indexOf(undefined);
                       if (indexLibre !== -1) {
-                        etatGloire[indexLibre] = jetonGloire;
-                        GameService.majPlateauMaison(partieEnvahir.id, { gloire: etatGloire }).catch(function (e) { window.alert('Échec de l\u2019enregistrement de la Gloire : ' + e.message); });
-                        renderGloireDOM_(partieEnvahir);
+                        etatGloire[indexLibre] = valeurGloire;
+                        auMoinsUnGloirePlace = true;
                       }
+                    });
+                    if (auMoinsUnGloirePlace) {
+                      GameService.majPlateauMaison(partieEnvahir.id, { gloire: etatGloire }).catch(function (e) { window.alert('Échec de l\u2019enregistrement de la Gloire : ' + e.message); });
+                      renderGloireDOM_(partieEnvahir);
                     }
                     var sommeGloire = etatGloire.reduce(function (s, v) { return s + (v || 0); }, 0);
                     influenceGagnee = sommeGloire;
@@ -3018,6 +3031,73 @@ var StrategieService = (function () {
           contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
           window.alert('Échec du calcul d’Influence : ' + erreur.message);
         });
+
+      } else if (contexte.type === 'ameliorer_gloire') {
+        // 21/08/2026 (correctif — retour utilisateur, Test Événement F
+        // Cycle 1 KO : "améliorer un jeton gloire ... je ne vois pas le
+        // résultat sur le plateau maison") : focusEngine.js reconnaît
+        // désormais la clé "ameliorer_gloire" (v13) mais ne peut pas
+        // écrire lui-même le résultat — le jeton Gloire (array) n'est pas
+        // suivi par CHAMPS_DIFF_SUIVIS (non diffable par ce moteur au clone
+        // JSON, voir focusEngine.js). AUCUN choix utilisateur ici (cible
+        // toujours le jeton de plus petite valeur, +1 plafonné à 5) — même
+        // principe de résolution déterministe que "influence_secteur"
+        // ci-dessus : popup affichée brièvement ("Calcul en cours…"),
+        // Annuler disponible en cas d'erreur. Persiste directement via
+        // GameService.majPlateauMaison (même pattern que le clic manuel sur
+        // un emplacement Gloire, renderGloireDOM_ ci-dessus) puis
+        // rafraîchit immédiatement l'affichage Gloire du Plat. maison.
+        //
+        // 21/08/2026 (correctif — retour utilisateur, suite : "j'ajoute un
+        // jeton gloire, je reviens sur plat. maison, j'améliore un jeton
+        // gloire, c'est le mauvais jeton qui est amélioré et mon jeton
+        // ajouté a disparu ; ça fonctionne si je fais une autre action
+        // entre-temps") : lisait `partieAffichee.plateauMaison.gloire`, qui
+        // n'est réécrit qu'au prochain StrategieService.afficher() complet
+        // — le clic manuel sur un emplacement Gloire (renderGloireDOM_
+        // ci-dessus) met à jour `etatGloire` (module var) ET la base
+        // IMMÉDIATEMENT, mais PAS `partieAffichee.plateauMaison.gloire`
+        // (jamais réassigné par ce clic), qui reste donc périmé tant
+        // qu'aucune autre action n'a redéclenché un afficher() complet
+        // ("l'autre action" qui faisait fonctionner le cas suivant). Lit
+        // désormais `etatGloire` directement — seule source à jour en
+        // permanence pour ce champ (même principe que le flux 'envahir'
+        // ci-dessus, qui l'utilise déjà pour cette raison).
+        titre.textContent = 'Améliorer un jeton Gloire';
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieGloireAmelioration = partieAffichee;
+        var gloireAvantAmelioration = etatGloire.slice(0, 5);
+        while (gloireAvantAmelioration.length < 5) gloireAvantAmelioration.push(null);
+
+        var indexGloireMin = -1, valeurGloireMin = null;
+        gloireAvantAmelioration.forEach(function (v, i) {
+          if (v === null || v === undefined || v >= 5) return;
+          if (valeurGloireMin === null || v < valeurGloireMin) { valeurGloireMin = v; indexGloireMin = i; }
+        });
+
+        if (indexGloireMin === -1) {
+          fermerModale_();
+          window.alert('Aucun jeton Gloire à améliorer (aucun jeton posé, ou tous déjà à la valeur maximale 5).');
+          resolve({ annule: true });
+        } else {
+          var gloireApresAmelioration = gloireAvantAmelioration.slice();
+          gloireApresAmelioration[indexGloireMin] = valeurGloireMin + 1;
+          GameService.majPlateauMaison(partieGloireAmelioration.id, { gloire: gloireApresAmelioration })
+            .then(function () {
+              partieGloireAmelioration.plateauMaison.gloire = gloireApresAmelioration;
+              etatGloire = gloireApresAmelioration;
+              renderGloireDOM_(partieGloireAmelioration);
+              fermerModale_();
+              resolve({ detail: 'jeton Gloire ' + valeurGloireMin + ' → ' + (valeurGloireMin + 1) + '.' });
+            })
+            .catch(function (erreur) {
+              window.alert('Échec de l’amélioration du jeton Gloire : ' + erreur.message);
+            });
+        }
 
       } else if (contexte.type === 'avancer_civilisation') {
         // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de

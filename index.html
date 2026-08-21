@@ -2355,13 +2355,15 @@
       pnCuirasse: 'Cuirassé', pnPorteVaisseau: 'Porte-Vaisseau'
     };
     // jetonPrime/jetonLiberation : vrais compteurs (nombre de jetons face
-    // cachée sur le secteur). jetonGloire est différent — comme sur la
-    // fiche Maison (plateauMaison.gloire, valeurs 1-5 par emplacement), ce
-    // champ stocke la VALEUR du jeton Gloire posé sur le secteur (voir
-    // js/strategieService.js, résolution 'envahir' : etatGloire[i] =
-    // jetonGloire, la valeur est recopiée telle quelle dans un emplacement
-    // Gloire de la fiche Maison) — pas une quantité, donc à afficher à part
-    // ("Gloire (2)"), jamais au format "N× Gloire" du reste du tableau.
+    // cachée sur le secteur). jetonGloire est différent — un TABLEAU de
+    // valeurs (21/08/2026, correctif — retour utilisateur : un secteur peut
+    // porter plusieurs jetons Gloire, docs-rules-cycle-de-jeu.md §1.5.5,
+    // voir secteurService.js/ligneSecteurParDefaut_ pour le détail complet)
+    // — chaque valeur est celle d'un jeton Gloire distinct posé sur le
+    // secteur (voir js/strategieService.js, résolution 'envahir' : chaque
+    // valeur est recopiée dans un emplacement Gloire libre de la fiche
+    // Maison) — donc affiché à part ("Gloire (2, 3)"), jamais au format
+    // "N× Gloire" du reste du tableau.
     var LABEL_JETON_SECTEUR = {
       jetonPrime: 'Prime', jetonLiberation: 'Libération'
     };
@@ -2380,7 +2382,8 @@
       if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Cube néant';
       flotte = flotte || '—';
       var jetons = listeNonNulle_(secteur, LABEL_JETON_SECTEUR);
-      if (secteur.jetonGloire > 0) jetons = (jetons ? jetons + ', ' : '') + 'Gloire (' + secteur.jetonGloire + ')';
+      var listeGloireSecteur = Array.isArray(secteur.jetonGloire) ? secteur.jetonGloire : (secteur.jetonGloire ? [secteur.jetonGloire] : []);
+      if (listeGloireSecteur.length) jetons = (jetons ? jetons + ', ' : '') + 'Gloire (' + listeGloireSecteur.join(', ') + ')';
       jetons = jetons || '—';
       var action = secteur.corrompu
         ? '<button type="button" class="btn btn-secondary btn-retirer-corruption" data-numero="' + secteur.numero + '" style="font-size:0.72rem;padding:4px 8px;">Retirer</button>'

@@ -129,7 +129,7 @@ test('appliquerCadreChoixPlacement : option "population_max" (jeton Gloire + Dé
 
   return GameService.appliquerCadreChoixPlacement(PARTIE_ID, 1, 1, 1, 3, undefined).then(function (partieMaj) {
     var secteur3 = ctx.stores.secteursPartie[PARTIE_ID + '|3'];
-    assert.strictEqual(secteur3.jetonGloire, 2);
+    assert.strictEqual(JSON.stringify(secteur3.jetonGloire), JSON.stringify([2]), 'jetonGloire est un tableau (plusieurs jetons Gloire possibles sur un secteur)');
     assert.strictEqual(secteur3.installationDefenseSecteur, 1);
     var secteur2 = ctx.stores.secteursPartie[PARTIE_ID + '|2'];
     assert.strictEqual(secteur2.jetonGloire, 0, 'secteur 2 non touché');
@@ -138,6 +138,22 @@ test('appliquerCadreChoixPlacement : option "population_max" (jeton Gloire + Dé
     assert.ok(applique.resume.indexOf('jeton Gloire 2') !== -1);
     assert.ok(applique.resume.indexOf('Défense de Secteur') !== -1);
     assert.ok(applique.resume.indexOf('Secteur 3') !== -1);
+  });
+});
+
+// 21/08/2026 (correctif — retour utilisateur, Test Événement F Cycle 1 KO :
+// "le secteur possède déjà un jeton de gloire (2), il devrait en avoir 2")
+// : un 2e jeton Gloire placé sur un secteur en possédant déjà un ne doit
+// PAS écraser le premier (jetonGloire est désormais un tableau, voir
+// secteurService.js/ligneSecteurParDefaut_/CHAMP_ELEMENT_PLACEMENT_).
+test('appliquerCadreChoixPlacement : option "population_max" sur un secteur possédant déjà un jeton Gloire -> les 2 jetons coexistent', function () {
+  var ctx = fixtureBase_();
+  var GameService = ctx.sandbox.GameService;
+  ctx.stores.secteursPartie[PARTIE_ID + '|3'].jetonGloire = [2];
+
+  return GameService.appliquerCadreChoixPlacement(PARTIE_ID, 1, 1, 1, 3, undefined).then(function () {
+    var secteur3 = ctx.stores.secteursPartie[PARTIE_ID + '|3'];
+    assert.strictEqual(JSON.stringify(secteur3.jetonGloire), JSON.stringify([2, 2]), 'le jeton Gloire préexistant ne doit pas être écrasé');
   });
 });
 

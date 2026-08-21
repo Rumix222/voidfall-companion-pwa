@@ -1,7 +1,7 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 12 — 21/08/2026 (gain d'Influence variable "par Guilde/Installation/cube/secteur Pur" — obtenirAgregatsInfluenceSecteursPurs)
+ * Version 13 — 21/08/2026 (correctif — jetonGloire devient un tableau, un secteur peut porter plusieurs jetons Gloire)
  *
  * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
  * secteur Pur", voir focusEngine.js v12) : nouvelle
@@ -164,7 +164,19 @@ var SecteurService = (function () {
       pnNeant: ligne.pnNeantDepart || 0,
       pnCorvette: 0, pnSentinelle: 0, pnDestroyer: 0, pnCuirasse: 0, pnPorteVaisseau: 0,
       jetonPrime: ligne.jetonPrimeDepart || 0,
-      jetonGloire: ligne.jetonGloireDepart || 0,
+      // 21/08/2026 (correctif — retour utilisateur, Test Événement F Cycle
+      // 1 KO : "je ne vois pas le nouveau jeton gloire ... le secteur
+      // possède déjà un jeton de gloire, il devrait en avoir 2") :
+      // jetonGloire devient un TABLEAU de valeurs (docs-rules-cycle-de-
+      // jeu.md §1.5.5 — "aucune limite au nombre de jetons ... Gloire dans
+      // un secteur") au lieu d'un simple nombre qui ne pouvait représenter
+      // qu'un seul jeton posé — un 2e jeton Gloire placé (ex. par un Cadre
+      // d'Événement galactique) sur un secteur en possédant déjà un
+      // ÉCRASAIT silencieusement le premier au lieu de s'y ajouter. Voir
+      // CHAMP_ELEMENT_PLACEMENT_.gloire/placerElementsNeantAdjacent/
+      // envahirResoudre ci-dessous, index.html (ligneSecteurHTML_) et
+      // strategieService.js (flux envahir) pour les autres points touchés.
+      jetonGloire: ligne.jetonGloireDepart ? [ligne.jetonGloireDepart] : [],
       jetonLiberation: ligne.jetonLiberationDepart || 0
     };
   }
@@ -716,12 +728,18 @@ var SecteurService = (function () {
         });
 
         // 3) Conséquences sur le secteur cible, uniquement en cas de victoire.
-        var jetonPrime = 0, jetonLiberation = 0, jetonGloire = 0;
+        var jetonPrime = 0, jetonLiberation = 0, jetonGloire = [];
         var secteurCible = secteursParNumero[cible];
         if (victoire && secteurCible) {
           jetonPrime = secteurCible.jetonPrime || 0;
           jetonLiberation = secteurCible.jetonLiberation || 0;
-          jetonGloire = secteurCible.jetonGloire || 0;
+          // jetonGloire est un TABLEAU (plusieurs jetons Gloire possibles
+          // sur un même secteur, voir CHAMP_ELEMENT_PLACEMENT_.gloire
+          // ci-dessus) — normalise au passage une éventuelle ancienne
+          // sauvegarde où ce champ était encore un simple nombre.
+          jetonGloire = Array.isArray(secteurCible.jetonGloire)
+            ? secteurCible.jetonGloire.slice()
+            : (secteurCible.jetonGloire ? [secteurCible.jetonGloire] : []);
 
           secteurCible.pnNeant = 0;
           secteurCible.pnCorvette = (secteurCible.pnCorvette || 0) + (Number(survivants.corvette) || 0);
@@ -735,7 +753,7 @@ var SecteurService = (function () {
           secteurCible.nombreGardien = 0;
           secteurCible.jetonPrime = 0;
           secteurCible.jetonLiberation = 0;
-          secteurCible.jetonGloire = 0;
+          secteurCible.jetonGloire = [];
         }
 
         return Promise.all(tousNumeros.map(function (n) { return DB.put('secteursPartie', secteursParNumero[n]); }))
@@ -871,11 +889,13 @@ var SecteurService = (function () {
     // jetons ci-dessus, aucun emplacement consommé — le secteur ciblé a
     // déjà pnNeant > 0, voir le filtre d'éligibilité plus bas, on y ajoute
     // simplement le cube posé). gloire est différent : jetonGloire stocke
-    // la VALEUR du jeton posé (pas une quantité, voir index.html
-    // LABEL_JETON_SECTEUR/ligneSecteurHTML_) — `valeur: true` fait que
-    // placerElementsNeantAdjacent AFFECTE ce champ au lieu de l'incrémenter.
+    // un TABLEAU de valeurs (un secteur peut porter plusieurs jetons
+    // Gloire, docs-rules-cycle-de-jeu.md §1.5.5 — voir correctif 21/08/2026
+    // ci-dessus, ligneSecteurParDefaut_) — `tableauValeurs: true` fait que
+    // placerElementsNeantAdjacent AJOUTE la valeur au tableau au lieu de
+    // l'écraser ou de l'incrémenter comme un simple compteur.
     cube_neant: { champ: 'pnNeant', categorie: 'jeton' },
-    gloire: { champ: 'jetonGloire', categorie: 'jeton', valeur: true },
+    gloire: { champ: 'jetonGloire', categorie: 'jeton', tableauValeurs: true },
     // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde...")
     // : "guilde" GÉNÉRIQUE (type au choix du joueur, pas de suffixe) —
     // aucun `champ` (le type précis n'est connu qu'au moment du
@@ -1003,7 +1023,20 @@ var SecteurService = (function () {
           // pour une clé totalement inconnue.
           if (!info || !info.champ) return;
           var quantite = Number(elements[cle]) || 0;
-          secteur[info.champ] = info.valeur ? quantite : (secteur[info.champ] || 0) + quantite;
+          if (info.tableauValeurs) {
+            // Un secteur peut porter plusieurs jetons Gloire (valeur
+            // individuelle chacun, aucun plafond) — ajoute cette valeur au
+            // tableau existant au lieu de l'écraser, normalisant au passage
+            // une éventuelle ancienne sauvegarde où ce champ était encore
+            // un simple nombre (jamais un tableau).
+            var tableauExistant = Array.isArray(secteur[info.champ])
+              ? secteur[info.champ].slice()
+              : (secteur[info.champ] ? [secteur[info.champ]] : []);
+            tableauExistant.push(quantite);
+            secteur[info.champ] = tableauExistant;
+          } else {
+            secteur[info.champ] = (secteur[info.champ] || 0) + quantite;
+          }
         });
         return DB.put('secteursPartie', secteur).then(function () { return secteur; });
       });
