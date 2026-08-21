@@ -1,7 +1,7 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 27 — 21/08/2026 (gain d'Influence variable — nouveau contexte 'influence_secteur', calcul déterministe sans choix utilisateur)
+ * Version 28 — 21/08/2026 (correctif — retour utilisateur : "je ne vois pas le compteur d'influence augmenter dans l'onglet plat. maison" — afficher() appelle désormais App.renderPlateauMaison, voir JSDoc inline dans la fonction)
  *
  * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
  * secteur Pur", voir focusEngine.js v12 — CLES_INFLUENCE_SECTEUR_) :
@@ -3216,6 +3216,26 @@ var StrategieService = (function () {
     }
     if (nouveauCycle) reinitialiserSoldeDebutCycle_(partie);
     partieAffichee = partie;
+    // 21/08/2026 (retour utilisateur — "je ne vois pas le compteur
+    // d'influence augmenter dans l'onglet plat. maison") : l'Influence
+    // vit sur l'écran "Plat. maison" côté index.html (App.renderPlateauMaison
+    // = renderEcranPlateauMaison_, "déménagée" de cet écran depuis la
+    // Session 10, voir en-tête ci-dessus) — PAS dans les fonctions
+    // render*_ de ce fichier. Tout appelant qui joue une action Focus
+    // (jouerAction_ ci-dessous) ou résout un Cadre d'Événement galactique
+    // (index.html, ~8 wrappers "…EtRafraichir_") appelle StrategieService.
+    // afficher(partie) après persistance, mais AUCUN n'appelait jusqu'ici
+    // App.renderPlateauMaison — l'Influence gagnée (gain fixe "influence",
+    // ou l'une des formules variables ajoutées cette session, voir
+    // focusEngine.js v12) restait donc invisible tant que le joueur ne
+    // rechargeait pas la partie (App.ouvrirPartie, seul autre appelant de
+    // renderEcranPlateauMaison_, lui l'appelait déjà directement).
+    // Centralisé ICI plutôt que dans chaque appelant (mêmes risques d'oubli
+    // que celui qui vient d'être corrigé) : idempotent, aucun listener
+    // DOM ni écriture déclenchée par renderEcranPlateauMaison_, donc sans
+    // risque même appelé deux fois (App.ouvrirPartie le fait déjà avant
+    // d'appeler afficher()).
+    if (typeof App !== 'undefined' && App.renderPlateauMaison) App.renderPlateauMaison(partie);
     renderRessources_(partie);
     renderRappelRessources_(partie);
     renderCubes_(partie);

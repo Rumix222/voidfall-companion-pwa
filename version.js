@@ -1265,6 +1265,23 @@
  *   s'affiche brièvement puis se ferme d'elle-même une fois le montant
  *   calculé, comme la résolution directe déjà en place pour une piste
  *   Corrompue unique (retirer_corruption).
+ *
+ * 21/08/2026 (correctif — retour utilisateur : "je ne vois pas le
+ * compteur d'influence augmenter dans l'onglet plat. maison") : le
+ * compteur "Influence" vit sur l'écran Plat. maison via App.renderPlateauMaison
+ * (index.html, "déménagé" là depuis la Session 10 — comportement legacy
+ * strategie.html/index.html GAS), un rendu SÉPARÉ des fonctions render*_
+ * de strategieService.js. Toute action qui gagne de l'Influence (le gain
+ * fixe "influence" déjà existant, ou l'une des formules variables
+ * ajoutées cette session) persistait bien en base, mais aucun appelant
+ * (jouerAction_ pour une action Focus, les ~8 wrappers "…EtRafraichir_"
+ * d'index.html pour un Cadre d'Événement galactique) n'appelait
+ * App.renderPlateauMaison après coup — seul App.ouvrirPartie (chargement
+ * initial d'une partie) le faisait. StrategieService.afficher (appelée
+ * par TOUS ces points) appelle désormais App.renderPlateauMaison
+ * elle-même (strategieService.js v28) : un seul endroit à corriger plutôt
+ * que chaque appelant, qui referme définitivement ce trou pour toute
+ * action future qui gagnerait de l'Influence.
  */
 
-var APP_VERSION = '20260821.5';
+var APP_VERSION = '20260821.6';
