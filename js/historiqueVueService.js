@@ -1,32 +1,15 @@
 /**
  * historiqueVueService.js
  * Écran Historique — Voidfall Companion PWA
- * Version 3 — 21/08/2026 (docs/docs-rapport.md CM-7 — retrait de l'export ouvrirHistorique jamais appelé)
  *
- * Version 2 — 17/08/2026 (Lot G — corrections mineures, suite)
+ * Affiche la liste des parties enregistrées (reprendre/archiver/
+ * supprimer/tout-supprimer) avec un détail par partie (événements,
+ * technologies disponibles/acquises, vainqueur), à partir de la donnée
+ * enrichie fournie par ScoreService.getHistorique().
  *
- * 17/08/2026 (Lot G — corrections mineures, suite) : libellé du bouton
- * "Archiver (protéger du « Tout supprimer »)" simplifié en "Archiver"
- * (3 occurrences — rendu initial + les 2 bascules de texte après clic) ;
- * "Technologies disponibles (maisons déchues)" -> "Technologies
- * disponibles" (le "(maisons déchues)" était redondant, la seule source
- * de Technologies disponibles étant justement les maisons déchues).
- * Décisions purement textuelles, aucun changement de comportement.
- *
- * Portage DOM du bloc "Historique" de score.html (GAS) —
- * carteHistoriqueHTML/ouvrirHistorique/init (partie reprendre/archiver/
- * supprimer/tout-supprimer). La donnée enrichie (événements, technologies
- * disponibles/acquises, vainqueur) vient de ScoreService.getHistorique()
- * (pur, déjà livré et testé en Phase 5). Remplace la simple liste
- * "Parties enregistrées" (Continuer/Archiver/Supprimer) qui vivait sur
- * l'écran d'accueil depuis la Session 4 — même logique
- * archiver/supprimer, reprise ici telle quelle, enrichie de l'affichage
- * détaillé par partie.
- *
- * Simplification par rapport à score.html : les confirmations utilisent
- * window.confirm()/window.alert() (pas de modal-info/modal-confirm
- * génériques dans cette PWA — même choix déjà fait pour
- * combatVueService.js/scoreVueService.js).
+ * Simplification : les confirmations utilisent window.confirm()/
+ * window.alert() (pas de modal-info/modal-confirm génériques dans cette
+ * PWA — même choix pour combatVueService.js/scoreVueService.js).
  *
  * Dépend de : js/gameService.js, js/scoreService.js (à charger avant ce
  * fichier) et de l'objet global App défini dans index.html
@@ -216,8 +199,5 @@ var HistoriqueVueService = (function () {
       });
   });
 
-  // 21/08/2026 (docs/docs-rapport.md CM-7) : export ouvrirHistorique
-  // retiré (zéro appelant — le listener #btn-historique ci-dessus est
-  // déjà branché en interne, le module n'a besoin d'exposer aucune API).
   return {};
 })();

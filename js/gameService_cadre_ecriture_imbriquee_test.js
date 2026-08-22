@@ -1,18 +1,17 @@
-// Test fumée node --test — régression pour le correctif "retour
-// utilisateur, EVOLUTION 7 KO : je ne vois pas l'effet de l'avancement
-// de la piste civilisation dans l'onglet plateau maison". Reproduit le
-// bug identifié : GameService.appliquerCadreChoixFocusEngine capturait
-// une ligne `plateauMaison` AVANT FocusEngine.resoudreEffet, puis la
-// réécrivait telle quelle (DB.put) à la fin — écrasant toute écriture
-// DIRECTE faite sur plateauMaison PENDANT la résolution par une popup
-// imbriquée (avancer_civilisation — EVOLUTION 7 ; retirer_corruption,
-// option Technologie — EVOLUTION 5 ; toutes deux persistent elles-mêmes
-// via GameService.majPlateauMaison/majCivilisation, lecture-fusion-
-// écriture). Ce test simule directement une telle écriture imbriquée
-// (sans charger civilisationService.js, hors périmètre ici) via un
-// `demanderChoix` factice qui écrit sur plateauMaison avant de résoudre,
-// exactement comme le ferait la vraie popup (strategieService.js).
-// Même mock DB minimal en mémoire (vm, pas de dépendance npm) que
+// Test fumée node --test — reproduit le bug "je ne vois pas l'effet de
+// l'avancement de la piste civilisation dans l'onglet plateau maison" :
+// GameService.appliquerCadreChoixFocusEngine capturait une ligne
+// `plateauMaison` AVANT FocusEngine.resoudreEffet, puis la réécrivait
+// telle quelle (DB.put) à la fin — écrasant toute écriture DIRECTE faite
+// sur plateauMaison PENDANT la résolution par une popup imbriquée
+// (avancer_civilisation ; retirer_corruption, option Technologie ;
+// toutes deux persistent elles-mêmes via
+// GameService.majPlateauMaison/majCivilisation, lecture-fusion-écriture).
+// Ce test simule directement une telle écriture imbriquée (sans charger
+// civilisationService.js, hors périmètre ici) via un `demanderChoix`
+// factice qui écrit sur plateauMaison avant de résoudre, exactement
+// comme le ferait la vraie popup (strategieService.js). Même mock DB
+// minimal en mémoire (vm, pas de dépendance npm) que
 // test_gameService_cadreChoixCube.js.
 const vm = require('vm');
 const fs = require('fs');

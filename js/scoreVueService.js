@@ -1,25 +1,15 @@
 /**
  * scoreVueService.js
  * Écran Fin de partie — Voidfall Companion PWA
- * Version 2 — 21/08/2026 (docs/docs-rapport.md BUG-1 — fix bouton Retour vers écran inexistant)
  *
- * 21/08/2026 (docs/docs-rapport.md BUG-1) : #btn-retour-fin appelait
- * App.afficherEcran('game'), écran renommé depuis en
- * 'plateau-galactique' — le clic affichait un écran totalement vide.
- * Corrigé.
+ * La logique de calcul vit dans js/scoreService.js (pur, testable en
+ * Node) — ce fichier ne fait que lire les champs, afficher un total en
+ * direct (aperçu, le calcul faisant foi étant fait par
+ * ScoreService.enregistrerFinDePartie), et appeler l'API.
  *
- * Portage DOM de la partie "Fin de partie" de score.html (GAS) —
- * construireFormulaire/majTotalAffiche/ouvrirEcranFin/init (le bloc
- * "Historique" de score.html N'EST PAS porté cette session, ScoreService.
- * getHistorique() est prêt mais son écran dédié reste Phase 6). La
- * logique de calcul vit dans js/scoreService.js (pur, testable en Node) —
- * ce fichier ne fait QUE lire les champs, afficher un total en direct
- * (aperçu, comme côté GAS : "le calcul faisant foi est fait côté
- * serveur"/ScoreService.enregistrerFinDePartie), et appeler l'API.
- *
- * Simplification par rapport à score.html : le résultat final s'affiche
- * via window.alert() (pas de modal-info générique dans cette PWA, voir
- * même choix déjà fait pour combatVueService.js).
+ * Simplification : le résultat final s'affiche via window.alert() (pas
+ * de modal-info générique dans cette PWA, même choix pour
+ * combatVueService.js).
  *
  * Dépend de : js/scoreService.js (à charger avant ce fichier) et de
  * l'objet global App défini dans index.html (App.getPartieCourante).
@@ -112,9 +102,8 @@ var ScoreVueService = (function () {
   document.getElementById('btn-terminer-partie').addEventListener('click', ouvrirEcranFin_);
   document.getElementById('btn-retour-fin').addEventListener('click', function () { App.afficherEcran('plateau-galactique'); });
   document.getElementById('btn-enregistrer-fin').addEventListener('click', enregistrer_);
-  // Petit ajout non présent côté GAS (score.html n'avait pas ce listener) :
-  // le total affiché ne se mettait à jour que via les champs du barème,
-  // pas la difficulté elle-même — corrigé ici, coût nul, aucune régression.
+  // Le total affiché doit aussi se mettre à jour quand la difficulté
+  // change, pas seulement via les champs du barème.
   document.getElementById('influence-difficulte').addEventListener('change', majTotalAffiche_);
 
   return {};

@@ -76,11 +76,14 @@ Statuts : ⬜ à traiter · 🔶 en cours · ✅ traité · ❌ écarté (avec r
 
 ## Gap fonctionnel (feature manquante, pas du code mort)
 
-- ⬜ **GAP-1** — `data/catalogue/technologies.json` champ `texteAmeliore`
-  (rempli sur les 28 technos) jamais affiché en UI : le joueur coche
-  "Améliorée" sans jamais voir le texte de l'effet amélioré. À afficher
-  dans le tooltip/fiche technologie (`badgeTechnologie_`, `index.html`)
-  quand `amelioree === true`.
+- ✅ **GAP-1** (traité 22/08/2026) — `data/catalogue/technologies.json`
+  champ `texteAmeliore` (rempli sur les 28 technos) jamais affiché en UI :
+  le joueur cochait "Améliorée" sans jamais voir le texte de l'effet
+  amélioré. Fix : tooltip (`title`) sur la Technologie de départ et
+  chaque case "Améliorée" des 5 emplacements "Technologies obtenues"
+  (Plat. maison), affichant `texteAmeliore` si coché sinon `texte` —
+  `js/gameService.js` propage désormais le champ, `index.html` (nouveau
+  helper `titreTechnologie_`) fait le lookup par nom (v52).
 
 ## Mutualisation
 
@@ -114,18 +117,21 @@ Statuts : ⬜ à traiter · 🔶 en cours · ✅ traité · ❌ écarté (avec r
 
 ## Données dupliquées
 
-- ⬜ **DUP-1** — `index.html` duplique `strategieService.js` (déjà noté
-  dans `docs/docs-architecture-pwa.md` §13) : `LABEL_RESSOURCE_CADRE_`,
-  `COULEUR_RESSOURCE_CADRE_`, `LABEL_GUILDE`, `LABEL_INSTALLATION`,
-  `LABEL_PN`, `TYPES_INSTALLATION`, `TYPES_GUILDE`, `TYPES_VAISSEAU`
-  côté `index.html` vs `CHAMP_RESSOURCE`/`RESSOURCES_TOUTES`/
-  `TYPES_VAISSEAU` côté `strategieService.js` (non exportés).
-  `index.html:1266` ajoute une 3ᵉ copie du mapping Guilde→couleur
-  (`COULEUR_PAR_GUILDE_CADRE_`). **Non traité — plus lourd et plus
-  risqué que les autres DUP** : 8 tables à exposer/dédupliquer, de
-  nombreux points de rendu à vérifier dans `index.html` (Plat.
-  Galactique/Focus/Secteurs). À faire en session dédiée avec plus de
-  marge de vérification manuelle.
+- ✅ **DUP-1** (traité 22/08/2026) — `index.html` dupliquait
+  `strategieService.js` : `LABEL_RESSOURCE_CADRE_`/
+  `COULEUR_RESSOURCE_CADRE_`/`TYPES_INSTALLATION`/`TYPES_GUILDE`/
+  `TYPES_VAISSEAU`/`COULEUR_PAR_GUILDE_CADRE_` supprimées, `index.html`
+  lit désormais `StrategieService.CHAMP_RESSOURCE`/
+  `TYPES_INSTALLATION_CONSTRUIRE_`/`TYPES_GUILDE_CONSTRUIRE_`/
+  `TYPES_VAISSEAU`/`GUILDE_VERS_RESSOURCE` (nouvellement exposées).
+  2 divergences de libellé trouvées entre les copies (`"Défense
+  Secteur"` vs `"Défense de Secteur"`, `"Cuirasse"` vs `"Cuirassé"`) —
+  tranchées par l'utilisateur, voir `version.js` v53. `LABEL_GUILDE`/
+  `LABEL_INSTALLATION`/`LABEL_PN` (tableau Secteurs) laissées à part :
+  ce ne sont pas des duplicats au sens strict (libellés abrégés
+  différents ET clés différentes — `guildeFermiers` vs `fermiers`).
+  Validé par les 80+51 tests + `e2e/partie-complete.spec.js` +
+  `e2e/partie-aleatoire.spec.js` (14 maisons).
 - ✅ **DUP-2** (traité 21/08/2026) — `secteurService.js`
   (`CHAMP_PN_PAR_TYPE`, non exporté) vs `strategieService.js`
   (`CHAMP_PN_PAR_TYPE_VUE`) : tables identiques. `CHAMP_PN_PAR_TYPE`
@@ -139,13 +145,17 @@ Statuts : ⬜ à traiter · 🔶 en cours · ✅ traité · ❌ écarté (avec r
   deux fichiers pour 5 lignes de données stables. Commentaires croisés
   ajoutés dans les deux fichiers à la place (chaque copie renvoie
   explicitement vers l'autre).
-- ⬜ **DUP-4** — `strategieService.js` : `CHAMP_RESSOURCE` vs
-  `RESSOURCES_TOUTES` recopient les 5 mêmes couleurs ;
-  `TYPES_INSTALLATION_CONSTRUIRE_`/`TYPES_GUILDE_CONSTRUIRE_` dupliquent
-  `TYPES_INSTALLATION`/`TYPES_GUILDE` d'`index.html` ; mapping
-  Guilde→Ressource éclaté sur 3 tables à clés différentes
-  (`GUILDE_VERS_RESSOURCE`, `CHAMP_GUILDE_PAR_CLE_INFLUENCE_`,
-  `LABEL_GUILDE_INFLUENCE_`).
+- ✅ **DUP-4** (traité 22/08/2026) — `strategieService.js` :
+  `TYPES_INSTALLATION_CONSTRUIRE_`/`TYPES_GUILDE_CONSTRUIRE_` ne
+  dupliquent plus rien (résolu par DUP-1 ci-dessus, `index.html` les
+  réutilise directement) ; `LABEL_GUILDE_INFLUENCE_` (copie exacte de
+  `TYPES_GUILDE_CONSTRUIRE_`) supprimée, remplacée par `labelGuilde_(cle)`
+  (même principe que `labelVaisseau_`/MUT-6). Restent volontairement
+  séparées (pas fusionnées) : `CHAMP_RESSOURCE` vs `RESSOURCES_TOUTES`
+  (portées différentes, déjà documenté en commentaire avant ce lot) et
+  `CHAMP_GUILDE_PAR_CLE_INFLUENCE_`/`GUILDE_VERS_RESSOURCE` (deux
+  traductions différentes — clé catalogue Focus vs colonne DB secteur —
+  pas la même donnée que le libellé d'affichage).
 
 Aucune duplication détectée dans les catalogues JSON eux-mêmes (schémas
 homogènes, aucun id en double, aucune référence cassée) — la dette est
@@ -153,34 +163,64 @@ entièrement côté JS.
 
 ## Architecture
 
-- ⬜ **ARCH-1** — `strategieService.js` (3423 lignes, le plus gros
-  fichier) : la modale générique `demanderChoix` (L.1660-3350) = la
-  moitié du fichier, fonctionnellement indépendante du rendu Focus/Plat.
-  maison → candidat à extraction (`modaleChoixService.js`). Ses 18
-  branches `contexte.type` gagneraient à passer d'un `if/else` géant à
-  un dispatch par table.
-- ⬜ **ARCH-2** — `index.html` : ~900 lignes (L.929-2280) constituent un
-  moteur de résolution des Cadres d'Événement galactique, cassant la
-  convention "1 fichier dédié par écran" → candidat à extraction vers
-  `js/evenementVueService.js`.
-- ⬜ **ARCH-3** — `gameService.js` : pattern systématique lire→muter→
-  sauvegarder→**relire** pour reconstruire le retour (~11 fonctions),
-  alors que l'objet muté en mémoire est déjà dans la forme attendue.
-  Pas un bug, juste redondant.
-- ⬜ **ARCH-4** — Dette de tests mal ciblée : `combatService.js`
-  (résolution de combat complexe) n'a **aucun test** — zone la plus
-  risquée du projet. `civilisationService_test.js` existe déjà et couvre
-  bien le module → mettre à jour `CLAUDE.md` qui liste encore
-  civilisationService.js comme non testé.
-- ⬜ **ARCH-5** — Convention de nommage des fichiers de test incohérente :
-  `*.test.js` / `*_test.js` / `test_*.js` coexistent. `node --test` sans
-  argument ne matche que `*.test.js` — vérifier que les deux autres
-  familles sont bien lancées individuellement.
-- ⬜ **ARCH-6** — Détails mineurs : commentaire obsolète `index.html:720`
-  ("`obtenirSecteurMere` n'est plus appelé" — faux, utilisé
-  `strategieService.js:2088`) ; classe CSS `.subsection-title` utilisée
-  5× en HTML mais jamais stylée ; `civilisationService.js` mélange
-  caractères accentués directs et échappements `\uXXXX`.
+- ❌ **ARCH-1** (écarté 22/08/2026, décision utilisateur) — `strategieService.js`
+  (3423 lignes, le plus gros fichier) : la modale générique `demanderChoix`
+  (L.1660-3350) = la moitié du fichier, fonctionnellement indépendante du
+  rendu Focus/Plat. maison → candidat à extraction (`modaleChoixService.js`).
+  Ses 18 branches `contexte.type` gagneraient à passer d'un `if/else` géant
+  à un dispatch par table. Non traité : extraction à gros volume sur le
+  fichier le plus gros et le plus sollicité du projet, risque de
+  régression réel sur une app en cours d'usage — hors périmètre d'une
+  reprise de rapport, à planifier comme une vraie refonte dédiée si
+  souhaitée.
+- ❌ **ARCH-2** (écarté 22/08/2026, décision utilisateur) — `index.html` :
+  ~900 lignes (L.929-2280) constituent un moteur de résolution des Cadres
+  d'Événement galactique, cassant la convention "1 fichier dédié par
+  écran" → candidat à extraction vers `js/evenementVueService.js`. Non
+  traité, même raison qu'ARCH-1.
+- ❌ **ARCH-3** (écarté 22/08/2026, décision assistant + confirmation
+  utilisateur) — `gameService.js` : pattern systématique lire→muter→
+  sauvegarder→**relire** pour reconstruire le retour (~11 fonctions,
+  factorisé dans `rechargerPartie_` par MUT-1). En l'examinant : ce
+  n'est PAS aussi redondant qu'il y paraît — `rechargerPartie_` appelle
+  `assemblerPartie_`, qui recalcule des champs dérivés (`cycleActuel`,
+  `civilisation`, `technologieDepart`...) et applique des valeurs par
+  défaut (`pm.jetonPrime || 0`, etc.) que l'objet muté en mémoire avant
+  la sauvegarde n'a pas nécessairement à jour. Retirer ce refetch pour
+  gagner une lecture IndexedDB locale (perf négligeable) contre le risque
+  de renvoyer une `partie` subtilement différente de ce qui est
+  réellement persisté : rapport risque/bénéfice défavorable, non traité.
+- ✅ **ARCH-4** (traité 22/08/2026) — Dette de tests mal ciblée :
+  `combatService.js` (résolution de combat Envahir/Escarmouche, portée
+  quasi textuellement depuis combat.html GAS) n'avait **aucun test** —
+  zone la plus risquée du projet. Fix : `js/combatService.test.js`, 24
+  tests (`vaisseauxDebloques`/`construireCamp`/`resoudreCombat`/
+  `resoudreInvasion`) couvrant les cas de base (victoire immédiate,
+  Défense de Secteur seule, égalité d'Initiative, priorité de rappel de
+  cube ORDRE_RAPPEL, déploiement des Porte-Vaisseaux, Absorption de
+  Salve Cuirassé/Porte-Vaisseaux) et les 8 bonus de Technologie
+  (Ciblage/Ciblage amélioré — dont le cas limite "défenseur qui n'a que
+  des Sentinelles", Torpilles/Torpilles améliorées, Cellules
+  énergétiques, Destroyers améliorés, Boucliers attaquant/défenseur).
+  Chaque valeur attendue vérifiée par exécution réelle avant d'être
+  figée en assertion (voir en-tête du fichier de test). `CLAUDE.md` mis
+  à jour (combatService.test.js ajouté à la liste, civilisationService.js
+  déjà correctement listé comme testé avant ce lot).
+- ✅ **ARCH-5** (vérifié 22/08/2026) — Convention de nommage des fichiers
+  de test incohérente : `*.test.js` / `*_test.js` / `test_*.js`
+  coexistent. `node --test` sans argument ne matche que `*.test.js`
+  (confirmé) ; les 7 fichiers `*_test.js`/`test_*.js` ont été lancés
+  individuellement (`node js/<fichier>`) pendant ce lot — tous passent.
+  Convention non unifiée (pas de renommage — hors périmètre, aucun bug
+  réel, juste une vérification demandée).
+- ✅ **ARCH-6** (traité 22/08/2026) — Détails mineurs : commentaire
+  obsolète `index.html:720` corrigé (renvoie vers le vrai appelant,
+  `strategieService.js`) ; classe CSS `.subsection-title` stylée (même
+  gabarit que `.card h3`, sans le trait orange — délibéré) ;
+  `civilisationService.js` : 9 échappements `\uXXXX` résiduels remplacés
+  par leur caractère direct, cohérent avec le reste du fichier (la plage
+  regex de normalisation Unicode ligne 133 n'est pas concernée, ce n'est
+  pas la même chose).
 
 ## Ordre de traitement suggéré
 
@@ -189,14 +229,26 @@ entièrement côté JS.
 3. ✅ Code mort — CM-1 à CM-8, CM-10 traités (21/08/2026) ; CM-9 laissé
    en attente d'une décision produit
 4. ✅ Mutualisation restante — MUT-2 à MUT-8 traités (21/08/2026)
-5. 🔶 Données dupliquées — DUP-2/DUP-3 traités (21/08/2026) ; **DUP-1 et
-   DUP-4 restent à faire**, en session dédiée (plus gros volume,
-   plusieurs écrans de rendu à revérifier manuellement)
-6. ⬜ ARCH-1/ARCH-2 et ARCH-4 (tests `combatService.js`) — seulement si
-   une refonte de fond est planifiée, gros volume de code sans filet de
-   sécurité — non commencés
+5. ✅ Données dupliquées — DUP-1 à DUP-4 traités (21-22/08/2026)
+6. ✅ Gap fonctionnel — GAP-1 traité (22/08/2026)
+7. ✅ Détails mineurs — ARCH-6 traité (22/08/2026)
+8. ✅ ARCH-4 — tests `combatService.js` traités (22/08/2026) ; ARCH-5
+   vérifié (22/08/2026) ; ARCH-1/ARCH-2/ARCH-3 écartés (décision
+   utilisateur/assistant, 22/08/2026 — refactors à gros volume/risque de
+   régression pour un bénéfice cosmétique ou de perf négligeable, hors
+   périmètre d'une reprise de rapport, voir raisons détaillées ci-dessus)
+
+**Point d'étape 22/08/2026 : tous les points du rapport sont désormais
+traités ou explicitement écartés avec raison.** Seuls restent ouverts,
+par décision produit délibérée : CM-9 (décision produit sur les trous de
+ver) et ARCH-1/ARCH-2/ARCH-3 (refactors à planifier en session dédiée si
+souhaité).
 
 Chaque point traité a été validé par : les 80 tests `*.test.js` + les 51
 tests `*_test.js`/`test_*.js` (`node --test`) + `e2e/partie-complete.spec.js`
 + `e2e/partie-aleatoire.spec.js` sur les 14 maisons du catalogue (et 10
-seeds supplémentaires sur une maison pour MUT-3 à MUT-6).
+seeds supplémentaires sur une maison pour MUT-3 à MUT-6). Le lot du
+22/08/2026 (GAP-1, ARCH-6, DUP-1, DUP-4, ARCH-4, ARCH-5) ajoute 24 tests
+à `combatService.test.js` (104 tests `*.test.js` au total) et a été
+validé par les mêmes moyens (80+51+24 tests + les 2 suites e2e sur les 14
+maisons).

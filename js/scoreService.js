@@ -1,16 +1,10 @@
 /**
  * scoreService.js
  * Fin de partie & historique — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 7, Phase 5 — Score)
  *
- * Portage quasi textuel de ScoreService.js (GAS, 213 l.) — comme
- * CivilisationService.js et combat.html avant lui, ce module s'est avéré
- * ENTIÈREMENT PUR côté GAS (aucune RPC Postgres, uniquement des appels
- * DataService.getPartieById/updatePartieEtHistorique/getAllParties déjà
- * équivalents à GameService.obtenirPartie/sauvegarderPartie/listerParties
- * côté PWA). Barème de l'Influence du Néant et règle de victoire (le
- * joueur doit STRICTEMENT dépasser l'Influence du Néant) repris à
- * l'identique.
+ * Barème de l'Influence du Néant et règle de victoire : le joueur doit
+ * STRICTEMENT dépasser l'Influence du Néant pour l'emporter (égalité =
+ * défaite du joueur).
  *
  * enregistrerFinDePartie ajoute `finDePartie`/`terminee` à l'objet partie
  * puis appelle GameService.sauvegarderPartie tel quel — ces deux champs
@@ -20,9 +14,9 @@
  * retire que les champs à colonne dédiée).
  *
  * ⚠️ `terminee` (ce fichier) est un indicateur informatif distinct de
- * `cycleTermine`/`statut` (gameService.js, dédiés au cycle) — pas de
- * fusion des deux notions cette session, pour ne pas toucher à la logique
- * de statut déjà en place.
+ * `cycleTermine`/`statut` (gameService.js, dédiés au cycle) — les deux
+ * notions restent séparées, pour ne pas complexifier la logique de
+ * statut déjà en place.
  *
  * Dépend de : gameService.js (GameService.obtenirPartie/sauvegarderPartie/
  * listerParties) — à charger avant ce fichier.
@@ -159,8 +153,9 @@ var ScoreService = (function () {
 
     /**
      * Historique enrichi (événements choisis, technologies disponibles/
-     * acquises, vainqueur), pour un futur écran Historique dédié (Phase 6).
-     * GameService.listerParties() trie déjà par date décroissante.
+     * acquises, vainqueur), consommé par l'écran Historique
+     * (historiqueVueService.js). GameService.listerParties() trie déjà
+     * par date décroissante.
      */
     getHistorique: function () {
       return GameService.listerParties().then(function (parties) {

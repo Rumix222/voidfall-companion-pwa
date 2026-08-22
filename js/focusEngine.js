@@ -1,166 +1,13 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
- * Version 14 — 21/08/2026 (docs/docs-rapport.md MUT-2 — factorisation demanderChoixEtJournaliser_)
  *
- * 21/08/2026 (docs/docs-rapport.md MUT-2) : motif
- * `demanderChoix -> journal.push -> return true/false` répété 7 fois
- * dans resoudreCle_ (construire, augmenter_population_pure,
- * retirer_corruption, gain_corruption, avancer_civilisation,
- * ameliorer_gloire, regrouper) factorisé en `demanderChoixEtJournaliser_`.
- * Aucun changement de comportement (35 tests focusEngine.test.js +
- * e2e/partie-aleatoire.spec.js sur les 14 maisons).
- *
- * Version 13 — 21/08/2026 (correctif — "ameliorer_gloire" réellement reconnue, déléguée à demanderChoix({type:'ameliorer_gloire'}))
- *
- * 21/08/2026 (retour utilisateur : "Implémenter le gain d'influence, il y
- * en a à plusieurs endroits, gagner de l'influence fait incrémenter le
- * compteur d'influence visible sur le plateau maison") : la clé simple
- * "influence" (montant fixe) était déjà automatisée (CLES_SIMPLES), mais
- * pas les formules VARIABLES rencontrées dans focus.json/pistesCivilisation.json
- * ("influence_valeur_gloire", "influence_par_technologie_amelioree", et 9
- * clés "influence_par_guilde", "influence_par_installation_pure",
- * "influence_par_cube_secteur_pur" et "influence_par_secteur_pur" (et
- * leurs variantes) — toutes tombaient sur le repli générique non automatisé.
- * Périmètre de cette session (voir CIBLE_KIND_MAP_GAIN_CORRUPTION_-like
- * discussion avec l'utilisateur) : uniquement les formules calculables
- * depuis l'état du plateau (Gloire/Technologies/secteurs), PAS les 2 clés
- * liées à l'issue d'un combat ("influence_par_cube_neant",
- * "influence_population_secteur" — dépendent du popup Envahir) ni
- * "evaluer_influence_programme_pur" (texte libre non structuré côté
- * programmes.json) — ces 3 restent hors périmètre, non automatisées,
- * comme avant. Nouvelles SecteurService.obtenirAgregatsInfluenceSecteursPurs
- * (secteurService.js v12) + nouveau contexte demanderChoix
- * 'influence_secteur' (strategieService.js v27, calcul déterministe sans
- * choix utilisateur — même principe que la résolution directe "une seule
- * option" déjà en place pour retirer_corruption/gagner_corruption).
- *
- * 21/08/2026 (effet "Gagner une Corruption", voir
- * docs-rules-corruption-gardiens-refuges-technoConsume.md) : nouveau cas
- * "gain_corruption" dans resoudreCle_, miroir exact de "retirer_corruption"
- * — voir son commentaire dédié plus bas pour le détail des 4 cibles
- * possibles et le partage de la popup 'gagner_corruption' avec le Cadre
- * d'Événement galactique "gain" (GameService.appliquerCadreGainCorruption,
- * nouveau, gameService.js), qui restreint les cibles proposées selon le
- * catalogue (cible/cible_options/repli) plutôt que de les laisser toutes
- * ouvertes.
- *
- * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
- * utilisateur : "automatiser augmentez une population pure ... et
- * etablir un guilde banquier -> idem que etablir une guilde sauf que
- * banquier est preselectionné dans la ddl et en lecture seule") : 2
- * nouvelles clés reconnues par resoudreCle_, même principe que
- * construire_installation/etablir_guilde (Effet UNIQUEMENT, signe > 0) :
- * - 'etablir_guilde_banquier' ajoutée à CATEGORIE_PAR_CLE_CONSTRUIRE_
- *   ('guilde', même popup 'construire' que etablir_guilde) + nouvelle
- *   TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = { etablir_guilde_banquier: 'banquiers' }
- *   — demanderChoix({type:'construire', ..., typeForce}) transmis à la
- *   popup (strategieService.js), qui restreint alors le <select> Type à
- *   cette seule option et le désactive (lecture seule) au lieu de laisser
- *   le joueur choisir librement.
- * - 'augmenter_population_pure' : nouveau cas dédié, demanderChoix({type:
- *   'augmenter_population_pure', ...}) — la popup fait la sélection du
- *   secteur (SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure,
- *   secteurService.js v6) et écrit directement via SecteurService.
- *   augmenterPopulationPure au moment de la validation (même pattern que
- *   construire/regrouper/envahir : focusEngine reste pur, aucun accès DB
- *   ici, resoudreCle_ relaie juste le résumé dans le journal).
- * js/gameService.js/index.html (cleFocusEnginePourOptionCadre_ dupliquée
- * dans les 2 fichiers), js/strategieService.js (popup, v21).
- *
- * 19/08/2026 (retour utilisateur : "on a dû perdre cette possibilité lors
- * du portage en PWA, il y a des actions de focus qui placent des guildes
- * ou des installations aussi") : "construire_installation"/"installation"/
- * "etablir_guilde"/"guilde" retirés de CLES_SECTEUR_HORS_PERIMETRE —
- * nouveau cas dédié dans resoudreCle_ (CLES_CONSTRUIRE/
- * CATEGORIE_PAR_CLE_CONSTRUIRE_) qui délègue à demanderChoix({type:
- * 'construire', categorie, ...}). Même principe que regrouper/envahir/
- * deployer_cube : la popup (DOM, strategieService.js) fait la sélection
- * secteur (possédé, au moins un emplacement libre pour la catégorie,
- * SecteurService.obtenirSecteursEligiblesConstruction déjà porté Session
- * 12/13 mais jamais branché ailleurs que le formulaire dédié écran
- * Secteurs) + type (Guilde ou Installation, au choix), appelle
- * directement SecteurService.construire et persiste en IndexedDB AU
- * MOMENT de la validation — resoudreCle_ ne fait que relayer le résumé
- * dans le journal, focusEngine reste pur. Bénéfice immédiat : toute carte
- * Focus du catalogue utilisant ces 4 clés (ex. id 21 "Organiser" —
- * Prospérité Standard, `effet.choice: ["gagner_programme", "installation"]`)
- * devient jouable sans changement supplémentaire (dispatch générique par
- * clé JSON, déjà en place). Portée volontairement limitée aux 4 clés de
- * base (quantité 1, secteur libre + type libre) — les variantes du
- * catalogue (etablir_guilde_meme_secteur/_up_to/_scientifique,
- * construire_installation_meme_secteur/_autre_secteur/_up_to) restent hors
- * périmètre (repli générique "effet non chiffré", pas de régression, juste
- * pas automatisées par ce lot — nécessiteraient de croiser l'état d'une
- * autre clé résolue dans le même JSON, ou une répétition "jusqu'à N fois",
- * hors de la portée demandée). js/strategieService.js (nouveau contexte
- * 'construire' de demanderChoix), js/gameService.js (cleFocusEnginePourOptionCadre_
- * étendu — Cadre "choix" d'Événement galactique portant sur etablir_guilde/
- * construire_installation, ex. Événement C Cycle 1 Cadre 2, réutilise
- * désormais ce même mécanisme au lieu d'une résolution manuelle),
- * index.html (idem, copie dupliquée par convention).
- *
- * 17/08/2026 (Session 14 fin) : "envahir"/"envahir_corrompu" retirés de
- * CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié dans resoudreCle_ qui
- * délègue à demanderChoix({type:'envahir', corrompu, ...}). La popup (DOM,
- * strategieService.js) fait la sélection cible/engagement, résout le
- * combat via CombatService.resoudreInvasion et persiste via
- * SecteurService.envahirResoudre. Conséquences scalaires (jetonPrime/
- * jetonLiberation/influence en victoire, cubeActif en défaite) appliquées
- * ICI sur l'état pur ; le jeton Gloire (array) est persisté DIRECTEMENT
- * par la popup (hors diff/annulation, même pattern que le clic manuel sur
- * un emplacement Gloire). HORS PÉRIMÈTRE cette session (journalisé en
- * avertissement le cas échéant) : défausse d'un jeton Gloire pour un
- * secteur source abandonné (repris par le Néant) — les jetons Prime/
- * Libération gagnés restent en revanche de simples compteurs (déjà le cas
- * pour toute carte via CLES_SIMPLES), pas besoin de popup de résolution
- * dédiée. C'est la dernière des 3 actions secteur "lourdes" de la Session
- * 14 — construire_installation/etablir_guilde/rappeler_cube/
- * retirer_corruption/effet_secteur restent hors périmètre (déjà branchés
- * en boutons dédiés écran Secteurs pour les 2 premiers, Session 13).
- *
- * 17/08/2026 (Session 14 suite — action secteur "Déployer des cubes"
- * portée) :
- *
- * 17/08/2026 (Session 14 suite) : "deployer_cube_par_chantier"/
- * "deployer_cube"/"deploy_cube"/"deployer_cube_secteur_mere" (Effet
- * UNIQUEMENT, signe > 0 — comme le legacy) ouvrent désormais une popup
- * dédiée (voir MODE_PAR_CLE_DEPLOYER_CUBE et le nouveau cas
- * contexte.type === 'deployer_cube' de strategieService.js) qui choisit
- * secteur(s)/type(s) de Flotte (limités aux Technologies débloquées)/
- * quantité(s), sur les 3 modes du livret : 'par_chantier' (N cube(s) PAR
- * Chantier Naval possédé, dans son secteur), 'libre' (N cube(s) au choix
- * sur n'importe quel secteur possédé), 'secteur_mere' (N cube(s) dans le
- * Secteur-Mère uniquement). Différence assumée avec le legacy : la popup
- * (DOM) ne fait QUE persister le placement sur les secteurs
- * (SecteurService.deployerCube) — c'est resoudreCle_ ICI qui débite Cube
- * actif et le coût en ressources (Cuirassé → Matériel, Porte-Vaisseau →
- * Nourriture, voir COUT_DEPLOIEMENT_PAR_TYPE côté strategieService.js) sur
- * l'état pur, pour que ces mutations restent diffables/annulables comme
- * le reste du moteur (le legacy les écrivait directement depuis la popup
- * via un PATCH séparé, hors du flux normal d'annulation).
- *
- * 17/08/2026 (Session 14) : "regrouper"/"regroupe" retirés de
- * CLES_SECTEUR_HORS_PERIMETRE — nouveau cas dédié dans resoudreCle_ qui
- * délègue à demanderChoix({type:'regrouper', ...}). Le moteur reste PUR :
- * c'est la popup (implémentation DOM, voir strategieService.js) qui
- * appelle directement SecteurService.regrouper et persiste en IndexedDB
- * AU MOMENT de la validation — resoudreCle_ ne fait que relayer le résumé
- * renvoyé ({deplacements, detail}) dans le journal. "Annuler" bloque toute
- * l'action (même comportement que "choice"/"choice_repeat" ci-dessous),
- * cohérent avec le popup Envahir du legacy (envahir/envahir_corrompu
- * portés à leur tour en fin de Session 14, voir plus haut). rappeler_cube/
- * retirer_corruption/construire_installation/etablir_guilde/effet_secteur
- * restent hors périmètre (inchangé cette session, voir liste ci-dessous).
- *
- * Extraction PURE (aucun DOM, aucun accès direct à IndexedDB) de la
- * logique appliquerJson_/resoudreCle_/jouerAction_ de strategie.html
- * (GAS, lignes ~2583-2990). Porte le mapping des clés Coût/Effet vers
- * l'état du Plateau maison PWA (voir gameService.js — champs et liste
- * blanche CHAMPS_PLATEAU_MAISON_AUTORISES).
+ * Porte le mapping des clés Coût/Effet du catalogue Focus vers l'état du
+ * Plateau maison PWA (voir gameService.js — champs et liste blanche
+ * CHAMPS_PLATEAU_MAISON_AUTORISES).
  *
  * ---------------------------------------------------------------------
- * MODE "PUR / DIFF" (tranché en session) :
+ * MODE "PUR / DIFF" :
  * FocusEngine.resoudreAction() ne fait AUCUNE écriture. Il reçoit l'état
  * actuel du plateau maison, calcule l'état résultant, et retourne :
  *   - succes (bool)
@@ -168,26 +15,20 @@
  *   - mutations (liste de {champ, avant, apres} — un par champ modifié)
  *   - plateauMaisonApres (l'état complet résultant, prêt à être passé à
  *     GameService.majPlateauMaison par l'appelant)
- * C'est l'appelant (futur écran Stratégie, ou l'orchestrateur ci-dessous)
+ * C'est l'appelant (écran Stratégie, ou l'orchestrateur ci-dessous)
  * qui décide d'écrire en base et d'empiler les mutations dans la pile
- * d'annulation (voir annulationService.js, nouveau cette session).
+ * d'annulation (voir annulationService.js).
  *
  * ---------------------------------------------------------------------
- * RÈGLE MÉTIER (déjà validée, préservée ET renforcée) :
- * Le Coût n'est débité qu'APRÈS résolution réussie de l'Effet. Amélioration
- * apportée par le mode pur par rapport à strategie.html GAS : côté GAS, si
- * une clé bloquante (ex. "Annuler" sur une popup Envahir) survient APRÈS
- * que d'autres clés du même JSON Effet/Coût aient déjà été appliquées, ces
- * clés précédentes restaient appliquées malgré le message "aucune donnée
- * modifiée" (incohérence documentée dans le commentaire de jouerAction_
- * GAS). Ici, resoudreJson_ travaille sur un CLONE de l'état et ne retourne
- * ses mutations à l'appelant QUE si la résolution complète du JSON (Effet
- * OU Coût, chacun pris comme un tout) a réussi — un blocage à N'IMPORTE
- * quelle clé annule bien la totalité du JSON en cours, pas seulement les
- * clés restantes. Le comportement legacy où le Coût est annulé après que
- * l'Effet a déjà réussi (cas limite documenté côté GAS) est conservé tel
- * quel : dans ce cas précis, les mutations de l'Effet sont conservées,
- * celles du Coût sont écartées, et un avertissement est journalisé.
+ * RÈGLE MÉTIER :
+ * Le Coût n'est débité qu'APRÈS résolution réussie de l'Effet. resoudreJson_
+ * travaille sur un CLONE de l'état et ne retourne ses mutations à
+ * l'appelant QUE si la résolution complète du JSON (Effet OU Coût, chacun
+ * pris comme un tout) a réussi — un blocage à N'IMPORTE quelle clé annule
+ * bien la totalité du JSON en cours, pas seulement les clés restantes.
+ * Cas limite volontairement toléré : si le Coût est annulé après que
+ * l'Effet a déjà réussi, les mutations de l'Effet sont conservées, celles
+ * du Coût sont écartées, et un avertissement est journalisé.
  *
  * ---------------------------------------------------------------------
  * POINTS DE CHOIX (interaction utilisateur) :
@@ -197,40 +38,36 @@
  * une fonction fournie par l'appelant, qui doit retourner une Promise
  * résolue avec la réponse du joueur. Voir le mapping des `contexte.type`
  * dans les commentaires de resoudreCle_ ci-dessous. C'est ce mécanisme qui
- * permet de couvrir TOUTES les clés dès cette session (comme demandé),
- * tout en restant testable en Node (un `demanderChoix` factice répond
- * automatiquement dans les tests).
+ * permet de couvrir TOUTES les clés du catalogue tout en restant testable
+ * en Node (un `demanderChoix` factice répond automatiquement dans les
+ * tests).
  *
  * ---------------------------------------------------------------------
  * CLÉS HORS PÉRIMÈTRE — signalé explicitement (pas d'invention de logique) :
- * Certaines clés dépendent de systèmes qui n'existent PAS ENCORE dans la
- * PWA (voir secteurService.js/gameService.js, en-têtes) :
- *   - Actions sur les secteurs : rappeler_cube, effet_secteur
- *     ("regrouper"/"regroupe" porté depuis la Session 14, "deployer_cube*"
- *     porté depuis la Session 14 suite, "envahir"/"envahir_corrompu"
- *     porté en fin de Session 14, "retirer_corruption" porté le
- *     20/08/2026 (EVOLUTION 5) — voir plus bas, cas dédiés dans
- *     resoudreCle_)
- *     (secteurService.js PWA ne porte QUE l'instanciation/lecture pour les
- *     clés restant ci-dessus — actions hors périmètre, cf. son en-tête)
+ * Certaines clés dépendent de systèmes que la PWA ne modélise pas
+ * automatiquement (voir secteurService.js/gameService.js, en-têtes) :
+ *   - Actions sur les secteurs : rappeler_cube, effet_secteur (les autres
+ *     actions secteur — regrouper/regroupe, deployer_cube*, envahir/
+ *     envahir_corrompu, retirer_corruption — ont chacune un cas dédié
+ *     dans resoudreCle_ ci-dessous ; secteurService.js PWA ne porte que
+ *     l'instanciation/lecture pour rappeler_cube/effet_secteur, actions
+ *     hors périmètre — cf. son en-tête)
  *   - Civilisation : avance_rapide, avancer_civilisation_moins_avancee,
- *     avancer_piste_corrompue ("avancer_civilisation"/"avancer_
- *     civilisation_societe"/"_gouvernement"/"_economie" portées le
- *     20/08/2026, EVOLUTION 7 — voir plus bas, cas dédié dans
- *     resoudreCle_ ; CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js
- *     exclut toujours civSociete/civGouvernement/civEconomie, mais
- *     CivilisationService.avancerPiste — appelée depuis la popup, pas
- *     depuis ce fichier — a ses propres fonctions dédiées pour ces champs)
+ *     avancer_piste_corrompue ("avancer_civilisation" et ses variantes
+ *     "_societe"/"_gouvernement"/"_economie" ont un cas dédié ci-dessous
+ *     qui délègue à CivilisationService.avancerPiste ; CHAMPS_PLATEAU_
+ *     MAISON_AUTORISES de gameService.js exclut toujours civSociete/
+ *     civGouvernement/civEconomie — ces champs restent sous la seule
+ *     responsabilité de CivilisationService)
  *   - Production : produire_ressource, produire_deux_ressources,
  *     produire_<ressource> (niveauxProduction dépend d'un calcul agrégé
  *     sur secteursPartie — population × guildes — non porté côté PWA)
- * Pour ces clés, resoudreCle_ NE BLOQUE PAS l'action (comportement aligné
- * sur le repli générique déjà présent côté GAS pour une clé non reconnue :
- * "effet non chiffré — à appliquer manuellement") : elle journalise un
- * avertissement explicite et continue. Aucune ressource n'est débitée/
- * créditée à tort pour ces clés — c'est délibérément prudent plutôt que de
- * deviner une mutation de secteur ou de piste de Civilisation qui n'a
- * aucune fonction de destination fiable pour l'instant.
+ * Pour ces clés, resoudreCle_ NE BLOQUE PAS l'action : elle journalise un
+ * avertissement explicite ("effet non chiffré — à appliquer manuellement")
+ * et continue. Aucune ressource n'est débitée/créditée à tort pour ces
+ * clés — c'est délibérément prudent plutôt que de deviner une mutation de
+ * secteur ou de piste de Civilisation qui n'a aucune fonction de
+ * destination fiable pour l'instant.
  *
  * Dépend d'aucun module (pur). L'orchestrateur FocusEngine.jouerActionEtPersister
  * en bas de fichier dépend de DB (db.js), GameService (gameService.js) et
@@ -242,10 +79,9 @@ var FocusEngine = (function () {
   'use strict';
 
   // ------------------------------------------------------------
-  // Constantes de mapping (portées telles quelles depuis
-  // strategie.html GAS — RESSOURCES/RESSOURCES_PRODUCTION/BONUS_COMMERCE/
-  // CLES_MODIFICATEURS_SILENCIEUSES, données du livret, indépendantes des
-  // secteurs).
+  // Constantes de mapping — RESSOURCES/RESSOURCES_PRODUCTION/BONUS_COMMERCE/
+  // CLES_MODIFICATEURS_SILENCIEUSES : données du livret, indépendantes des
+  // secteurs.
   // ------------------------------------------------------------
 
   var CHAMP_PAR_CLE = {
@@ -259,57 +95,49 @@ var FocusEngine = (function () {
     liberation: 'jetonLiberation'
   };
   var CLES_SIMPLES = Object.keys(CHAMP_PAR_CLE);
-  // 21/08/2026 (docs/docs-rapport.md DUP-3) : RESSOURCES_PRODUCTION est
-  // identique à gameService.js/RESSOURCES_SIMPLES_CADRE, et les 5
-  // premières entrées de CHAMP_PAR_CLE ci-dessus correspondent à
-  // gameService.js/CHAMP_RESSOURCE_PLATEAU_MAISON_ — PAS fusionnées
-  // (focusEngine.js charge après gameService.js, voir index.html, et
-  // les deux fichiers restent volontairement indépendants l'un de
-  // l'autre). Si l'une de ces 5 ressources change ici, vérifier l'autre
-  // copie côté gameService.js.
+  // RESSOURCES_PRODUCTION est identique à gameService.js/
+  // RESSOURCES_SIMPLES_CADRE, et les 5 premières entrées de CHAMP_PAR_CLE
+  // ci-dessus correspondent à gameService.js/CHAMP_RESSOURCE_PLATEAU_
+  // MAISON_ — PAS fusionnées : focusEngine.js charge après gameService.js
+  // (voir index.html) et les deux fichiers restent volontairement
+  // indépendants l'un de l'autre. Si l'une de ces 5 ressources change
+  // ici, vérifier l'autre copie côté gameService.js.
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
   var NB_CUBES_TOTAL = 14;
 
   var CLES_MODIFICATEURS_SILENCIEUSES = ['sans_benefice_case', 'exclude', 'restriction', 'same_sector', 'meme_secteur', 'tie_break'];
 
-  // 19/08/2026 (Construire une Installation / Établir une Guilde — retour
-  // utilisateur : "on a dû perdre cette possibilité lors du portage") :
   // "rappeler_cube"/"effet_secteur" restent hors périmètre (déjà branchés
-  // en formulaires dédiés écran Secteurs, session 13, pas de popup Focus/
-  // Cadre dédiée demandée pour eux) — seules les 4 clés de construction/
-  // établissement générique sortent de cette liste (voir CLES_CONSTRUIRE/
-  // CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous). Les VARIANTES du catalogue
+  // en formulaires dédiés côté écran Secteurs, pas de popup Focus/Cadre
+  // dédiée pour eux) — les clés de construction/établissement générique
+  // (voir CLES_CONSTRUIRE/CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous) et
+  // "retirer_corruption" (cas dédié, comme construire/augmenter_
+  // population_pure, qui ouvre une popup de choix parmi les 4 cibles
+  // possibles — Secteur, Piste de Civilisation, Programme, Technologie
+  // Chambres de décontamination — voir strategieService.js, contexte
+  // 'retirer_corruption') en sont exclues. Les VARIANTES du catalogue
   // (etablir_guilde_meme_secteur/_up_to/_scientifique,
   // construire_installation_meme_secteur/_autre_secteur/_up_to —
   // contrainte de secteur croisée avec une autre clé du même JSON,
   // répétition "jusqu'à N fois", ou type figé) restent hors périmètre :
   // elles retombent sur le repli générique en bas de resoudreCle_ ("effet
-  // non chiffré — à appliquer manuellement"), pas de régression, juste
-  // pas automatisées par CE lot (portée volontairement limitée au pattern
-  // décrit : secteur libre + type au choix, quantité 1).
-  //
-  // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-  // TODO.md) : "retirer_corruption" RETIRÉE de cette liste — nouveau cas
-  // dédié ci-dessous (comme construire/augmenter_population_pure), qui
-  // ouvre une popup de choix parmi les 4 cibles possibles (Secteur, Piste
-  // de Civilisation, Programme, Technologie Chambres de décontamination —
-  // voir strategieService.js, contexte 'retirer_corruption').
+  // non chiffré — à appliquer manuellement"), portée volontairement
+  // limitée au pattern décrit (secteur libre + type au choix, quantité 1).
   var CLES_SECTEUR_HORS_PERIMETRE = [
     'rappeler_cube', 'effet_secteur'
   ];
   var CATEGORIE_PAR_CLE_CONSTRUIRE_ = {
     construire_installation: 'installation', installation: 'installation',
     etablir_guilde: 'guilde', guilde: 'guilde',
-    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : même popup
-    // 'construire' (catégorie 'guilde') que etablir_guilde, avec le type
-    // forcé sur "Banquiers" (voir TYPE_FORCE_PAR_CLE_CONSTRUIRE_ ci-dessous).
+    // Même popup 'construire' (catégorie 'guilde') que etablir_guilde,
+    // avec le type forcé sur "Banquiers" (voir TYPE_FORCE_PAR_CLE_
+    // CONSTRUIRE_ ci-dessous).
     etablir_guilde_banquier: 'guilde'
   };
-  // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : clé de
-  // CLES_CONSTRUIRE -> type forcé (présélectionné et non modifiable côté
-  // popup 'construire', strategieService.js) — absent pour les clés dont
-  // le type reste au libre choix du joueur (etablir_guilde/
-  // construire_installation, comportement inchangé).
+  // Clé de CLES_CONSTRUIRE -> type forcé (présélectionné et non modifiable
+  // côté popup 'construire', strategieService.js) — absent pour les clés
+  // dont le type reste au libre choix du joueur (etablir_guilde/
+  // construire_installation).
   var TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = {
     etablir_guilde_banquier: 'banquiers'
   };
@@ -321,23 +149,22 @@ var FocusEngine = (function () {
     deploy_cube: 'libre',
     deployer_cube_secteur_mere: 'secteur_mere'
   };
-  // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste [de Civilisation]",
-  // voir TODO.md) : "avancer_civilisation" (piste au choix) et
-  // "avancer_civilisation_societe"/"_gouvernement"/"_economie" (piste
-  // imposée) RETIRÉES de cette liste — nouveau cas dédié ci-dessous (comme
-  // construire/retirer_corruption), qui ouvre une popup de choix/aperçu
-  // (contexte 'avancer_civilisation', strategieService.js) puis délègue à
-  // CivilisationService.avancerPiste, seule source de vérité pour cette
-  // mécanique (déjà utilisée par le bouton "Avancer" de l'écran Focus).
-  // "avance_rapide" reste ICI (résolue différemment, en aval, à
-  // l'intérieur même de CivilisationService.avancerPiste — voir son
-  // en-tête, EVOLUTION 6 — jamais via resoudreCle_, cette clé n'apparaît
-  // d'ailleurs que sur une case déjà en cours d'avancement, jamais comme
-  // effet Focus/Cadre à résoudre isolément). "avancer_civilisation_moins_
-  // avancee"/"avancer_piste_corrompue" restent hors périmètre (fonctions
-  // dédiées existantes — CivilisationService.avancerPisteMoinsAvancee/
-  // avancerPisteCorrompue — mais aucune popup Focus/Cadre demandée pour
-  // elles à ce jour, hors périmètre de cette évolution).
+  // "avancer_civilisation" (piste au choix) et "avancer_civilisation_
+  // societe"/"_gouvernement"/"_economie" (piste imposée) ont un cas dédié
+  // ci-dessous (comme construire/retirer_corruption), qui ouvre une popup
+  // de choix/aperçu (contexte 'avancer_civilisation', strategieService.js)
+  // puis délègue à CivilisationService.avancerPiste, seule source de
+  // vérité pour cette mécanique (déjà utilisée par le bouton "Avancer" de
+  // l'écran Focus) — elles n'apparaissent donc pas dans la liste
+  // ci-dessous. "avance_rapide" reste hors périmètre ICI (résolue
+  // différemment, en aval, à l'intérieur même de CivilisationService.
+  // avancerPiste — voir son en-tête — jamais via resoudreCle_ : cette clé
+  // n'apparaît d'ailleurs que sur une case déjà en cours d'avancement,
+  // jamais comme effet Focus/Cadre à résoudre isolément). "avancer_
+  // civilisation_moins_avancee"/"avancer_piste_corrompue" restent hors
+  // périmètre : des fonctions dédiées existent (CivilisationService.
+  // avancerPisteMoinsAvancee/avancerPisteCorrompue) mais aucune popup
+  // Focus/Cadre n'est branchée dessus.
   var CLES_CIVILISATION_HORS_PERIMETRE = [
     'avance_rapide', 'avancer_civilisation_moins_avancee', 'avancer_piste_corrompue'
   ];
@@ -351,9 +178,9 @@ var FocusEngine = (function () {
   };
   var CLES_AVANCER_CIVILISATION_ = ['avancer_civilisation'].concat(Object.keys(PISTE_PAR_CLE_AVANCER_CIVILISATION_));
 
-  // Bonus Commerce — 6 bonus fixes du livret (portés tels quels depuis
-  // strategie.html, var BONUS_COMMERCE). Données de règles statiques, donc
-  // sans risque à porter en dur ici (contrairement aux clés secteur/civ).
+  // Bonus Commerce — 6 bonus fixes du livret. Données de règles statiques,
+  // donc sans risque à porter en dur ici (contrairement aux clés secteur/
+  // civ, qui dépendent de l'état de la partie).
   var BONUS_COMMERCE = [
     { label: 'Gagnez 3 Influence.', effet: { influence: 3 } },
     { label: 'Activez 1 cube de Puissance Navale.', effet: { activer_cube: 1 } },
@@ -363,10 +190,9 @@ var FocusEngine = (function () {
     { label: 'Gagnez 1 Science.', effet: { science: 1 } }
   ];
 
-  // 21/08/2026 (Gain d'Influence variable "par Guilde/Installation/cube/
-  // secteur Pur", voir docs-architecture-pwa.md) : clés dont le montant
-  // dépend d'un comptage sur secteursPartie — voir le cas dédié dans
-  // resoudreCle_ ci-dessous pour le détail.
+  // Gain d'Influence variable "par Guilde/Installation/cube/secteur Pur" :
+  // clés dont le montant dépend d'un comptage sur secteursPartie — voir le
+  // cas dédié dans resoudreCle_ ci-dessous pour le détail.
   var CLES_INFLUENCE_SECTEUR_ = [
     'influence_par_guilde', 'influence_par_guilde_pure', 'influence_par_guilde_scientifique_pure',
     'influence_par_installation_pure', 'influence_par_cube_secteur_pur', 'influence_par_cube_secteur_pur_et_fiche',
@@ -404,13 +230,13 @@ var FocusEngine = (function () {
   }
 
   /**
-   * 21/08/2026 (docs/docs-rapport.md MUT-2) : motif répété 7 fois dans
-   * resoudreCle_ (construire, augmenter_population_pure, retirer_corruption,
-   * gain_corruption, avancer_civilisation, ameliorer_gloire, regrouper) —
-   * ouvre une popup dédiée dont le contenu ET la persistance sont gérés
-   * entièrement par elle (focusEngine reste pur, aucun accès DB ici),
-   * n'annule TOUT l'effet que si la popup est annulée, sinon journalise
-   * un résumé. `formatterMessage(reponse)` optionnel pour les popups dont
+   * Factorise un motif répété dans resoudreCle_ (construire, augmenter_
+   * population_pure, retirer_corruption, gain_corruption, avancer_
+   * civilisation, ameliorer_gloire, regrouper) — ouvre une popup dédiée
+   * dont le contenu ET la persistance sont gérés entièrement par elle
+   * (focusEngine reste pur, aucun accès DB ici), n'annule TOUT l'effet que
+   * si la popup est annulée, sinon journalise un résumé.
+   * `formatterMessage(reponse)` optionnel pour les popups dont
    * le résumé n'est pas simplement `source + ' : ' + reponse.detail`
    * (ex. "regrouper", qui préfixe avec le nombre de déplacements).
    */
@@ -423,8 +249,7 @@ var FocusEngine = (function () {
   }
 
   // ------------------------------------------------------------
-  // Résolution d'une clé Coût/Effet — cœur du moteur (portage de
-  // resoudreCle_, strategie.html GAS ~2608-2739).
+  // Résolution d'une clé Coût/Effet — cœur du moteur.
   // Retourne une Promise<boolean> : true (ou undefined traité comme true)
   // si la clé est résolue et ne bloque pas la suite, false si elle bloque
   // (annulation de TOUT le JSON en cours — voir resoudreJsonInterne_).
@@ -445,12 +270,11 @@ var FocusEngine = (function () {
     // rencontré tel quel dans pistesCivilisation.json ("Gagnez un/deux
     // jeton(s) Prime.") et dans BONUS_COMMERCE ci-dessous ("Gagnez un
     // jeton Prime.", cle gagner_commerce -> popup Bonus Commerce ->
-    // resoudreJsonInterne_ récursif sur { gagner_prime: 1 }) — jusqu'ici
-    // retombait sur le repli générique (non automatisé) faute de cas
-    // dédié, contrairement à "prime" (bare) déjà couvert par CLES_SIMPLES
-    // ci-dessus. Contrairement à gagner_technologie/gagner_programme, pas
-    // de choix utilisateur requis ici : automatisable à l'identique de
-    // "prime". ---
+    // resoudreJsonInterne_ récursif sur { gagner_prime: 1 }) — cas dédié
+    // nécessaire car "gagner_prime" diffère de "prime" (bare), déjà couvert
+    // par CLES_SIMPLES ci-dessus. Contrairement à gagner_technologie/
+    // gagner_programme, pas de choix utilisateur requis ici : automatisable
+    // à l'identique de "prime". ---
     if (cle === 'gagner_prime' && typeof valeur === 'number') {
       etat.jetonPrime = Math.max(0, etat.jetonPrime + signe * valeur);
       journal.push(source + ' : ' + (signe > 0 ? '+' : '−') + valeur + ' prime.');
@@ -523,17 +347,17 @@ var FocusEngine = (function () {
       });
     }
 
-    // --- Déploiement de cube (Effet UNIQUEMENT — signe > 0, comme le
-    // legacy : côté Coût, ces clés retombent sur le traitement générique
-    // "cube" ci-dessous, cas non prévu par le livret). Ouvre une popup
-    // dédiée (mode selon la clé — voir MODE_PAR_CLE_DEPLOYER_CUBE) qui
-    // choisit secteur(s)/type(s)/quantité(s) et persiste via
-    // SecteurService.deployerCube (un appel par ligne engagée, fait CÔTÉ
-    // POPUP — DOM, voir strategieService.js). La consommation de Cube
-    // actif et le coût en ressources (Cuirassé/Porte-Vaisseau) sont en
-    // revanche appliqués ICI, sur l'état pur, pour rester cohérents avec
-    // le reste du moteur (diff/annulation) — amélioration par rapport au
-    // legacy, où la popup écrivait elle-même plateau_maison. ---
+    // --- Déploiement de cube (Effet UNIQUEMENT — signe > 0 : côté Coût,
+    // ces clés retombent sur le traitement générique "cube" ci-dessous,
+    // cas non prévu par le livret). Ouvre une popup dédiée (mode selon la
+    // clé — voir MODE_PAR_CLE_DEPLOYER_CUBE) qui choisit secteur(s)/
+    // type(s)/quantité(s) et persiste via SecteurService.deployerCube (un
+    // appel par ligne engagée, fait CÔTÉ POPUP — DOM, voir
+    // strategieService.js). La consommation de Cube actif et le coût en
+    // ressources (Cuirassé/Porte-Vaisseau) sont en revanche appliqués ICI,
+    // sur l'état pur, pour rester cohérents avec le reste du moteur
+    // (diff/annulation) plutôt que d'être écrits directement par la
+    // popup. ---
     if (CLES_DEPLOYER_CUBE.indexOf(cle) !== -1 && typeof valeur === 'number' && signe > 0) {
       return Promise.resolve(demanderChoix({
         type: 'deployer_cube',
@@ -591,22 +415,19 @@ var FocusEngine = (function () {
     // construire/regrouper/envahir ci-dessus — focusEngine reste pur,
     // aucun accès DB ici).
     //
-    // 20/08/2026 (EVOLUTION 3 — voir TODO.md) : "augmenter_population"
-    // (SANS "_pure") reconnue en plus de "augmenter_population_pure" —
-    // c'est la clé utilisée par data/catalogue/pistesCivilisation.json ET
-    // focus.json (jamais "_pure", forme réservée au seul catalogue
-    // evenements.json) ; jusqu'ici non reconnue, elle retombait sur le
-    // repli générique "effet non chiffré — à appliquer manuellement",
-    // alors que la mécanique est IDENTIQUE (secteur Pur, Population < 6,
-    // même popup). Comme CivilisationService.avancerPiste ET
-    // FocusEngine.jouerActionEtPersister (actions Focus) délèguent tous
-    // deux à CE même resoudreCle_, ce point unique couvre les 2 usages
-    // demandés ("piste civilisation ou focus") sans code spécifique à
-    // l'un ou l'autre. "augmenter_population_up_to" (variante "jusqu'à N
-    // fois" du catalogue focus.json) reste HORS PÉRIMÈTRE — comme les
-    // autres variantes _up_to/_meme_secteur déjà notées plus haut dans ce
-    // fichier — et retombe donc sur le repli générique, journalisé en
-    // avertissement, pas de régression. ---
+    // "augmenter_population" (SANS "_pure") est reconnue au même titre que
+    // "augmenter_population_pure" : c'est la clé utilisée par data/
+    // catalogue/pistesCivilisation.json ET focus.json (jamais "_pure",
+    // forme réservée au seul catalogue evenements.json) — la mécanique est
+    // IDENTIQUE (secteur Pur, Population < 6, même popup). Comme
+    // CivilisationService.avancerPiste ET FocusEngine.jouerActionEtPersister
+    // (actions Focus) délèguent tous deux à CE même resoudreCle_, ce point
+    // unique couvre les 2 usages ("piste civilisation ou focus") sans code
+    // spécifique à l'un ou l'autre. "augmenter_population_up_to" (variante
+    // "jusqu'à N fois" du catalogue focus.json) reste HORS PÉRIMÈTRE —
+    // comme les autres variantes _up_to/_meme_secteur déjà notées plus
+    // haut dans ce fichier — et retombe donc sur le repli générique,
+    // journalisé en avertissement. ---
     if ((cle === 'augmenter_population_pure' || cle === 'augmenter_population') && signe > 0) {
       return demanderChoixEtJournaliser_({
         type: 'augmenter_population_pure',
@@ -617,8 +438,8 @@ var FocusEngine = (function () {
 
     // --- Retirer une Corruption : Effet UNIQUEMENT (signe > 0). Ouvre une
     // popup dédiée (contexte 'retirer_corruption', strategieService.js)
-    // qui laisse le joueur choisir PARMI JUSQU'À 4 cibles possibles
-    // (TODO.md, EVOLUTION 5) : un Secteur qu'il possède et Corrompu
+    // qui laisse le joueur choisir PARMI JUSQU'À 4 cibles possibles :
+    // un Secteur qu'il possède et Corrompu
     // (SecteurService.obtenirSecteursEligiblesRetraitCorruption/
     // retirerCorruption), une piste de Civilisation actuellement
     // Corrompue s'il y en a au moins une (CivilisationService.
@@ -671,16 +492,15 @@ var FocusEngine = (function () {
     // --- Avancer sur une piste de Civilisation : Effet UNIQUEMENT (signe
     // > 0). Ouvre une popup dédiée (contexte 'avancer_civilisation',
     // strategieService.js) qui affiche, pour la ou les piste(s) candidate(s)
-    // (TODO.md, EVOLUTION 7) — piste imposée (PISTE_PAR_CLE_AVANCER_
-    // CIVILISATION_) OU au choix (contexte.piste === null, "avancer_
-    // civilisation") — le niveau actuel (X/NIVEAU_MAX) et un aperçu de la
-    // PROCHAINE case, avant Annuler/Valider. À la validation, la popup
-    // appelle directement CivilisationService.avancerPiste (persistance
-    // ET résolution de l'effet de la nouvelle case atteinte, laquelle
-    // PEUT À SON TOUR ouvrir une ou plusieurs popups imbriquées —
-    // demanderChoix relayé tel quel par avancerPiste, comme pour n'importe
-    // quel autre effet : choix "et/ou", rappel manuel EVOLUTION 4,
-    // retirer_corruption EVOLUTION 5, avance_rapide EVOLUTION 6 — déjà
+    // — piste imposée (PISTE_PAR_CLE_AVANCER_CIVILISATION_) OU au choix
+    // (contexte.piste === null, "avancer_civilisation") — le niveau actuel
+    // (X/NIVEAU_MAX) et un aperçu de la PROCHAINE case, avant
+    // Annuler/Valider. À la validation, la popup appelle directement
+    // CivilisationService.avancerPiste (persistance ET résolution de
+    // l'effet de la nouvelle case atteinte, laquelle PEUT À SON TOUR
+    // ouvrir une ou plusieurs popups imbriquées — demanderChoix relayé tel
+    // quel par avancerPiste, comme pour n'importe quel autre effet : choix
+    // "et/ou", rappel manuel, retirer_corruption, avance_rapide — déjà
     // tous gérés par avancerPiste elle-même, aucun code supplémentaire
     // nécessaire ici pour cet enchaînement). Comme construire/retirer_
     // corruption ci-dessus, la popup fait le choix ET la persistance
@@ -741,7 +561,7 @@ var FocusEngine = (function () {
 
     // --- ressource_choix : N unités au choix parmi les 5 ressources de
     // production (pas Influence/Commerce). Ne bloque jamais (pas de bouton
-    // "Annuler" côté legacy pour cette popup). ---
+    // "Annuler" pour cette popup). ---
     if (cle === 'ressource_choix' && typeof valeur === 'number') {
       return Promise.resolve(demanderChoix({ type: 'ressource_choix', nombre: valeur, signe: signe, source: source })).then(function (reponse) {
         var choisies = Array.isArray(reponse) ? reponse.slice(0, valeur) : [];
@@ -776,13 +596,13 @@ var FocusEngine = (function () {
           return promesse.then(function () {
             return resoudreOption_(valeur[indexOption], signe, source, etat, journal, demanderChoix);
           });
-        }, Promise.resolve()).then(function () { return true; }); // tolérant, cf. resoudreOption_ GAS
+        }, Promise.resolve()).then(function () { return true; }); // tolérant : un refus sur une option nichée n'annule pas le reste
       });
     }
 
     // --- choice_repeat : { times, options } — répète un choix exclusif
     // `times` fois ; un "Annuler" sur n'importe quel tour arrête les tours
-    // restants et bloque toute l'action (comportement legacy conservé). ---
+    // restants et bloque toute l'action. ---
     if (cle === 'choice_repeat' && valeur && Array.isArray(valeur.options)) {
       var fois = valeur.times || 1;
       var tourPromise = Promise.resolve(true);
@@ -817,7 +637,7 @@ var FocusEngine = (function () {
     // moment de la validation, PAS ici (focusEngine reste pur, aucun accès
     // DB). resoudreCle_ se contente de relayer le résumé dans le journal.
     // "Annuler" bloque toute l'action (même règle que "choice"/
-    // "choice_repeat" ci-dessus, cohérent avec le popup Envahir legacy). ---
+    // "choice_repeat" ci-dessus). ---
     if (cle === 'regrouper' || cle === 'regroupe') {
       return demanderChoixEtJournaliser_({ type: 'regrouper', source: source, partieId: etat.partieId }, source, journal, demanderChoix, function (reponse) {
         return source + ' : Regrouper — ' + reponse.deplacements + ' déplacement(s) (' + reponse.detail + ').';
@@ -836,9 +656,9 @@ var FocusEngine = (function () {
     // revanche persisté DIRECTEMENT par la popup (même pattern que le
     // clic manuel sur un emplacement Gloire côté écran Stratégie),
     // l'Influence gagnée depuis son total étant calculée là-bas et
-    // simplement relayée ici en scalaire. HORS PÉRIMÈTRE cette session
-    // (journalisé en avertissement le cas échéant, à traiter
-    // manuellement) : défausse d'un jeton Gloire pour un secteur source
+    // simplement relayée ici en scalaire. HORS PÉRIMÈTRE (journalisé en
+    // avertissement le cas échéant, à traiter manuellement) : défausse
+    // d'un jeton Gloire pour un secteur source
     // abandonné (repris par le Néant). PAS hors périmètre en revanche :
     // les jetons Prime/Libération gagnés restent de simples compteurs
     // (jetonPrime/jetonLiberation), cohérent avec le reste du moteur où
@@ -931,8 +751,8 @@ var FocusEngine = (function () {
   /**
    * Point d'entrée "un JSON entier" (Effet OU Coût) : clone `etatBase`,
    * résout toutes les clés dessus, et ne retourne les mutations que si
-   * TOUT le JSON a été résolu avec succès (voir remarque sur l'amélioration
-   * apportée par rapport à strategie.html GAS, en-tête de fichier).
+   * TOUT le JSON a été résolu avec succès (voir RÈGLE MÉTIER, en-tête de
+   * fichier).
    */
   function resoudreJson_(json, signe, source, texteAction, etatBase, demanderChoix) {
     var etatLocal = cloner_(etatBase);
@@ -996,13 +816,10 @@ var FocusEngine = (function () {
   }
 
   /**
-   * Orchestrateur optionnel : lit le plateau maison, résout l'action,
-   * écrit le résultat via GameService.majPlateauMaison et empile
-   * l'annulation via AnnulationService.empiler. Ajouté cette session pour
-   * boucler la fonctionnalité d'annulation demandée (sans quoi il n'y
-   * aurait rien à empiler) — le rebranchement DOM complet de l'écran
-   * Stratégie reste hors périmètre (session séparée), mais cette fonction
-   * est le point d'entrée que ce futur écran pourra appeler directement.
+   * Orchestrateur : lit le plateau maison, résout l'action, écrit le
+   * résultat via GameService.majPlateauMaison et empile l'annulation via
+   * AnnulationService.empiler — le point d'entrée que l'écran Stratégie
+   * appelle pour jouer une action Focus (voir strategieService.js).
    * Dépend de DB, GameService, AnnulationService (à charger avant ce
    * fichier si cette fonction est utilisée).
    */
@@ -1031,11 +848,10 @@ var FocusEngine = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 5, Phase 5 — Civilisation) : wrapper public léger
-   * autour de resoudreJson_ (aucune nouvelle logique), pour permettre à
-   * civilisationService.js de résoudre l'effet d'une case de piste de
-   * Civilisation en réutilisant CE moteur plutôt que d'en dupliquer un
-   * second. Toujours "pur" : ne fait aucune écriture, retourne
+   * Wrapper public léger autour de resoudreJson_ (aucune logique propre),
+   * pour permettre à civilisationService.js de résoudre l'effet d'une case
+   * de piste de Civilisation en réutilisant CE moteur plutôt que d'en
+   * dupliquer un second. Toujours "pur" : ne fait aucune écriture, retourne
    * {succes, journal, mutations, etatResultat} — ⚠️ champ "etatResultat",
    * PAS "plateauMaisonApres" (nom différent de resoudreAction ci-dessus,
    * qui enveloppe ce même résultat interne — attention à l'appelant).

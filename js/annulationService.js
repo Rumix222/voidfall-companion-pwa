@@ -1,27 +1,22 @@
 /**
  * annulationService.js
  * Pile d'annulation des actions Focus — Voidfall Companion PWA
- * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-8 — retrait de l'export LIMITE_PAR_PARTIE jamais lu)
- *
- * Version 1 — 17/08/2026 (Session 4, Phase 4 suite)
  *
  * Permet d'annuler la dernière action Focus jouée, puis l'avant-dernière,
  * etc. (annulation en chaîne, LIFO). S'appuie sur les mutations {champ,
  * avant, apres} produites par focusEngine.js : annuler = réécrire les
  * valeurs `avant` sur plateauMaison, aucune logique métier "inverse" à
- * recalculer (choix retenu en session pour la robustesse — voir en-tête
- * de focusEngine.js).
+ * recalculer (voir en-tête de focusEngine.js).
  *
- * Persisté en IndexedDB (store `pileAnnulation`, voir db.js v3) plutôt
- * qu'en mémoire, pour survivre à une fermeture accidentelle de l'app en
- * cours de partie.
+ * Persisté en IndexedDB (store `pileAnnulation`, voir db.js) plutôt qu'en
+ * mémoire, pour survivre à une fermeture accidentelle de l'app en cours
+ * de partie.
  *
- * Règles tranchées en session :
+ * Règles :
  * - Limite de 10 actions par partie (la plus ancienne est purgée au-delà).
- * - La pile est entièrement vidée à chaque fin de cycle (à appeler
- *   depuis GameService quand cette fonction existera — hors périmètre de
- *   cette session, voir docs-migration-pwa-plan.md, avancerCycle marqué
- *   "hors périmètre" faute de RPC source).
+ * - La pile doit être entièrement vidée à chaque fin de cycle (voir
+ *   viderPile ci-dessous) — exposée ici, pas encore appelée
+ *   automatiquement par GameService.
  *
  * Dépend de db.js (DB) : à charger avant ce fichier.
  */
@@ -120,9 +115,6 @@ var AnnulationService = (function () {
     return obtenirPileTriee_(partieId).then(function (pile) { return pile.length; });
   }
 
-  // 21/08/2026 (docs/docs-rapport.md CM-8) : LIMITE_PAR_PARTIE retirée de
-  // l'API publique (zéro appelant hors du fichier) — reste une constante
-  // privée, toujours utilisée en interne par empiler_.
   return {
     empiler: empiler_,
     annulerDerniere: annulerDerniere_,

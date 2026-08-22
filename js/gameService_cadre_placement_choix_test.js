@@ -141,10 +141,8 @@ test('appliquerCadreChoixPlacement : option "population_max" (jeton Gloire + Dé
   });
 });
 
-// 21/08/2026 (correctif — retour utilisateur, Test Événement F Cycle 1 KO :
-// "le secteur possède déjà un jeton de gloire (2), il devrait en avoir 2")
-// : un 2e jeton Gloire placé sur un secteur en possédant déjà un ne doit
-// PAS écraser le premier (jetonGloire est désormais un tableau, voir
+// Un 2e jeton Gloire placé sur un secteur en possédant déjà un ne doit
+// PAS écraser le premier — jetonGloire est un tableau (voir
 // secteurService.js/ligneSecteurParDefaut_/CHAMP_ELEMENT_PLACEMENT_).
 test('appliquerCadreChoixPlacement : option "population_max" sur un secteur possédant déjà un jeton Gloire -> les 2 jetons coexistent', function () {
   var ctx = fixtureBase_();

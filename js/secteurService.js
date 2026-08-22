@@ -1,153 +1,14 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 14 — 21/08/2026 (docs/docs-rapport.md MUT-7/MUT-8 — factorisation installationsUtilisees_/guildesUtilisees_ + clé composite regrouper)
  *
- * 21/08/2026 (docs/docs-rapport.md) :
- * - MUT-7 : `installationsUtilisees_(secteur)`/`guildesUtilisees_(secteur)`
- *   factorisent le calcul "emplacements utilisés" recopié 4 fois
- *   (construire, obtenirSecteursEligiblesConstruction, getEntretien,
- *   obtenirSecteursEligiblesPlacementNeantAdjacent) — même principe que
- *   totalPn_ déjà en place.
- * - MUT-8 : `regrouper` utilise désormais un objet imbriqué
- *   {depart: {type: quantite}} plutôt qu'une clé composite "depart:type"
- *   reparsée via lastIndexOf(':').
- * Aucun changement de comportement (22 tests secteurService_actions.test.js
- * + e2e/partie-aleatoire.spec.js).
- *
- * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
- * secteur Pur", voir focusEngine.js v12) : nouvelle
- * obtenirAgregatsInfluenceSecteursPurs — un seul aller DB, comptage en
- * mémoire des Guildes/Installations/cubes/secteurs "Purs" du joueur (voir
- * son JSDoc ci-dessous pour le détail complet). Consommée par le contexte
- * demanderChoix 'influence_secteur' (strategieService.js v27).
- *
- * 21/08/2026 (effet "Gagner une Corruption", voir
- * docs-rules-corruption-gardiens-refuges-technoConsume.md) : nouvelles
- * obtenirSecteursEligiblesGainCorruption/placerCorruption, miroir de
- * obtenirSecteursEligiblesRetraitCorruption/retirerCorruption — voir leur
- * JSDoc ci-dessous pour le détail (immunité du Secteur-Mère à la
- * Corruption, seule différence structurelle avec le retrait).
- *
- * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
- * cube du Néant... OU placez un jeton Gloire de valeur 2 et une Défense
- * de Secteur...") : nouvelle clé "guilde" GÉNÉRIQUE (type au choix du
- * joueur) dans CHAMP_ELEMENT_PLACEMENT_ — sans `champ` (résolu côté
- * appelant en "guilde_<type>" avant tout appel à
- * placerElementsNeantAdjacent, voir GameService.appliquerCadreChoixPlacement,
- * index.html/strategieService.js) ; suffit à obtenirSecteursEligiblesPlacementNeantAdjacent
- * (compte par `categorie`, jamais par `champ` précis, aucun changement
- * nécessaire là). placerElementsNeantAdjacent ignore désormais aussi
- * silencieusement toute entrée sans `champ` (filet de sécurité, ne
- * devrait jamais être atteint en usage normal).
- *
- * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
- * utilisateur : "automatiser augmentez une population pure : choisir
- * secteur dans DDL parmi secteur eligible (non corrompu)") : nouvelles
- * fonctions obtenirSecteursEligiblesAugmenterPopulationPure(partieId)/
- * augmenterPopulationPure(partieId, numero) — même principe que
- * construire ci-dessous (revalidation complète avant écriture, jamais
- * confiance à l'appelant). Éligibilité (docs-rules-secteurs.md §3) : un
- * secteur qui appartient au joueur (appartientAuJoueur_), non Corrompu
- * (la Population d'un secteur Corrompu ne peut pas être modifiée), avec
- * une Population non nulle (certains secteurs spéciaux n'ont pas de dé
- * Population du tout) et strictement inférieure à 6 (plafond de la
- * règle). js/focusEngine.js (nouvelle clé 'augmenter_population_pure',
- * v6), js/gameService.js/index.html (cleFocusEnginePourOptionCadre_),
- * js/strategieService.js (nouveau contexte demanderChoix
- * 'augmenter_population_pure', v21).
- *
- * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 1 "Nous sommes la
- * résistance", retour utilisateur : "premier effet nombre cube et gloire
- * pas rafraichit quand on va dans onglet secteur") : cadre "placement"
- * (cube_neant + gloire) déjà câblé génériquement côté index.html/
- * gameService.js (voir Cadres 1 des Événements A/B), mais cube_neant et
- * gloire étaient absents de CHAMP_ELEMENT_PLACEMENT_ — placerElementsNeant
- * Adjacent ignorait donc ces 2 clés (`if (!info) return`) : la popup se
- * validait normalement mais n'écrivait RIEN sur secteursPartie, d'où
- * l'impression d'un défaut de rafraîchissement (en réalité aucune donnée à
- * afficher). cube_neant ajouté en jeton standard (incrémente pnNeant,
- * comme prime/liberation) ; gloire ajouté avec un nouveau flag `valeur:
- * true` (au lieu d'incrémenter, affecte directement jetonGloire — ce champ
- * stocke la VALEUR du jeton posé, pas une quantité, voir index.html
- * LABEL_JETON_SECTEUR/ligneSecteurHTML_ et js/strategieService.js
- * résolution 'envahir').
- *
- * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
- * Domineum") : nouveau type de cadre "placement_multiple" (data/catalogue/
- * evenements.json) — plusieurs jeux d'éléments à poser, chacun sur un
- * secteur du Néant adjacent désigné par un critère de Population
- * (`population_min`/`population_max`), pas par un libre choix du joueur
- * comme le cadre "placement" simple. `prime` ajouté à
- * CHAMP_ELEMENT_PLACEMENT_ (jeton, aucun emplacement consommé — premier
- * cadre à poser un jeton Prime). Nouvelles fonctions PURES (aucune
- * écriture) resoudrePlacementMultipleNeantAdjacent(partieId, effet) —
- * calcule les cibles (secteur atteignant l'extremum de Population par
- * groupe de placements, ou plusieurs candidats à égalité) en réutilisant
- * obtenirSecteursEligiblesPlacementNeantAdjacent existante (filtre Néant/
- * adjacence/emplacements) pour chaque jeu d'éléments — et
- * appliquerPlacementMultipleNeantAdjacent(partieId, effet, ciblesParGroupe)
- * — revalide à neuf (jamais confiance à l'appelant) puis écrit
- * séquentiellement via placerElementsNeantAdjacent (inchangée). Le cas
- * particulier "un seul secteur du Néant adjacent" (effet.cas_particulier
- * du catalogue) fusionne tous les placements en un seul groupe ciblant ce
- * secteur unique. js/gameService.js (v13 — appliquerCadrePlacementMultiple),
- * index.html (rendu Cadre 1 + popup de confirmation/désambiguïsation).
- *
- * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
- * obtenirSecteursEligiblesDefenseGuildeNeantAdjacent/
- * placerDefenseGuildeNeantAdjacent (Session précédente, codées en dur pour
- * Défense de Secteur + Guilde de Scientifiques, Événement A Cycle 1 Cadre
- * 1) remplacées par des versions génériques,
- * obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements)/
- * placerElementsNeantAdjacent(partieId, numero, elements) — `elements` est
- * l'objet effet.elements du cadre (data/catalogue/evenements.json),
- * n'importe quelle combinaison d'Installations/Guildes/jetons Libération
- * (CHAMP_ELEMENT_PLACEMENT_ ci-dessous fait la correspondance vers les
- * champs secteursPartie). Permet de porter le Cadre 1 de l'Événement B
- * Cycle 1 (jeton Libération + Défense de Secteur) sans dupliquer la
- * logique d'éligibilité (Néant, adjacence, emplacements Installation/
- * Guilde libres) : seuls les éléments de type Installation/Guilde
- * comptent pour les emplacements, un jeton (Libération) se pose sans
- * consommer d'emplacement. `dernierEmplacement` (bool, remplace les deux
- * compteurs bruts renvoyés avant) n'est vrai que si un TYPE D'EMPLACEMENT
- * RÉELLEMENT DEMANDÉ par ce cadre est à son dernier emplacement libre —
- * évite d'alerter sur la Guilde quand le cadre ne pose qu'une Installation
- * (ou l'inverse). gameService.js (v13 — appliquerCadrePlacement lit
- * désormais cadre.effet.elements depuis evenementCycle.cadres au lieu
- * d'appeler l'ancienne fonction dédiée), js/strategieService.js (v18 —
- * contexte 'placement_secteur_neant_adjacent' reçoit `elements` et appelle
- * les fonctions génériques), index.html (v30 — appliquerCadrePlacementEtRafraichir_
- * transmet cadre.effet.elements à demanderChoix).
- *
- * 17/08/2026 (Session 12) : portage de toutes les actions de jeu sur les
- * secteurs, désormais possible grâce au code SQL des RPC (fourni par
- * l'utilisateur, voir rpc.json) — construire, deployerCube,
- * envahirResoudre, rappelerCube, regrouper, retirerCorruption,
- * obtenirSecteursEligiblesConstruction, getEntretien. Portage LIGNE À
- * LIGNE de chaque fonction PL/pgSQL (mêmes validations, mêmes messages
- * d'erreur, même ordre d'opérations), adapté au modèle IndexedDB
- * (secteursPartie, clé composée [partieId, numero] — pas de transaction
- * SQL multi-lignes ni de verrou FOR UPDATE : JS étant mono-thread, aucun
- * autre appelant ne peut s'intercaler entre lecture et écriture ici).
- *
- * Phase 3 du plan de migration : portage PARTIEL de SecteurService.js
- * (GAS, 338 l.). Seules les fonctions sans dépendance à une RPC Postgres
- * dont le SQL source n'a jamais été récupéré sont portées ici (même
- * situation déjà rencontrée pour choisirFocusHeroique/avancerCycle en
- * Phase 2 — voir gameService.js) :
- *
- *   PORTÉ : instancierSecteurs (mise en place du plateau à la création
- *   de partie — logique JS pure, aucune RPC), obtenirSecteurs (lecture),
- *   obtenirAdjacences (lecture catalogue), obtenirSecteurMere (lecture),
- *   ET (Session 12) construire/deployerCube/envahirResoudre/
- *   rappelerCube/regrouper/retirerCorruption/
- *   obtenirSecteursEligiblesConstruction/getEntretien.
- *
- * Simplification par rapport à GAS : getSecteurMereNumero(partieId) est
- * ici obtenirSecteurMere(scenarioId) — prend directement le scenarioId
- * (déjà connu de l'appelant via partie.scenarioId) plutôt que de
- * ré-interroger la partie pour le retrouver.
+ * Actions de jeu sur les secteurs (construire, déployer/rappeler un
+ * cube, regrouper, envahir, gérer la Corruption) avec, pour chaque
+ * action, une revalidation complète des règles d'éligibilité juste avant
+ * l'écriture — jamais confiance dans les paramètres reçus de l'appelant.
+ * Pas de transaction multi-lignes ni de verrou explicite sur IndexedDB :
+ * JS étant mono-thread, aucun autre appelant ne peut s'intercaler entre
+ * une lecture et l'écriture qui la suit.
  *
  * Dépend de db.js (DB) : à charger avant ce fichier. gameService.js
  * dépend de ce fichier (creerPartie y fait appel) : à charger AVANT
@@ -158,7 +19,7 @@ var SecteurService = (function () {
   'use strict';
 
   // ⚠️ Un seul scénario a de vraies données pour l'instant ('solo_1',
-  // "Première ligne") — porté tel quel depuis SecteurService.js GAS.
+  // "Première ligne").
   var SCENARIO_PAR_DEFAUT = 'solo_1';
 
   function ligneSecteurParDefaut_(partieId, ligne) {
@@ -176,18 +37,14 @@ var SecteurService = (function () {
       pnNeant: ligne.pnNeantDepart || 0,
       pnCorvette: 0, pnSentinelle: 0, pnDestroyer: 0, pnCuirasse: 0, pnPorteVaisseau: 0,
       jetonPrime: ligne.jetonPrimeDepart || 0,
-      // 21/08/2026 (correctif — retour utilisateur, Test Événement F Cycle
-      // 1 KO : "je ne vois pas le nouveau jeton gloire ... le secteur
-      // possède déjà un jeton de gloire, il devrait en avoir 2") :
-      // jetonGloire devient un TABLEAU de valeurs (docs-rules-cycle-de-
-      // jeu.md §1.5.5 — "aucune limite au nombre de jetons ... Gloire dans
-      // un secteur") au lieu d'un simple nombre qui ne pouvait représenter
-      // qu'un seul jeton posé — un 2e jeton Gloire placé (ex. par un Cadre
-      // d'Événement galactique) sur un secteur en possédant déjà un
-      // ÉCRASAIT silencieusement le premier au lieu de s'y ajouter. Voir
-      // CHAMP_ELEMENT_PLACEMENT_.gloire/placerElementsNeantAdjacent/
-      // envahirResoudre ci-dessous, index.html (ligneSecteurHTML_) et
-      // strategieService.js (flux envahir) pour les autres points touchés.
+      // jetonGloire est un TABLEAU de valeurs (docs-rules-cycle-de-jeu.md
+      // §1.5.5 — un secteur peut porter plusieurs jetons Gloire, sans
+      // limite), pas un simple nombre : un 2e jeton Gloire placé sur un
+      // secteur en possédant déjà un s'ajoute au tableau au lieu de
+      // l'écraser. Voir CHAMP_ELEMENT_PLACEMENT_.gloire/
+      // placerElementsNeantAdjacent/envahirResoudre ci-dessous,
+      // index.html (ligneSecteurHTML_) et strategieService.js (flux
+      // envahir) pour les autres points concernés.
       jetonGloire: ligne.jetonGloireDepart ? [ligne.jetonGloireDepart] : [],
       jetonLiberation: ligne.jetonLiberationDepart || 0
     };
@@ -195,10 +52,9 @@ var SecteurService = (function () {
 
   /**
    * Construit et enregistre les lignes secteursPartie pour une partie
-   * tout juste créée. Tolérant (comme instancierSecteurs_ côté GAS) :
-   * une erreur ici ne doit JAMAIS empêcher la création de la partie —
-   * elle est capturée, journalée en console, et la fonction résout quand
-   * même (tableau vide).
+   * tout juste créée. Tolérant : une erreur ici ne doit JAMAIS empêcher
+   * la création de la partie — elle est capturée, journalée en console,
+   * et la fonction résout quand même (tableau vide).
    */
   function instancierSecteurs(partie) {
     var scenarioId = partie.scenarioId || SCENARIO_PAR_DEFAUT;
@@ -237,7 +93,7 @@ var SecteurService = (function () {
           // Les GUILDES du Secteur-Mère sont la SOMME de deux sources :
           // "maisons" (contenu fixe imprimé) + "originesMaison" (contenu
           // supplémentaire de l'Origine choisie) — jamais un remplacement
-          // de l'une par l'autre (portage du correctif GAS du 12/08/2026).
+          // de l'une par l'autre.
           if (secteurMereDonnees) {
             secteur.installationChantierNaval = secteurMereDonnees.secteurMereInstallationChantierNaval || 0;
             secteur.installationDefenseSecteur += secteurMereDonnees.secteurMereInstallationDefenseSecteur || 0;
@@ -322,8 +178,9 @@ var SecteurService = (function () {
   }
 
   /**
-   * Adjacences du scénario (paires de secteurs voisins) — pour la future
-   * action "Regrouper" (Phase 5+). Simple lecture catalogue.
+   * Adjacences du scénario (paires de secteurs voisins) — utilisées par
+   * regrouper et par le filtre d'adjacence des placements sur secteur du
+   * Néant. Simple lecture catalogue.
    */
   function obtenirAdjacences(scenarioId) {
     return DB.getAll('scenarioAdjacences').then(function (lignes) {
@@ -333,8 +190,8 @@ var SecteurService = (function () {
 
   /**
    * Numéro du Secteur-Mère du joueur pour un scénario donné (ou null si
-   * introuvable). Voir note d'en-tête : prend scenarioId directement,
-   * contrairement à getSecteurMereNumero(partieId) côté GAS.
+   * introuvable). Prend scenarioId directement (déjà connu de l'appelant
+   * via partie.scenarioId) plutôt que partieId.
    */
   function obtenirSecteurMere(scenarioId) {
     return DB.getAll('scenarioSecteurs').then(function (lignes) {
@@ -343,9 +200,8 @@ var SecteurService = (function () {
     });
   }
 
-  // Portage direct des colonnes pn_* (secteurs_partie) <-> types de
-  // vaisseau utilisés par les RPC secteur_deployer_cube/secteur_rappeler_
-  // cube/secteur_regrouper/secteur_envahir_resoudre.
+  // Types de vaisseau (Puissance Navale) <-> champs secteursPartie
+  // correspondants.
   var CHAMP_PN_PAR_TYPE = {
     corvette: 'pnCorvette', sentinelle: 'pnSentinelle', destroyer: 'pnDestroyer',
     cuirasse: 'pnCuirasse', porte_vaisseau: 'pnPorteVaisseau'
@@ -360,10 +216,8 @@ var SecteurService = (function () {
     return (secteur.pnNeant || 0) === 0 && totalPn_(secteur) > 0;
   }
 
-  // 21/08/2026 (docs/docs-rapport.md MUT-7) : mêmes principe que totalPn_
-  // ci-dessus — "emplacements Installations/Guildes utilisés sur ce
-  // secteur" recopié 4 fois (construire, obtenirSecteursEligiblesConstruction,
-  // getEntretien, obtenirSecteursEligiblesPlacementNeantAdjacent).
+  // Même principe que totalPn_ : centralise le calcul d'emplacements
+  // Installation/Guilde utilisés (plusieurs appelants dans ce fichier).
   function installationsUtilisees_(secteur) {
     return (secteur.installationChantierNaval || 0) + (secteur.installationDefenseSecteur || 0) + (secteur.installationBaseStellaire || 0);
   }
@@ -374,11 +228,10 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC secteur_construire
-   * (rpc.json). Construit une installation ou une Guilde sur un secteur
-   * qui appartient au joueur, si un emplacement est libre (limite définie
-   * par types_secteur.nombre_installation_max / nombre_guilde_max pour le
-   * type de secteur concerné).
+   * Construit une installation ou une Guilde sur un secteur qui
+   * appartient au joueur, si un emplacement est libre (limite définie par
+   * typesSecteur.nombreInstallationMax / nombreGuildeMax pour le type de
+   * secteur concerné).
    */
   function construire(partieId, numero, categorie, type) {
     if (categorie !== 'installation' && categorie !== 'guilde') {
@@ -421,11 +274,11 @@ var SecteurService = (function () {
   }
 
   /**
-   * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, "augmenter une
-   * Population Pure") : secteurs éligibles pour ajouter 1 au dé Population
-   * — un secteur possédé par le joueur (appartientAuJoueur_), non Corrompu,
-   * avec une Population renseignée (certains secteurs spéciaux n'en ont
-   * pas) et strictement inférieure à 6 (docs-rules-secteurs.md §3).
+   * Secteurs éligibles pour ajouter 1 au dé Population ("augmenter une
+   * Population Pure") — un secteur possédé par le joueur
+   * (appartientAuJoueur_), non Corrompu, avec une Population renseignée
+   * (certains secteurs spéciaux n'en ont pas) et strictement inférieure à
+   * 6 (docs-rules-secteurs.md §3).
    */
   function obtenirSecteursEligiblesAugmenterPopulationPure(partieId) {
     return obtenirSecteurs(partieId).then(function (secteurs) {
@@ -436,19 +289,16 @@ var SecteurService = (function () {
   }
 
   /**
-   * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-   * TODO.md) : secteurs éligibles pour l'option "Secteur" de la popup de
-   * choix de retirer_corruption — un secteur possédé par le joueur
-   * (appartientAuJoueur_, "avec un de nos cube de puissance" per TODO.md)
-   * ET actuellement Corrompu. Même gabarit que
+   * Secteurs éligibles pour l'option "Secteur" de la popup de choix de
+   * retirer_corruption — un secteur possédé par le joueur
+   * (appartientAuJoueur_) ET actuellement Corrompu. Même gabarit que
    * obtenirSecteursEligiblesAugmenterPopulationPure ci-dessus. Ne
-   * remplace PAS la permissivité existante de retirerCorruption
-   * (ci-dessous, utilisée telle quelle par le bouton "Retirer" déjà en
-   * place écran Secteurs, sans cette restriction de possession — pas de
-   * changement de comportement pour ce bouton) : cette liste ne sert
-   * qu'à peupler le <select> de la nouvelle popup 'retirer_corruption'
-   * (strategieService.js), qui appelle ensuite retirerCorruption comme
-   * n'importe quel autre appelant.
+   * remplace PAS la permissivité de retirerCorruption (ci-dessous),
+   * utilisée telle quelle par le bouton "Retirer" écran Secteurs sans
+   * cette restriction de possession : cette liste ne sert qu'à peupler
+   * le <select> de la popup 'retirer_corruption' (strategieService.js),
+   * qui appelle ensuite retirerCorruption comme n'importe quel autre
+   * appelant.
    */
   function obtenirSecteursEligiblesRetraitCorruption(partieId) {
     return obtenirSecteurs(partieId).then(function (secteurs) {
@@ -459,9 +309,8 @@ var SecteurService = (function () {
   }
 
   /**
-   * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) : ajoute 1 au
-   * dé Population du secteur choisi — revalide l'éligibilité à neuf
-   * (jamais confiance à l'appelant, même principe que construire
+   * Ajoute 1 au dé Population du secteur choisi — revalide l'éligibilité
+   * à neuf (jamais confiance à l'appelant, même principe que construire
    * ci-dessus) avant d'écrire.
    */
   function augmenterPopulationPure(partieId, numero) {
@@ -478,11 +327,9 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteur_deployer_cube (rpc.json). AUCUNE validation côté RPC d'origine
-   * (ni existence du secteur, ni stock) — portage fidèle : un type
-   * inconnu ou un secteur introuvable ne fait juste rien (silencieux),
-   * comme un UPDATE SQL sur 0 ligne.
+   * Déploie un cube de Puissance Navale sur un secteur. AUCUNE validation
+   * ici (ni existence du secteur, ni stock) : un type inconnu ou un
+   * secteur introuvable ne fait juste rien (silencieux).
    */
   function deployerCube(partieId, numero, type, quantite) {
     var champ = CHAMP_PN_PAR_TYPE[type];
@@ -494,10 +341,6 @@ var SecteurService = (function () {
     });
   }
 
-  /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteur_rappeler_cube (rpc.json).
-   */
   function rappelerCube(partieId, numero, type) {
     var champ = CHAMP_PN_PAR_TYPE[type];
     if (!champ) return Promise.reject(new Error('Type de vaisseau inconnu : ' + type));
@@ -511,10 +354,6 @@ var SecteurService = (function () {
     });
   }
 
-  /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteur_retirer_corruption (rpc.json).
-   */
   function retirerCorruption(partieId, numero) {
     return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
       if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
@@ -524,17 +363,15 @@ var SecteurService = (function () {
   }
 
   /**
-   * 21/08/2026 (effet "Gagner une Corruption", voir
-   * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) : secteurs
-   * éligibles pour l'option "Secteur" de la popup de choix de
+   * Secteurs éligibles pour l'option "Secteur" de la popup de choix de
    * gagner_corruption — miroir d'obtenirSecteursEligiblesRetraitCorruption
    * ci-dessus, mais INVERSÉ (un secteur possédé, PAS encore Corrompu) ET
    * avec une contrainte supplémentaire absente du retrait : le
-   * Secteur-Mère standard est immunisé à la Corruption ("sauf un secteur
-   * immunisé à la Corruption, comme un Secteur-Mère standard", §1) — donc
-   * exclu ici via obtenirSecteurMere(scenarioId), jamais éligible en
-   * gain (alors qu'il ne peut de toute façon jamais être Corrompu, donc
-   * cette exclusion ne change rien à obtenirSecteursEligiblesRetraitCorruption).
+   * Secteur-Mère standard est immunisé à la Corruption
+   * (docs-rules-corruption-gardiens-refuges-technoConsume.md §1) — donc
+   * exclu ici via obtenirSecteurMere(scenarioId), jamais éligible en gain
+   * (alors qu'il ne peut de toute façon jamais être Corrompu, donc cette
+   * exclusion ne change rien à obtenirSecteursEligiblesRetraitCorruption).
    */
   function obtenirSecteursEligiblesGainCorruption(partieId) {
     return Promise.all([DB.get('parties', partieId), obtenirSecteurs(partieId)]).then(function (resultats) {
@@ -548,11 +385,10 @@ var SecteurService = (function () {
   }
 
   /**
-   * 21/08/2026 (effet "Gagner une Corruption") : miroir de
-   * retirerCorruption ci-dessus — place la Corruption (secteur.corrompu =
-   * true) au lieu de la retirer. Même permissivité (aucune revalidation
-   * d'éligibilité ici, comme retirerCorruption) : c'est
-   * obtenirSecteursEligiblesGainCorruption ci-dessus qui peuple le
+   * Miroir de retirerCorruption ci-dessus — place la Corruption
+   * (secteur.corrompu = true) au lieu de la retirer. Même permissivité
+   * (aucune revalidation d'éligibilité ici, comme retirerCorruption) :
+   * c'est obtenirSecteursEligiblesGainCorruption ci-dessus qui peuple le
    * <select> de la popup 'gagner_corruption' (strategieService.js).
    */
   function placerCorruption(partieId, numero) {
@@ -564,21 +400,20 @@ var SecteurService = (function () {
   }
 
   /**
-   * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/
-   * cube/secteur Pur") : agrège, sur tous les secteurs "Purs" du joueur
-   * (appartientAuJoueur_ ET !corrompu — même définition que "Pur" déjà
-   * utilisée par obtenirSecteursEligiblesAugmenterPopulationPure/
+   * Agrège, sur tous les secteurs "Purs" du joueur (appartientAuJoueur_
+   * ET !corrompu — même définition que "Pur" déjà utilisée par
+   * obtenirSecteursEligiblesAugmenterPopulationPure/
    * obtenirSecteursEligiblesGainCorruption ci-dessus), les compteurs
-   * nécessaires aux formules d'Influence de focus.json/pistesCivilisation.json
-   * (voir focusEngine.js — CLES_INFLUENCE_SECTEUR_) : nombre de secteurs
-   * Purs, nombre de secteurs Purs avec au moins une Guilde, nombre de
-   * secteurs Purs à Population 6, total de Guildes Pures (par type et
-   * toutes confondues), total d'Installations Pures, total de cubes de
-   * Puissance Navale sur secteurs Purs (totalPn_, quel que soit le type
-   * de vaisseau). Un seul aller DB (obtenirSecteurs), tout le reste est
-   * un simple comptage en mémoire — appelée par le contexte demanderChoix
-   * 'influence_secteur' (strategieService.js), qui sait quelle formule
-   * appliquer à quel compteur.
+   * nécessaires aux formules d'Influence de focus.json/
+   * pistesCivilisation.json (voir focusEngine.js — CLES_INFLUENCE_SECTEUR_) :
+   * nombre de secteurs Purs, nombre de secteurs Purs avec au moins une
+   * Guilde, nombre de secteurs Purs à Population 6, total de Guildes
+   * Pures (par type et toutes confondues), total d'Installations Pures,
+   * total de cubes de Puissance Navale sur secteurs Purs (totalPn_, quel
+   * que soit le type de vaisseau). Un seul aller DB (obtenirSecteurs),
+   * tout le reste est un simple comptage en mémoire — appelée par le
+   * contexte demanderChoix 'influence_secteur' (strategieService.js),
+   * qui sait quelle formule appliquer à quel compteur.
    */
   function obtenirAgregatsInfluenceSecteursPurs(partieId) {
     return obtenirSecteurs(partieId).then(function (secteurs) {
@@ -617,13 +452,10 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC secteur_regrouper
-   * (rpc.json) — déplacement de Puissance Navale entre secteurs
-   * ADJACENTS qui appartiennent tous deux au joueur, 5 déplacements
-   * maximum au total. Deux passes de validation AVANT toute écriture
-   * (adjacence/appartenance, puis stock disponible agrégé par secteur de
-   * départ+type), comme la RPC d'origine — IndexedDB n'a pas de verrou
-   * FOR UPDATE, mais JS étant mono-thread ça ne change rien ici.
+   * Déplacement de Puissance Navale entre secteurs ADJACENTS qui
+   * appartiennent tous deux au joueur, 5 déplacements maximum au total.
+   * Deux passes de validation AVANT toute écriture (adjacence/
+   * appartenance, puis stock disponible agrégé par secteur de départ+type).
    */
   function regrouper(partieId, mouvements) {
     if (!Array.isArray(mouvements) || !mouvements.length) {
@@ -671,10 +503,9 @@ var SecteurService = (function () {
               if (!appartientAuJoueur_(sArrivee)) throw new Error('Le secteur ' + m.arrivee + ' ne vous appartient pas.');
             });
 
-            // 21/08/2026 (docs/docs-rapport.md MUT-8) : objet imbriqué
-            // {depart: {type: quantite}} plutôt qu'une clé composite
-            // "depart:type" reparsée via lastIndexOf(':') — plus direct,
-            // et ne casserait pas si `type` contenait un jour ':'.
+            // Objet imbriqué {depart: {type: quantite}} — agrège la
+            // quantité demandée par secteur de départ et par type, pour
+            // vérifier le stock disponible avant toute écriture.
             var retireParDepart = {};
             mouvements.forEach(function (m) {
               retireParDepart[m.depart] = retireParDepart[m.depart] || {};
@@ -704,15 +535,14 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteur_envahir_resoudre (rpc.json). Persiste les conséquences de
-   * l'effet "envahir" : retrait des unités engagées des secteurs sources
-   * (avec reprise automatique par le Néant à 2 cubes si un secteur source
-   * retombe à 0 PN, sauf le Secteur-Mère qui ne peut jamais être repris),
-   * et en cas de victoire, dépôt des survivants + retrait des
-   * Installations/Gardien/jetons Prime-Libération-Gloire du secteur
-   * cible (les jetons retirés sont renvoyés à l'appelant, qui les reporte
-   * sur plateau_maison côté client — inchangé, comme la RPC d'origine).
+   * Persiste les conséquences de l'effet "envahir" : retrait des unités
+   * engagées des secteurs sources (avec reprise automatique par le
+   * Néant à 2 cubes si un secteur source retombe à 0 PN, sauf le
+   * Secteur-Mère qui ne peut jamais être repris), et en cas de victoire,
+   * dépôt des survivants + retrait des Installations/Gardien/jetons
+   * Prime-Libération-Gloire du secteur cible (les jetons retirés sont
+   * renvoyés à l'appelant, qui les reporte sur le plateau maison côté
+   * client).
    */
   function envahirResoudre(partieId, cible, sources, victoire, survivants) {
     survivants = survivants || {};
@@ -799,11 +629,9 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteurs_eligibles_construction (rpc.json) — secteurs qui appartiennent
-   * au joueur avec au moins un emplacement Installation/Guilde libre
-   * (utilisé pour peupler le sélecteur de secteur d'un formulaire
-   * Construire).
+   * Secteurs qui appartiennent au joueur avec au moins un emplacement
+   * Installation/Guilde libre (utilisé pour peupler le sélecteur de
+   * secteur d'un formulaire Construire).
    */
   function obtenirSecteursEligiblesConstruction(partieId, categorie) {
     if (categorie !== 'installation' && categorie !== 'guilde') {
@@ -843,11 +671,10 @@ var SecteurService = (function () {
   }
 
   /**
-   * 17/08/2026 (Session 12) : portage direct de la RPC
-   * secteurs_entretien_partie (rpc.json) — nombre d'unités d'entretien
-   * dues (1 par emplacement Installation ou Guilde totalement occupé sur
-   * chaque secteur), purement informatif (rien n'est déduit
-   * automatiquement des ressources — voir chargerEntretien_, app-2.html).
+   * Nombre d'unités d'entretien dues (1 par emplacement Installation ou
+   * Guilde totalement occupé sur chaque secteur), purement informatif :
+   * rien n'est déduit automatiquement des ressources (voir
+   * chargerEntretien_, index.html).
    */
   function getEntretien(partieId) {
     return DB.get('parties', partieId).then(function (ligneP) {
@@ -878,26 +705,16 @@ var SecteurService = (function () {
   }
 
   /**
-   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
-   * générique) : correspondance entre les clés `elements` d'un cadre de
-   * type "placement" (data/catalogue/evenements.json) et les champs
+   * Correspondance entre les clés `elements` d'un cadre de type
+   * "placement" (data/catalogue/evenements.json) et les champs
    * secteursPartie à incrémenter. `categorie` détermine si l'élément
    * consomme un emplacement Installation/Guilde (limité par
    * typesSecteur.nombreInstallationMax/nombreGuildeMax) ou se pose
    * librement (jeton, categorie 'jeton', aucune limite d'emplacement).
-   *
-   * 20/08/2026 (correctif — retour utilisateur : "je préfère mettre à
-   * jour les données plutôt que bidouiller le code" pour un écart de
-   * convention de nommage) : la table ci-dessous REVIENT à sa forme
-   * d'origine (4 clés Guilde au PLURIEL, seule "guilde_scientifique" au
-   * singulier — convention déjà majoritaire ici avant EVOLUTION 2).
-   * L'anomalie "Événement E Cycle 1 Cadre 1" restait bien réelle
-   * ("guilde_banquier", singulier, absent de cette table), mais corrigée
-   * cette fois côté DONNÉE (data/catalogue/evenements.json, 3 occurrences
-   * "guilde_banquier" -> "guilde_banquiers") plutôt que côté code — voir
-   * version.js pour le détail. EVOLUTION 2 (20/08/2026, plus tôt cette
-   * session) avait fait l'inverse (singulier ici) ; ce correctif revient
-   * dessus.
+   * Convention de nommage : les clés Guilde sont au PLURIEL (ex.
+   * "guilde_fermiers", "guilde_banquiers"), sauf "guilde_scientifique"
+   * au singulier — doit rester cohérent avec data/catalogue/
+   * evenements.json.
    */
   var CHAMP_ELEMENT_PLACEMENT_ = {
     defense_secteur: { champ: 'installationDefenseSecteur', categorie: 'installation' },
@@ -909,24 +726,20 @@ var SecteurService = (function () {
     guilde_mineurs: { champ: 'guildeMineurs', categorie: 'guilde' },
     guilde_banquiers: { champ: 'guildeBanquiers', categorie: 'guilde' },
     liberation: { champ: 'jetonLiberation', categorie: 'jeton' },
-    // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-    // Domineum") : premier cadre à poser un jeton Prime (jeton, comme
-    // Libération, aucun emplacement Installation/Guilde consommé).
+    // jeton, aucun emplacement Installation/Guilde consommé.
     prime: { champ: 'jetonPrime', categorie: 'jeton' },
-    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 1 "Nous sommes
-    // la résistance") : cube_neant incrémente pnNeant (comme les autres
-    // jetons ci-dessus, aucun emplacement consommé — le secteur ciblé a
-    // déjà pnNeant > 0, voir le filtre d'éligibilité plus bas, on y ajoute
-    // simplement le cube posé). gloire est différent : jetonGloire stocke
-    // un TABLEAU de valeurs (un secteur peut porter plusieurs jetons
-    // Gloire, docs-rules-cycle-de-jeu.md §1.5.5 — voir correctif 21/08/2026
-    // ci-dessus, ligneSecteurParDefaut_) — `tableauValeurs: true` fait que
+    // cube_neant incrémente pnNeant (comme les autres jetons ci-dessus,
+    // aucun emplacement consommé — le secteur ciblé a déjà pnNeant > 0,
+    // voir le filtre d'éligibilité plus bas, on y ajoute simplement le
+    // cube posé). gloire est différent : jetonGloire stocke un TABLEAU de
+    // valeurs (un secteur peut porter plusieurs jetons Gloire,
+    // docs-rules-cycle-de-jeu.md §1.5.5 — voir ligneSecteurParDefaut_
+    // ci-dessus) — `tableauValeurs: true` fait que
     // placerElementsNeantAdjacent AJOUTE la valeur au tableau au lieu de
     // l'écraser ou de l'incrémenter comme un simple compteur.
     cube_neant: { champ: 'pnNeant', categorie: 'jeton' },
     gloire: { champ: 'jetonGloire', categorie: 'jeton', tableauValeurs: true },
-    // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde...")
-    // : "guilde" GÉNÉRIQUE (type au choix du joueur, pas de suffixe) —
+    // "guilde" GÉNÉRIQUE (type au choix du joueur, pas de suffixe) —
     // aucun `champ` (le type précis n'est connu qu'au moment du
     // placement, résolu côté appelant AVANT d'appeler
     // placerElementsNeantAdjacent, qui ne reçoit jamais cette clé
@@ -938,21 +751,17 @@ var SecteurService = (function () {
   };
 
   /**
-   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
-   * générique) : secteurs candidats pour un cadre de type "placement"
-   * (zone "secteur_neant_adjacent") — un secteur du Néant (pnNeant > 0),
+   * Secteurs candidats pour un cadre de type "placement" (zone
+   * "secteur_neant_adjacent") — un secteur du Néant (pnNeant > 0),
    * adjacent à un secteur qui appartient au joueur, avec assez
    * d'emplacements Installation ET Guilde libres pour les éléments de
    * type correspondant demandés par `elements` (les jetons, ex.
-   * Libération, ne consomment aucun emplacement). Généralise
-   * l'ancienne obtenirSecteursEligiblesDefenseGuildeNeantAdjacent
-   * (codée en dur pour Défense de Secteur + Guilde de Scientifiques,
-   * Événement A Cycle 1 Cadre 1) : même filtre Néant/adjacence, calcul
-   * des emplacements requis dérivé de `elements` au lieu d'être fixe.
-   * `dernierEmplacement` (bool) n'est vrai que si un type d'emplacement
-   * réellement demandé par ce cadre est à son dernier emplacement libre
-   * sur ce secteur (ex. un cadre qui ne pose qu'une Installation
-   * n'alerte jamais sur la Guilde, et inversement).
+   * Libération, ne consomment aucun emplacement). Générique : le calcul
+   * des emplacements requis est dérivé de `elements`, pas fixé au type
+   * de cadre. `dernierEmplacement` (bool) n'est vrai que si un type
+   * d'emplacement réellement demandé par ce cadre est à son dernier
+   * emplacement libre sur ce secteur (ex. un cadre qui ne pose qu'une
+   * Installation n'alerte jamais sur la Guilde, et inversement).
    */
   function obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements) {
     return DB.get('parties', partieId).then(function (ligneP) {
@@ -1022,15 +831,12 @@ var SecteurService = (function () {
   }
 
   /**
-   * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
-   * générique) : place les éléments d'un cadre "placement" dans le
-   * secteur du Néant adjacent choisi par le joueur — revalide les mêmes
-   * conditions qu'obtenirSecteursEligiblesPlacementNeantAdjacent (jamais
-   * confiance à l'appelant, même principe que construire ci-dessus)
-   * avant d'écrire. Généralise placerDefenseGuildeNeantAdjacent (codée
-   * en dur pour Défense de Secteur + Guilde de Scientifiques) : incrémente
-   * le champ secteursPartie de chaque clé de `elements` reconnue par
-   * CHAMP_ELEMENT_PLACEMENT_, de la quantité indiquée.
+   * Place les éléments d'un cadre "placement" dans le secteur du Néant
+   * adjacent choisi par le joueur — revalide les mêmes conditions
+   * qu'obtenirSecteursEligiblesPlacementNeantAdjacent (jamais confiance à
+   * l'appelant, même principe que construire ci-dessus) avant d'écrire :
+   * incrémente le champ secteursPartie de chaque clé de `elements`
+   * reconnue par CHAMP_ELEMENT_PLACEMENT_, de la quantité indiquée.
    */
   function placerElementsNeantAdjacent(partieId, numero, elements) {
     return obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements).then(function (eligibles) {
@@ -1043,13 +849,13 @@ var SecteurService = (function () {
         if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
         Object.keys(elements || {}).forEach(function (cle) {
           var info = CHAMP_ELEMENT_PLACEMENT_[cle];
-          // 21/08/2026 : `!info.champ` couvre les entrées GÉNÉRIQUES sans
-          // type résolu (ex. "guilde", voir CHAMP_ELEMENT_PLACEMENT_
-          // ci-dessus) — ne devrait jamais arriver ici en usage normal
-          // (le type est toujours résolu par l'appelant AVANT d'appeler
-          // cette fonction), mais ignoré silencieusement plutôt que
-          // d'écrire sur un champ "undefined", même filet de sécurité que
-          // pour une clé totalement inconnue.
+          // `!info.champ` couvre les entrées GÉNÉRIQUES sans type résolu
+          // (ex. "guilde", voir CHAMP_ELEMENT_PLACEMENT_ ci-dessus) — ne
+          // devrait jamais arriver ici en usage normal (le type est
+          // toujours résolu par l'appelant AVANT d'appeler cette
+          // fonction), mais ignoré silencieusement plutôt que d'écrire
+          // sur un champ "undefined", même filet de sécurité que pour
+          // une clé totalement inconnue.
           if (!info || !info.champ) return;
           var quantite = Number(elements[cle]) || 0;
           if (info.tableauValeurs) {
@@ -1073,8 +879,7 @@ var SecteurService = (function () {
   }
 
   /**
-   * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-   * Domineum") : calcule (SANS écrire) les cibles d'un cadre de type
+   * Calcule (SANS écrire) les cibles d'un cadre de type
    * "placement_multiple" (data/catalogue/evenements.json, effet.placements[]
    * — chaque entrée { critere: 'population_min'|'population_max', elements }).
    * Contrairement à un cadre "placement" simple, le secteur n'est pas un
@@ -1147,8 +952,7 @@ var SecteurService = (function () {
   }
 
   /**
-   * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : applique un
-   * cadre "placement_multiple" — `ciblesParGroupe` (un numéro de secteur
+   * Applique un cadre "placement_multiple" — `ciblesParGroupe` (un numéro de secteur
    * par entrée de `resoudrePlacementMultipleNeantAdjacent(...).groupes`,
    * même ordre) vient du joueur (choix explicite en cas d'égalité de
    * Population, ou seul candidat possible sinon) mais est REVALIDÉ ici :
@@ -1203,10 +1007,8 @@ var SecteurService = (function () {
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,
     appliquerPlacementMultipleNeantAdjacent: appliquerPlacementMultipleNeantAdjacent,
     getEntretien: getEntretien,
-    // 21/08/2026 (docs/docs-rapport.md DUP-2) : exposée publiquement —
-    // strategieService.js en gardait une copie identique
-    // (CHAMP_PN_PAR_TYPE_VUE), désormais supprimée au profit de cette
-    // seule source de vérité.
+    // Exposée publiquement : seule source de vérité pour ce mapping,
+    // utilisée aussi par strategieService.js (pas de copie locale).
     CHAMP_PN_PAR_TYPE: CHAMP_PN_PAR_TYPE
   };
 })();

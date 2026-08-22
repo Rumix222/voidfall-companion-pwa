@@ -2,20 +2,6 @@
  * Test fumée — focusEngine.js + annulationService.js
  * Exécution : node focusEngine.test.js
  *
- * 17/08/2026 (Session 14 fin) : ajout des tests "envahir"/"envahir_corrompu"
- * (victoire, défaite, annulé) — le témoin "hors périmètre" utilise
- * désormais "retirer_corruption" (envahir étant porté, il ne peut plus
- * servir de témoin ; "rappeler_cube" est écarté aussi : son nom contient
- * "cube" et tombe dans le repli générique dédié aux clés Cube, pas dans
- * celui des clés secteur).
- * 17/08/2026 (Session 14 suite) : ajout des tests "deployer_cube" (mode
- * libre + coût ressource, mode transmis pour par_chantier/secteur_mere,
- * annulé, et le cas Coût signe<0 qui retombe sur le repli générique
- * "cube").
- * 17/08/2026 (Session 14) : ajout des tests "regrouper" (succès + annulé)
- * — le cas hors périmètre "envahir" reste inchangé et sert toujours de
- * témoin pour les clés secteur NON portées cette session.
- *
  * Simule un DB en mémoire (même forme que DB : get/getAll/put/supprimer)
  * pour ne dépendre ni du navigateur ni d'IndexedDB réel. Charge les
  * fichiers réels via vm, comme le reste de la suite du projet.
@@ -173,12 +159,11 @@ test('gagner_prime : crédite jetonPrime directement (case "Gagnez un jeton Prim
   });
 });
 
-// 21/08/2026 (retour utilisateur — Événement E Cycle 1 Cadre 2 : "Avancer
-// piste civilisation -> avance rapide -> gagner un jeton commerce ->
-// gagner un jeton prime, ça s'est mal passé") : reproduit la chaîne
-// complète — le Bonus Commerce "Gagnez un jeton Prime." (index 4 de
-// BONUS_COMMERCE) doit réellement créditer jetonPrime, pas juste
-// journaliser un rappel manuel.
+// Reproduit la chaîne complète "Avancer piste civilisation -> avance
+// rapide -> gagner un jeton commerce -> gagner un jeton prime" : le
+// Bonus Commerce "Gagnez un jeton Prime." (index 4 de BONUS_COMMERCE)
+// doit réellement créditer jetonPrime, pas juste journaliser un rappel
+// manuel.
 test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonPrime', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -195,12 +180,12 @@ test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jeto
   });
 });
 
-// 20/08/2026 (EVOLUTION 5 — voir TODO.md) : "retirer_corruption" est
-// désormais portée (voir tests dédiés plus bas) — "effet_secteur" la
-// remplace comme témoin des clés secteur restant hors périmètre
-// ("rappeler_cube" écarté aussi : son nom contient "cube" et tombe dans
-// le repli générique dédié aux clés Cube, pas dans celui des clés
-// secteur — même remarque déjà faite pour "envahir" avant son portage).
+// "effet_secteur" sert de témoin pour les clés secteur non automatisées
+// (repli générique "effet non chiffré") — "retirer_corruption" ne peut
+// pas servir de témoin car elle est portée (voir tests dédiés plus bas) ;
+// "rappeler_cube" est écarté aussi : son nom contient "cube" et tombe
+// dans le repli générique dédié aux clés Cube, pas dans celui des clés
+// secteur.
 test('clé secteur hors périmètre (effet_secteur) : ne bloque pas, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -307,12 +292,10 @@ test('regrouper : annulé (popup "Annuler") — bloque toute l\u2019action, coû
   });
 });
 
-// 20/08/2026 (EVOLUTION 3 — voir TODO.md) : "augmenter_population" (SANS
-// "_pure") — clé utilisée par data/catalogue/pistesCivilisation.json et
-// focus.json, jusqu'ici NON reconnue (repli générique "effet non chiffré",
-// aucune popup) alors que "augmenter_population_pure" (evenements.json,
-// même mécanique) l'était déjà. Même gabarit de test que "regrouper"
-// ci-dessus.
+// "augmenter_population" (SANS "_pure") est la clé utilisée par
+// data/catalogue/pistesCivilisation.json et focus.json — à distinguer de
+// "augmenter_population_pure" (evenements.json, même mécanique). Même
+// gabarit de test que "regrouper" ci-dessus.
 test('augmenter_population (piste Civilisation/Focus, sans "_pure") : succès — délègue à demanderChoix({type:"augmenter_population_pure"}), journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -368,11 +351,10 @@ test('augmenter_population et augmenter_population_pure : même comportement (ch
   });
 });
 
-// 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-// TODO.md) : "retirer_corruption" délègue désormais à demanderChoix
-// ({type:'retirer_corruption'}) — la popup (strategieService.js) fait le
-// choix ET la persistance (comme "regrouper"/"augmenter_population_pure"
-// ci-dessus), resoudreCle_ ne fait que relayer reponse.detail.
+// "retirer_corruption" délègue à demanderChoix({type:'retirer_corruption'})
+// — la popup (strategieService.js) fait le choix ET la persistance (comme
+// "regrouper"/"augmenter_population_pure" ci-dessus), resoudreCle_ ne fait
+// que relayer reponse.detail.
 test('retirer_corruption : succès — délègue à demanderChoix({type:"retirer_corruption"}), journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -404,11 +386,11 @@ test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019act
   });
 });
 
-// 21/08/2026 (effet "Gagner une Corruption", voir docs-rules-corruption-
-// gardiens-refuges-technoConsume.md) : "gain_corruption" délègue à
-// demanderChoix({type:'gagner_corruption'}) — miroir exact de
-// retirer_corruption ci-dessus, même contrat (la popup fait le choix ET
-// la persistance, resoudreCle_ ne fait que relayer reponse.detail).
+// "gain_corruption" délègue à demanderChoix({type:'gagner_corruption'})
+// (voir docs-rules-corruption-gardiens-refuges-technoConsume.md) — miroir
+// exact de retirer_corruption ci-dessus, même contrat (la popup fait le
+// choix ET la persistance, resoudreCle_ ne fait que relayer
+// reponse.detail).
 test('gain_corruption : succès — délègue à demanderChoix({type:"gagner_corruption"}), journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -440,10 +422,10 @@ test('gain_corruption : annulé (popup "Annuler") — bloque toute l’action, c
   });
 });
 
-// 21/08/2026 (gain d'Influence variable, voir docs-architecture-pwa.md) :
-// "influence_valeur_gloire" résolue entièrement en pur — aucun
-// demanderChoix appelé (demanderChoixSansPopup_ jetterait si c'était le
-// cas), somme des jetons Gloire (null ignorés).
+// "influence_valeur_gloire" résolue entièrement en pur (voir
+// docs-architecture-pwa.md) — aucun demanderChoix appelé
+// (demanderChoixSansPopup_ jetterait si c'était le cas), somme des
+// jetons Gloire (null ignorés).
 test('influence_valeur_gloire : somme des jetons Gloire créditée, résolue en pur (aucun demanderChoix)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -457,9 +439,9 @@ test('influence_valeur_gloire : somme des jetons Gloire créditée, résolue en 
   });
 });
 
-// 21/08/2026 (gain d'Influence variable) : "influence_par_technologie_amelioree"
-// résolue entièrement en pur — combine les 3 sources de Technologies
-// possédées (départ, emplacements obtenus, avancées choisies).
+// "influence_par_technologie_amelioree" résolue entièrement en pur —
+// combine les 3 sources de Technologies possédées (départ, emplacements
+// obtenus, avancées choisies).
 test('influence_par_technologie_amelioree : combine les 3 sources, résolue en pur (aucun demanderChoix)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -479,11 +461,10 @@ test('influence_par_technologie_amelioree : combine les 3 sources, résolue en p
   });
 });
 
-// 21/08/2026 (gain d'Influence variable) : les 9 clés "influence_par_*"
-// nécessitant un comptage sur les secteurs délèguent à
-// demanderChoix({type:'influence_secteur'}) — calcul déterministe, aucun
-// choix utilisateur, la popup (strategieService.js) fait le calcul ET
-// résout {montant, detail}.
+// Les 9 clés "influence_par_*" nécessitant un comptage sur les secteurs
+// délèguent à demanderChoix({type:'influence_secteur'}) — calcul
+// déterministe, aucun choix utilisateur, la popup (strategieService.js)
+// fait le calcul ET résout {montant, detail}.
 test('influence_par_guilde_pure : délègue à demanderChoix({type:"influence_secteur"}), journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -537,11 +518,10 @@ test('influence_par_secteur_pur : annulé (popup "Annuler") — bloque toute l�
   });
 });
 
-// 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
-// voir TODO.md) : "avancer_civilisation" (piste au choix) et les 3
-// variantes "avancer_civilisation_<piste>" (piste imposée) délèguent
-// désormais à demanderChoix({type:'avancer_civilisation', piste}) — la
-// popup (strategieService.js) fait le choix ET la persistance (comme
+// "avancer_civilisation" (piste au choix) et les 3 variantes
+// "avancer_civilisation_<piste>" (piste imposée) délèguent à
+// demanderChoix({type:'avancer_civilisation', piste}) — la popup
+// (strategieService.js) fait le choix ET la persistance (comme
 // "regrouper"/"retirer_corruption" ci-dessus), resoudreCle_ ne fait que
 // relayer reponse.detail.
 test('avancer_civilisation (piste au choix) : succès — délègue à demanderChoix avec piste:null, journalisé', function () {

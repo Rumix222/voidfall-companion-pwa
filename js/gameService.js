@@ -1,384 +1,67 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 24 — 21/08/2026 (docs/docs-rapport.md MUT-1/CM-1 — factorisation appliquerCadre* + suppression de definirTechnologieAvanceeAmelioree)
  *
- * 21/08/2026 (docs/docs-rapport.md MUT-1) : les 8 fonctions `appliquerCadre*`
- * répétaient ~15 lignes de boilerplate identique (chargement partie +
- * garde-fous anti-double-application + résolution du cadre dans le
- * catalogue de l'Événement) et le refetch final (parties+plateauMaison ->
- * assemblerPartie_) réapparaissait 11 fois dans le fichier. Factorisés en
- * `chargerCadreOuvrable_(partieId, cycle, ordreCadre)` et
- * `rechargerPartie_(partieId)`. Aucun changement de comportement (validé
- * par les 5 fichiers de test dédiés aux Cadres + e2e/partie-aleatoire.spec.js
- * sur les 14 maisons).
+ * Créer / lire / lister / sauvegarder / archiver / supprimer une partie ;
+ * mise à jour partielle du plateau maison (majPlateauMaison) ; Événement
+ * galactique (sélection par cycle, Cadres — automatisés quand possible,
+ * sinon résolution manuelle) ; avancement de cycle ; Focus héroïques ;
+ * Technologies (obtenues, avancées) ; délégation à CivilisationService
+ * pour les pistes de Civilisation (majCivilisation).
  *
- * 21/08/2026 (docs/docs-rapport.md CM-1) : `definirTechnologieAvanceeAmelioree`
- * supprimée — confirmé zéro appelant en dehors de son propre fichier de
- * test (aucun bouton index.html ne l'invoque). Attention, correction par
- * rapport à l'analyse initiale du rapport : SEULE cette fonction était
- * morte. Le champ `technologiesAvanceesAmeliorees` qu'elle écrivait
- * reste, lui, VIVANT et TESTÉ — lu par focusEngine.js pour l'effet
- * "influence_par_technologie_amelioree" (voir focusEngine.test.js,
- * ajouté le 21/08/2026). Sa valeur reste structurellement toujours `{}`
- * en usage réel (aucune UI ne l'alimente, `majPlateauMaison` ne
- * l'autorise pas non plus via CHAMPS_PLATEAU_MAISON_AUTORISES) — un vrai
- * gap fonctionnel (UI manquante pour marquer une Technologie avancée
- * améliorée), pas du code mort à supprimer sans discussion. Non traité
- * ici, à ajouter à docs/docs-rapport.md si une UI dédiée est souhaitée.
+ * Séparation de colonnes (invariant du fichier) : civilisation /
+ * cycleActuel / technologiesObtenues / plateauMaison ne sont JAMAIS
+ * sérialisés dans `parties.etatJson` — ils vivent dans leurs clés dédiées
+ * (record `plateauMaison`, ou colonnes cycleNum/cycleTermine de
+ * `parties`). Voir pourEtatJson_/assemblerPartie_ ci-dessous. `etatJson`
+ * ne contient QUE les champs sans colonne dédiée : joueur (sans
+ * technologieDepart, autoritaire dans plateauMaison), adversaires,
+ * evenements, technologiesAcquises, focusJoueur, focusHeroiques,
+ * focusHeroiquesPioches — id/dateCreation/archivee/scenarioId/cycleNum/
+ * cycleTermine vivent en colonnes top-level du record `parties`, jamais
+ * dupliqués dans le blob.
  *
- * 21/08/2026 (docs/docs-rapport.md BUG-2) : cleFocusEnginePourOptionCadre_
- * exposée publiquement (GameService.cleFocusEnginePourOptionCadre) —
- * index.html en gardait une copie recopiée à la main, déjà cause d'un
- * Cadre non cliquable par le passé faute de synchronisation manuelle.
- * Supprimée côté index.html, qui lit désormais directement cette
- * fonction. Aucun changement de comportement.
+ * `cycleActuel` n'est PAS stocké comme un champ redondant en plus de
+ * cycleNum/cycleTermine : il est recalculé à chaque lecture
+ * (assemblerPartie_) à partir de ces deux colonnes, qui restent seules
+ * autoritaires — évite une source de vérité en trop à garder synchronisée
+ * par les fonctions de cycle.
  *
- * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
- * du mal") :
- * - Cadre 1 : resoudreCiblesCadreGainCorruption_ reconnaît désormais un
- *   `effet_conditionnel` quand — et SEULEMENT quand — il correspond
- *   exactement au gabarit de ce Cadre (voir
- *   conditionAvancerPisteSiCorrompue_ ci-dessous : si_cible
- *   "piste_civilisation", condition "marqueur_pas_case_la_plus_a_droite",
- *   consequence.cle "avancer_piste_civilisation" valeur 1) — auparavant
- *   tout effet_conditionnel rendait le Cadre non automatisable (voir
- *   ancien commentaire ci-dessous, conservé pour le reste du filtre).
- *   `config.avancerPisteApresPlacement` (nouveau) transmis jusqu'à la
- *   popup 'gagner_corruption' (strategieService.js) via
- *   appliquerCadreGainCorruption : quand la cible choisie est "piste", la
- *   popup appelle en plus CivilisationService.avancerPisteSansEffet sur
- *   cette même piste (civilisationService.js v5).
- * - Cadre 2 (permanent) : nouveau champ manuel 'corruptionMaison' dans
- *   CHAMPS_PLATEAU_MAISON_AUTORISES/assemblerPartie_ (compteur de
- *   Corruption sur la fiche Maison, tenu à jour automatiquement par
- *   CivilisationService.definirCorruption pour les pistes de Civilisation
- *   — voir civilisationService.js v5 — et manuellement par le joueur pour
- *   les Programmes/Chambres de décontamination, comme le reste de ces 2
- *   sources). Affiché sur l'écran Plat. maison à gauche d'Influence (voir
- *   index.html, renderEcranPlateauMaison_).
+ * Champ `technologiesAvanceesAmeliorees` (map {nom: bool}, sur
+ * plateauMaison) : lu par focusEngine.js pour l'effet
+ * "influence_par_technologie_amelioree" (voir focusEngine.test.js) — un
+ * contrat actif. Sa valeur reste structurellement toujours `{}` en usage
+ * réel : aucune UI ne l'alimente aujourd'hui (majPlateauMaison ne
+ * l'autorise pas non plus via CHAMPS_PLATEAU_MAISON_AUTORISES) — gap
+ * fonctionnel connu (UI manquante pour marquer une Technologie avancée
+ * comme améliorée), pas du code mort.
  *
- * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
- * galactique — type "gain", voir docs-rules-corruption-gardiens-refuges-
- * technoConsume.md §1) : nouvelles cadreGainCorruptionAutomatisable/
- * appliquerCadreGainCorruption + resolveur privé
- * resoudreCiblesCadreGainCorruption_/CIBLE_KIND_MAP_GAIN_CORRUPTION_ (voir
- * leur JSDoc pour le détail complet — quelles cibles catalogue sont
- * automatisées, lesquelles restent volontairement manuelles). Sort du
- * hors-périmètre "Cadre gain -> toujours manuel" (en place depuis le
- * 19/08/2026) les Cadres dont la cible est un choix personnel de
- * placement (secteur/piste/Programme/Technologie Chambres de
- * décontamination), en réutilisant la même popup 'gagner_corruption'
- * (strategieService.js v26) que la clé FocusEngine "gain_corruption"
- * (focusEngine.js v11), avec un mécanisme de restriction de cibles
- * (ciblesAutorisees/ciblesRepli/exclureTechno) que cette dernière ne
- * fournit pas (rien à restreindre pour un Focus/une case de piste).
- * index.html (nouvelle catégorie de cadre "estGainCorruption", en plus de
- * placement/placement_multiple/manuel/résolution — voir renderCadresEvenement_
- * et appliquerCadreGainCorruptionEtRafraichir_).
+ * technologiesObtenues compte 5 emplacements (le tableau par défaut) ;
+ * avec la Technologie de départ (fixe, hors de ce tableau), cela fait 6
+ * technologies maximum au total. Une partie dont une technologie occupe
+ * un 6e emplacement (ancien format) la conserve telle quelle en base
+ * (colonne dédiée, jamais tronquée ici) — seul index.html limite
+ * l'affichage/l'édition à 5.
  *
- * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : nouvelle méthode
- * appliquerCadreChoixPlacement (+ construireResumePlacementChoix_,
- * LABEL_TYPE_GUILDE_RESUME_) — applique un cadre `type: 'choix'` dont
- * chaque option est elle-même `type: 'placement'` avec un `critere` de
- * Population (nouveau gabarit, hors périmètre de "placement"/
- * "placement_multiple" existants, qui n'offrent jamais de choix entre
- * plusieurs placements alternatifs). Résout la clé générique "guilde"
- * (secteurService.js v10) en "guilde_<type>" via `typeGuildeChoisi`,
- * revalide intégralement le secteur choisi (jamais confiance à
- * l'appelant, réutilise SecteurService.resoudrePlacementMultipleNeantAdjacent
- * en enveloppant l'option dans un `placements` à 1 entrée). Voir
- * strategieService.js (nouveau contexte 'placement_critere') et
- * index.html (actionsCadre_/ouvrirPopupCadreEtRafraichir_) pour le
- * câblage complet.
+ * Identifiant de partie : crypto.randomUUID(), généré une seule fois à la
+ * création — unicité locale par appareil, aucun serveur à consulter.
  *
- * 21/08/2026 (effet "Améliorer un jeton Gloire") : cleFocusEnginePourOptionCadre_
- * reconnaît désormais { cle: 'ameliorer_gloire' } — même mécanisme
- * générique qu'avancer_civilisation/retirer_corruption ci-dessus,
- * identité (focusEngine.js v10 la reconnaît nativement, résolue sans
- * popup).
- *
- * 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO : "je ne
- * vois pas l'effet de l'avancement de la piste civilisation dans
- * l'onglet plateau maison") : appliquerCadreChoixFocusEngine ne
- * réutilise plus `lignePlateauMaison` (capturée AVANT FocusEngine.
- * resoudreEffet) pour l'écriture finale — un DB.put bâti sur ce
- * snapshot périmé écrasait toute écriture DIRECTE faite sur plateauMaison
- * PENDANT la résolution par une popup imbriquée (avancer_civilisation,
- * EVOLUTION 7 ; retirer_corruption/Technologie, EVOLUTION 5), en
- * violation de la règle #1 du projet (lecture-fusion-écriture
- * systématique, voir CLAUDE.md). Relit désormais une ligne fraîche juste
- * avant de fusionner les champs suivis par focusEngine.js — voir
- * version.js pour le détail complet et le nouveau test dédié
- * (gameService_cadre_ecriture_imbriquee_test.js).
- *
- * 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
- * voir TODO.md) : cleFocusEnginePourOptionCadre_ reconnaît désormais
- * { cle: 'avancer_civilisation' } (piste au choix) et { cle:
- * 'avancer_civilisation_societe'/'_gouvernement'/'_economie' } (piste
- * imposée) — même mécanisme générique qu'augmenter_population_pure/
- * retirer_corruption ci-dessus, identité (focusEngine.js v9 les
- * reconnaît nativement).
- *
- * 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
- * TODO.md) : CHAMPS_PLATEAU_MAISON_AUTORISES accepte désormais
- * 'corruptionChambreDecontamination' (nouveau jeton manuel, voir
- * strategieService.js) et cleFocusEnginePourOptionCadre_ reconnaît
- * { cle: 'retirer_corruption' } — même mécanisme générique
- * qu'augmenter_population_pure/etablir_guilde ci-dessus, aucun autre
- * changement dans ce fichier.
- *
- * 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
- * utilisateur) : cleFocusEnginePourOptionCadre_ reconnaît désormais aussi
- * { cle: 'augmenter_population_pure' } et { cle: 'etablir_guilde_banquier' }
- * (identité — FocusEngine.resoudreCle_ les reconnaît telles quelles, voir
- * focusEngine.js v6) — même mécanisme générique qu'etablir_guilde/
- * construire_installation ci-dessous, aucun autre changement dans ce
- * fichier (appliquerCadreChoixFocusEngine reste inchangée, entièrement
- * générique sur la clé retournée ici).
- *
- * 19/08/2026 (Construire une Installation / Établir une Guilde portées —
- * retour utilisateur : "on a dû perdre cette possibilité lors du portage
- * en PWA, il y a des actions de focus qui placent des guildes ou des
- * installations aussi") : cleFocusEnginePourOptionCadre_ reconnaît
- * désormais { cle: 'etablir_guilde' } / { cle: 'construire_installation' }
- * (identité — FocusEngine.resoudreCle_ les gère nativement, voir
- * focusEngine.js v5, CLES_CONSTRUIRE). appliquerCadreChoixCube renommée
- * appliquerCadreChoixFocusEngine (ne concernait plus que les cubes) — le
- * mécanisme (délègue à FocusEngine.resoudreEffet) est inchangé, sert
- * maintenant aussi la construction. Événement C Cycle 1 Cadre 2
- * ("Etablissez une Guilde OU construisez une Installation", ajouté la
- * session précédente avec une résolution manuelle de repli) passe ainsi
- * automatiquement par ce mécanisme, sans changement propre à ce cadre.
- * appliquerCadreChoixManuel (session précédente) reste en place comme
- * filet de sécurité générique pour toute future option de cadre "choix"
- * réellement non automatisable. js/focusEngine.js (v5), js/strategieService.js
- * (v19 — nouveau contexte 'construire'), index.html.
- *
- * 19/08/2026 (Événement galactique C, Cycle 1 "Vestiges du Domineum") :
- * deux nouvelles méthodes pour les 2 Cadres de cet événement.
- * appliquerCadrePlacementMultiple(partieId, cycle, ordreCadre,
- * ciblesParGroupe) — Cadre 1, nouveau type de cadre "placement_multiple"
- * (data/catalogue/evenements.json) — délègue tout le calcul/la
- * revalidation à SecteurService.appliquerPlacementMultipleNeantAdjacent
- * (secteurService.js v4, voir son en-tête) ; `ciblesParGroupe` vient de
- * l'appelant (IHM) mais n'est jamais cru sur parole (revalidé côté
- * SecteurService, même principe qu'appliquerCadrePlacement). Stocke
- * `{ secteurs: [...], le }` (dédupliqué — le cas particulier "un seul
- * secteur du Néant adjacent" fusionne tous les jetons sur un seul
- * secteur). appliquerCadreChoixManuel(partieId, cycle, ordreCadre,
- * indexOption, resume) — Cadre 2 ("Établissez une Guilde OU construisez
- * une Installation") : les deux options sont hors périmètre (aucune
- * mécanique de construction de Guilde/Installation automatisée par
- * l'app, mêmes clés déjà signalées hors périmètre côté Focus/
- * focusEngine.js) — enregistre juste l'option choisie comme résolue
- * manuellement (`resume`, texte au passé fourni par l'appelant, ex.
- * "Guilde établie manuellement"), aucun delta plateauMaison/secteursPartie.
- * index.html (nouveaux data-placement-multiple/gestion actionsCadre_ pour
- * les options non automatisables).
- *
- * 18/08/2026 (Simplification UI Événement galactique — Cadre 3 générique,
- * Événement B Cycle 1 : "activer 1 cube / déployer 1 cube sur le
- * Secteur-Mère") : nouvelle méthode appliquerCadreChoixCube(partieId,
- * cycle, ordreCadre, indexOption, demanderChoix) — pour une option de
- * cadre "choix" portant sur les cubes de Puissance Navale
- * (cleFocusEnginePourOptionCadre_ reconnaît activer_cube/deployer_cube),
- * délègue à FocusEngine.resoudreEffet (moteur pur déjà utilisé par
- * l'écran Focus pour ces mêmes clés) plutôt que de dupliquer une
- * deuxième logique de débit de cubeActif — FocusEngine reste la SEULE
- * source de vérité pour cette mécanique. `demanderChoix` est le seul
- * paramètre IHM que GameService accepte (comme FocusEngine.
- * jouerActionEtPersister le fait déjà) : nécessaire pour la popup
- * imbriquée "Déployer des cubes" (choix du type de Flotte) côté option
- * "déployer". Une annulation de cette popup imbriquée résout avec
- * { annule: true } (pas une erreur — le joueur peut réessayer). GameService
- * dépend désormais de FocusEngine (référence globale paresseuse, résolue
- * seulement à l'appel — focusEngine.js peut être chargé après
- * gameService.js dans index.html, l'inverse de sa propre dépendance
- * documentée sur GameService pour son orchestrateur jouerActionEtPersister).
- * index.html (v32 — actionsCadre_ reconnaît les options cube,
- * appliquerCadreCubeEtRafraichir_ nouvelle), css/style.css inchangé.
- * Tests fumée dédiés : test_gameService_cadreChoixCube.js (node --test,
- * charge le VRAI focusEngine.js + mock DB en mémoire via vm, 4
- * scénarios : activer, déployer validé, déployer annulé, option inconnue).
- *
- * 18/08/2026 (Simplification UI Événement galactique — Cadre 1 générique) :
- * appliquerCadrePlacement ne délègue plus à une fonction SecteurService
- * dédiée à un seul jeu d'éléments (Défense de Secteur + Guilde de
- * Scientifiques) — elle retrouve le cadre `ordreCadre` dans
- * evenementCycle.cadres (déjà chargé en mémoire, catalogue complet
- * persisté par choisirEvenement) et transmet son `effet.elements` tel
- * quel à SecteurService.placerElementsNeantAdjacent (générique, voir son
- * en-tête). Permet de porter le Cadre 1 de l'Événement B Cycle 1 (jeton
- * Libération + Défense de Secteur) sans aucune nouvelle fonction dédiée.
- * secteurService.js (v4), js/strategieService.js (v18), index.html (v30).
- *
- * 17/08/2026 (Lot F — corrections mineures) : technologiesObtenues passe
- * de 6 à 5 emplacements (les 3 occurrences du tableau par défaut) — avec
- * la Technologie de départ (fixe), cela fait 6 technologies maximum au
- * total (décision utilisateur, voir index.html/renderTechnologiesObtenues_).
- * Une partie déjà en cours avec une technologie au 6e emplacement (index
- * 5) la conserve en base (colonne dédiée, jamais tronquée ici) — seul
- * index.html limite l'affichage/l'édition à 5, hors périmètre signalé.
- *
- * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : nouvelle
- * mécanique confirmée par l'utilisateur (session du 17/08), sans
- * équivalent legacy (GAS) ni RPC Postgres existante — écrite entièrement
- * à partir de la règle telle que décrite en session, pas d'un SQL/JS
- * legacy à porter (contrairement au reste de ce fichier). Ajout de :
- *   - 2 colonnes dédiées de plateauMaison (jamais dans etatJson, même
- *     principe que technologiesObtenues) : technologiesAvanceesChoisies
- *     (les 4 choisies au cycle 1, 4 emplacements) et
- *     technologiesAvanceesAmeliorees (map {nom: bool}, couvre les 8) ;
- *   - choisirTechnologieAvancee(partieId, slot, nom) : choix d'une des 4,
- *     cycle 1 uniquement, rejette les doublons entre emplacements ;
- *   - definirTechnologieAvanceeAmelioree(partieId, nom, amelioree) :
- *     rejette si la technologie n'est pas dans le groupe actif du cycle
- *     en cours ;
- *   - obtenirTechnologiesAvanceesGroupes(partie) : fonction PURE (pas
- *     d'accès DB), calcule groupeA (les 4 du cycle 1)/groupeB (le
- *     complément, actif au cycle 3)/actif (améliorable ce cycle-ci),
- *     appelée à la fois en interne (definirTechnologieAvanceeAmelioree)
- *     et par index.html (rendu de l'écran Plat. Galactique) — un seul
- *     endroit pour cette logique, affichage et persistance ne peuvent
- *     pas diverger.
- * Règle du groupe actif (groupeActifTechnologiesAvancees_, privée) :
- * aucune amélioration possible au cycle 1 ; les 4 choisies au cycle 1
- * (groupeA) sont améliorables au cycle 2 ; le complément (groupeB, calculé
- * — jamais choisi manuellement) devient améliorable au cycle 3, à la
- * place de groupeA (pas en plus). Testé par
- * gameService_technologies_avancees_test.js (nouveau fichier, 17/08/2026).
- *
- * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
- * ajout du champ "texte" (déjà présent dans la table catalogue
- * "technologies", jusqu'ici jamais remonté) sur les technologies de
- * obtenirMaisonsCatalogue_/formatMaison_ — nécessaire au tooltip des
- * badges technologie sur l'écran Partie (portage de carteMaisonHTML,
- * app-2.html GAS). Changement additif (nouvelle clé sur des objets déjà
- * en place) : n'affecte pas les parties déjà créées (technologies
- * stockées telles quelles à la création, "texte" restera vide pour elles
- * — pas de migration nécessaire) ; les 18 tests fumée existants
- * (gameService_cycle_focus_technologie_test.js/
- * gameService_evenements_technologie_test.js) passent sans modification,
- * aucun des deux ne construit ses fixtures via obtenirMaisonsCatalogue_/
- * formatMaison_.
- *
- * 17/08/2026 (Session 12 — SQL RPC récupéré)
- *
- * 17/08/2026 (Session 12) : ajout de avancerCycle, choisirFocusHeroique et
- * choisirTechnologieObtenue — portage ligne à ligne des RPC Postgres
- * correspondantes (avancer_cycle, choisir_focus_heroique,
- * choisir_technologie_obtenue), dont le SQL a été fourni par
- * l'utilisateur (rpc.json). Ces 3 fonctions étaient jusqu'ici hors
- * périmètre faute de code source. Correctif inclus : cycleActuel (champ
- * dérivé, jamais stocké) doit être recalculé après mutation de
- * cycleNum/cycleTermine dans avancerCycle — repéré par le test fumée
- * dédié (gameService_cycle_focus_technologie.test.js, 12 cas). Voir aussi
- * secteurService.js (v2, même session — les 8 actions secteur).
- *
- * 17/08/2026 (Session 11) : ajout de getEvenementsParCycle, choisirEvenement
- * et definirTechnologieAmelioree — portage direct de leurs équivalents
- * GameService.js (GAS). Ni l'une ni l'autre n'est une RPC Postgres
- * (contrairement à avancerCycle/choisirFocusHeroique/
- * choisirTechnologieObtenue/secteur_*, qui restent hors périmètre faute de
- * code SQL récupéré) : ce sont de simples lectures/écritures JS, déjà
- * visibles dans le code legacy fourni, donc portables sans attendre
- * l'extraction SQL en cours. Voir aussi index.html (écran Partie —
- * sélection d'événement galactique par cycle, case "Technologie de départ
- * améliorée").
- *
- * 17/08/2026 (Session 5, Phase 5 — Civilisation) : ajout de
- * majCivilisation(partieId, champs) — seul changement de cette version.
- * civilisationService.js (nouveau ce jour) en est l'unique appelant
- * prévu. Le reste du fichier est inchangé.
- *
- * 17/08/2026 (Phase 4, partielle) : creerPartie remplit désormais
- * partie.focusJoueur avec la vraie mise en place (voir
- * FocusService.obtenirMiseEnPlace, focusService.js) au lieu d'un tableau
- * vide — tolérant (garde typeof, comme SecteurService). Dépend désormais
- * aussi de focusService.js, à charger AVANT ce fichier (même principe
- * que secteurService.js).
- * [Nettoyage Session 9] Les cartes SONT jouables depuis la Session 4 —
- * voir js/focusEngine.js/js/strategieService.js. Ce commentaire disait
- * encore le contraire (rédigé avant l'existence de focusEngine.js) :
- * corrigé ici, aucune conséquence fonctionnelle, juste une note obsolète.
- *
- * 17/08/2026 (Phase 3) : creerPartie appelle désormais
- * SecteurService.instancierSecteurs(partie) après la sauvegarde
- * (tolérant — voir secteurService.js, ne bloque jamais la création de
- * partie) ; scenarioId se défaut sur SecteurService.SCENARIO_PAR_DEFAUT
- * si non fourni (comme côté GAS), au lieu de rester null. Dépend
- * désormais de secteurService.js, à charger AVANT ce fichier — via un
- * garde `typeof SecteurService !== 'undefined'`, gameService.js reste
- * utilisable seul (tests) si secteurService.js n'est pas chargé.
- *
- * 17/08/2026 (suite Session 3) : obtenirMaisonsCatalogue exposée
- * publiquement (était privée) — utilisée par js/setupService.js (portage
- * de l'écran de création de partie, setup.html GAS).
- *
- * Session 3 (Phase 2 du plan de migration) : remplace GameService.js (GAS)
- * + la partie "état de jeu" de DataService.js. Écriture directe dans les
- * stores IndexedDB `parties` / `plateauMaison` / `historique` via js/db.js
- * (DB.get/getAll/put/supprimer) — plus de RPC Supabase, plus de
- * google.script.run.
- *
- * PÉRIMÈTRE VOLONTAIREMENT RÉDUIT à cette session (confirmé en session) :
- * créer / lire / lister / sauvegarder / archiver / supprimer une partie,
- * + mise à jour partielle du plateau maison (majPlateauMaison). Restent
- * HORS PÉRIMÈTRE (repoussés aux phases correspondantes du plan) :
- *   - choisirEvenement, choisirFocusHeroique, choisirTechnologieObtenue,
- *     définirTechnologieAmelioree, avancerCycle : plusieurs de ces
- *     fonctions étaient des RPC Postgres dont le SQL source n'a jamais
- *     été récupéré côté GAS (voir en-tête de DataService.js) — rien à
- *     porter, à réécrire depuis les règles.
- *   - [Nettoyage Session 9] avancerCivilisation* retiré de cette liste :
- *     PORTÉ depuis, mais PAS comme fonction de gameService.js — voir
- *     civilisationService.js (Session 5), qui avance les pistes via le
- *     nouveau majCivilisation ci-dessous, sans passer par une RPC du même
- *     nom que côté GAS.
- *   - focusJoueur (mise en place Focus, FocusService — Phase 4) et les
- *     secteurs (SecteurService — Phase 3) : creerPartie amorce les champs
- *     correspondants à vide/null, dans la forme attendue, pour ne pas
- *     casser l'écran une fois ces phases livrées.
- *
- * Identifiant de partie : crypto.randomUUID() (généré une seule fois à la
- * création, confirmé en session — remplace Utilities.getUuid() de GAS ;
- * plus de Postgres pour garantir l'unicité, sans enjeu ici, stockage
- * local par appareil).
- *
- * Séparation de colonnes (règle projet, section 2 du plan de migration) :
- * civilisation / cycleActuel / technologiesObtenues / plateauMaison ne
- * sont JAMAIS sérialisés dans `parties.etatJson` — ils vivent dans leurs
- * clés dédiées (record `plateauMaison`, ou colonnes cycleNum/cycleTermine
- * de `parties`). Voir pourEtatJson_/assemblerPartie_ ci-dessous, portage
- * direct de pourEtatJson_/construirePartieDepuisLigne_ (DataService.js GAS).
- *
- * Précision par rapport au schéma "brouillon" de la section 2 du plan :
- * `cycleActuel` n'est PAS stocké comme un troisième champ redondant en
- * plus de cycleNum/cycleTermine — il est recalculé à la lecture
- * (assemblerPartie_), exactement comme le fait déjà construirePartieDepuisLigne_
- * côté GAS (`cycle_termine ? 'termine' : cycle_num`). cycleNum/cycleTermine
- * restent la paire autoritaire, ce qui évite une source de vérité en trop
- * à garder synchronisée par les futures fonctions de cycle (Phase 2+).
- *
- * `parties.etatJson` ne contient QUE les champs sans colonne dédiée :
- * joueur (sans technologieDepart, autoritaire dans plateauMaison),
- * adversaires, evenements, technologiesAcquises, focusJoueur,
- * focusHeroiques, focusHeroiquesPioches — id/dateCreation/archivee/
- * scenarioId/cycleNum/cycleTermine vivent en colonnes top-level du record
- * `parties`, jamais dupliqués dans le blob (léger nettoyage volontaire par
- * rapport à pourEtatJson_ côté GAS, qui les y laissait par héritage de
- * l'ancien format Sheets — signalé explicitement ici).
- *
- * Dépend de db.js (objet global DB, avec DB.supprimer ajouté cette
- * session) : à charger avant ce fichier.
+ * Dépend de db.js (objet global DB) : à charger avant ce fichier.
+ * secteurService.js et focusService.js sont des dépendances optionnelles
+ * de creerPartie (gardées par `typeof X !== 'undefined'`) : ce fichier
+ * reste utilisable seul (tests) si l'un ou l'autre n'est pas chargé.
+ * FocusEngine est résolu en référence globale paresseuse (au moment de
+ * l'appel, pas au chargement) par appliquerCadreChoixFocusEngine, ce qui
+ * permet à focusEngine.js d'être chargé après gameService.js dans
+ * index.html malgré la dépendance inverse que FocusEngine a lui-même sur
+ * GameService pour son orchestrateur jouerActionEtPersister.
  */
 
 var GameService = (function () {
   'use strict';
 
   // Mise en place solo — constantes du livret, identiques pour toute
-  // Maison/Origine (portage direct de GameService.js GAS, 15/08/2026).
+  // Maison/Origine.
   var INFLUENCE_DEPART = 10;
   var GLOIRE_DEPART = [2, null, null, null, null];
 
@@ -388,30 +71,27 @@ var GameService = (function () {
     'jetonPrime', 'jetonLiberation', 'jetonCommerce', 'gloire',
     'programme1', 'programme2', 'programme3', 'programme4',
     'technologiesObtenues', 'technologiesAvanceesChoisies',
-    // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-    // TODO.md) : compteur manuel des Corruptions actuellement stockées
-    // sur la Technologie "Chambres de décontamination" (jeton simple,
-    // même principe que jetonPrime/jetonLiberation — voir
-    // strategieService.js, jetonInputHTML_/persisterJeton_). Le jeu ne
-    // gagne PAS automatiquement de Corruption sur cette case (mécanique
-    // de stockage non automatisée, hors périmètre de cette évolution qui
-    // ne porte que le RETRAIT) : l'incrémenter reste manuel, le
-    // décrémenter peut désormais se faire via l'effet retirer_corruption
-    // (FocusEngine.js) si le joueur possède la Technologie.
+    // Compteur manuel des Corruptions actuellement stockées sur la
+    // Technologie "Chambres de décontamination" (jeton simple, même
+    // principe que jetonPrime/jetonLiberation — voir strategieService.js,
+    // jetonInputHTML_/persisterJeton_). Le jeu ne gagne PAS automatiquement
+    // de Corruption sur cette case (mécanique de stockage non automatisée) :
+    // l'incrémenter reste manuel, le décrémenter peut se faire via l'effet
+    // retirer_corruption (FocusEngine.js) si le joueur possède la
+    // Technologie.
     'corruptionChambreDecontamination',
-    // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Permanent au
-    // Cycle 1", voir en-tête de fichier) : compteur générique du nombre de
-    // Corruptions actuellement sur la fiche Maison — tenu à jour
-    // automatiquement par CivilisationService.definirCorruption pour les
-    // pistes de Civilisation (via majCivilisation, voir CHAMPS_CIVILISATION_
+    // Compteur générique du nombre de Corruptions actuellement sur la
+    // fiche Maison — tenu à jour automatiquement par
+    // CivilisationService.definirCorruption pour les pistes de
+    // Civilisation (via majCivilisation, voir CHAMPS_CIVILISATION_
     // AUTORISES ci-dessous) ; whitelisté ICI en plus pour permettre la
     // saisie manuelle directe (Programmes/Chambres de décontamination,
-    // hors périmètre automatisé — champ éditable, strategieService.js).
+    // non automatisées — champ éditable, strategieService.js).
     'corruptionMaison'
   ];
 
   // ------------------------------------------------------------
-  // Utilitaires génériques (portage direct de GameService.js GAS)
+  // Utilitaires génériques
   // ------------------------------------------------------------
 
   function pickRandom_(tableau) {
@@ -433,7 +113,7 @@ var GameService = (function () {
       nom: maison.nom,
       complexite: maison.complexite,
       technologies: maison.technologies.map(function (t) {
-        return { nom: t.nom, type: t.type || '', texte: t.texte || '' };
+        return { nom: t.nom, type: t.type || '', texte: t.texte || '', texteAmeliore: t.texteAmeliore || '' };
       })
     };
   }
@@ -473,18 +153,16 @@ var GameService = (function () {
   }
 
   // ------------------------------------------------------------
-  // Accès catalogue (stores IndexedDB peuplés par catalogueSync.js,
-  // Phase 1) — équivalent de DataService.getMaisonsInternal_/
-  // getOrigineMaison côté GAS.
+  // Accès catalogue (stores IndexedDB peuplés par catalogueSync.js).
   // ------------------------------------------------------------
 
   /**
    * Jointure maisons + technologies (clés catalogue camelCase, voir
    * catalogueSync.js) -> [{ nom, complexite, technologies: [{nom, type,
-   * texte}] }]. 17/08/2026 (Lot 1 — maisons déchues) : "texte" ajouté (déjà
-   * présent dans la table catalogue "technologies", jusqu'ici jamais
-   * remonté) — nécessaire au tooltip des badges technologie sur l'écran
-   * Partie (title="...", portage de carteMaisonHTML, app-2.html GAS).
+   * texte, texteAmeliore}] }]. "texte" alimente le tooltip des badges
+   * technologie sur l'écran Partie ; "texteAmeliore" celui de la case
+   * "Améliorée" (Plat. maison, voir index.html
+   * renderTechnologiesObtenues_/renderEcranPlateauMaison_).
    */
   function obtenirMaisonsCatalogue_() {
     return Promise.all([DB.getAll('maisons'), DB.getAll('technologies')]).then(function (resultats) {
@@ -497,7 +175,7 @@ var GameService = (function () {
         var nomsTech = [m.technologie1, m.technologie2].filter(Boolean);
         var technologiesMaison = nomsTech.map(function (nomTech) {
           var t = techParNom[nomTech];
-          return { nom: nomTech, type: t ? (t.type || '') : '', texte: t ? (t.texte || '') : '' };
+          return { nom: nomTech, type: t ? (t.type || '') : '', texte: t ? (t.texte || '') : '', texteAmeliore: t ? (t.texteAmeliore || '') : '' };
         });
         return { nom: m.nom, complexite: m.complexite, technologies: technologiesMaison };
       });
@@ -528,13 +206,12 @@ var GameService = (function () {
   }
 
   /**
-   * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : les 8
-   * technologies des 4 maisons déchues (mise en place), toutes maisons
-   * confondues — même liste source que choisirTechnologieObtenue (slots
-   * "Technologies obtenues") et que toutesTechnologiesAdverses_
-   * (index.html/strategieService.js), mais exposée ici en fonction
-   * réutilisable : nécessaire aux deux nouvelles fonctions Technologies
-   * avancées ci-dessous (choix + calcul du groupe actif par cycle).
+   * Les 8 technologies des 4 maisons déchues (mise en place), toutes
+   * maisons confondues — même liste source que choisirTechnologieObtenue
+   * (slots "Technologies obtenues") et que toutesTechnologiesAdverses_
+   * (index.html/strategieService.js), exposée ici en fonction réutilisable
+   * pour les fonctions Technologies avancées ci-dessous (choix + calcul du
+   * groupe actif par cycle).
    */
   function technologiesAdversesToutes_(partie) {
     var toutes = [];
@@ -547,12 +224,12 @@ var GameService = (function () {
   }
 
   /**
-   * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : règle
-   * confirmée par l'utilisateur (session du 17/08) — les 4 Technologies
-   * avancées choisies au cycle 1 (partie.technologiesAvanceesChoisies)
-   * sont improvable au cycle 2 ; au cycle 3, ce sont les 4 AUTRES parmi
-   * les 8 (le complément, calculé, jamais choisi manuellement) qui
-   * deviennent improvable. Aucune amélioration possible au cycle 1 (rien
+   * Règle du groupe actif : les 4 Technologies avancées choisies au
+   * cycle 1 (partie.technologiesAvanceesChoisies) sont améliorables au
+   * cycle 2 ; au cycle 3, ce sont les 4 AUTRES parmi les 8 (le complément,
+   * calculé, jamais choisi manuellement) qui deviennent améliorables, à la
+   * place des 4 premières (pas en plus). Aucune amélioration possible au
+   * cycle 1 (rien
    * n'est encore "actif"), ni une fois les 4 emplacements du cycle 1
    * incomplets (retourne [] tant que les 4 ne sont pas tous remplis :
    * le complément ne serait pas fiable). Retourne un tableau de noms
@@ -575,24 +252,16 @@ var GameService = (function () {
   }
 
   /**
-   * 18/08/2026 (Refonte affichage Événement galactique — Plat. Galactique) :
-   * formate un événement galactique. Remplace l'ancienne lecture
-   * texte1/texte2/nom/cycle (portage direct de l'ex-formatEvenement_ GAS),
-   * devenue caduque suite à la migration du catalogue Supabase -> JSON
-   * local (data/catalogue/evenements.json) : ce fichier structure
-   * désormais chaque événement en `cadres[]` (effets de la moitié gauche
+   * Formate un événement galactique. data/catalogue/evenements.json
+   * structure chaque événement en `cadres[]` (effets de la moitié gauche
    * de la carte, résolus en Phase Préparation, à l'ouverture du Cycle —
    * voir docs/docs-rules-cycle-de-jeu.md §1.5) et `objectifs.blocs[]`
-   * (moitié droite, évalués en Phase Évaluation, §3.3), et n'a plus de
-   * champs texte1/texte2/nom/cycle à plat. `manches` (haut droit de la
-   * carte, §2 Introduction) est conservé tel quel.
-   *
-   * 19/08/2026 (retour utilisateur, principe à garder pour les prochains
-   * événements) : `instruction` (champ optionnel côté catalogue, popup
-   * de résolution manuelle d'un cadre "gain" — voir index.html
-   * appliquerCadreManuelEtRafraichir_) ajouté à la liste blanche —
-   * absent par défaut (null), jamais bloquant pour un cadre qui n'en
-   * définit pas encore.
+   * (moitié droite, évalués en Phase Évaluation, §3.3). `manches` (haut
+   * droit de la carte, §2 Introduction) est conservé tel quel.
+   * `instruction` (champ optionnel côté catalogue, popup de résolution
+   * manuelle d'un cadre "gain" — voir index.html
+   * appliquerCadreManuelEtRafraichir_) est absent par défaut (null),
+   * jamais bloquant pour un cadre qui n'en définit pas.
    */
   function formatEvenement_(e) {
     return {
@@ -622,15 +291,14 @@ var GameService = (function () {
   // reste hors périmètre (docs-rules-cycle-de-jeu.md §1.5, la plupart des
   // sous-points sont ❌/🚫) et s'affiche en texte brut, à résoudre
   // manuellement par le joueur.
-  // 21/08/2026 (docs/docs-rapport.md DUP-3) : RESSOURCES_SIMPLES_CADRE
-  // est identique à FocusEngine.RESSOURCES_PRODUCTION, et
-  // CHAMP_RESSOURCE_PLATEAU_MAISON_ est un sous-ensemble exact de
-  // FocusEngine.CHAMP_PAR_CLE (les 5 premières entrées) — PAS fusionnées :
-  // gameService.js charge avant focusEngine.js (index.html) et reste
-  // volontairement utilisable sans lui (seule exception déjà existante :
-  // appliquerCadreChoixFocusEngine, qui vérifie `typeof FocusEngine`
-  // avant utilisation). Si l'une de ces 5 ressources change ici, vérifier
-  // l'autre copie côté focusEngine.js.
+  // RESSOURCES_SIMPLES_CADRE est identique à FocusEngine.RESSOURCES_
+  // PRODUCTION, et CHAMP_RESSOURCE_PLATEAU_MAISON_ est un sous-ensemble
+  // exact de FocusEngine.CHAMP_PAR_CLE (les 5 premières entrées) — PAS
+  // fusionnées : gameService.js charge avant focusEngine.js (index.html)
+  // et reste volontairement utilisable sans lui (seule exception déjà
+  // existante : appliquerCadreChoixFocusEngine, qui vérifie `typeof
+  // FocusEngine` avant utilisation). Si l'une de ces 5 ressources change
+  // ici, vérifier l'autre copie côté focusEngine.js.
   var RESSOURCES_SIMPLES_CADRE = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
   var CHAMP_RESSOURCE_PLATEAU_MAISON_ = {
     nourriture: 'ressourceNourriture', energie: 'ressourceEnergie', materiel: 'ressourceMateriel',
@@ -692,22 +360,17 @@ var GameService = (function () {
   }
 
   /**
-   * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
-   * générique, Événement B Cycle 1) : correspondance entre une option
-   * `effet.options[i]` d'un cadre "choix" et la clé Effet reconnue par
-   * FocusEngine.resoudreCle_ — d'abord pour les cubes de Puissance Navale
-   * (voir focusEngine.js, CLES_DEPLOYER_CUBE et la clé générique "cube") :
-   * { cle: 'activer_cube', valeur: N } et { cle: 'deployer_cube', valeur:
-   * N, cible: 'secteur_mere' | absent }.
-   *
-   * 19/08/2026 (Construire une Installation / Établir une Guilde portées) :
-   * { cle: 'etablir_guilde', valeur: N } / { cle: 'construire_installation',
-   * valeur: N } ajoutés (identité — FocusEngine.resoudreCle_ reconnaît ces
-   * clés telles quelles, voir CLES_CONSTRUIRE côté focusEngine.js) — ex.
-   * Événement C Cycle 1 Cadre 2 ("Etablissez une Guilde OU construisez une
-   * Installation"). Retourne null si l'option ne correspond à aucune des
-   * formes reconnues (jamais d'invention de clé FocusEngine à partir d'une
-   * donnée non prévue).
+   * Correspondance entre une option `effet.options[i]` d'un cadre "choix"
+   * et la clé Effet reconnue par FocusEngine.resoudreCle_ : d'abord pour
+   * les cubes de Puissance Navale (voir focusEngine.js,
+   * CLES_DEPLOYER_CUBE et la clé générique "cube") — { cle: 'activer_cube',
+   * valeur: N } et { cle: 'deployer_cube', valeur: N, cible: 'secteur_mere'
+   * | absent } — puis pour construction/établissement — { cle:
+   * 'etablir_guilde', valeur: N } / { cle: 'construire_installation',
+   * valeur: N } (identité — FocusEngine.resoudreCle_ reconnaît ces clés
+   * telles quelles, voir CLES_CONSTRUIRE côté focusEngine.js). Retourne
+   * null si l'option ne correspond à aucune des formes reconnues (jamais
+   * d'invention de clé FocusEngine à partir d'une donnée non prévue).
    */
   function cleFocusEnginePourOptionCadre_(option) {
     if (!option || !option.cle) return null;
@@ -718,31 +381,27 @@ var GameService = (function () {
     }
     if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
     if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
-    // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-    // TODO.md) : même mécanisme générique — FocusEngine.resoudreCle_
-    // reconnaît nativement 'retirer_corruption' (focusEngine.js v8),
-    // identité comme les autres clés ci-dessus.
+    // Même mécanisme générique — FocusEngine.resoudreCle_ reconnaît
+    // nativement 'retirer_corruption', identité comme les autres clés
+    // ci-dessus.
     if (option.cle === 'retirer_corruption') return option.cle;
-    // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de Civilisation",
-    // voir TODO.md) : même mécanisme générique — FocusEngine.resoudreCle_
-    // reconnaît nativement 'avancer_civilisation' (piste au choix) et
+    // Même mécanisme générique — FocusEngine.resoudreCle_ reconnaît
+    // nativement 'avancer_civilisation' (piste au choix) et
     // 'avancer_civilisation_societe'/'_gouvernement'/'_economie' (piste
-    // imposée), focusEngine.js v9.
+    // imposée).
     if (option.cle === 'avancer_civilisation' || option.cle === 'avancer_civilisation_societe' ||
       option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
       return option.cle;
     }
-    // 21/08/2026 (effet "Améliorer un jeton Gloire") : même mécanisme
-    // générique — FocusEngine.resoudreCle_ reconnaît nativement
-    // 'ameliorer_gloire' (focusEngine.js v10), résolue sans popup
-    // (déterministe).
+    // Même mécanisme générique — FocusEngine.resoudreCle_ reconnaît
+    // nativement 'ameliorer_gloire', résolue sans popup (déterministe).
     if (option.cle === 'ameliorer_gloire') return option.cle;
     return null;
   }
 
   // ------------------------------------------------------------
-  // 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
-  // galactique — type "gain", data/catalogue/evenements.json — voir
+  // Effet "Gagner une Corruption" d'un Cadre d'Événement galactique — type
+  // "gain", data/catalogue/evenements.json (voir
   // docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
   // resoudreCiblesCadreGainCorruption_ traduit le vocabulaire de cible du
   // catalogue ("cible"/"cible_options"/"repli"/"restriction") vers les 4
@@ -791,15 +450,14 @@ var GameService = (function () {
     return resultat;
   }
 
-  // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 1 — voir en-tête de
-  // fichier) : reconnaît EXACTEMENT le gabarit imprimé sur cette carte —
-  // "si_cible":"piste_civilisation", "condition":"marqueur_pas_case_la_
-  // plus_a_droite", "consequence":{"cle":"avancer_piste_civilisation",
-  // "valeur":1,...} (voir data/catalogue/evenements.json) — et rien
-  // d'autre, pour ne prendre AUCUN risque sur un futur Cadre au vocabulaire
-  // similaire mais à la sémantique différente (aucune autre carte du
-  // catalogue n'utilise "effet_conditionnel" à ce jour, vérifié sur tout
-  // evenements.json).
+  // Reconnaît EXACTEMENT le gabarit imprimé sur la carte de l'Événement
+  // galactique G, Cycle 1, Cadre 1 — "si_cible":"piste_civilisation",
+  // "condition":"marqueur_pas_case_la_plus_a_droite",
+  // "consequence":{"cle":"avancer_piste_civilisation","valeur":1,...} (voir
+  // data/catalogue/evenements.json) — et rien d'autre, pour ne prendre
+  // AUCUN risque sur un futur Cadre au vocabulaire similaire mais à la
+  // sémantique différente (aucune autre carte du catalogue n'utilise
+  // "effet_conditionnel" à ce jour, vérifié sur tout evenements.json).
   function conditionAvancerPisteSiCorrompue_(effetConditionnel) {
     return !!effetConditionnel &&
       effetConditionnel.si_cible === 'piste_civilisation' &&
@@ -841,16 +499,16 @@ var GameService = (function () {
   }
 
   /**
-   * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : construit le texte
-   * "✓ Appliqué (...)" pour GameService.appliquerCadreChoixPlacement
-   * ci-dessous — `elements` est le dict RÉSOLU (jamais la clé générique
-   * "guilde", toujours "guilde_<type>" une fois le type choisi). Pas de
-   * tentative de réutiliser abregerResumeCadre_ (index.html, EVOLUTION 1)
-   * : ses gabarits reconnus ("Population du Secteur N augmentée de...",
-   * "Guilde X établie sur...") ne correspondent pas à ce nouveau cas
-   * (plusieurs éléments combinés en un seul placement) — texte déjà
-   * concis nativement, laissé tel quel (abregerResumeCadre_ le laisse de
-   * toute façon passer inchangé si aucun de ses gabarits ne correspond).
+   * Construit le texte "✓ Appliqué (...)" pour
+   * GameService.appliquerCadreChoixPlacement ci-dessous — `elements` est
+   * le dict RÉSOLU (jamais la clé générique "guilde", toujours
+   * "guilde_<type>" une fois le type choisi). Pas de réutilisation
+   * d'abregerResumeCadre_ (index.html) : ses gabarits reconnus
+   * ("Population du Secteur N augmentée de...", "Guilde X établie sur...")
+   * ne correspondent pas à ce cas (plusieurs éléments combinés en un seul
+   * placement) — texte déjà concis nativement, laissé tel quel
+   * (abregerResumeCadre_ le laisse de toute façon passer inchangé si
+   * aucun de ses gabarits ne correspond).
    */
   var LABEL_TYPE_GUILDE_RESUME_ = {
     fermiers: 'Fermiers', ingenieurs: 'Ingénieurs', mineurs: 'Mineurs', banquiers: 'Banquiers', scientifiques: 'Scientifiques'
@@ -920,8 +578,7 @@ var GameService = (function () {
   // ------------------------------------------------------------
   // Assemblage / désassemblage entre la forme "client" (un seul objet
   // partie, civilisation/plateauMaison inclus) et les 2 records IndexedDB
-  // (parties + plateauMaison) — portage direct de
-  // construirePartieDepuisLigne_ / pourEtatJson_ (DataService.js GAS).
+  // (parties + plateauMaison).
   // ------------------------------------------------------------
 
   function assemblerPartie_(lignePartie, lignePlateauMaison) {
@@ -948,7 +605,6 @@ var GameService = (function () {
       }
     };
     partie.technologiesObtenues = pm.technologiesObtenues || [null, null, null, null, null];
-    // 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
     // technologiesAvanceesChoisies (les 4 choisies au cycle 1, parmi les
     // 8 des maisons déchues) et technologiesAvanceesAmeliorees (map
     // {nom: bool}, couvre les 8 — celles du cycle 2 ET celles du cycle
@@ -982,13 +638,11 @@ var GameService = (function () {
       jetonCommerce: pm.jetonCommerce || [],
       gloire: pm.gloire || [],
       programmes: [pm.programme1 || null, pm.programme2 || null, pm.programme3 || null, pm.programme4 || null],
-      // 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-      // TODO.md) : nouveau jeton manuel (Corruption(s) actuellement
-      // stockée(s) sur la Technologie "Chambres de décontamination") —
-      // voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
+      // Jeton manuel (Corruption(s) actuellement stockée(s) sur la
+      // Technologie "Chambres de décontamination") — voir
+      // CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
       corruptionChambreDecontamination: pm.corruptionChambreDecontamination || 0,
-      // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 — voir
-      // en-tête de fichier) : compteur de Corruption sur la fiche Maison.
+      // Compteur de Corruption sur la fiche Maison.
       corruptionMaison: pm.corruptionMaison || 0
     };
 
@@ -996,12 +650,13 @@ var GameService = (function () {
   }
 
   /**
-   * 21/08/2026 (docs/docs-rapport.md MUT-1) : relit parties+plateauMaison
-   * et réassemble une `partie` à jour — dernière étape, identique, de
-   * quasiment toute mutation de ce fichier (une écriture ne renvoie jamais
-   * l'objet persisté directement, toujours un aller-retour DB frais).
-   * Factorisée ici (11 occurrences avant factorisation) plutôt que
-   * dupliquée à chaque fonction.
+   * Relit parties+plateauMaison et réassemble une `partie` à jour —
+   * dernière étape de quasiment toute mutation de ce fichier (une
+   * écriture ne renvoie jamais l'objet persisté directement, toujours un
+   * aller-retour DB frais : assemblerPartie_ recalcule des champs dérivés
+   * et applique des valeurs par défaut que l'objet muté en mémoire n'a
+   * pas nécessairement à jour). Factorisée ici plutôt que dupliquée à
+   * chaque fonction.
    */
   function rechargerPartie_(partieId) {
     return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r) {
@@ -1010,9 +665,9 @@ var GameService = (function () {
   }
 
   /**
-   * 21/08/2026 (docs/docs-rapport.md MUT-1) : boilerplate commun aux 8
-   * fonctions `appliquerCadre*` (résolution d'un Cadre d'Événement
-   * galactique) — lit parties+plateauMaison, assemble la `partie`,
+   * Boilerplate commun aux fonctions `appliquerCadre*` (résolution d'un
+   * Cadre d'Événement galactique) — lit parties+plateauMaison, assemble
+   * la `partie`,
    * retrouve l'Événement galactique du cycle, applique le garde-fou
    * anti-double-application (un Cadre déjà résolu ne peut pas l'être une
    * seconde fois), et retrouve le `cadre` lui-même dans le catalogue de
@@ -1076,7 +731,7 @@ var GameService = (function () {
 
   // ------------------------------------------------------------
   // Journal d'actions — best-effort, ne doit jamais faire échouer
-  // l'action principale (même principe que DataService.logHistorique GAS).
+  // l'action principale.
   // ------------------------------------------------------------
 
   function ajouterHistorique_(partieId, action, details) {
@@ -1091,10 +746,9 @@ var GameService = (function () {
   }
 
   // ------------------------------------------------------------
-  // Suppression — plateauMaison (+ secteursPartie si déjà présents,
-  // prévoyance Phase 3) avant parties. Pas de contrainte FK sous
-  // IndexedDB (contrairement à Postgres) : l'ordre n'est plus obligatoire,
-  // conservé par cohérence/lisibilité avec deletePartieEtHistorique GAS.
+  // Suppression — plateauMaison (+ secteursPartie) avant parties. Pas de
+  // contrainte FK sous IndexedDB : l'ordre n'est pas obligatoire, conservé
+  // par cohérence/lisibilité.
   // ------------------------------------------------------------
 
   function supprimerSecteursPartie_(partieId) {
@@ -1118,30 +772,26 @@ var GameService = (function () {
   return {
 
     /**
-     * 17/08/2026 (Session 3, suite) : exposée publiquement pour
-     * setupService.js — remplace à la fois Api.getMaisonsPourSelection et
-     * Api.getDetailMaisons(noms) côté GAS. Plus de distinction "légère vs
-     * détaillée" : la donnée est déjà locale (IndexedDB), pas d'enjeu de
-     * poids de payload réseau à optimiser ici.
+     * Exposée publiquement pour setupService.js. Pas de distinction
+     * "légère vs détaillée" : la donnée est déjà locale (IndexedDB), pas
+     * d'enjeu de poids de payload réseau à optimiser ici.
      */
     obtenirMaisonsCatalogue: obtenirMaisonsCatalogue_,
 
     /**
-     * 21/08/2026 (docs/docs-rapport.md BUG-2) : exposée publiquement pour
-     * index.html, qui en gardait jusqu'ici une copie recopiée à la main
-     * (cleFocusEnginePourOptionCadre_/LABEL_OPTION_FOCUSENGINE_ dans
-     * actionsCadre_) pour savoir si un bouton d'option de Cadre doit être
-     * cliquable — un oubli de synchronisation avait déjà rendu un Cadre
-     * non cliquable par le passé (voir commentaire index.html historique).
-     * index.html lit désormais directement cette fonction au lieu de la
-     * redéfinir : une seule source de vérité.
+     * Exposée publiquement pour index.html, qui lit directement cette
+     * fonction pour savoir si un bouton d'option de Cadre doit être
+     * cliquable, plutôt que de dupliquer la logique localement (une
+     * source de vérité unique évite un désync entre les deux copies).
      */
     cleFocusEnginePourOptionCadre: cleFocusEnginePourOptionCadre_,
 
     /**
-     * Crée une nouvelle partie. Portage de GameService.creerPartie (GAS),
-     * réduit à ce qui ne dépend pas de FocusService/SecteurService (voir
-     * en-tête) : focusJoueur démarre à [] et aucun secteur n'est instancié.
+     * Crée une nouvelle partie : tire une maison (ou utilise celle choisie
+     * en mode manuel) et ses adversaires, calcule les ressources/
+     * civilisation de départ depuis originesMaison, met en place les
+     * Focus de la maison (FocusService) et instancie le plateau des
+     * secteurs (SecteurService) si ces modules sont chargés.
      * @param {Object} options
      *   options.mode : 'manuel' | 'aleatoire'
      *   options.maison : nom de la maison (mode manuel)
@@ -1150,8 +800,9 @@ var GameService = (function () {
      *     physique déjà en cours (mode doit être 'manuel') :
      *   options.technologieDepart, options.maisonsDechues (4 noms),
      *   options.technologiesSansPoint (3 noms parmi les 8 des maisons déchues)
-     *   options.scenarioId : optionnel (mise en place des secteurs différée
-     *     à la Phase 3, pas de valeur par défaut imposée ici)
+     *   options.scenarioId : optionnel (mise en place des secteurs
+     *     déléguée à SecteurService.instancierSecteurs, pas de valeur par
+     *     défaut imposée ici)
      */
     creerPartie: function (options) {
       options = options || {};
@@ -1211,9 +862,9 @@ var GameService = (function () {
               console.warn('GameService.creerPartie : lecture originesMaison a échoué (civilisation/ressources de départ à 0) :', erreur);
               return null;
             }),
-          // 17/08/2026 (Phase 4, partielle) : mise en place des Focus de la
-          // maison — tolérant (garde typeof, comme SecteurService), une
-          // erreur ici ne doit jamais empêcher la création de la partie.
+          // Mise en place des Focus de la maison — tolérant (garde
+          // typeof, comme SecteurService), une erreur ici ne doit jamais
+          // empêcher la création de la partie.
           (typeof FocusService !== 'undefined' && FocusService.obtenirMiseEnPlace)
             ? FocusService.obtenirMiseEnPlace(maisonJoueur.nom).catch(function (erreur) {
                 console.warn('GameService.creerPartie : mise en place Focus échouée (partie créée quand même, sans Focus) :', erreur);
@@ -1268,13 +919,11 @@ var GameService = (function () {
                 economie: civilisationDepart.economie,
                 corrompues: { societe: false, gouvernement: false, economie: false }
               },
-              // Focus héroïques / secteurs : hors périmètre de cette session
-              // (Phases 3 et 4), champs prévus dans la forme attendue.
-              // focusJoueur (Phase 4, partielle) : vraie mise en place
-              // désormais (voir FocusService.obtenirMiseEnPlace ci-dessus).
-              // [Nettoyage Session 9] Les cartes SONT jouables depuis la
-              // Session 4 (js/focusEngine.js) — l'ancienne mention "pas
-              // encore jouables" ici était obsolète, corrigée.
+              // focusHeroiques : emplacements vides par cycle, remplis en
+              // cours de partie (voir choisirFocusHeroique/avancerCycle
+              // plus bas). focusJoueur : mise en place réelle via
+              // FocusService.obtenirMiseEnPlace ci-dessus, jouable via
+              // js/focusEngine.js.
               focusHeroiques: { cycle1: [null, null, null], cycle2: [null, null, null], cycle3: [null, null, null] },
               focusHeroiquesPioches: [],
               focusJoueur: focusJoueur
@@ -1325,12 +974,12 @@ var GameService = (function () {
               DB.put('parties', enregistrementPartie),
               DB.put('plateauMaison', plateauMaison)
             ]).then(function () {
-              // 17/08/2026 (Phase 3) : instanciation du plateau des secteurs
-              // — après l'écriture de "parties" (secteursPartie.partieId
-              // n'a pas de contrainte FK sous IndexedDB, mais on garde le
-              // même ordre que côté GAS par cohérence). Tolérant en soi
-              // (voir SecteurService.instancierSecteurs) : une erreur ici
-              // ne remonte jamais jusqu'à la création de la partie.
+              // Instanciation du plateau des secteurs après l'écriture de
+              // "parties" (secteursPartie.partieId n'a pas de contrainte
+              // FK sous IndexedDB, mais on garde cet ordre par cohérence).
+              // Tolérant en soi (voir SecteurService.instancierSecteurs) :
+              // une erreur ici ne remonte jamais jusqu'à la création de la
+              // partie.
               if (typeof SecteurService !== 'undefined' && SecteurService.instancierSecteurs) {
                 return SecteurService.instancierSecteurs(partie);
               }
@@ -1372,7 +1021,7 @@ var GameService = (function () {
 
     /**
      * Sauvegarde une partie déjà créée (le client garde l'état complet en
-     * mémoire, comme côté GAS) + ajoute une ligne au journal d'actions.
+     * mémoire) + ajoute une ligne au journal d'actions.
      */
     sauvegarderPartie: function (partie, action, details) {
       if (!partie || !partie.id) {
@@ -1410,8 +1059,8 @@ var GameService = (function () {
 
     /**
      * Supprime définitivement une partie (quel que soit son statut).
-     * L'historique n'est jamais supprimé (pas de FK sous IndexedDB, comme
-     * côté GAS où historique.partie_id n'a pas de contrainte).
+     * L'historique n'est jamais supprimé (pas de contrainte FK sous
+     * IndexedDB sur historique.partieId).
      */
     supprimerPartie: function (id) {
       return DB.get('parties', id).then(function (ligne) {
@@ -1443,7 +1092,8 @@ var GameService = (function () {
      * actif, jetons, Gloire, Programmes, technologiesObtenues). Liste
      * blanche volontaire — un appelant ne doit pouvoir écrire QUE ces
      * champs (pas civSociete ni technologieDepart, qui ont leurs propres
-     * fonctions dédiées, portées en Phase 3/5). Lecture-fusion-écriture :
+     * fonctions dédiées — voir majCivilisation ci-dessous et
+     * definirTechnologieAmelioree plus bas). Lecture-fusion-écriture :
      * ne touche jamais aux champs non fournis dans `champs`.
      */
     majPlateauMaison: function (partieId, champs) {
@@ -1463,11 +1113,9 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 5, Phase 5 — Civilisation) : mise à jour
-     * partielle des 6 champs Civilisation (niveaux des 3 pistes + leurs 3
-     * marqueurs "Corrompue"), auparavant explicitement exclus de
-     * majPlateauMaison ("leurs propres fonctions dédiées, portées en
-     * Phase 3/5" — voir commentaire ci-dessus, on y est). Même principe
+     * Mise à jour partielle des 6 champs Civilisation (niveaux des 3
+     * pistes + leurs 3 marqueurs "Corrompue"), volontairement exclus de
+     * majPlateauMaison (voir commentaire ci-dessus). Même principe
      * lecture-fusion-écriture, liste blanche séparée par cohérence avec le
      * découpage fonctionnel (civilisationService.js est seul appelant
      * prévu de celle-ci, comme focusEngine.js/écran Stratégie le sont de
@@ -1477,11 +1125,10 @@ var GameService = (function () {
       var CHAMPS_CIVILISATION_AUTORISES = [
         'civSociete', 'civGouvernement', 'civEconomie',
         'civCorrompueSociete', 'civCorrompueGouvernement', 'civCorrompueEconomie',
-        // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2, voir
-        // en-tête de fichier) : CivilisationService.definirCorruption
-        // ajuste corruptionMaison dans le MÊME appel que le marqueur
-        // Corrompue qui vient de changer (une seule écriture) — whitelisté
-        // ici en plus de CHAMPS_PLATEAU_MAISON_AUTORISES (saisie manuelle).
+        // CivilisationService.definirCorruption ajuste corruptionMaison
+        // dans le MÊME appel que le marqueur Corrompue qui vient de
+        // changer (une seule écriture) — whitelisté ici en plus de
+        // CHAMPS_PLATEAU_MAISON_AUTORISES (saisie manuelle).
         'corruptionMaison'
       ];
       var filtre = {};
@@ -1500,12 +1147,9 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — restauration IHM Partie) : liste des
-     * événements galactiques du catalogue, groupés par cycle (1/2/3) —
-     * portage direct de GameService.getEvenementsParCycle (GAS, fonction
-     * JS pure lisant DataService.getEvenements(), jamais une RPC). Utilisé
-     * pour peupler les menus déroulants de choix d'événement (voir
-     * index.html, écran Partie).
+     * Liste des événements galactiques du catalogue, groupés par cycle
+     * (1/2/3). Utilisé pour peupler les menus déroulants de choix
+     * d'événement (voir index.html, écran Partie).
      */
     getEvenementsParCycle: function () {
       return DB.getAll('evenements').then(function (lignes) {
@@ -1519,15 +1163,11 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — restauration IHM Partie) : enregistre le
-     * choix d'un événement galactique pour un cycle donné (1, 2 ou 3) —
-     * portage direct de GameService.choisirEvenement (GAS, fonction JS
-     * pure : recherche l'événement dans le catalogue local + réécrit
-     * partie.evenements.cycleN — jamais une RPC, contrairement à la
-     * plupart des autres actions de l'écran Partie). partie.evenements vit
-     * dans etatJson (pas de colonne dédiée, comme côté GAS) — sauvegarde
-     * via sauvegarderPartie (lecture-fusion-écriture implicite : on relit
-     * la partie complète juste avant de la réécrire).
+     * Enregistre le choix d'un événement galactique pour un cycle donné
+     * (1, 2 ou 3). partie.evenements vit dans etatJson (pas de colonne
+     * dédiée) — sauvegarde via sauvegarderPartie (lecture-fusion-écriture
+     * implicite : on relit la partie complète juste avant de la
+     * réécrire).
      */
     choisirEvenement: function (partieId, cycle, nomEvenement) {
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId), DB.getAll('evenements')])
@@ -1545,17 +1185,15 @@ var GameService = (function () {
     },
 
     /**
-     * 18/08/2026 (Refonte affichage Événement galactique — Plat.
-     * Galactique) : fonction PURE (aucun accès DB), exposée pour l'IHM —
-     * voir actionsSimplesCadre_ ci-dessus pour le détail de ce qui est
+     * Fonction PURE (aucun accès DB), exposée pour l'IHM — voir
+     * actionsSimplesCadre_ ci-dessus pour le détail de ce qui est
      * considéré "1 clic" (uniquement des deltas sur les 5 ressources
      * suivies par plateauMaison) et ce qui reste hors périmètre.
      */
     actionsSimplesCadre: actionsSimplesCadre_,
 
     /**
-     * 18/08/2026 (Refonte affichage Événement galactique — Plat.
-     * Galactique) : applique en un clic l'une des actions renvoyées par
+     * Applique en un clic l'une des actions renvoyées par
      * actionsSimplesCadre_ pour le cadre `ordreCadre` de l'Événement
      * galactique choisi au Cycle `cycle` — crédite/débite les 5
      * ressources concernées sur plateauMaison et marque le cadre comme
@@ -1602,13 +1240,12 @@ var GameService = (function () {
     },
 
     /**
-     * 19/08/2026 (Événement galactique B, Cycle 1 — Cadre 2 "Placez une
-     * Corruption sur l'offre de Programme Domination") : applique un cadre
-     * de type "gain" (voir data/catalogue/evenements.json) — hors
-     * périmètre d'actionsSimplesCadre_ (ne porte sur aucune des 5
-     * ressources plateauMaison, l'app ne suit pas l'offre de Programme) :
-     * ne fait qu'enregistrer que le joueur a résolu l'effet à la main sur
-     * le plateau physique, même garde-fou anti-double-application que
+     * Applique un cadre de type "gain" (voir data/catalogue/evenements.
+     * json) — hors périmètre d'actionsSimplesCadre_ (ne porte sur aucune
+     * des 5 ressources plateauMaison ; typiquement une ressource que
+     * l'app ne suit pas, comme l'offre de Programme Domination) : ne fait
+     * qu'enregistrer que le joueur a résolu l'effet à la main sur le
+     * plateau physique, même garde-fou anti-double-application que
      * appliquerCadreEffet/appliquerCadrePlacement ci-dessus, mais sans
      * toucher plateauMaison (aucun delta à appliquer).
      */
@@ -1626,26 +1263,22 @@ var GameService = (function () {
     },
 
     /**
-     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : applique un
-     * cadre de type "placement" (zone "secteur_neant_adjacent", voir
-     * data/catalogue/evenements.json) — hors périmètre d'actionsSimplesCadre_
-     * (ne porte pas sur les 5 ressources simples de plateauMaison mais sur
-     * secteursPartie). Place la structure sur le secteur choisi par le
-     * joueur via SecteurService.placerElementsNeantAdjacent (qui
-     * revalide Néant/adjacence/emplacements libres — jamais confiance à
-     * l'appelant), puis marque le cadre comme résolu, même garde-fou
-     * anti-double-application qu'appliquerCadreEffet ci-dessus.
+     * Applique un cadre de type "placement" (zone
+     * "secteur_neant_adjacent", voir data/catalogue/evenements.json) —
+     * hors périmètre d'actionsSimplesCadre_ (ne porte pas sur les 5
+     * ressources simples de plateauMaison mais sur secteursPartie). Place
+     * la structure sur le secteur choisi par le joueur via
+     * SecteurService.placerElementsNeantAdjacent (qui revalide Néant/
+     * adjacence/emplacements libres — jamais confiance à l'appelant),
+     * puis marque le cadre comme résolu, même garde-fou anti-double-
+     * application qu'appliquerCadreEffet ci-dessus.
      *
-     * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
-     * générique) : retrouve le cadre `ordreCadre` dans
-     * evenementCycle.cadres (catalogue complet de l'événement choisi,
-     * déjà persisté par choisirEvenement) pour lire son `effet.elements`
-     * et le transmettre tel quel à SecteurService.placerElementsNeantAdjacent
-     * (générique) — auparavant appelait SecteurService.
-     * placerDefenseGuildeNeantAdjacent, codée en dur pour Défense de
-     * Secteur + Guilde de Scientifiques (seul jeu d'éléments existant à
-     * l'époque). Permet à ce même point d'entrée de résoudre n'importe
-     * quel cadre "placement" du catalogue, quels que soient ses éléments.
+     * Retrouve le cadre `ordreCadre` dans evenementCycle.cadres (catalogue
+     * complet de l'événement choisi, déjà persisté par choisirEvenement)
+     * pour lire son `effet.elements` et le transmettre tel quel à
+     * SecteurService.placerElementsNeantAdjacent (générique) : ce point
+     * d'entrée résout ainsi n'importe quel cadre "placement" du
+     * catalogue, quels que soient ses éléments.
      */
     appliquerCadrePlacement: function (partieId, cycle, ordreCadre, numeroSecteur) {
       return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
@@ -1666,10 +1299,9 @@ var GameService = (function () {
     },
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-     * Domineum") : applique un cadre de type "placement_multiple" — jeux
-     * d'éléments répartis sur des secteurs du Néant adjacents désignés par
-     * un critère de Population (pas un libre choix comme "placement"
+     * Applique un cadre de type "placement_multiple" — jeux d'éléments
+     * répartis sur des secteurs du Néant adjacents désignés par un
+     * critère de Population (pas un libre choix comme "placement"
      * simple, voir SecteurService.resoudrePlacementMultipleNeantAdjacent).
      * `ciblesParGroupe` (un numéro de secteur par groupe, même ordre que
      * SecteurService.resoudrePlacementMultipleNeantAdjacent(...).groupes)
@@ -1703,24 +1335,20 @@ var GameService = (function () {
     },
 
     /**
-     * 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
-     * cube du Néant dans le secteur du Néant adjacent avec la Population
-     * la plus basse OU placez un jeton Gloire de valeur 2 et une Défense
-     * de Secteur dans le secteur du Néant adjacent avec la Population la
-     * plus élevée.") : applique UNE option d'un cadre `type: 'choix'`
-     * dont chaque option est elle-même `type: 'placement'` (avec un
-     * `critere` de Population — data/catalogue/evenements.json, PAS un
-     * flat {cle, valeur} comme les options automatisées par FocusEngine,
-     * voir cleFocusEnginePourOptionCadre_ ci-dessus) — nouveau gabarit de
-     * cadre, hors périmètre de "placement"/"placement_multiple" existants
-     * (ceux-ci n'offrent jamais de CHOIX entre plusieurs placements
-     * alternatifs, toujours un seul ou plusieurs SIMULTANÉS).
+     * Applique UNE option d'un cadre `type: 'choix'` dont chaque option
+     * est elle-même `type: 'placement'` (avec un `critere` de Population
+     * — data/catalogue/evenements.json, PAS un flat {cle, valeur} comme
+     * les options automatisées par FocusEngine, voir
+     * cleFocusEnginePourOptionCadre_ ci-dessus) — hors périmètre de
+     * "placement"/"placement_multiple" (ceux-ci n'offrent jamais de CHOIX
+     * entre plusieurs placements alternatifs, toujours un seul ou
+     * plusieurs SIMULTANÉS).
      *
      * `typeGuildeChoisi` (optionnel, une des clés de TYPES_GUILDE_CONSTRUIRE_
      * côté strategieService.js — 'fermiers'/'ingenieurs'/'mineurs'/
      * 'banquiers'/'scientifiques') résout la clé GÉNÉRIQUE "guilde" de
      * l'option (type au choix du joueur, voir CHAMP_ELEMENT_PLACEMENT_,
-     * secteurService.js v10) en "guilde_<type>" avant tout appel à
+     * secteurService.js) en "guilde_<type>" avant tout appel à
      * SecteurService.placerElementsNeantAdjacent — qui ne reçoit donc
      * jamais la clé générique. Revalide intégralement le `numeroSecteur`
      * reçu (jamais confiance à l'appelant, même principe qu'
@@ -1771,12 +1399,10 @@ var GameService = (function () {
     },
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
-     * une Guilde OU construisez une Installation") : applique un cadre de
-     * type "choix" (data/catalogue/evenements.json) dont l'option retenue
-     * ne correspond à AUCUNE mécanique automatisée par l'app (ni cube/
-     * construction — cleFocusEnginePourOptionCadre_ —, ni
-     * Science->Technologie — optionTechnologieViaScience_) : fallback
+     * Applique un cadre de type "choix" (data/catalogue/evenements.json)
+     * dont l'option retenue ne correspond à AUCUNE mécanique automatisée
+     * par l'app (ni cube/construction — cleFocusEnginePourOptionCadre_ —,
+     * ni Science->Technologie — optionTechnologieViaScience_) : fallback
      * générique — ne fait qu'enregistrer que le joueur a résolu l'option
      * choisie à la main sur le plateau physique, même garde-fou anti-
      * double-application que les autres appliquerCadre*, sans toucher ni
@@ -1786,13 +1412,11 @@ var GameService = (function () {
      * appliquerCadreChoixFocusEngine (resume dérivé côté FocusEngine, ici
      * côté index.html faute de mécanique à déléguer).
      *
-     * 19/08/2026 (Construire une Installation / Établir une Guilde
-     * portées) : etablir_guilde/construire_installation, l'exemple
-     * d'origine de cette fonction (Cadre 2 ci-dessus), sont désormais
-     * automatisés (voir appliquerCadreChoixFocusEngine) — cette fonction
-     * reste le filet de sécurité générique pour toute future option de
-     * cadre "choix" sans mécanique automatisée derrière, pas figée sur un
-     * cadre précis.
+     * Reste le filet de sécurité générique pour toute future option de
+     * cadre "choix" sans mécanique automatisée derrière — n'est pas figée
+     * sur un cadre précis (etablir_guilde/construire_installation, par
+     * exemple, sont désormais automatisés via appliquerCadreChoixFocusEngine
+     * plutôt que de passer par ici).
      */
     appliquerCadreChoixManuel: function (partieId, cycle, ordreCadre, indexOption, resume) {
       return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
@@ -1812,23 +1436,19 @@ var GameService = (function () {
     },
 
     /**
-     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
-     * générique, Événement B Cycle 1) : applique un cadre "choix" dont
-     * l'option retenue (`indexOption`, dans cadre.effet.options) porte sur
-     * une mécanique déjà automatisée côté FocusEngine (voir
-     * cleFocusEnginePourOptionCadre_ ci-dessus) — hors périmètre
-     * d'actionsSimplesCadre_ (ne porte pas sur les 5 ressources simples).
-     * Réutilise FocusEngine.resoudreEffet (moteur pur déjà utilisé par
-     * l'écran Focus pour ces mêmes clés — activer_cube y est une clé
-     * "cube" générique, deployer_cube_secteur_mere y ouvre la popup dédiée
-     * 'deployer_cube', etablir_guilde/construire_installation la popup
-     * 'construire' via `demanderChoix`, voir focusEngine.js) plutôt que de
-     * dupliquer une deuxième logique de résolution : seule source de
-     * vérité pour ces mécaniques, qu'elles soient déclenchées depuis Focus
-     * ou depuis un Cadre d'Événement galactique. Renommée (ex-
-     * appliquerCadreChoixCube) le 19/08/2026 lors de l'ajout de
-     * etablir_guilde/construire_installation — le nom "Cube" ne
-     * correspondait plus à ce que fait la fonction.
+     * Applique un cadre "choix" dont l'option retenue (`indexOption`,
+     * dans cadre.effet.options) porte sur une mécanique déjà automatisée
+     * côté FocusEngine (voir cleFocusEnginePourOptionCadre_ ci-dessus) —
+     * hors périmètre d'actionsSimplesCadre_ (ne porte pas sur les 5
+     * ressources simples). Réutilise FocusEngine.resoudreEffet (moteur
+     * pur déjà utilisé par l'écran Focus pour ces mêmes clés — activer_cube
+     * y est une clé "cube" générique, deployer_cube_secteur_mere y ouvre
+     * la popup dédiée 'deployer_cube', etablir_guilde/
+     * construire_installation la popup 'construire' via `demanderChoix`,
+     * voir focusEngine.js) plutôt que de dupliquer une deuxième logique
+     * de résolution : seule source de vérité pour ces mécaniques, qu'elles
+     * soient déclenchées depuis Focus ou depuis un Cadre d'Événement
+     * galactique.
      *
      * `demanderChoix` est fourni par l'appelant (StrategieService,
      * couche IHM) — GameService reste autrement une couche de données
@@ -1881,22 +1501,19 @@ var GameService = (function () {
             evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
             partie.evenements[cleCycle] = evenementCycle;
 
-            // 20/08/2026 (correctif — retour utilisateur, EVOLUTION 7 KO
-            // : "avancé sur une piste de Civilisation" mais l'effet de
-            // Case n'apparaissait pas sur Plat. maison) : NE PLUS
-            // réutiliser `lignePlateauMaison` (capturée tout en haut,
-            // AVANT FocusEngine.resoudreEffet) pour l'écriture finale.
-            // Certaines options (avancer_civilisation — EVOLUTION 7 ;
-            // retirer_corruption, option Technologie — EVOLUTION 5)
-            // écrivent DIRECTEMENT sur plateauMaison PENDANT la
-            // résolution, via une popup imbriquée qui appelle elle-même
+            // NE PAS réutiliser `lignePlateauMaison` (capturée tout en
+            // haut, AVANT FocusEngine.resoudreEffet) pour l'écriture
+            // finale. Certaines options (avancer_civilisation ;
+            // retirer_corruption, option Technologie) écrivent
+            // DIRECTEMENT sur plateauMaison PENDANT la résolution, via
+            // une popup imbriquée qui appelle elle-même
             // GameService.majPlateauMaison/majCivilisation (toutes deux
             // lecture-fusion-écriture, sûres) — un DB.put bâti sur le
-            // snapshot périmé de `lignePlateauMaison` écrasait ces
+            // snapshot périmé de `lignePlateauMaison` écraserait ces
             // écritures avec les anciennes valeurs (violation de la
             // règle #1 du projet, "lecture-fusion-écriture systématique :
             // ne jamais écraser un champ non concerné par la modification
-            // en cours" — voir CLAUDE.md). Corrigé en relisant une ligne
+            // en cours" — voir CLAUDE.md). On relit donc une ligne
             // FRAÎCHE juste avant de fusionner uniquement `champs` (les
             // mutations suivies par focusEngine.js pour L'ACTION DIRECTE
             // du cadre — cube/ressources — jamais celles d'une popup
@@ -1921,10 +1538,9 @@ var GameService = (function () {
     },
 
     /**
-     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
-     * galactique — voir resoudreCiblesCadreGainCorruption_ ci-dessus)
      * true si le Cadre est automatisable pour ce gain (secteur/piste/
-     * Programme/Technologie, avec repli éventuel) — utilisée par
+     * Programme/Technologie, avec repli éventuel — voir
+     * resoudreCiblesCadreGainCorruption_ ci-dessus) — utilisée par
      * index.html pour décider si ce Cadre "gain" doit ouvrir la popup
      * dédiée (appliquerCadreGainCorruption ci-dessous) ou rester sur
      * l'existant appliquerCadreManuel (offre_programme, cadre composé,
@@ -1935,14 +1551,13 @@ var GameService = (function () {
     },
 
     /**
-     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
-     * galactique, voir resoudreCiblesCadreGainCorruption_ ci-dessus et
-     * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
-     * applique un cadre "type":"gain" dont l'effet ne porte QUE sur
-     * "corruption" et dont la cible est automatisable (sinon,
-     * cadreGainCorruptionAutomatisable renvoie false et l'appelant —
-     * index.html — reste sur GameService.appliquerCadreManuel, cette
-     * fonction n'est même pas invoquée). Répète `quantite` fois l'appel à
+     * Applique un cadre "type":"gain" dont l'effet ne porte QUE sur
+     * "corruption" (voir resoudreCiblesCadreGainCorruption_ ci-dessus et
+     * docs-rules-corruption-gardiens-refuges-technoConsume.md §1) et dont
+     * la cible est automatisable (sinon, cadreGainCorruptionAutomatisable
+     * renvoie false et l'appelant — index.html — reste sur
+     * GameService.appliquerCadreManuel, cette fonction n'est même pas
+     * invoquée). Répète `quantite` fois l'appel à
      * demanderChoix({type:'gagner_corruption', ...}) — chaque popup fait
      * SA PROPRE persistance (secteur/piste/Technologie — comme
      * appliquerCadreChoixFocusEngine/retirer_corruption ci-dessus,
@@ -2009,20 +1624,12 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — restauration IHM Partie) : marque une
-     * technologie possédée (départ, cible='depart' ; ou l'un des 5
-     * emplacements obtenus, cible=index 0-4) comme améliorée ou non —
-     * portage direct de GameService.definirTechnologieAmelioree (GAS,
-     * PATCH JS direct sur plateau_maison, jamais une RPC). Écrit
-     * directement sur le record `plateauMaison` (et non via
+     * Marque une technologie possédée (départ, cible='depart' ; ou l'un
+     * des 5 emplacements obtenus, cible=index 0-4) comme améliorée ou
+     * non. Écrit directement sur le record `plateauMaison` (et non via
      * majPlateauMaison, qui exclut volontairement technologieDepart et
      * technologiesObtenues — "leurs propres fonctions dédiées", voir
      * commentaire de CHAMPS_PLATEAU_MAISON_AUTORISES).
-     *
-     * [Nettoyage Session 12] choisirTechnologieObtenue EST portée depuis
-     * cette session (voir ci-dessous) — ce commentaire disait le
-     * contraire (rédigé avant, quand le SQL de la RPC n'était pas encore
-     * récupéré) : corrigé, aucune conséquence fonctionnelle.
      */
     definirTechnologieAmelioree: function (partieId, cible, amelioree) {
       amelioree = !!amelioree;
@@ -2047,13 +1654,11 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — SQL RPC récupéré) : fait avancer la partie
-     * au cycle suivant (1 -> 2 -> 3 -> 'termine') — portage direct de la
-     * RPC avancer_cycle (rpc.json). cycleActuel n'est jamais stocké tel
-     * quel côté PWA (calculé à la lecture, voir assemblerPartie_) : seule
-     * la partie utile de la RPC compte ici — incrément de cycleNum/
-     * cycleTermine + amorçage de focusHeroiques/focusHeroiquesPioches
-     * pour le nouveau cycle si absents.
+     * Fait avancer la partie au cycle suivant (1 -> 2 -> 3 -> 'termine').
+     * cycleActuel n'est jamais stocké tel quel (calculé à la lecture, voir
+     * assemblerPartie_) : incrémente cycleNum/cycleTermine et amorce
+     * focusHeroiques/focusHeroiquesPioches pour le nouveau cycle si
+     * absents.
      */
     avancerCycle: function (partieId) {
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
@@ -2081,23 +1686,17 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — SQL RPC récupéré) : enregistre (ou retire,
-     * si nom est vide) le Focus héroïque choisi manuellement pour un
-     * emplacement (0/1/2) d'un cycle donné — portage direct de la RPC
-     * choisir_focus_heroique (rpc.json). Un même Focus héroïque ne peut
-     * être choisi qu'une fois par partie, tous cycles confondus
-     * (focusHeroiquesPioches) ; remplacer un emplacement déjà occupé
-     * libère l'ancien choix. Construction de la carte (regroupement des
-     * 2-3 actions du catalogue "focus") déléguée à
-     * FocusService.obtenirCarteHeroiqueParNom, déjà porté et testé
-     * (Session 4, focusService.js) — la RPC faisait exactement la même
-     * chose (boucle sur la table focus filtrée type='Héroïque').
+     * Enregistre (ou retire, si nom est vide) le Focus héroïque choisi
+     * manuellement pour un emplacement (0/1/2) d'un cycle donné. Un même
+     * Focus héroïque ne peut être choisi qu'une fois par partie, tous
+     * cycles confondus (focusHeroiquesPioches) ; remplacer un emplacement
+     * déjà occupé libère l'ancien choix. Construction de la carte
+     * (regroupement des 2-3 actions du catalogue "focus") déléguée à
+     * FocusService.obtenirCarteHeroiqueParNom.
      *
-     * ⚠️ Contrairement à avancerCycle/choisirTechnologieObtenue, la RPC
-     * d'origine n'écrit PAS d'entrée d'historique pour cette action
-     * (supabaseRpc_ simple côté DataService.js GAS, pas
-     * supabaseRpcEtHistorique_) — reproduit ici à l'identique (écriture
-     * directe dans `parties`, sans ajouterHistorique_).
+     * ⚠️ Contrairement à avancerCycle/choisirTechnologieObtenue, cette
+     * action n'écrit pas d'entrée d'historique (écriture directe dans
+     * `parties`, sans ajouterHistorique_).
      */
     choisirFocusHeroique: function (partieId, cycle, slot, nom) {
       slot = Number(slot);
@@ -2152,11 +1751,9 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Session 12 — SQL RPC récupéré) : enregistre (ou retire,
-     * si nomTechnologie est vide) la technologie obtenue dans l'un des 5
-     * emplacements du plateau maison, parmi les technologies des maisons
-     * déchues (partie.adversaires) — portage direct de la RPC
-     * choisir_technologie_obtenue (rpc.json).
+     * Enregistre (ou retire, si nomTechnologie est vide) la technologie
+     * obtenue dans l'un des 5 emplacements du plateau maison, parmi les
+     * technologies des maisons déchues (partie.adversaires).
      */
     choisirTechnologieObtenue: function (partieId, slot, nomTechnologie) {
       slot = Number(slot);
@@ -2192,20 +1789,19 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
-     * enregistre (ou retire, si nomTechnologie est vide) le choix d'une
+     * Enregistre (ou retire, si nomTechnologie est vide) le choix d'une
      * des 4 Technologies avancées (parmi les 8 des maisons déchues) —
      * même principe que choisirTechnologieObtenue (recherche dans
-     * partie.adversaires, écriture via majPlateauMaison), mais nouvelle
-     * mécanique confirmée par l'utilisateur (session du 17/08) :
+     * partie.adversaires, écriture via majPlateauMaison), avec deux
+     * règles propres à cette mécanique :
      *   - le choix ne se fait qu'au cycle 1 (rejette sinon — les 4
      *     emplacements sont fixés pour le reste de la partie une fois le
      *     cycle 1 passé) ;
      *   - une même technologie ne peut occuper qu'un seul des 4
      *     emplacements à la fois (contrairement à choisirTechnologieObtenue,
-     *     qui ne vérifie pas ce doublon côté serveur — reproduit tel quel
-     *     là-bas, mais gênant ici vu que les 4 NON choisies deviennent le
-     *     groupe du cycle 3, un doublon fausserait ce complément).
+     *     qui ne vérifie pas ce doublon — gênant ici vu que les 4 NON
+     *     choisies deviennent le groupe du cycle 3, un doublon fausserait
+     *     ce complément).
      * L'amélioration (case à cocher) est gérée séparément par
      * definirTechnologieAvanceeAmelioree, jamais ici.
      */
@@ -2241,8 +1837,7 @@ var GameService = (function () {
     },
 
     /**
-     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
-     * fonction PURE (aucun accès DB) exposée pour l'IHM (index.html) —
+     * Fonction PURE (aucun accès DB) exposée pour l'IHM (index.html) —
      * regroupe la logique d'affichage par cycle (quelles 4 technologies
      * montrer, lesquelles sont améliorables) au même endroit que la
      * logique d'écriture ci-dessus (groupeActifTechnologiesAvancees_),

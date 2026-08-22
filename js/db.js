@@ -1,29 +1,9 @@
 /**
  * db.js
  * Wrapper IndexedDB — Voidfall Companion PWA
- * Version 4 — 21/08/2026 (docs/docs-rapport.md CM-6 — retrait de 3 exports publics jamais appelés)
  *
- * 21/08/2026 (docs/docs-rapport.md CM-6) : DB.ouvrir/DB.vider/
- * DB.NOMS_STORES retirés de l'API publique (zéro appelant dans tout le
- * repo) ; vider() supprimée entièrement, ouvrir_ reste privée. Aucun
- * changement de comportement pour get/getAll/put/putTout/supprimer.
- *
- * Version 3 — 17/08/2026
- *
- * 17/08/2026 (Session 4, Phase 4 suite) : ajout du store `pileAnnulation`
- * (annulation de la dernière action Focus jouée, en chaîne — voir
- * annulationService.js) — VERSION_BASE passée à 2 pour déclencher la
- * création du nouveau store à la prochaine ouverture (onupgradeneeded
- * générique déjà en place, aucune autre modification nécessaire ici).
- * Seul changement de cette version, le reste de l'API (get/getAll/put/
- * putTout/supprimer/vider) est inchangé.
- *
- * 17/08/2026 (Session 3, Phase 2) : ajout de DB.supprimer(nomStore, cle).
- *
- * Ouvre la base 'voidfallCompanion' (schéma détaillé en section 2 de
- * docs-migration-pwa-plan.md) et expose un accès générique get/put/getAll
- * par store. Remplace DataService.js (accès aux données) + api.html
- * (pont google.script.run) côté catalogue et état de partie.
+ * Ouvre la base 'voidfallCompanion' et expose un accès générique
+ * get/put/getAll par store.
  *
  * Convention : les fonctions publiques sont exposées via l'objet DB
  * (IIFE), les fonctions internes sont suffixées _.
@@ -68,12 +48,12 @@ var DB = (function () {
         { nom: 'dateAction', cle: 'dateAction' }
       ]
     },
-    // 17/08/2026 (Session 4) : une entrée = une action Focus jouée avec
-    // succès (effet + coût éventuel), sous forme de mutations de champs
-    // {champ, avant, apres} — voir focusEngine.js pour la production de
-    // ces mutations et annulationService.js pour la pile LIFO qui s'en
-    // sert. Limitée à 10 entrées par partie (purge côté
-    // annulationService.js, pas ici) et vidée à chaque fin de cycle.
+    // Une entrée = une action Focus jouée avec succès (effet + coût
+    // éventuel), sous forme de mutations de champs {champ, avant, apres}
+    // — voir focusEngine.js pour la production de ces mutations et
+    // annulationService.js pour la pile LIFO qui s'en sert. Limitée à 10
+    // entrées par partie (purge côté annulationService.js, pas ici) et
+    // vidée à chaque fin de cycle.
     pileAnnulation: {
       keyPath: 'id',
       autoIncrement: true,
@@ -195,7 +175,7 @@ var DB = (function () {
    * Écrasement complet d'un store en une seule transaction : vide le
    * store puis réinsère tous les enregistrements fournis. Utilisé par
    * catalogueSync.js (le catalogue est toujours réimporté en bloc, jamais
-   * fusionné partiellement — voir §5 du plan de migration).
+   * fusionné partiellement).
    */
   function putTout(nomStore, valeurs) {
     verifierStore_(nomStore);
@@ -227,11 +207,6 @@ var DB = (function () {
     });
   }
 
-  // 21/08/2026 (docs/docs-rapport.md CM-6) : ouvrir_/vider/NOMS_STORES
-  // retirés de l'API publique (zéro appelant dans tout le repo) — vider()
-  // supprimée entièrement (rien ne l'appelait, même en interne) ;
-  // ouvrir_ reste privée, toujours utilisée en interne par get/getAll/
-  // put/putTout/supprimer.
   return {
     get: get,
     getAll: getAll,

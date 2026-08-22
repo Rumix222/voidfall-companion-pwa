@@ -1,44 +1,21 @@
 /**
  * combatService.js
  * Moteur de combat (Envahir / Escarmouche) — Voidfall Companion PWA
- * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-4 — retrait de 2 exports publics jamais appelés)
  *
- * 21/08/2026 (docs/docs-rapport.md CM-4) : NOMS_VAISSEAUX/totalNavale
- * retirés de l'API publique (zéro appelant hors du fichier). Aucun
- * changement de comportement.
+ * Calcule le résultat exact d'un Combat (Envahir/Escarmouche), technologies
+ * de base et améliorées comprises. La PERSISTANCE des conséquences d'une
+ * invasion sur le plateau des secteurs (retrait des Installations,
+ * changement de propriétaire, dépôt de la Puissance Navale survivante)
+ * reste hors périmètre : resoudreInvasion() calcule le résultat, mais
+ * l'appliquer au plateau reste à faire manuellement par le joueur (comme
+ * le reste des actions secteur non automatisées, voir focusEngine.js).
  *
- * Version 1 — 17/08/2026 (Session 6, Phase 5 — Combat/Invasion)
- *
- * Portage QUASI TEXTUEL de combat.html (GAS, module `Combat`, 544 l.) —
- * ce module était déjà entièrement PUR côté GAS (aucune RPC Postgres,
- * aucun DataService : uniquement partie.joueur/partie.technologiesObtenues,
- * déjà présents tels quels dans l'objet `partie` assemblé par
- * gameService.js). Portable sans réécriture de règles, contrairement aux
- * actions secteur (envahir/regrouper/etc.) qui restent hors périmètre —
- * voir secteurService.js en-tête : LA RÉSOLUTION DU COMBAT est pure et se
- * porte intégralement ; ce qui reste hors périmètre est la PERSISTANCE de
- * ses conséquences sur le plateau des secteurs (secteur_envahir_resoudre,
- * RPC Postgres sans code source jamais récupéré — retrait des
- * Installations, changement de propriétaire du secteur, dépôt de la
- * Puissance Navale survivante). resoudreInvasion() calcule donc le
- * résultat exact d'une invasion ; appliquer ce résultat au plateau des
- * secteurs reste, pour l'instant, à faire manuellement par le joueur
- * (comme le reste des actions secteur non automatisées, voir
- * focusEngine.js).
- *
- * Simplifications héritées telles quelles de combat.html (non réévaluées
- * cette session) :
+ * Simplifications connues, non couvertes :
  * - Aucun bonus nécessitant une dépense de ressource en cours de combat
  *   (Missiles longue portée, Drones autonomes, Focus Exaltation "Bombarder").
  * - Le choix du cube rappelé est automatisé selon une priorité fixe
  *   (Corvette > Sentinelle > Destroyer > Porte-Vaisseaux > Cuirassé)
  *   plutôt que laissé au joueur.
- *
- * Seule adaptation réelle par rapport à combat.html : resoudreInvasion()
- * lit les champs d'un objet secteursPartie PWA (camelCase —
- * installationDefenseSecteur/installationBaseStellaire/pnNeant, voir
- * secteurService.js/db.js) au lieu des champs snake_case d'un objet
- * Api.getSecteurs GAS.
  *
  * Module pur : aucune dépendance, aucun accès DOM ni IndexedDB. La
  * construction des champs de saisie et le branchement des boutons vivent
@@ -394,9 +371,6 @@ var CombatService = (function () {
     return resultat;
   }
 
-  // 21/08/2026 (docs/docs-rapport.md CM-4) : NOMS_VAISSEAUX/totalNavale_
-  // retirés de l'API publique (zéro appelant hors de ce fichier) — les
-  // deux restent des symboles privés, toujours utilisés en interne.
   return {
     vaisseauxDebloques: vaisseauxDebloques,
     construireCamp: construireCamp,

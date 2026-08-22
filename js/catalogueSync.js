@@ -1,22 +1,12 @@
 /**
  * catalogueSync.js
  * Import JSON local -> IndexedDB (catalogue, lecture seule)
- * Version 3 — 19/08/2026
  *
- * 19/08/2026 : lireFichier_ ajoute un paramètre anti-cache (?bust=) à
- * l'URL — cache:'no-store' seul ne suffisait pas à garantir un aller-retour
- * réseau réel une fois un Service Worker déjà actif (voir commentaire dans
- * lireFichier_ et version.js pour le détail du correctif complet, Piège n°1).
- *
- * 18/08/2026 : suppression de la dépendance Supabase. Le catalogue est
- * désormais bundlé dans le repo sous forme de fichiers JSON statiques
- * (data/catalogue/*.json, un fichier par store, déjà en camelCase — voir
- * export_catalogue.py qui a servi à générer l'état initial depuis
- * l'ancienne base Supabase). Le sens reste le même qu'avant (source ->
- * IndexedDB, en bloc, lecture seule), seule la source change : plus
- * d'appel réseau externe, plus de clé à protéger, fonctionne hors-ligne
- * dès le premier chargement une fois les fichiers mis en cache par le
- * Service Worker.
+ * Le catalogue est bundlé dans le repo sous forme de fichiers JSON
+ * statiques (data/catalogue/*.json, un fichier par store, en camelCase).
+ * Synchronisation toujours en bloc (source -> IndexedDB), jamais fusionnée
+ * partiellement ; fonctionne hors-ligne dès le premier chargement une fois
+ * les fichiers mis en cache par le Service Worker.
  *
  * Pour mettre à jour le catalogue : éditer le(s) fichier(s) JSON
  * concerné(s) dans data/catalogue/, committer, pousser. Les joueurs
@@ -53,22 +43,17 @@ var CatalogueSync = (function () {
    */
   function lireFichier_(nomFichier) {
     var url = './data/catalogue/' + nomFichier + '.json';
-    // 19/08/2026 (bug constaté en test) : sans cache:'no-store', le
-    // navigateur peut resservir une réponse HTTP mise en cache pour ce
-    // fetch (le serveur statique n'envoie pas d'en-têtes de cache forts)
-    // — "Synchroniser le catalogue" resservait alors un JSON périmé même
-    // après une mise à jour bien déployée (APP_VERSION incrémenté, SW
-    // réinstallé). Le catalogue devant toujours refléter le fichier
-    // actuel au moment du clic, on force ici un aller-retour réseau.
-    //
-    // 19/08/2026 (correctif Piège n°1, suite) : cache:'no-store' seul reste
-    // insuffisant tant qu'un ancien Service Worker est actif — son
-    // handler 'fetch' (cache-first) intercepte la requête AVANT qu'elle
-    // n'atteigne le réseau, quel que soit son mode de cache, dès que
-    // caches.match() trouve une entrée pour cette URL exacte. Un paramètre
-    // anti-cache rend l'URL inédite pour caches.match() (comparaison
-    // stricte, query string incluse), ce qui la fait retomber sur le vrai
-    // fetch() réseau dans le handler du Service Worker.
+    // cache:'no-store' seul ne suffit pas à garantir un aller-retour
+    // réseau réel : le serveur statique n'envoie pas d'en-têtes de cache
+    // forts (le navigateur peut resservir une réponse HTTP en cache), et
+    // surtout un Service Worker déjà actif intercepte la requête AVANT
+    // qu'elle n'atteigne le réseau via son handler 'fetch' (cache-first),
+    // dès que caches.match() trouve une entrée pour cette URL exacte —
+    // quel que soit le mode de cache demandé. Le paramètre anti-cache
+    // (?bust=) rend l'URL inédite pour caches.match() (comparaison
+    // stricte, query string incluse), ce qui la fait retomber sur un vrai
+    // fetch() réseau. Nécessaire pour que "Synchroniser le catalogue"
+    // reflète toujours le fichier actuel (voir Piège n°1 dans CLAUDE.md).
     return fetch(url + '?bust=' + Date.now(), { cache: 'no-store' }).then(function (reponse) {
       if (!reponse.ok) {
         throw new Error('HTTP ' + reponse.status + ' sur ' + url);

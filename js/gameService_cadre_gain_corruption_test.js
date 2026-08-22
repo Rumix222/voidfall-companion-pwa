@@ -97,11 +97,11 @@ test('cadreGainCorruptionAutomatisable : cibles simples/repli/cible_options reco
   ), true);
 });
 
-// 21/08/2026 : reste volontairement manuel — offre_programme (comme
-// demandé par l'utilisateur), cadre composé (élément autre que
-// "corruption"), cible contextuelle non modélisée, et effet_conditionnel
-// (une piste de Civilisation devrait en plus avancer — voir JSDoc de
-// resoudreCiblesCadreGainCorruption_, gameService.js).
+// Reste volontairement manuel : offre_programme, cadre composé (élément
+// autre que "corruption"), cible contextuelle non modélisée, et
+// effet_conditionnel générique (une piste de Civilisation devrait en
+// plus avancer — voir JSDoc de resoudreCiblesCadreGainCorruption_,
+// gameService.js).
 test('cadreGainCorruptionAutomatisable : offre_programme / cadre composé / cible inconnue / effet_conditionnel -> false', function () {
   var ctx = creerSandbox_(creerFixture_({}));
   var GameService = ctx.sandbox.GameService;
@@ -181,11 +181,11 @@ test('appliquerCadreGainCorruption : Annuler sur la première popup — {annule:
     });
 });
 
-// 21/08/2026 (Cadre "Gagnez deux Corruption... sur des emplacements de
-// Programme, si possible...", cible: emplacement_programme, elements:
-// {corruption:2}) : Annuler APRÈS au moins un placement réussi ne
-// renvoie PAS {annule:true} — le cadre est marqué appliqué avec le
-// résumé PARTIEL (voir JSDoc gameService.js).
+// Cadre "Gagnez deux Corruption... sur des emplacements de Programme, si
+// possible..." (cible: emplacement_programme, elements: {corruption:2}) :
+// Annuler APRÈS au moins un placement réussi ne renvoie PAS
+// {annule:true} — le cadre est marqué appliqué avec le résumé PARTIEL
+// (voir JSDoc gameService.js).
 test('appliquerCadreGainCorruption : quantité 2, Annuler après le 1er placement — marqué appliqué, résumé partiel', function () {
   var ctx = creerSandbox_(creerFixture_({
     type: 'gain', cible: 'emplacement_programme', elements: { corruption: 2 },
@@ -227,9 +227,9 @@ test('appliquerCadreGainCorruption : quantité 2, les deux réussissent — rés
 });
 
 // ---------------------------------------------------------------
-// 21/08/2026 (Événement galactique G, Cycle 1, Cadre 1 "Le visage du mal" —
-// voir en-tête de fichier gameService.js v22) : effet_conditionnel reconnu
-// UNIQUEMENT quand il correspond exactement au gabarit de ce Cadre.
+// Événement galactique G, Cycle 1, Cadre 1 "Le visage du mal" —
+// effet_conditionnel reconnu UNIQUEMENT quand il correspond exactement
+// au gabarit de ce Cadre.
 // ---------------------------------------------------------------
 
 test('cadreGainCorruptionAutomatisable : effet_conditionnel EXACT du Cadre G/Cycle1/1 -> true', function () {

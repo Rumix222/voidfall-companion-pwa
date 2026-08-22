@@ -1,7 +1,5 @@
 // Test fumée node --test pour SecteurService.obtenirSecteursEligiblesPlacementNeantAdjacent/
-// placerElementsNeantAdjacent (généralisation Cadre 1) — mock DB minimal en mémoire,
-// pas de dépendance npm (vm + fixtures), conforme au principe déjà retenu pour les futurs
-// tests e2e (docs-migration-pwa-plan.md).
+// placerElementsNeantAdjacent — mock DB minimal en mémoire, pas de dépendance npm (vm + fixtures).
 const vm = require('vm');
 const fs = require('fs');
 const assert = require('assert');
@@ -121,21 +119,18 @@ test('placement générique — Cadre 1 style Événement B (jeton + installatio
     });
 });
 
-// 20/08/2026 (correctif — anomalie mise à jour Guilde Secteur, voir
-// TODO.md EVOLUTION 2) : régression pour le bug constaté sur l'Événement
-// E Cycle 1 Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du
-// Néant..."). Root cause réelle : data/catalogue/evenements.json
-// écrivait "guilde_banquier" (SINGULIER, coquille) alors que
-// CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) n'a jamais reconnu que la
-// forme au PLURIEL ("guilde_banquiers", cohérente avec guilde_fermiers/
+// Régression pour un bug de convention de nommage sur l'Événement E
+// Cycle 1 Cadre 1 ("Placez une Guilde de Banquiers et 1 cube du
+// Néant..."). Root cause : data/catalogue/evenements.json écrivait
+// "guilde_banquier" (SINGULIER, coquille) alors que
+// CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) ne reconnaît que la forme
+// au PLURIEL ("guilde_banquiers", cohérente avec guilde_fermiers/
 // guilde_ingenieurs/guilde_mineurs) : le cube (clé reconnue) s'appliquait
 // tandis que la Guilde (clé inconnue, ignorée silencieusement par
 // placerElementsNeantAdjacent) était perdue sans erreur. Corrigé côté
-// DONNÉE (les 3 occurrences fautives d'evenements.json renommées en
-// "guilde_banquiers" — retour utilisateur : préférence pour corriger la
-// donnée plutôt que le code face à un écart de convention de nommage) ;
-// secteurService.js est resté/est revenu à sa forme d'origine (plurielle).
-// Ce test reflète donc désormais la clé CORRIGÉE du catalogue.
+// DONNÉE (catalogue renommé en "guilde_banquiers", plutôt que
+// d'assouplir secteurService.js à une clé non conventionnelle). Ce test
+// reflète la clé CORRIGÉE du catalogue.
 test('placement générique — Événement E Cycle 1 Cadre 1 (guilde_banquiers + cube_neant)', function () {
   var fixtures = { parties: {}, scenarioSecteurs: [], typesSecteur: [], secteursPartie: [] };
   fixtures.parties[PARTIE_ID] = { scenarioId: 'scn1' };

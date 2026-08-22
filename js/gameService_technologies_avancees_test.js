@@ -1,12 +1,7 @@
 /**
  * Test fumée — gameService.js (choisirTechnologieAvancee /
  * obtenirTechnologiesAvanceesGroupes)
- * Lot C — Plat. Galactique, Technologies avancées (17/08/2026)
  * Exécution : node --test gameService_technologies_avancees_test.js
- *
- * 21/08/2026 (docs/docs-rapport.md CM-1) : tests de
- * definirTechnologieAvanceeAmelioree retirés — fonction supprimée
- * (zéro appelant réel), voir gameService.js en-tête.
  */
 
 var assert = require('assert');
@@ -180,12 +175,12 @@ test('choisirTechnologieAvancee : nom vide -> retire du slot', function () {
 });
 
 // ---------------------------------------------------------------
-// definirTechnologieAvanceeAmelioree supprimée le 21/08/2026
-// (docs/docs-rapport.md CM-1) — zéro appelant réel (aucune UI ne
-// l'invoquait). Le champ technologiesAvanceesAmeliorees qu'elle écrivait
-// reste lu par focusEngine.js (effet influence_par_technologie_amelioree,
-// voir focusEngine.test.js) mais aucun code ne peut plus l'alimenter —
-// gap fonctionnel connu, pas re-testé ici.
+// definirTechnologieAvanceeAmelioree a été supprimée — zéro appelant réel
+// (aucune UI ne l'invoquait). Le champ technologiesAvanceesAmeliorees
+// qu'elle écrivait reste lu par focusEngine.js (effet
+// influence_par_technologie_amelioree, voir focusEngine.test.js) mais
+// aucun code ne peut plus l'alimenter — gap fonctionnel connu, pas testé
+// ici.
 // ---------------------------------------------------------------
 
 // ---------------------------------------------------------------

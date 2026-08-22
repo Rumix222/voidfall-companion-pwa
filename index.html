@@ -23,14 +23,7 @@
     <h1 id="topbar-titre" class="topbar-titre" title="Retour à l'accueil">Voidfall<span class="topbar-accent">Companion</span></h1>
   </header>
 
-  <!-- Barre visible uniquement pendant une partie ouverte.
-       17/08/2026 (Lot C — restructuration Partie) : le bouton "Partie"
-       devient "Plat. Galactique" (dernier des 3 écrans annoncés au Lot
-       A/B — remplacement complet de l'ex-écran unique "Partie" terminé).
-       17/08/2026 (Lot A/B — restructuration Partie) : 2 nouveaux boutons,
-       "Mise en place" et "Plat. maison" (voir screen-mise-en-place /
-       screen-plateau-maison plus bas), qui reprennent chacun une partie
-       du contenu de l'ex-écran unique "Partie". -->
+  <!-- Barre visible uniquement pendant une partie ouverte. -->
   <div id="barre-navigation-partie" class="barre-navigation-partie" hidden>
     <nav id="nav-ecrans" class="nav-ecrans">
       <button id="nav-mise-en-place" class="btn btn-toggle" data-nav="mise-en-place">Mise en place</button>
@@ -112,20 +105,11 @@
   </section>
 
   <!-- Écran Mise en place : maisons déchues et leurs technologies (dont
-       celles sans gain d'Influence, badge-sans-point). 17/08/2026 (Lot A
-       — restructuration Partie) : nouvel écran dédié, portage direct du
-       bloc #liste-adversaires qui vivait sur l'écran Partie jusqu'ici
-       (App.renderEcranGame_), aucun changement de logique. Contenu figé
-       à la création de partie (creerPartie est le seul point d'écriture
-       de partie.adversaires) : rendu une seule fois depuis
-       App.ouvrirPartie, jamais rafraîchi ensuite — contrairement à
-       Plat. Galactique/Plat. maison.
-       17/08/2026 (Lot C — restructuration Partie) : ajout de "Votre
-       maison" (carte-joueur, nom + Difficulté) — absente de la demande
-       initiale (qui ne listait que les maisons déchues pour cet écran),
-       ajoutée ici car elle n'a plus d'écran d'accueil depuis que "Partie"
-       devient "Plat. Galactique" (voir plus bas) ; hors périmètre
-       signalé, à retirer si tu préfères qu'elle vive ailleurs. -->
+       celles sans gain d'Influence, badge-sans-point), et carte du
+       joueur (nom + Difficulté). Contenu figé à la création de partie
+       (creerPartie est le seul point d'écriture de partie.adversaires) :
+       rendu une seule fois depuis App.ouvrirPartie, jamais rafraîchi
+       ensuite — contrairement à Plat. Galactique/Plat. maison. -->
   <section id="screen-mise-en-place" class="screen" hidden>
     <h2 class="section-title">Votre maison</h2>
     <div class="card card-joueur" id="carte-joueur"></div>
@@ -135,61 +119,21 @@
   </section>
 
   <!-- Écran Plat. Galactique : cycle, événement galactique, Technologies
-       avancées, Focus héroïques, fin de cycle.
-       17/08/2026 (Lot F — corrections mineures Plat. Galactique/maison/
-       Focus/Secteurs) :
-       - "Fin du cycle" ne fonctionnait plus : renderEcranPlateauGalactique_/
-         renderEcranPlateauMaison_/renderEcranSecteurs_ sont des fonctions
-         privées de la fermeture App, appelées SANS préfixe App. depuis le
-         listener de #btn-fin-cycle qui vit dans une AUTRE fermeture
-         (ReferenceError silencieusement transformé en alerte "Échec du
-         passage au cycle suivant" par le .catch) — corrigé en les exposant
-         via App.renderPlateauGalactique/renderPlateauMaison/renderSecteurs.
-       - #btn-terminer-partie : plus jamais affiché seul (attribut hidden
-         fixe) — reste dans le DOM car scoreVueService.js lui attache son
-         listener par id (ouvrirEcranFin_), mais désormais uniquement
-         déclenché par programme (voir plus bas). #btn-fin-cycle change de
-         libellé pour "Terminer la partie" au cycle 3 (et à l'état
-         "termine") — remplace visuellement #btn-terminer-partie plutôt que
-         de le montrer en plus (voir renderEcranPlateauGalactique_).
-       - "— cycle en cours" retiré du titre Focus héroïques ; "— cycle N"
-         retiré du titre Événement galactique (#evenement-cycle-numero
-         supprimé, devenu inutile).
-       17/08/2026 (Lot C — restructuration Partie) : remplace l'ex-écran
-       "Partie" (renommage complet, dernier des 3 écrans annoncés au Lot
-       A/B — voir barre-navigation-partie). Focus héroïques déplacés
-       depuis l'écran Stratégie (#plateau-galactique-focus-heroiques,
-       rendu par js/strategieService.js, renderFocusHeroiques_ — même
-       fonction, seul l'id du conteneur qu'elle cible a changé). Ajout de
-       "Technologies avancées" (#technologies-avancees-liste, nouvelle
-       mécanique, voir gameService.js v9 — 4 des 8 technologies des
-       maisons déchues choisies au cycle 1, améliorables par lot de 4 aux
-       cycles 2/3, voir App.renderTechnologiesAvancees_ plus bas).
-       17/08/2026 (Session 4) : ex-écran de confirmation "partie créée",
-       devenu l'écran persistant "Partie" (accessible via la nav tant
-       qu'une partie est ouverte). Volontairement en lecture seule pour
-       cycle : son avancement (avancerCycle) dépend de fonctions serveur
-       GAS dont le SQL source n'a jamais été récupéré (hors périmètre,
-       voir gameService.js en-tête) — rien à porter, pas encore réécrit
-       depuis les règles. -->
-  <!-- 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
-       - "Cycle X" quitte le flux des .section-title (devient un titre de
-         page, .titre-cycle, sans le trait orange) et remonte dans un
-         bandeau d'en-tête (.plateau-galactique-entete) avec l'Entretien
-         dû juste en dessous et le bouton "Fin du cycle" à droite — les
-         deux étaient auparavant tout en bas de l'écran, loin d'être vus
-         en premier.
-       - Les 3 blocs restants (Événement galactique/Technologies avancées/
-         Focus héroïques) devienent des sections à part entière (h2.
-         section-title, trait orange — jusqu'ici de simples h3.
-         subsection-title SANS style, voir audit CSS : la classe n'avait
-         jamais eu de règle définie). Le nombre de manches (auparavant à
-         côté de "Cycle X") est rapatrié à côté d'"Événement galactique",
-         là où il est imprimé sur la carte physique (coin supérieur
-         droit).
-       - #btn-retour-accueil-partie supprimé : le titre de l'app
-         (#topbar-titre, voir header ci-dessus) fait désormais ce rôle
-         depuis n'importe quel onglet. -->
+       avancées, Focus héroïques, fin de cycle. renderEcranPlateauGalactique_/
+       renderEcranPlateauMaison_/renderEcranSecteurs_ sont des fonctions
+       privées de la fermeture App : un appel depuis un listener situé
+       dans une autre fermeture doit passer par l'alias public
+       App.renderPlateauGalactique/renderPlateauMaison/renderSecteurs,
+       jamais le nom privé, sous peine de ReferenceError silencieux.
+       #btn-terminer-partie reste caché en permanence dans le DOM (utile
+       uniquement pour que scoreVueService.js y attache son listener par
+       id, ouvrirEcranFin_) — il n'est déclenché que par programme, une
+       fois l'état "termine" atteint ; #btn-fin-cycle prend alors le
+       libellé "Terminer la partie" et le remplace visuellement.
+       Le titre "Cycle X" (.titre-cycle) et l'Entretien dû vivent dans un
+       bandeau d'en-tête (.plateau-galactique-entete) avec le bouton "Fin
+       du cycle" à droite — le titre de l'app (#topbar-titre, voir header
+       plus haut) sert de retour à l'accueil depuis n'importe quel onglet. -->
   <section id="screen-plateau-galactique" class="screen" hidden>
     <div class="plateau-galactique-entete">
       <div>
@@ -199,13 +143,10 @@
       <button id="btn-fin-cycle" class="btn btn-primary">Fin du cycle</button>
     </div>
 
-    <!-- 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
-         l'événement galactique du cycle en cours — choisirEvenement porté
-         (fonction JS pure côté GAS, jamais une RPC), voir gameService.js.
-         18/08/2026 (Refonte affichage Événement galactique) : le texte de
-         l'événement (#evenement-cycle-texte, ancien texte1/texte2 aplati)
-         est remplacé par #evenement-cycle-detail — Cadres (moitié gauche
-         de la carte, §1.5 docs-rules-cycle-de-jeu.md) puis Objectifs
+    <!-- Sélection de l'événement galactique du cycle en cours
+         (GameService.getEvenementsParCycle/choisirEvenement). Le détail
+         (#evenement-cycle-detail) affiche les Cadres (moitié gauche de la
+         carte, §1.5 docs-rules-cycle-de-jeu.md) puis les Objectifs
          (moitié droite, §3.3), rendus séparément par
          renderEvenementCycle_/renderCadresEvenement_/renderObjectifsEvenement_. -->
     <h2 class="section-title section-title-avec-suffixe">
@@ -219,40 +160,25 @@
       <div id="evenement-cycle-detail" style="margin-top:10px;"></div>
     </div>
 
-    <!-- 17/08/2026 (Lot C — Technologies avancées) : 4 emplacements —
-         listes déroulantes au cycle 1 (choix, parmi les 8 technologies
-         des maisons déchues), texte fixe aux cycles 2 (les 4 choisies) et
-         3 (les 4 autres, complément calculé) — voir
+    <!-- 4 emplacements — listes déroulantes au cycle 1 (choix parmi les 8
+         technologies des maisons déchues), texte fixe aux cycles 2 (les 4
+         choisies) et 3 (les 4 autres, complément calculé) — voir
          App.renderTechnologiesAvancees_ (index.html) et
          GameService.obtenirTechnologiesAvanceesGroupes (gameService.js).
-         17/08/2026 (Lot G — corrections mineures) : case "Améliorée"
-         retirée d'ici (lecture seule désormais).
-         17/08/2026 (Lot I — corrections mineures, technologies avancées) :
-         la tentative du Lot G de déplacer la case "Améliorée" vers une
-         section dédiée sur Plat. maison (#technologies-avancees-ameliorees-liste)
-         est retirée (retour arrière demandé par l'utilisateur — mauvaise
-         approche). La bonne mécanique : la case "Améliorée" de la section
-         "Technologies obtenues" existante sur Plat. maison (5 ddl, voir
-         #technologies-obtenues-liste ci-dessous) n'est cochable que si la
-         technologie choisie dans la ddl fait partie du groupe actif du
-         cycle en cours (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif,
-         déjà calculé et exposé — aucun changement côté gameService.js) —
+         Lecture seule ici : la case "Améliorée" vit sur la section
+         "Technologies obtenues" de Plat. maison (#technologies-obtenues-liste),
+         où elle n'est cochable que si la technologie choisie dans la ddl
+         fait partie du groupe actif du cycle en cours
+         (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
          voir renderTechnologiesObtenues_ plus bas. -->
     <h2 class="section-title" style="margin-top:22px;">Technologies avancées</h2>
     <div class="game-block" id="bloc-technologies-avancees">
       <div id="technologies-avancees-liste"></div>
     </div>
 
-    <!-- 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
-         #plateau-galactique-focus-heroiques passe de .card-list (grille
-         de .card, un cadre complet par emplacement) à un conteneur nu —
-         renderFocusHeroiques_ (js/strategieService.js) n'y rend plus
-         qu'un <select> par emplacement (le détail badge+actions a quitté
-         cet écran il y a plusieurs lots déjà, voir son en-tête), donc
-         .card créait un second cadre autour du cadre déjà dessiné par le
-         <select> lui-même — résidu visuel, corrigé en alignant sur le
-         même gabarit .techno-obtenue-ligne que "Technologies avancées"
-         juste au-dessus (un seul cadre par ligne). -->
+    <!-- renderFocusHeroiques_ (js/strategieService.js) rend un <select>
+         par emplacement, aligné sur le même gabarit .techno-obtenue-ligne
+         que "Technologies avancées" juste au-dessus. -->
     <h2 class="section-title" style="margin-top:22px;">Focus héroïques</h2>
     <div class="game-block">
       <div id="plateau-galactique-focus-heroiques"></div>
@@ -264,38 +190,19 @@
 
   <!-- Écran Plat. maison : Ressources / Jetons et cubes de puissance
        navale / Pistes de Civilisation / Technologies / Influence, dans
-       cet ordre. 17/08/2026 (Lot D — Ressources/Civilisation vers Plat.
-       maison) : les 3 premières sections arrivent depuis l'ex-écran
-       Stratégie (#bloc-ressources scindé en #bloc-ressources —
-       #ressources-principales seul — et #bloc-jetons-cubes —
-       #ressources-jetons/#ressources-gloire/#ressources-cubes —,
-       #bloc-pistes-civilisation inchangé) ; renommé "Focus" (voir plus
-       bas). Mêmes ids partout, rendus par les mêmes fonctions de
-       js/strategieService.js (afficher() cible par id, indépendamment de
-       l'écran qui contient physiquement chaque conteneur — comme pour
-       les Focus héroïques au Lot C). Restent dans "Focus" : le bouton
-       Annuler la dernière action et le journal (décision utilisateur).
-       Technologies et Influence : inchangés, seulement décalés après les
-       3 nouvelles sections (voir Lot B pour leur historique).
-       17/08/2026 (Lot F — corrections mineures) : boutons globaux "Avancer
-       la moins avancée"/"Avancer la piste Corrompue" retirés de l'écran
-       (décision utilisateur — CivilisationService.avancerPisteMoinsAvancee/
-       avancerPisteCorrompue restent disponibles pour un futur pont Focus ->
-       Civilisation, voir js/strategieService.js). Ligne Cube inactif/
-       actif/déployé compactée sur une seule ligne (voir renderCubes_,
-       js/strategieService.js). Technologies obtenues : 6 emplacements ->
-       5 (+ la Technologie de départ, fixe = 6 technologies max au total),
-       voir renderTechnologiesObtenues_ plus bas et gameService.js.
-       17/08/2026 (Lot B — restructuration Partie) : nouvel écran dédié,
-       portage direct des blocs qui vivaient sur l'écran Partie jusqu'ici
-       (carte-joueur pour la Technologie de départ + Influence,
-       #bloc-technologies-obtenues), mêmes ids (#check-amelioree-depart,
-       #technologies-obtenues-liste), mêmes appels GameService, aucun
-       changement de logique/persistance. #technologie-depart-plateau-
-       maison est un texte fixe : la Technologie de départ n'a jamais été
-       un <select> ni en legacy ni dans la PWA (choisie une fois à la
-       création de partie via setupService.js) — seule sa case "Améliorée"
-       est interactive, inchangée. -->
+       cet ordre. Rendu par js/strategieService.js, qui cible chaque
+       conteneur par id (StrategieService.afficher() est indépendant de
+       l'écran qui contient physiquement chaque bloc — comme pour les
+       Focus héroïques sur Plat. Galactique). Pas de boutons globaux
+       "Avancer la moins avancée"/"Avancer la piste Corrompue" sur cet
+       écran (décision produit) — CivilisationService.
+       avancerPisteMoinsAvancee/avancerPisteCorrompue restent disponibles
+       pour un futur pont Focus -> Civilisation. Technologies obtenues :
+       5 emplacements + la Technologie de départ (fixe) = 6 technologies
+       max au total. #technologie-depart-plateau-maison est un texte fixe
+       (la Technologie de départ est choisie une fois à la création de
+       partie via setupService.js, jamais modifiable ensuite) — seule sa
+       case "Améliorée" est interactive. -->
   <section id="screen-plateau-maison" class="screen" hidden>
     <h2 class="section-title">Ressources</h2>
     <div class="game-block" id="bloc-ressources">
@@ -330,9 +237,9 @@
   </section>
 
   <!-- Écran Fin de partie : score final + calcul de l'Influence du Néant.
-       17/08/2026 (Session 7, Phase 5 — Score) : le calcul faisant foi est
-       fait côté ScoreService.enregistrerFinDePartie ; le total affiché
-       ici pendant la saisie n'est qu'un aperçu (voir scoreVueService.js). -->
+       Le calcul faisant foi est fait côté ScoreService.enregistrerFinDePartie ;
+       le total affiché ici pendant la saisie n'est qu'un aperçu (voir
+       scoreVueService.js). -->
   <section id="screen-fin" class="screen" hidden>
     <h2 class="section-title">Fin de partie</h2>
 
@@ -367,45 +274,21 @@
     </div>
   </section>
 
-  <!-- Écran Focus (ex-Stratégie) : Actions réalisées (Annuler + journal) /
-       Listes de focus / bandeau permanent de rappel des ressources.
-       17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
-       - "Actions réalisées" : regroupe le bouton Annuler la dernière
-         action et le journal sous un même titre (hypothèse assumée —
-         la demande listait "Actions réalisées" sans préciser si le
-         bouton Annuler en fait partie ; les deux concernent la dernière
-         action jouée, regroupés ensemble ici, à ajuster si besoin).
-       - "Listes de focus" : ex-"Vos Focus" (h3 promu en h2 pour
-         s'aligner sur les autres titres de section ; le sous-titre "Vos
-         Focus" est retiré, devenu redondant avec le nouveau titre).
-       - #focus-rappel-ressources : bandeau fixe en bas d'écran (position:
-         fixed, voir css/style.css), affiche Nourriture/Énergie/Matériel/
-         Crédit/Science/Cube actif en chiffres colorés (mêmes couleurs que
-         les pastilles de coût des cartes Focus, portage de couleurCout_/
-         abregeCout_, js/strategieService.js). Rendu par
-         renderRappelRessources_, appelée depuis afficher() ; mis à jour en
-         direct par l'input Stock des ressources principales (Plat. maison,
-         #ressources-principales) via majRappelRessourceAffiche_ — même
-         mécanisme que majDeltaAffiche_. Cube actif n'a pas de saisie
-         directe sur cet écran (modifié uniquement par les actions Focus/
-         Secteurs) : rafraîchi seulement à chaque afficher(), comme le
-         reste de l'écran.
-       17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
-       renommage "Stratégie" -> "Focus" (id nav-strategie -> nav-focus,
-       data-nav strategie -> focus, id screen-strategie -> screen-focus —
-       seuls changements d'id, aucune référence ailleurs dans le code, voir
-       audit) ; #bloc-ressources (ressources principales/jetons/gloire/
-       cubes) et Pistes de Civilisation quittent cet écran pour Plat.
-       maison (voir plus haut). Le module js/strategieService.js garde son
-       nom (rendu par id, indépendant de l'écran) — non renommé, hors
-       périmètre de ce lot.
-       17/08/2026 (Lot C — restructuration Partie) : Focus héroïques
-       déplacés vers l'écran Plat. Galactique (#plateau-galactique-focus-
-       heroiques) — voir js/strategieService.js, renderFocusHeroiques_ ne
-       change que l'id du conteneur qu'elle cible, toujours appelée
-       depuis StrategieService.afficher() (inchangé).
-       [Nettoyage Session 9] Cette légende disait encore "lecture seule —
-       avancement hors périmètre", obsolète depuis la Session 5 : corrigé. -->
+  <!-- Écran Focus (le module qui le rend garde le nom historique
+       js/strategieService.js — rendu par id, indépendant de l'écran qui
+       contient chaque conteneur) : Actions réalisées (Annuler + journal)
+       / Listes de focus / bandeau permanent de rappel des ressources.
+       #focus-rappel-ressources : bandeau fixe en bas d'écran (position:
+       fixed, voir css/style.css), affiche Nourriture/Énergie/Matériel/
+       Crédit/Science/Cube actif en chiffres colorés (mêmes couleurs que
+       les pastilles de coût des cartes Focus — couleurCout_/abregeCout_,
+       js/strategieService.js). Rendu par renderRappelRessources_, appelée
+       depuis afficher() ; mis à jour en direct par l'input Stock des
+       ressources principales (Plat. maison, #ressources-principales) via
+       majRappelRessourceAffiche_ — même mécanisme que majDeltaAffiche_.
+       Cube actif n'a pas de saisie directe sur cet écran (modifié
+       uniquement par les actions Focus/Secteurs) : rafraîchi seulement à
+       chaque afficher(), comme le reste de l'écran. -->
   <section id="screen-focus" class="screen" hidden>
     <h2 class="section-title">Actions réalisées</h2>
     <div class="bloc-annulation">
@@ -421,11 +304,11 @@
       <div class="card-list" id="strategie-focus-joueur" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 
-    <!-- 17/08/2026 (Lot F — corrections mineures) : détail jouable des
-         Focus héroïques choisis pour le cycle en cours (sélection faite
-         sur l'écran Plat. Galactique) — voir renderFocusHeroiquesJoueur_,
-         js/strategieService.js. Bloc entier masqué tant qu'aucun Focus
-         héroïque n'est choisi pour ce cycle (ou partie terminée). -->
+    <!-- Détail jouable des Focus héroïques choisis pour le cycle en cours
+         (sélection faite sur l'écran Plat. Galactique) — voir
+         renderFocusHeroiquesJoueur_, js/strategieService.js. Bloc entier
+         masqué tant qu'aucun Focus héroïque n'est choisi pour ce cycle
+         (ou partie terminée). -->
     <div id="bloc-focus-heroiques-joueur" hidden style="margin-top:22px;">
       <h2 class="section-title">Focus héroïques</h2>
       <div class="game-block" id="bloc-focus-heroiques-joueur-liste">
@@ -441,12 +324,10 @@
     <h2 class="section-title">Plateau des secteurs</h2>
     <div class="game-block" style="overflow-x:auto;" id="secteurs-conteneur"></div>
 
-    <!-- 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-         Construire/Rappeler un cube désormais possibles (SecteurService.
-         construire/rappelerCube portés). Envahir/Regrouper/Déployer des
-         cubes restent hors périmètre de cette session (engagement
-         multi-unités, formulaire plus complexe) — voir résumé de fin de
-         session. -->
+    <!-- Envahir/Regrouper/Déployer des cubes restent hors périmètre de cet
+         écran (engagement multi-unités, formulaire plus complexe) — seuls
+         Construire et Rappeler un cube sont possibles ici
+         (SecteurService.construire/rappelerCube). -->
     <div class="game-block" id="bloc-construire" style="margin-top:14px;">
       <h3 class="subsection-title">Construire</h3>
       <select id="construire-categorie">
@@ -498,10 +379,7 @@
 
   <!-- Écran Historique — liste enrichie (événements, technologies,
        vainqueur), reprendre/archiver/supprimer par partie + suppression
-       en masse des parties non archivées. 17/08/2026 (Session 8,
-       Phase 6) : remplace la simple liste "Parties enregistrées" qui
-       vivait sur l'écran d'accueil depuis la Session 4 — voir
-       historiqueVueService.js. -->
+       en masse des parties non archivées (voir historiqueVueService.js). -->
   <section id="screen-historique" class="screen" hidden>
     <h2 class="section-title">Historique des parties</h2>
     <button id="btn-supprimer-non-archivees" class="btn btn-danger" style="width:100%;margin-bottom:12px;">Tout supprimer (parties non archivées)</button>
@@ -545,249 +423,25 @@
 <script src="js/historiqueVueService.js"></script>
 <script>
   /**
-   * index.html (script inline)
-   * Version 23 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2, compteur Corruption plateau maison)
-   *
-   * 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
-   * mal", voir gameService.js v22/civilisationService.js v5/
-   * strategieService.js v31) : renderEcranPlateauMaison_ affiche
-   * désormais un nouveau bloc "Corruption" (plateauMaison.corruptionMaison,
-   * champ numérique modifiable) juste à gauche d'"Influence" — écran
-   * Plat. maison, section renommée "Corruption et Influence"
-   * (#plateau-influence-bloc). Le Cadre 1 de cet Événement (choix "Programme
-   * ou piste de Civilisation") n'a nécessité aucun changement ici : il
-   * passe déjà par la popup 'gagner_corruption' générique (voir
-   * appliquerCadreGainCorruptionEtRafraichir_ ci-dessous, inchangée).
-   * Correctif découvert en testant ce Cadre 2 dans le Browser pane : le
-   * `select.onchange` du choix d'Événement galactique (renderEvenementCycle_
-   * ci-dessous) ne rafraîchissait que `partieCourante` (ce fichier) —
-   * StrategieService.afficher n'était JAMAIS rappelé, laissant son propre
-   * `partieAffichee` périmé (ancien Événement) tant qu'aucune autre action
-   * Focus/Plat. maison n'intervenait entre-temps (Piège n°2, CLAUDE.md).
-   * Sans conséquence visible jusqu'ici (rien sur Plat. maison ne dépendait
-   * de l'Événement en cours) — mais evenementConserveCorruptionActif_
-   * (strategieService.js v31) en dépend désormais directement : un appel à
-   * StrategieService.afficher(partieMaj) est ajouté après chaque
-   * changement d'Événement réussi.
-   *
-   * 17/08/2026 (Lot J — corrections mineures, écran Combat) : voir
-   * commentaire de App.afficherEcran ci-dessous — les vaisseaux
-   * disponibles de l'écran Combat se rafraîchissent désormais dès le clic
-   * sur l'onglet Combat, plus seulement au bascule Envahir/Escarmouche.
-   *
-   * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
-   * retour arrière sur le Lot G — la section dédiée "Technologies
-   * avancées" ajoutée sur Plat. maison (#technologies-avancees-ameliorees-liste,
-   * renderTechnologiesAvanceesAmeliorees_) est supprimée (décision
-   * utilisateur : mauvaise approche). À la place : la case "Améliorée"
-   * déjà existante dans "Technologies obtenues" (Plat. maison, 5 ddl,
-   * renderTechnologiesObtenues_) n'est désormais cochable que si la
-   * technologie choisie dans sa ddl fait partie du groupe actif du cycle
-   * en cours (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif
-   * — déjà calculé côté gameService.js, aucun changement nécessaire) ;
-   * verrouillée si aucune technologie choisie (inchangé) ou si la
-   * technologie choisie n'est pas améliorable ce cycle (nouveau). Plat.
-   * Galactique inchangé par rapport au Lot G (Technologies avancées
-   * toujours en lecture seule là-bas).
-   *
-   * 17/08/2026 (Lot H — corrections mineures, tableau Secteurs) : dans le
-   * tableau de l'écran Secteurs uniquement (ligneSecteurHTML_) — Guildes
-   * réduites aux 3 premières lettres + point (LABEL_GUILDE : Fer./Ing./
-   * Min./Ban./Sci.), "Chantier"/"Défense" abrégés en "Ch."/"Def."
-   * (LABEL_INSTALLATION : "Ch. Naval"/"Def. Secteur" — TYPES_INSTALLATION,
-   * qui alimente le <select> du formulaire Construire, reste avec les
-   * noms complets, hors périmètre de la demande "tableau secteur").
-   * "Corvette (Néant)" -> "Cube néant" dans la colonne Flotte.
-   *
-   * 17/08/2026 (Lot G — corrections mineures, suite) [SUPERSEDÉ PAR LE LOT
-   * I CI-DESSUS] : case "Améliorée"
-   * retirée des Technologies avancées sur Plat. Galactique (redevient
-   * lecture seule) — déplacée sur Plat. maison (nouveau bloc
-   * #technologies-avancees-ameliorees-liste, renderTechnologiesAvanceesAmeliorees_,
-   * appelée depuis renderEcranPlateauMaison_), qui liste en permanence
-   * les 8 technologies et verrouille les cases hors du groupe actif du
-   * cycle en cours (tout verrouillé au cycle 1 et à l'état 'termine', le
-   * groupe A déverrouillé au cycle 2, le groupe B au cycle 3 — même
-   * GameService.obtenirTechnologiesAvanceesGroupes que source de vérité
-   * du groupe actif, inchangée).
-   *
-   * 17/08/2026 (Lot F — corrections mineures) :
-   * - Correctif : "Fin du cycle" ne fonctionnait plus (ReferenceError
-   *   silencieuse, voir listener #btn-fin-cycle plus bas) — App expose
-   *   désormais renderPlateauGalactique/renderPlateauMaison/renderSecteurs.
-   * - #btn-fin-cycle se relabellise "Terminer la partie" au cycle 3/
-   *   'termine' (renderEcranPlateauGalactique_) ; #btn-terminer-partie
-   *   reste caché en permanence (voir index.html), toujours déclenché par
-   *   programme.
-   * - Technologies avancées (renderTechnologiesAvancees_) : nom de la
-   *   maison retiré (options + texte fixe), phrase d'explication du cycle
-   *   1 retirée.
-   * - Technologies obtenues (renderTechnologiesObtenues_) : 6 -> 5
-   *   emplacements (voir gameService.js v10 pour le tableau par défaut/
-   *   les bornes de slot assorties).
-   * - Titres "Focus héroïques" et "Événement galactique" : suffixes "—
-   *   cycle en cours"/"— cycle N" retirés (#evenement-cycle-numero
-   *   supprimé du DOM et de renderEvenementCycle_).
-   * - Secteurs : en-tête de colonne "Gardiens" -> "Gard.".
-   *
-   * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) :
-   * aucune fonction JS de ce script inline modifiée — voir commentaire
-   * HTML de screen-focus ci-dessus pour le détail (réorganisation DOM +
-   * nouveau conteneur #focus-rappel-ressources, rendu entièrement par
-   * js/strategieService.js v12).
-   *
-   * 17/08/2026 (Lot D — Ressources/Civilisation vers Plat. maison) :
-   * restructuration purement DOM, aucune fonction JS de ce script inline
-   * modifiée (afficherEcran reste générique par data-nav, App.ouvrirPartie
-   * appelle toujours StrategieService.afficher(partie) une seule fois,
-   * quel que soit l'écran visible — voir commentaires HTML des sections
-   * screen-plateau-maison / screen-focus ci-dessus pour le détail du
-   * déplacement). Seuls ids renommés : nav-strategie -> nav-focus,
-   * data-nav strategie -> focus, screen-strategie -> screen-focus
-   * (aucune référence ailleurs dans ce fichier ni dans les autres fichiers
-   * du projet, vérifié par recherche globale).
-   *
-   * 17/08/2026 (Lot C — restructuration Partie) : dernier des 3 lots
-   * annoncés — l'écran "Partie" (nav) devient "Plat. Galactique" (id
-   * screen-plateau-galactique, ex screen-game). Contenu : titre "Cycle X"
-   * (#plateau-galactique-cycle), Événement galactique (inchangé, déplacé),
-   * nouvelle section "Technologies avancées" (#technologies-avancees-liste
-   * — voir renderTechnologiesAvancees_ plus bas et gameService.js v9),
-   * Focus héroïques (#plateau-galactique-focus-heroiques, déplacés depuis
-   * l'écran Stratégie — voir strategieService.js v10, seule fonction
-   * modifiée là-bas est le conteneur ciblé), Fin de cycle/entretien/
-   * Terminer la partie/Retour à l'accueil (inchangés, déplacés).
-   * renderEcranGame_ renommée renderEcranPlateauGalactique_ ; carte-joueur
-   * (nom + Difficulté) déménage vers l'écran Mise en place (elle n'avait
-   * plus d'écran d'accueil — hors périmètre signalé, voir en-tête de
-   * screen-mise-en-place). afficherEcran('game') -> afficherEcran(
-   * 'plateau-galactique') à l'ouverture d'une partie (seul changement de
-   * comportement : l'écran de départ reste visuellement le même contenu,
-   * seul son nom/emplacement dans la nav change).
-   *
-   * 17/08/2026 (Lot A/B — restructuration Partie) : l'écran unique
-   * "Partie" éclate en 3 écrans distincts dans la nav — "Mise en place"
-   * (maisons déchues + technologies, ex bloc #liste-adversaires),
-   * "Partie" (allégé : carte-joueur nom/Difficulté, cycle, Événement
-   * galactique, Fin de cycle/entretien — inchangé sinon) et
-   * "Plat. maison" (Technologie de départ en texte fixe + case Améliorée,
-   * Technologies obtenues, Influence). renderEcranGame_ éclatée en 3
-   * fonctions (renderEcranGame_/renderEcranMiseEnPlace_/
-   * renderEcranPlateauMaison_, voir plus bas) — aucune logique de calcul
-   * ni appel GameService modifié, uniquement la répartition du DOM entre
-   * écrans. Voir aussi css/style.css (.champ-technologie-fixe, nouvelle
-   * classe, réutilisée telle quelle par Technologies avancées au Lot C).
-   *
-   * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du 17/08) :
-   * portage direct de carteMaisonHTML (app-2.html GAS) sur l'écran Partie —
-   * carte joueur : ligne "Difficulté" ajoutée (joueur.complexite, absente
-   * depuis toujours côté PWA), nom en <h3> (au lieu d'un div stylé inline,
-   * pour hériter de .card h3 — voir css/style.css). Cartes maisons déchues :
-   * technologies affichées en badges (.badge/.badge-sans-point, tooltip =
-   * texte de règle), remplace l'affichage réduit au seul nom qui masquait
-   * l'info la plus utile de cet écran (quelles technologies ne rapportent
-   * pas d'Influence). #liste-adversaires perd son style inline flex-column
-   * au profit de .card-list (grille auto-fill, voir css/style.css) —
-   * portage du comportement responsive du legacy. Dépend de
-   * js/gameService.js (v8, champ "texte" ajouté aux technologies).
-   *
-   * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-   * écran Partie — bouton "Fin du cycle" (GameService.avancerCycle +
-   * purge de la pile d'annulation), bloc Entretien dû (informatif,
-   * SecteurService.getEntretien), 6 sélecteurs Technologies obtenues
-   * (GameService.choisirTechnologieObtenue). Écran Secteurs — colonne
-   * Action "Retirer" la corruption + formulaires Construire/Rappeler un
-   * cube. Envahir/Regrouper/Déployer des cubes restent hors périmètre de
-   * cette session (engagement multi-unités, formulaire plus complexe).
-   * Voir aussi js/strategieService.js (Focus héroïques sélectionnables).
-   *
-   * 17/08/2026 (Session 12 — restauration IHM Partie) : case "Technologie
-   * de départ améliorée" (checkbox, branchée sur
-   * GameService.definirTechnologieAmelioree) + bloc sélection de
-   * l'Événement galactique du cycle en cours (select, branché sur
-   * GameService.getEvenementsParCycle/choisirEvenement) ajoutés à l'écran
-   * Partie — portage direct de app-2.html (GAS), aucune des deux
-   * fonctions n'étant une RPC Postgres (contrairement au reste de l'écran
-   * Partie, toujours hors périmètre — voir gameService.js). Voir aussi
-   * css/style.css (.check-amelioree).
-   *
-   * 17/08/2026 (Session 11 — restauration IHM Secteurs) :
-   * renderEcranSecteurs_ restauré à l'identique de secteurs.html (GAS) —
-   * colonnes N°/Pop./Guildes/Installations/Flotte/Gardiens (portage direct
-   * de ligneHTML_/listeNonNulle_), ligne colorée si Corrompu, Néant inclus
-   * dans la colonne Flotte. Colonne "Type" (Secteur-Mère/Déchue/Avant-
-   * poste) et total PN agrégé (introduits au portage initial, absents du
-   * legacy) supprimés — SecteurService.obtenirSecteurMere n'est donc plus
-   * appelé ici (reste disponible dans l'API publique de secteurService.js,
-   * aucun autre appelant). Voir aussi css/style.css (nav scrollable).
-   *
-   * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : Influence
-   * déménagée de l'écran Stratégie vers l'écran Partie (bloc
-   * .plateau-influence, losange argenté — comportement legacy app.html),
-   * conteneurs #ressources-gloire / #ressources-cubes ajoutés à l'écran
-   * Stratégie (rendu par js/strategieService.js). Voir aussi css/style.css
-   * et js/strategieService.js (mêmes changements).
-   *
-   * 17/08/2026 (Session 4, Phase 4 suite — rebranchement DOM) :
-   * - screen-partie-creee renommé/étendu en screen-game, devenu l'écran
-   *   PERSISTANT "Partie" (accessible depuis la nav tant qu'une partie
-   *   est ouverte), plutôt qu'un écran de confirmation ponctuel. Secteurs
-   *   et Focus en sont retirés (déplacés dans leurs propres écrans
-   *   screen-secteurs / screen-strategie). Bouton "Retour à l'accueil"
-   *   déplacé ici (remplace btn-retour-accueil-creation, qui n'existe
-   *   plus — seul changement de comportement pour setupService.js, qui
-   *   n'y fait lui-même aucune référence).
-   * - App gagne une notion de "partie courante" (partieCourante,
-   *   App.getPartieCourante/App.ouvrirPartie/App.rafraichirPartieCourante)
-   *   — nécessaire pour que l'écran Stratégie (js/strategieService.js)
-   *   sache sur quelle partie agir, et pour rafraîchir l'affichage après
-   *   une action Focus jouée ou annulée (état modifié en base par
-   *   FocusEngine/AnnulationService, partieCourante devenu obsolète).
-   * - App.afficherPartieCreee (nom conservé pour ne pas toucher
-   *   setupService.js) délègue désormais à App.ouvrirPartie.
-   * - Ajout d'un bouton "Continuer" sur les cartes de la liste "Parties
-   *   enregistrées" (accueil), pour rouvrir une partie existante.
-   * - Nav Partie/Stratégie/Secteurs (barre-navigation-partie), affichée
-   *   dès qu'une partie est ouverte, masquée au retour à l'accueil.
-   *
-   * 17/08/2026 (Phase 4, partielle) : App.afficherPartieCreee affichait
-   * déjà les Focus de mise en place — logique reprise dans
-   * js/strategieService.js (désormais jouable).
-   * 17/08/2026 (Phase 3) : App.afficherPartieCreee affichait déjà le
-   * plateau des secteurs — logique reprise ci-dessous pour screen-secteurs.
+   * index.html (script inline) : orchestration des écrans et de la
+   * navigation (App), modale de choix générique, et rendu DOM des écrans
+   * Plat. Galactique / Mise en place / Plat. maison / Secteurs /
+   * Historique. La logique de jeu pure vit dans js/*Service.js (voir
+   * CLAUDE.md, table des fichiers).
    */
   var App = (function () {
     var partieCourante = null;
 
     /**
-     * 17/08/2026 (Lot J — corrections mineures, écran Combat) : l'écran
-     * Combat n'était rafraîchi (vaisseaux disponibles, via
-     * CombatService.vaisseauxDebloques) qu'au bascule Envahir/Escarmouche
-     * (CombatVueService.setMode_ -> render_) — jamais au simple clic sur
-     * l'onglet Combat depuis un autre écran, laissant afficher une liste
-     * de vaisseaux périmée si elle avait changé entretemps (technologie/
-     * déploiement). App.getPartieCourante() est déjà tenu à jour en
-     * mémoire par ailleurs (toute action qui la modifie appelle
-     * rafraichirPartieCourante) — CombatVueService.afficher() n'avait
-     * simplement jamais l'occasion d'être rappelée. Corrigé ici : rappel
-     * de CombatVueService.afficher() (état 'combat', partie déjà ouverte)
-     * à chaque clic sur l'onglet Combat.
-     *
-     * 19/08/2026 (Piège n°2, retour utilisateur — "une bonne fois pour
-     * toute, rafraichir toute les données secteurs lorsqu'on clique sur
-     * l'onglet secteurs") : même traitement pour l'onglet Secteurs que
-     * pour Combat ci-dessus — au lieu de compter sur CHAQUE action qui
-     * mute secteursPartie pour explicitement rappeler App.renderSecteurs
-     * (nombreux oublis constatés : Construire/Établir, Événement D Cadre
-     * 1, et avant ça regrouper/envahir/deployer_cube), rappel systématique
-     * de renderEcranSecteurs_ à chaque clic sur l'onglet Secteurs lui-même
-     * — filet de sécurité générique qui rend la classe de bug impossible
-     * pour ce chemin (navigation vers l'onglet), quelle que soit l'action
-     * qui a modifié les secteurs entretemps. Les rappels explicites déjà
-     * en place après chaque action (jouerAction_, appliquerCadre*EtRafraichir_)
-     * restent utiles pour l'écran Secteurs s'il est DÉJÀ affiché au moment
-     * de l'action (pas de clic d'onglet dans ce cas) — donc conservés,
-     * l'un ne remplace pas l'autre.
+     * Bascule l'écran visible par data-nav. Rafraîchit en plus, au clic
+     * sur l'onglet correspondant, l'écran Combat (CombatVueService.afficher,
+     * vaisseaux disponibles) et l'écran Secteurs (renderEcranSecteurs_) —
+     * filet de sécurité générique pour ces deux écrans, dont l'état peut
+     * changer sans passer par un rappel explicite de rendu (voir Piège n°2,
+     * CLAUDE.md). Les rappels explicites déjà en place après chaque action
+     * (jouerAction_, appliquerCadre*EtRafraichir_) restent nécessaires pour
+     * les autres écrans, et pour Secteurs quand il est déjà affiché au
+     * moment de l'action.
      */
     function afficherEcran(nom) {
       document.querySelectorAll('.screen').forEach(function (ecran) {
@@ -834,22 +488,24 @@
     }
 
     /**
-     * 17/08/2026 (Lot C — restructuration Partie) : renommée depuis
-     * renderEcranGame_ (l'écran "Partie" devient "Plat. Galactique") —
-     * carte-joueur (nom + Difficulté) retirée d'ici, déplacée dans
-     * renderEcranMiseEnPlace_ ci-dessous (elle n'avait plus d'écran
-     * d'accueil, voir en-tête de screen-mise-en-place). Ajout du titre
-     * "Cycle X" (#plateau-galactique-cycle, remplace l'ancien paragraphe
-     * "Cycle actuel : #game-cycle-actuel") et de
-     * renderTechnologiesAvancees_ (nouvelle mécanique, voir plus bas).
-     *
-     * 17/08/2026 (Lot F) : bascule le libellé de #btn-fin-cycle vers
-     * "Terminer la partie" au cycle 3 (et à l'état "termine") — le bouton
-     * #btn-terminer-partie séparé reste caché en permanence (voir
-     * index.html), ce libellé le remplace visuellement. Le clic garde le
-     * même comportement (voir listener plus bas) : avancerCycle, puis
-     * déclenchement programmatique de #btn-terminer-partie une fois l'état
-     * "termine" atteint.
+     * Texte de tooltip pour une technologie (case "Améliorée", Plat.
+     * maison) — texteAmeliore si la case est cochée ET que le catalogue en
+     * fournit un, sinon le texte de base. `infosTech` peut être `null`
+     * (technologie non trouvée dans le catalogue local, ex. partie créée
+     * avant l'ajout de ce champ).
+     */
+    function titreTechnologie_(infosTech, amelioree) {
+      if (!infosTech) return '';
+      return (amelioree && infosTech.texteAmeliore) ? infosTech.texteAmeliore : (infosTech.texte || '');
+    }
+
+    /**
+     * #btn-fin-cycle affiche "Terminer la partie" au cycle 3 (et à l'état
+     * "termine") — #btn-terminer-partie reste caché en permanence, ce
+     * libellé le remplace visuellement. Le clic garde le même comportement
+     * (voir listener plus bas) : avancerCycle, puis déclenchement
+     * programmatique de #btn-terminer-partie une fois l'état "termine"
+     * atteint.
      */
     function renderEcranPlateauGalactique_(partie) {
       champTexte_('plateau-galactique-cycle', String(partie.cycleActuel));
@@ -864,27 +520,13 @@
     }
 
     /**
-     * 17/08/2026 (Lot A — restructuration Partie) : écran "Mise en place" —
-     * portage direct du bloc #liste-adversaires qui vivait dans
-     * renderEcranGame_ jusqu'ici (même logique, mêmes classes/badges),
-     * simplement extrait dans sa propre fonction. Voir en-tête de
-     * screen-mise-en-place (index.html) : rendu une seule fois depuis
-     * App.ouvrirPartie, jamais rafraîchi après coup (contenu figé à la
-     * création de partie).
-     *
-     * 17/08/2026 (Lot C — restructuration Partie) : carte-joueur (nom +
-     * Difficulté) rejoint ici — venait de renderEcranGame_/
-     * renderEcranPlateauGalactique_, retirée de cet écran maintenant que
-     * "Partie" devient "Plat. Galactique" (voir en-tête de
-     * screen-mise-en-place, hors périmètre signalé).
-     *
-     * 17/08/2026 (Lot 1 — maisons déchues, suite à l'audit UI/UX du
-     * 17/08) : portage direct de carteMaisonHTML (app-2.html GAS, appel
-     * sans options -> technologies affichées, ni Difficulté ni
-     * Technologie de départ pour les maisons déchues). Remplace
-     * l'affichage réduit au seul nom, qui masquait l'information de jeu
-     * la plus utile de cet écran : quelles technologies ne rapportent
-     * pas d'Influence (badge-sans-point).
+     * Écran "Mise en place" : rendu une seule fois depuis App.ouvrirPartie,
+     * jamais rafraîchi après coup (contenu figé à la création de partie —
+     * voir en-tête de screen-mise-en-place, index.html). Les technologies
+     * des maisons déchues sont affichées en badges (badge-sans-point pour
+     * celles qui ne rapportent pas d'Influence) plutôt qu'en simple liste
+     * de noms, pour garder visible l'information la plus utile de cet
+     * écran.
      */
     function renderEcranMiseEnPlace_(partie) {
       var joueur = partie.joueur || {};
@@ -902,32 +544,18 @@
     }
 
     /**
-     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) :
-     * nouvelle mécanique, aucun équivalent legacy — voir gameService.js
-     * v9 (choisirTechnologieAvancee/definirTechnologieAvanceeAmelioree/
-     * obtenirTechnologiesAvanceesGroupes, seule source de vérité pour le
-     * calcul du groupe actif : cette fonction ne fait qu'afficher ce que
-     * GameService.obtenirTechnologiesAvanceesGroupes lui retourne).
-     * Cycle 1 : 4 <select>, choix parmi les 8 technologies des maisons
+     * Affiche ce que GameService.obtenirTechnologiesAvanceesGroupes
+     * retourne (seule source de vérité pour le calcul du groupe actif) :
+     * cycle 1, 4 <select>, choix parmi les 8 technologies des maisons
      * déchues (un même nom ne peut occuper 2 emplacements — filtré côté
-     * options, revalidé côté GameService). Cycle 2 : les 4 choisies,
-     * texte fixe. Cycle 3 : les 4 AUTRES (complément, jamais choisi
-     * manuellement), texte fixe.
-     *
-     * 17/08/2026 (Lot G — corrections mineures, suite) : case "Améliorée"
-     * retirée d'ici (décision utilisateur) — cet écran ne fait plus que
-     * lister les noms (choix au cycle 1, lecture seule aux cycles 2/3).
-     *
-     * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
-     * la case "Améliorée" ne revient PAS ici et ne va PAS non plus dans
-     * une section dédiée sur Plat. maison (retour arrière sur le Lot G,
-     * voir commentaire ci-dessus dans le HTML de screen-plateau-galactique).
-     * Elle vit sur la case "Améliorée" déjà existante de la section
-     * "Technologies obtenues" (Plat. maison, 5 ddl) — voir
-     * renderTechnologiesObtenues_ plus bas, qui relit
-     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (même
-     * source de vérité que cette fonction) pour savoir si la technologie
-     * choisie dans chaque ddl est actuellement améliorable.
+     * options, revalidé côté GameService) ; cycle 2, les 4 choisies, texte
+     * fixe ; cycle 3, les 4 AUTRES (complément, jamais choisi manuellement),
+     * texte fixe. Pas de case "Améliorée" ici (lecture seule) : elle vit
+     * sur la case "Améliorée" de la section "Technologies obtenues" (Plat.
+     * maison, 5 ddl) — voir renderTechnologiesObtenues_ plus bas, qui
+     * relit GameService.obtenirTechnologiesAvanceesGroupes(partie).actif
+     * (même source de vérité que cette fonction) pour savoir si la
+     * technologie choisie dans chaque ddl est actuellement améliorable.
      */
     function renderTechnologiesAvancees_(partie) {
       var container = document.getElementById('technologies-avancees-liste');
@@ -985,44 +613,38 @@
     }
 
     /**
-     * 17/08/2026 (Lot B — restructuration Partie) : écran "Plat. maison" —
-     * portage direct des blocs Technologie de départ (+ case Améliorée)
-     * et Influence qui vivaient dans le innerHTML de #carte-joueur
-     * (renderEcranGame_) jusqu'ici, aucun changement de logique/
-     * persistance (même appel GameService.definirTechnologieAmelioree).
-     * Seule différence : #check-amelioree-depart est désormais un élément
-     * STATIQUE du DOM (index.html), plus régénéré à chaque rendu comme
-     * avant (il vivait dans un innerHTML recalculé) — d'où le passage de
-     * addEventListener à .onchange (idempotent d'un appel à l'autre,
-     * jamais de listener dupliqué), même pattern que
-     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
-     *
-     * 17/08/2026 (Lot K — corrections mineures, technologies avancées) :
-     * la case #check-amelioree-depart n'appliquait pas le même verrou que
-     * les 5 cases de "Technologies obtenues" (Lot I) — elle ne se
-     * désactivait que si aucune technologie de départ n'était choisie,
-     * sans vérifier qu'elle est bien référencée sur Plat. Galactique (dans
-     * le groupe actif du cycle en cours, GameService.obtenir
-     * TechnologiesAvanceesGroupes(partie).actif). Corrigé : même règle,
-     * même source de vérité que renderTechnologiesObtenues_ ci-dessous.
+     * Écran "Plat. maison" : Technologie de départ (+ case Améliorée) et
+     * Influence. #check-amelioree-depart est un élément STATIQUE du DOM
+     * (index.html), pas régénéré à chaque rendu — d'où l'usage de
+     * .onchange plutôt que addEventListener (idempotent d'un appel à
+     * l'autre, jamais de listener dupliqué), même pattern que
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas. Elle
+     * n'est déverrouillée que si la technologie de départ est référencée
+     * sur Plat. Galactique, dans le groupe actif du cycle en cours
+     * (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
+     * même règle, même source de vérité que renderTechnologiesObtenues_
+     * ci-dessous.
      */
     function renderEcranPlateauMaison_(partie) {
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
+      var infosTechDepart = (joueur.technologies || []).filter(function (t) { return t.nom === techDepart.nom; })[0] || null;
       var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
       var corruptionMaison = (partie.plateauMaison || {}).corruptionMaison || 0;
 
-      champTexte_('technologie-depart-plateau-maison', techDepart.nom ?
-        techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—');
+      var elTechDepart = document.getElementById('technologie-depart-plateau-maison');
+      if (elTechDepart) {
+        elTechDepart.textContent = techDepart.nom ?
+          techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—';
+        elTechDepart.title = titreTechnologie_(infosTechDepart, techDepart.amelioree);
+      }
 
-      // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
-      // mal", voir gameService.js/civilisationService.js) : nouveau bloc
-      // "Corruption" (plateauMaison.corruptionMaison) à gauche d'Influence
-      // — champ numérique modifiable (mis à jour automatiquement par
-      // CivilisationService.definirCorruption pour les pistes de
-      // Civilisation ; à ajuster manuellement ici pour les Programmes/
-      // Chambres de décontamination). Régénéré à chaque rendu comme le
-      // reste de cet écran — voir Piège n°2, CLAUDE.md.
+      // Bloc "Corruption" (plateauMaison.corruptionMaison) à gauche
+      // d'Influence — champ numérique modifiable (mis à jour
+      // automatiquement par CivilisationService.definirCorruption pour les
+      // pistes de Civilisation ; à ajuster manuellement ici pour les
+      // Programmes/Chambres de décontamination). Régénéré à chaque rendu
+      // comme le reste de cet écran — voir Piège n°2, CLAUDE.md.
       document.getElementById('plateau-influence-bloc').innerHTML =
         '<div class="plateau-influence-ligne">' +
         '<div class="plateau-influence"><label><span class="losange-corail"></span> Corruption</label>' +
@@ -1057,6 +679,7 @@
             .then(function (partieMaj) {
               partieCourante = partieMaj;
               checkboxDepart.disabled = false;
+              if (elTechDepart) elTechDepart.title = titreTechnologie_(infosTechDepart, etatDemande);
             })
             .catch(function (erreur) {
               checkboxDepart.checked = !etatDemande;
@@ -1070,36 +693,23 @@
     }
 
     /**
-     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-     * 6 emplacements de technologies obtenues (parmi les 8 des maisons
-     * déchues), chacun avec sa case "Améliorée" — portage direct de
-     * initTechnologiesObtenues (app-2.html GAS). Un même nom de
+     * 5 emplacements de technologies obtenues (parmi les 8 des maisons
+     * déchues), chacun avec sa case "Améliorée". Un même nom de
      * technologie ne peut apparaître qu'à un seul emplacement à la fois
-     * (retiré des options des 5 autres selects dès qu'il est choisi
-     * quelque part).
+     * (retiré des options des 4 autres selects dès qu'il est choisi
+     * quelque part). Avec la Technologie de départ (fixe,
+     * #bloc-technologie-depart), cela fait 6 technologies maximum au
+     * total.
      *
-     * 17/08/2026 (Lot F — corrections mineures) : 6 emplacements -> 5 —
-     * avec la Technologie de départ (fixe, #bloc-technologie-depart),
-     * cela fait 6 technologies maximum au total. Si une partie déjà en
-     * cours avait une technologie choisie au 6e emplacement (index 5, non
-     * standard vu le nombre de maisons déchues), elle n'est plus affichée
-     * ici (donnée conservée en base, simplement plus éditable depuis cet
-     * écran) — hors périmètre signalé, aucun cas connu en pratique.
-     *
-     * 17/08/2026 (Lot I — corrections mineures, technologies avancées) :
-     * case "Améliorée" désormais verrouillée/déverrouillée selon
+     * La case "Améliorée" est verrouillée/déverrouillée selon
      * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (liste
      * de noms — les 4 technologies choisies au cycle 1 pendant le cycle 2,
      * les 4 autres pendant le cycle 3, aucune au cycle 1 ni à l'état
      * 'termine' — même source de vérité que Plat. Galactique,
-     * renderTechnologiesAvancees_ ci-dessus, aucun changement côté
-     * gameService.js). Retour arrière sur le Lot G, qui avait ajouté une
-     * section dédiée sur cet écran — décision utilisateur : pas de section
-     * séparée, seule la case déjà existante ici doit refléter
-     * l'améliorabilité de la technologie choisie dans sa ddl. Verrouillée
-     * dans tous les cas si aucune technologie n'est choisie dans la ddl
-     * (inchangé) OU si la technologie choisie n'est pas dans le groupe
-     * actif du cycle en cours (nouveau).
+     * renderTechnologiesAvancees_ ci-dessus). Verrouillée dans tous les
+     * cas si aucune technologie n'est choisie dans la ddl, ou si la
+     * technologie choisie n'est pas dans le groupe actif du cycle en
+     * cours.
      */
     function renderTechnologiesObtenues_(partie) {
       var container = document.getElementById('technologies-obtenues-liste');
@@ -1111,6 +721,8 @@
       });
       var obtenues = (partie.technologiesObtenues || [null, null, null, null, null]).slice(0, 5);
       var nomsAmeliorables = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
+      var infosTechParNom = {};
+      toutesLesTechs.forEach(function (t) { infosTechParNom[t.nom] = t; });
 
       container.innerHTML = obtenues.map(function (tech, slot) {
         var nomsPrisAilleurs = obtenues
@@ -1122,9 +734,10 @@
             (t.maison ? ' (' + t.maison + ')' : '') + '</option>';
         }).join('');
         var verrouillee = !tech || nomsAmeliorables.indexOf(tech.nom) === -1;
+        var titreAmelioree = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, tech.amelioree).replace(/"/g, '&quot;') : '';
         return '<div class="techno-obtenue-ligne">' +
           '<select class="select-technologie-obtenue" data-slot="' + slot + '">' + options + '</select>' +
-          '<label class="check-amelioree"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
+          '<label class="check-amelioree" title="' + titreAmelioree + '"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
           (tech && tech.amelioree ? ' checked' : '') + (verrouillee ? ' disabled' : '') + '> Améliorée</label>' +
           '</div>';
       }).join('');
@@ -1154,6 +767,8 @@
             .then(function (partieMaj) {
               partieCourante = partieMaj;
               cb.disabled = false;
+              var tech = obtenues[slot];
+              if (cb.parentElement) cb.parentElement.title = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, etatDemande) : '';
             })
             .catch(function (erreur) {
               cb.checked = !etatDemande;
@@ -1165,10 +780,8 @@
     }
 
     /**
-     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-     * entretien dû (dernier emplacement Installation/Guilde occupé sur le
-     * plateau des secteurs) — portage direct de chargerEntretien_
-     * (app-2.html GAS), purement informatif : rien n'est déduit
+     * Entretien dû (dernier emplacement Installation/Guilde occupé sur le
+     * plateau des secteurs) — purement informatif : rien n'est déduit
      * automatiquement des ressources.
      */
     function chargerEntretien_(partie) {
@@ -1188,61 +801,42 @@
     // gameService.js fixe la liste des 5 clés possibles ; LABEL_RESOLUTION_
     // CADRE_ couvre les valeurs de `resolution` du catalogue (voir
     // data/catalogue/evenements.json et docs-rules-cycle-de-jeu.md §1.5.3).
-    var LABEL_RESSOURCE_CADRE_ = {
-      nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel', credit: 'Crédit', science: 'Science'
-    };
-
-    // 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : couleurs des
-    // 5 ressources (mêmes valeurs que CHAMP_RESSOURCE/RESSOURCES_TOUTES de
-    // strategieService.js — Plat. maison — dupliquées ici par convention,
-    // même principe que TYPES_INSTALLATION_CONSTRUIRE_/TYPES_GUILDE_
-    // CONSTRUIRE_ un peu plus haut dans strategieService.js) — utilisées
-    // uniquement par libelleRessourceAbregeeHTML_/libelleDeltaCadreAbrege_
-    // ci-dessous, pour le texte "✓ Appliqué (...)" (jamais pour le libellé
-    // des boutons, qui garde le nom complet — voir libelleActionCadre_/
-    // libelleDeltaCadre_, inchangées).
-    var COULEUR_RESSOURCE_CADRE_ = {
-      nourriture: '#49b867', energie: '#f8a21b', materiel: '#ec0d69', credit: '#d1a671', science: '#06afe5'
-    };
-    // 18/08/2026 (retour utilisateur) : "Par joueur" et "Une fois" retirés
-    // (bruit visuel — la plupart des cadres sont "par_joueur" ou "unique",
-    // le badge n'apportait pas d'information utile). Les 3 résolutions
-    // restantes (permanent/collectif/retardement, moins fréquentes et
-    // significatives pour savoir QUAND résoudre le cadre) gardent leur
-    // badge.
+    // "Par joueur" et "Une fois" n'ont volontairement pas de badge (bruit
+    // visuel — la plupart des cadres sont "par_joueur" ou "unique") ; les
+    // 3 résolutions restantes (permanent/collectif/retardement, moins
+    // fréquentes et significatives pour savoir QUAND résoudre le cadre)
+    // gardent le leur.
     var LABEL_RESOLUTION_CADRE_ = {
       permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
     };
 
-    // 18/08/2026 (Simplification UI Événement galactique) : LABEL_ELEMENT_
-    // PLACEMENT_/libelleElementsPlacementCadre_ et COULEUR_SCIENCE_CADRE_
-    // (pastille de coût du bouton "Gagner une technologie") devenus
-    // orphelins suite au retrait des libellés détaillés du titre de
-    // popup/texte "Appliqué" (points 3-5) et du bouton dédié sur la carte
-    // (point 6) — supprimés (hors périmètre demandé mais signalé : code
-    // mort direct de ce même lot, aucune autre référence dans le fichier).
+    // Libellé d'une des 5 ressources simples de Cadre, lu depuis
+    // StrategieService.CHAMP_RESSOURCE (repli sur la clé brute si absente)
+    // — source de vérité unique, partagée avec Plat. maison.
+    function libelleRessourceCadre_(cle) {
+      var infosRessource = StrategieService.CHAMP_RESSOURCE[cle];
+      return infosRessource ? infosRessource.label : cle;
+    }
 
     function libelleDeltaCadre_(delta) {
       return Object.keys(delta || {}).map(function (cle) {
         var valeur = delta[cle];
-        return (valeur > 0 ? '+' : '') + valeur + ' ' + (LABEL_RESSOURCE_CADRE_[cle] || cle);
+        return (valeur > 0 ? '+' : '') + valeur + ' ' + libelleRessourceCadre_(cle);
       }).join(', ');
     }
 
     /**
-     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) :
-     * libelleDeltaCadre_/LABEL_RESSOURCE_CADRE_ ci-dessus restent
-     * INCHANGÉS (encore utilisés tels quels par libelleActionCadre_ pour
-     * le libellé des BOUTONS, ex. "Gagner 3 Crédits" — hors périmètre de
-     * cette évolution, qui ne concerne que le texte affiché une fois le
-     * cadre "✓ Appliqué (...)"). libelleRessourceAbregeeHTML_/
-     * libelleDeltaCadreAbrege_ sont une variante dédiée à ce seul texte de
-     * résultat : nom de ressource abrégé à 3 lettres + "." (ex. "Crédit"
-     * -> "Cré.") coloré comme sur Plat. maison (COULEUR_RESSOURCE_CADRE_).
+     * libelleDeltaCadre_ ci-dessus reste utilisé tel quel par
+     * libelleActionCadre_ pour le libellé des BOUTONS (ex. "Gagner 3
+     * Crédits"). libelleRessourceAbregeeHTML_/libelleDeltaCadreAbrege_ sont
+     * une variante dédiée au texte de résultat "✓ Appliqué (...)" : nom de
+     * ressource abrégé à 3 lettres + "." (ex. "Crédit" -> "Cré.") coloré
+     * comme sur Plat. maison (StrategieService.CHAMP_RESSOURCE).
      */
     function libelleRessourceAbregeeHTML_(cle) {
-      var nom = LABEL_RESSOURCE_CADRE_[cle] || cle;
-      var couleur = COULEUR_RESSOURCE_CADRE_[cle];
+      var infosRessource = StrategieService.CHAMP_RESSOURCE[cle];
+      var nom = infosRessource ? infosRessource.label : cle;
+      var couleur = infosRessource ? infosRessource.couleur : null;
       var abrege = nom.slice(0, 3) + '.';
       return couleur ? '<span style="color:' + couleur + '">' + abrege + '</span>' : abrege;
     }
@@ -1254,40 +848,43 @@
       }).join(', ');
     }
 
-    // 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : couleur par
-    // Guilde = couleur de la ressource qu'elle produit (portage direct de
-    // GUILDE_VERS_RESSOURCE, strategieService.js — Fermiers/Nourriture,
-    // Ingénieurs/Énergie, Mineurs/Matériel, Banquiers/Crédit,
-    // Scientifiques/Science), dupliquée ici par convention (voir
-    // COULEUR_RESSOURCE_CADRE_ ci-dessus). Clés = labels EXACTS de
-    // TYPES_GUILDE_CONSTRUIRE_ (strategieService.js), tels qu'ils
-    // apparaissent dans le texte "Guilde <Label> établie sur le Secteur N"
-    // (resume de GameService.appliquerCadreChoixFocusEngine).
-    var COULEUR_PAR_GUILDE_CADRE_ = {
-      Fermiers: '#49b867', Ingénieurs: '#f8a21b', Mineurs: '#ec0d69', Banquiers: '#d1a671', Scientifiques: '#06afe5'
-    };
+    // Couleur par Guilde = couleur de la ressource qu'elle produit. Clés =
+    // labels EXACTS de StrategieService.TYPES_GUILDE_CONSTRUIRE_, tels
+    // qu'ils apparaissent dans le texte "Guilde <Label> établie sur le
+    // Secteur N" (resume de GameService.appliquerCadreChoixFocusEngine).
+    // Calculée depuis StrategieService.TYPES_GUILDE_CONSTRUIRE_/
+    // GUILDE_VERS_RESSOURCE/CHAMP_RESSOURCE plutôt que dupliquée en dur —
+    // le préfixe 'guilde' + Cle capitalisée reconstruit la clé attendue
+    // par GUILDE_VERS_RESSOURCE (ex. 'fermiers' -> 'guildeFermiers') —
+    // convention déjà en place des deux côtés, vérifiée pour les 5
+    // Guildes.
+    var COULEUR_PAR_GUILDE_CADRE_ = {};
+    StrategieService.TYPES_GUILDE_CONSTRUIRE_.forEach(function (g) {
+      var champGuilde = 'guilde' + g.cle.charAt(0).toUpperCase() + g.cle.slice(1);
+      var ressource = StrategieService.GUILDE_VERS_RESSOURCE[champGuilde];
+      var infosRessource = ressource ? StrategieService.CHAMP_RESSOURCE[ressource] : null;
+      if (infosRessource) COULEUR_PAR_GUILDE_CADRE_[g.label] = infosRessource.couleur;
+    });
 
     /**
-     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : abrège
-     * spécifiquement le texte de `cadresAppliques[ordre].resume` (voir
-     * GameService.appliquerCadreChoixFocusEngine) pour l'affichage
-     * "✓ Appliqué (...)" d'un Cadre d'Événement galactique (renderCadresEvenement_
-     * ci-dessous) — le texte SOURCE (strategieService.js contextes
-     * 'construire'/'augmenter_population_pure', focusEngine.js, gameService.js)
-     * n'est PAS modifié : il reste affiché tel quel dans le journal Focus
-     * ("Actions réalisées", #ressources-journal — StrategieService.
-     * renderJournal_), qui réutilise le même `resume`/journal FocusEngine
-     * hors du contexte Événement galactique et est hors périmètre de cette
-     * évolution. Reconnaît uniquement les 2 gabarits produits à ce jour par
-     * ce chemin (voir strategieService.js) :
+     * Abrège spécifiquement le texte de `cadresAppliques[ordre].resume`
+     * (voir GameService.appliquerCadreChoixFocusEngine) pour l'affichage
+     * "✓ Appliqué (...)" d'un Cadre d'Événement galactique
+     * (renderCadresEvenement_ ci-dessous) — le texte SOURCE
+     * (strategieService.js contextes 'construire'/'augmenter_population_pure',
+     * focusEngine.js, gameService.js) n'est PAS modifié : il reste affiché
+     * tel quel dans le journal Focus ("Actions réalisées",
+     * #ressources-journal — StrategieService.renderJournal_), qui
+     * réutilise le même `resume`/journal FocusEngine hors du contexte
+     * Événement galactique. Reconnaît uniquement les 3 gabarits produits à
+     * ce jour par ce chemin (voir strategieService.js) :
      * - "Population du Secteur N augmentée de 1" -> "+1 Pop. Sec. N"
      * - "Guilde <Label> établie sur le Secteur N" -> "+1 Guilde <Label
      *   abrégé coloré> Sec. N"
      * - "Installation <Label> construite sur le Secteur N" -> "+1
-     *   Installation <Label> Sec. N" (même principe "+1"/"Sec.", décision
-     *   assistant non explicitement demandée par TODO.md — à valider :
-     *   une Installation n'étant pas associée à une ressource, son Label
-     *   reste en toutes lettres, non coloré).
+     *   Installation <Label> Sec. N" (même principe "+1"/"Sec." ; une
+     *   Installation n'étant pas associée à une ressource, son Label reste
+     *   en toutes lettres, non coloré).
      * Tout texte de resume qui ne correspond à AUCUN de ces 3 gabarits
      * (ex. cube "+1 cube(s) activé(s)", ou un `resume` manuel du type "X
      * résolu manuellement") ressort inchangé (regex sans correspondance).
@@ -1314,16 +911,14 @@
       return texte;
     }
 
-    // 19/08/2026 (retour utilisateur) : seul le Crédit se pluralise en
-    // français dans le vocabulaire du jeu ("Gagnez 2 Crédits.", voir
-    // data/catalogue/pistesCivilisation.json) — Nourriture/Énergie/
-    // Matériel/Science restent invariables (noms de quantité, jamais
-    // pluralisés dans le catalogue).
+    // Seul le Crédit se pluralise en français dans le vocabulaire du jeu
+    // ("Gagnez 2 Crédits.", voir data/catalogue/pistesCivilisation.json) —
+    // Nourriture/Énergie/Matériel/Science restent invariables (noms de
+    // quantité, jamais pluralisés dans le catalogue).
     var LABEL_RESSOURCE_CADRE_PLURIEL_ = { credit: 'Crédits' };
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-     * Domineum") : libellés des critères de SecteurService.
+     * Libellés des critères de SecteurService.
      * resoudrePlacementMultipleNeantAdjacent (cadre.effet.placements[].critere,
      * data/catalogue/evenements.json) — titre de la popup de désambiguïsation
      * en cas d'égalité de Population, texte de la popup de confirmation.
@@ -1332,14 +927,12 @@
       population_min: 'Population la plus basse', population_max: 'Population la plus élevée'
     };
 
-    // 21/08/2026 (Événement F, Cycle 1, Cadre 1 — "Placez une Guilde et 1
-    // cube du Néant... OU placez un jeton Gloire de valeur 2 et une
-    // Défense de Secteur...") : libellés courts pour les `elements` d'une
-    // option `type: 'placement'` d'un cadre "choix" — voir
-    // libelleOptionPlacementChoix_ ci-dessous. "guilde" reste générique
-    // ici (le type précis n'est choisi qu'au moment du placement, popup
-    // 'placement_critere') ; "gloire" affiche sa valeur entre parenthèses
-    // (ex. "jeton Gloire (2)"), traité à part ci-dessous plutôt qu'ici.
+    // Libellés courts pour les `elements` d'une option `type: 'placement'`
+    // d'un cadre "choix" — voir libelleOptionPlacementChoix_ ci-dessous.
+    // "guilde" reste générique ici (le type précis n'est choisi qu'au
+    // moment du placement, popup 'placement_critere') ; "gloire" affiche sa
+    // valeur entre parenthèses (ex. "jeton Gloire (2)"), traité à part
+    // ci-dessous plutôt qu'ici.
     var LABEL_ELEMENT_PLACEMENT_CADRE_ = {
       guilde: 'Guilde', cube_neant: 'cube du Néant', defense_secteur: 'Défense de Secteur',
       chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
@@ -1347,11 +940,10 @@
     };
 
     /**
-     * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : libellé de bouton (menu
-     * "Choisir un effet") pour une option `type: 'placement'` — ex.
-     * "Guilde + cube du Néant (Population la plus basse)". Le détail
-     * (secteur choisi, type de Guilde) n'apparaît qu'après résolution,
-     * dans le statut "✓ Appliqué (...)" (GameService.
+     * Libellé de bouton (menu "Choisir un effet") pour une option
+     * `type: 'placement'` — ex. "Guilde + cube du Néant (Population la
+     * plus basse)". Le détail (secteur choisi, type de Guilde) n'apparaît
+     * qu'après résolution, dans le statut "✓ Appliqué (...)" (GameService.
      * construireResumePlacementChoix_).
      */
     function libelleOptionPlacementChoix_(option) {
@@ -1366,22 +958,18 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
-     * une Guilde OU construisez une Installation") : filet de sécurité
-     * générique pour une option de cadre "choix" dont la `cle` ne
-     * correspond à AUCUNE mécanique automatisée (ni cube/construction —
-     * cleFocusEnginePourOptionCadre_ —, ni Science->Technologie —
-     * optionTechnologieViaScience_) : `label` (bouton, infinitif) /
-     * `resume` (statut "✓ Appliqué (...)", au passé — voir mémoire projet,
-     * toujours "manuellement" jamais "à la main"/parenthèses imbriquées).
-     * Fallback générique (humaniserCleCadre_) pour toute clé non
-     * répertoriée ici, plutôt que de rendre le cadre bloqué — vide pour
-     * l'instant (etablir_guilde/construire_installation/
-     * etablir_guilde_banquier/augmenter_population_pure sont automatisées,
-     * voir LABEL_OPTION_FOCUSENGINE_/cleFocusEnginePourOptionCadre_
-     * ci-dessous) :
-     * conservé prêt à accueillir une future clé réellement non
-     * automatisable.
+     * Filet de sécurité générique pour une option de cadre "choix" dont la
+     * `cle` ne correspond à AUCUNE mécanique automatisée (ni
+     * cube/construction — cleFocusEnginePourOptionCadre_ —, ni
+     * Science->Technologie — optionTechnologieViaScience_) : `label`
+     * (bouton, infinitif) / `resume` (statut "✓ Appliqué (...)", au passé
+     * — voir mémoire projet, toujours "manuellement" jamais "à la
+     * main"/parenthèses imbriquées). Fallback générique
+     * (humaniserCleCadre_) pour toute clé non répertoriée ici, plutôt que
+     * de rendre le cadre bloqué — vide pour l'instant (toutes les clés
+     * connues sont automatisées, voir LABEL_OPTION_FOCUSENGINE_/
+     * cleFocusEnginePourOptionCadre_ ci-dessous) : conservé prêt à
+     * accueillir une future clé réellement non automatisable.
      */
     var LABEL_OPTION_CADRE_MANUELLE_ = {};
     function humaniserCleCadre_(cle) {
@@ -1390,33 +978,31 @@
     }
 
     /**
-     * 19/08/2026 (retour utilisateur) : libellé d'action pour le bouton
-     * d'une popup de cadre — au lieu du delta brut préfixé "Appliquer : "
-     * (ex. "Appliquer : +3 Crédit"), reprend le gabarit d'effet du jeu
-     * ("Gagnez N Ressource(s).", voir catalogue) au verbe à l'infinitif
-     * pour un bouton ("Gagner 3 Crédits"). Ne couvre que le cas à une
-     * seule ressource (le seul rencontré à ce jour, effet.type "choix"
-     * simple) ; retombe sur le format delta générique pour un futur cadre
-     * à plusieurs ressources dans un même delta.
+     * Libellé d'action pour le bouton d'une popup de cadre — reprend le
+     * gabarit d'effet du jeu ("Gagnez N Ressource(s).", voir catalogue) au
+     * verbe à l'infinitif pour un bouton ("Gagner 3 Crédits") plutôt que le
+     * delta brut préfixé "Appliquer : ". Ne couvre que le cas à une seule
+     * ressource (le seul rencontré à ce jour, effet.type "choix" simple) ;
+     * retombe sur le format delta générique pour un futur cadre à
+     * plusieurs ressources dans un même delta.
      */
     function libelleActionCadre_(delta) {
       var cles = Object.keys(delta || {});
       if (cles.length === 1) {
         var cle = cles[0], valeur = delta[cle];
-        var nom = (Math.abs(valeur) > 1 && LABEL_RESSOURCE_CADRE_PLURIEL_[cle]) || LABEL_RESSOURCE_CADRE_[cle] || cle;
+        var nom = (Math.abs(valeur) > 1 && LABEL_RESSOURCE_CADRE_PLURIEL_[cle]) || libelleRessourceCadre_(cle);
         return (valeur > 0 ? 'Gagner ' : 'Perdre ') + Math.abs(valeur) + ' ' + nom;
       }
       return 'Appliquer : ' + libelleDeltaCadre_(delta);
     }
 
     /**
-     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 2) : reconnaît
-     * l'option "dépenser N Science pour gagner une Technologie de base"
-     * (cadre.effet.type === 'choix', voir data/catalogue/evenements.json)
-     * — coût 100% simple (Science), gain non automatisable (le choix de
-     * LA technologie reste manuel, sur Plat. maison) : seul le coût est
-     * appliqué en un clic (voir actionsCadre_/ouvrirPopupCadreEtRafraichir_),
-     * jamais le gain.
+     * Reconnaît l'option "dépenser N Science pour gagner une Technologie
+     * de base" (cadre.effet.type === 'choix', voir
+     * data/catalogue/evenements.json) — coût 100% simple (Science), gain
+     * non automatisable (le choix de LA technologie reste manuel, sur
+     * Plat. maison) : seul le coût est appliqué en un clic (voir
+     * actionsCadre_/ouvrirPopupCadreEtRafraichir_), jamais le gain.
      */
     function optionTechnologieViaScience_(option) {
       return !!(option && option.cout && Object.keys(option.cout).length === 1 && typeof option.cout.science === 'number' &&
@@ -1439,13 +1025,9 @@
       });
     }
 
-    // 21/08/2026 (docs/docs-rapport.md BUG-2) : cleFocusEnginePourOptionCadre_
-    // vivait ici en copie recopiée à la main depuis GameService.js (déjà
-    // cause d'un bug réel — un ajout de clé oublié côté copie locale avait
-    // rendu un Cadre "choix" non cliquable en pratique malgré le moteur
-    // déjà prêt à le résoudre, voir historique de cette section). Supprimée
-    // : tous les appels utilisent désormais GameService.cleFocusEnginePourOptionCadre
-    // directement, une seule source de vérité.
+    // Tous les appels utilisent GameService.cleFocusEnginePourOptionCadre
+    // directement (source de vérité unique — ne pas en garder de copie
+    // locale dans ce fichier).
 
     function libelleOptionCube_(option, cleFocusEngine) {
       var valeur = Number(option.valeur) || 1;
@@ -1459,44 +1041,37 @@
       return 'Déployer ' + valeur + ' cube' + pluriel;
     }
 
-    // 19/08/2026 (Construire une Installation / Établir une Guilde
-    // portées) : libellés (bouton, infinitif) pour les clés reconnues par
+    // Libellés (bouton, infinitif) pour les clés reconnues par
     // cleFocusEnginePourOptionCadre_ en dehors des cubes (libelleOptionCube_
     // ci-dessus) — le détail (secteur + type choisis) n'apparaît qu'après
     // résolution, dans le statut "✓ Appliqué (...)" (resume dérivé du
     // journal FocusEngine, voir GameService.appliquerCadreChoixFocusEngine).
-    // Renommé LABEL_OPTION_CONSTRUIRE_ -> LABEL_OPTION_FOCUSENGINE_ le
-    // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2) à l'ajout de
-    // augmenter_population_pure, qui n'est pas une construction.
     var LABEL_OPTION_FOCUSENGINE_ = {
       etablir_guilde: 'Établir une Guilde',
       construire_installation: 'Construire une Installation',
       etablir_guilde_banquier: 'Établir une Guilde de Banquiers',
       augmenter_population_pure: 'Augmenter une Population Pure',
-      // 20/08/2026 (EVOLUTION 5 — correctif, voir cleFocusEnginePourOptionCadre_
-      // ci-dessus) : sans cette entrée, un Cadre "retirer_corruption"
-      // serait retombé sur libelleOptionCube_ ("Déployer N cube(s)",
-      // libellé faux) faute de correspondance ici.
+      // Sans cette entrée, un Cadre "retirer_corruption" retomberait sur
+      // libelleOptionCube_ ("Déployer N cube(s)", libellé faux) faute de
+      // correspondance ici.
       retirer_corruption: 'Retirer une Corruption',
-      // 20/08/2026 (EVOLUTION 7 — effet "avancer sur piste de
-      // Civilisation", voir TODO.md) : 1 libellé par variante — la piste
-      // précise (si imposée) reste visible sur le bouton, le détail
+      // 1 libellé par variante de "avancer sur piste de Civilisation" — la
+      // piste précise (si imposée) reste visible sur le bouton, le détail
       // (niveau atteint) n'apparaît qu'après résolution dans le statut
       // "✓ Appliqué (...)", comme les autres options ci-dessus.
       avancer_civilisation: 'Avancer sur une piste de Civilisation',
       avancer_civilisation_societe: 'Avancer sur la piste Société',
       avancer_civilisation_gouvernement: 'Avancer sur la piste Gouvernement',
       avancer_civilisation_economie: 'Avancer sur la piste Économie',
-      // 21/08/2026 (effet "Améliorer un jeton Gloire") : le détail (quel
-      // jeton, quelle valeur) n'apparaît qu'après résolution, dans le
-      // statut "✓ Appliqué (...)", comme les autres options ci-dessus.
+      // "Améliorer un jeton Gloire" : le détail (quel jeton, quelle
+      // valeur) n'apparaît qu'après résolution, dans le statut
+      // "✓ Appliqué (...)", comme les autres options ci-dessus.
       ameliorer_gloire: 'Améliorer un jeton Gloire'
     };
 
     /**
-     * 19/08/2026 (Construire une Installation / Établir une Guilde
-     * portées) : dispatche le libellé de bouton d'une option de cadre
-     * "choix" automatisée via FocusEngine selon la clé reconnue par
+     * Dispatche le libellé de bouton d'une option de cadre "choix"
+     * automatisée via FocusEngine selon la clé reconnue par
      * cleFocusEnginePourOptionCadre_ — cube (libelleOptionCube_, déjà
      * existant) ou LABEL_OPTION_FOCUSENGINE_ (toute autre mécanique
      * automatisée : construction, Population Pure...).
@@ -1507,15 +1082,14 @@
     }
 
     /**
-     * 18/08/2026 (Refonte affichage Événement galactique) : applique un
-     * cadre "1 clic" (GameService.appliquerCadreEffet) puis rafraîchit
-     * l'écran. #ressources-principales (Plat. maison) et le bandeau de
-     * rappel (Focus) sont rendus par StrategieService.afficher() — jamais
-     * mis à jour tout seuls au changement d'onglet (afficherEcran ne fait
-     * que basculer la visibilité, voir en-tête App ci-dessus) — d'où le
-     * rappel explicite ici, même pattern que le bouton "Fin du cycle" plus
-     * bas (btn-fin-cycle, seule autre action de cet écran qui modifie les
-     * ressources).
+     * Applique un cadre "1 clic" (GameService.appliquerCadreEffet) puis
+     * rafraîchit l'écran. #ressources-principales (Plat. maison) et le
+     * bandeau de rappel (Focus) sont rendus par StrategieService.afficher()
+     * — jamais mis à jour tout seuls au changement d'onglet (afficherEcran
+     * ne fait que basculer la visibilité, voir Piège n°2 dans CLAUDE.md) —
+     * d'où le rappel explicite ici, même pattern que le bouton "Fin du
+     * cycle" plus bas (btn-fin-cycle, seule autre action de cet écran qui
+     * modifie les ressources).
      */
     function appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton) {
       bouton.disabled = true;
@@ -1532,19 +1106,16 @@
     }
 
     /**
-     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
-     * générique, Événement B Cycle 1) : applique l'option choisie (activer/
-     * déployer un cube, ou — depuis le 19/08/2026 — établir une Guilde/
-     * construire une Installation, voir cleFocusEnginePourOptionCadre_
-     * ci-dessus) via GameService.appliquerCadreChoixFocusEngine (ex-
-     * appliquerCadreChoixCube, renommée à l'ajout de la construction) —
-     * qui délègue à FocusEngine.resoudreEffet, seule source de vérité pour
-     * ces mécaniques (déjà utilisées par l'écran Focus), en lui passant
-     * StrategieService.demanderChoix pour la popup imbriquée ("Déployer
-     * des cubes" ou "Construire une Installation"/"Établir une Guilde")
-     * le cas échéant. `resultat.annule` (Annuler sur cette popup
-     * imbriquée) n'est PAS une erreur : réactive juste le cadre, comme
-     * les autres popups.
+     * Applique l'option choisie (activer/déployer un cube, établir une
+     * Guilde/construire une Installation, voir
+     * cleFocusEnginePourOptionCadre_ ci-dessus) via GameService.
+     * appliquerCadreChoixFocusEngine, qui délègue à FocusEngine.
+     * resoudreEffet, seule source de vérité pour ces mécaniques (déjà
+     * utilisées par l'écran Focus), en lui passant StrategieService.
+     * demanderChoix pour la popup imbriquée ("Déployer des cubes" ou
+     * "Construire une Installation"/"Établir une Guilde") le cas échéant.
+     * `resultat.annule` (Annuler sur cette popup imbriquée) n'est PAS une
+     * erreur : réactive juste le cadre, comme les autres popups.
      */
     function appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -1554,14 +1125,12 @@
           if (!resultat || resultat.annule) { bouton.disabled = false; return; }
           partieCourante = resultat;
           renderEvenementCycle_(resultat);
-          // 19/08/2026 (retour utilisateur — "Installation et guilde ne
-          // sont pas rafraîchit lorsque je clique sur l'onglet secteur") :
-          // depuis que cette fonction sert aussi les options
-          // etablir_guilde/construire_installation (en plus des cubes,
-          // qui ne touchent jamais secteursPartie), un rappel explicite à
-          // App.renderSecteurs est nécessaire — App.afficherEcran ne
+          // Cette fonction sert aussi les options etablir_guilde/
+          // construire_installation (en plus des cubes, qui ne touchent
+          // jamais secteursPartie) : un rappel explicite à
+          // App.renderSecteurs est donc nécessaire — App.afficherEcran ne
           // re-rend rien tout seul (Piège n°2, voir CLAUDE.md), l'onglet
-          // Secteurs restait donc affiché avec son dernier rendu, périmé.
+          // Secteurs resterait sinon affiché avec son dernier rendu, périmé.
           App.renderSecteurs(resultat);
           StrategieService.afficher(resultat);
         })
@@ -1572,9 +1141,9 @@
     }
 
     /**
-     * 21/08/2026 (effet "Gagner une Corruption" d'un Cadre d'Événement
-     * galactique — voir GameService.appliquerCadreGainCorruption/
-     * cadreGainCorruptionAutomatisable ci-dessus, gameService.js) : ouvre
+     * Effet "Gagner une Corruption" d'un Cadre d'Événement galactique
+     * (voir GameService.appliquerCadreGainCorruption/
+     * cadreGainCorruptionAutomatisable, gameService.js) : ouvre
      * la (ou les, si `quantite` > 1) popup(s) 'gagner_corruption'
      * (StrategieService.demanderChoix, contexte construit côté
      * GameService à partir de la cible catalogue) puis rafraîchit l'écran.
@@ -1605,14 +1174,12 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 2 "Etablissez
-     * une Guilde OU construisez une Installation") : applique l'option
-     * choisie sans mécanique automatisée (voir LABEL_OPTION_CADRE_MANUELLE_/
+     * Applique l'option choisie sans mécanique automatisée (voir
+     * LABEL_OPTION_CADRE_MANUELLE_/
      * actionsCadre_ ci-dessus) via GameService.appliquerCadreChoixManuel —
      * `resume` est le même texte au passé affiché ensuite comme statut
-     * "✓ Appliqué (...)" (rendu générique déjà en place pour
-     * cadresAppliques[ordre].resume, voir renderCadresEvenement_ — aucun
-     * changement nécessaire côté rendu).
+     * "✓ Appliqué (...)" (rendu générique pour cadresAppliques[ordre].resume,
+     * voir renderCadresEvenement_).
      */
     function appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, indexOption, resume, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -1629,13 +1196,12 @@
     }
 
     /**
-     * 18/08/2026 (Simplification UI Événement galactique) : le cadre de
-     * type "placement" n'a plus de bouton "Placer" dédié sous le texte —
-     * c'est désormais tout le cadre (.cadre-carte-cliquable) qui ouvre la
+     * Le cadre de type "placement" n'a pas de bouton "Placer" dédié sous
+     * le texte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre la
      * popup au clic (cf. renderCadresEvenement_ ci-dessous). Comme
      * appliquerCadrePlacementEtRafraichir_ attend un élément exposant
      * .disabled (pattern <button>) pour désactiver l'action pendant la
-     * popup/l'appel réseau, ce faux "bouton" adapte un <div> en bascule
+     * popup/l'appel réseau, ce faux "bouton" adapte un <div> en basculant
      * simplement une classe CSS (.cadre-carte-en-cours, cursor:not-allowed
      * + opacité réduite, voir style.css) plutôt que l'attribut natif
      * disabled — évite de dupliquer la logique d'appel dans
@@ -1649,28 +1215,22 @@
     }
 
     /**
-     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : cadre de
-     * type "placement" (zone "secteur_neant_adjacent") — ouvre la même
-     * modale de choix générique que les actions de Focus (StrategieService.
-     * demanderChoix, contexte 'placement_secteur_neant_adjacent') pour
-     * sélectionner le secteur, puis persiste via GameService.
-     * appliquerCadrePlacement (qui revalide tout côté SecteurService) et
-     * rafraîchit l'écran — même pattern qu'appliquerCadreEtRafraichir_
-     * ci-dessus pour les cadres "1 clic" sur ressources simples.
+     * Cadre de type "placement" (zone "secteur_neant_adjacent") — ouvre la
+     * même modale de choix générique que les actions de Focus
+     * (StrategieService.demanderChoix, contexte
+     * 'placement_secteur_neant_adjacent') pour sélectionner le secteur,
+     * puis persiste via GameService.appliquerCadrePlacement (qui revalide
+     * tout côté SecteurService) et rafraîchit l'écran — même pattern
+     * qu'appliquerCadreEtRafraichir_ ci-dessus pour les cadres "1 clic" sur
+     * ressources simples.
      *
-     * 18/08/2026 (Simplification UI Événement galactique, points 3 et 4) :
-     * titre de popup générique ("Choisir un secteur") au lieu de rappeler
-     * les éléments posés (déjà lisibles sur le texte du cadre, visible
-     * derrière la popup) ; la `description` (qui reprenait cadre.texte,
-     * redondant) est supprimée.
-     *
-     * 18/08/2026 (Simplification UI Événement galactique — Cadre 1
-     * générique) : `elements: cadre.effet.elements` transmis à la popup
-     * (contexte.elements, voir strategieService.js) — SecteurService.
-     * obtenirSecteursEligiblesPlacementNeantAdjacent en a besoin pour
-     * calculer les emplacements requis (générique, plus figé sur Défense
-     * de Secteur + Guilde de Scientifiques). Le paramètre `cadre` est de
-     * nouveau utilisé (il ne l'était plus depuis les points 3/4).
+     * Le titre de la popup est générique ("Choisir un secteur") plutôt que
+     * de rappeler les éléments posés (déjà lisibles sur le texte du cadre,
+     * visible derrière la popup). `elements: cadre.effet.elements` est
+     * transmis à la popup (contexte.elements, voir strategieService.js) —
+     * SecteurService.obtenirSecteursEligiblesPlacementNeantAdjacent en a
+     * besoin pour calculer les emplacements requis (générique, pas figé
+     * sur Défense de Secteur + Guilde de Scientifiques).
      */
     function appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -1695,10 +1255,9 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-     * Domineum") : construit le texte de la popup de confirmation d'un
-     * cadre "placement_multiple" une fois les cibles connues (sans égalité
-     * de Population à trancher) — jamais le texte du cadre répété (déjà
+     * Construit le texte de la popup de confirmation d'un cadre
+     * "placement_multiple" une fois les cibles connues (sans égalité de
+     * Population à trancher) — jamais le texte du cadre répété (déjà
      * visible sur la carte derrière la popup), juste le résultat calculé,
      * pour que le joueur puisse le reporter sur le plateau physique.
      */
@@ -1712,8 +1271,7 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : résout
-     * séquentiellement chaque groupe renvoyé par SecteurService.
+     * Résout séquentiellement chaque groupe renvoyé par SecteurService.
      * resoudrePlacementMultipleNeantAdjacent — un groupe à candidat unique
      * est retenu directement (aucune interaction, la cible est déterminée
      * par la règle de Population) ; un groupe à plusieurs candidats
@@ -1743,8 +1301,8 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1) : persiste les
-     * cibles retenues via GameService.appliquerCadrePlacementMultiple
+     * Persiste les cibles retenues via
+     * GameService.appliquerCadrePlacementMultiple
      * (revalide tout côté SecteurService) puis rafraîchit l'écran — même
      * pattern qu'appliquerCadrePlacementEtRafraichir_ ci-dessus.
      */
@@ -1763,8 +1321,7 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges du
-     * Domineum") : cadre de type "placement_multiple" — la cible de chaque
+     * Cadre de type "placement_multiple" — la cible de chaque
      * jeu d'éléments est déterminée par la Population des secteurs du
      * Néant adjacents (voir SecteurService.resoudrePlacementMultipleNeantAdjacent),
      * pas par un libre choix comme le cadre "placement" simple. Si aucune
@@ -1813,25 +1370,21 @@
     }
 
     /**
-     * 19/08/2026 (Événement galactique B, Cycle 1 — Cadre 2 "Placez une
-     * Corruption sur l'offre de Programme Domination") : cadre de type
-     * "gain" (aucune ressource plateauMaison suivie par l'app derrière —
-     * l'offre de Programme n'est pas modélisée) — ouvre la même modale
-     * générique que les autres cadres, en réutilisant le contexte
-     * 'confirmation' déjà existant côté StrategieService.demanderChoix
-     * (message + Annuler/Valider), puis persiste juste "cadre résolu" via
+     * Cadre de type "gain" sans ressource plateauMaison suivie par l'app
+     * (ex. l'offre de Programme Domination, non modélisée) — ouvre la même
+     * modale générique que les autres cadres, en réutilisant le contexte
+     * 'confirmation' de StrategieService.demanderChoix (message +
+     * Annuler/Valider), puis persiste juste "cadre résolu" via
      * GameService.appliquerCadreManuel (aucun delta appliqué, contrairement
      * à appliquerCadreEtRafraichir_ ci-dessus).
      *
-     * 19/08/2026 (retour utilisateur, principe à garder pour les
-     * prochains événements) : le message n'est jamais le rappel verbatim
-     * de cadre.texte (déjà lisible sur la carte juste derrière la popup)
-     * — c'est une instruction courte, à l'infinitif, en italique, portée
-     * par le catalogue (cadre.instruction, voir data/catalogue/
-     * evenements.json) pour rester spécifique au cadre sans dupliquer sa
-     * description complète. Fallback sur cadre.texte si le catalogue ne
-     * fournit pas encore d'instruction dédiée (cadre "gain" futur pas
-     * encore enrichi).
+     * Principe à garder pour les événements : le message n'est jamais le
+     * rappel verbatim de cadre.texte (déjà lisible sur la carte juste
+     * derrière la popup) — c'est une instruction courte, à l'infinitif, en
+     * italique, portée par le catalogue (cadre.instruction, voir
+     * data/catalogue/evenements.json) pour rester spécifique au cadre sans
+     * dupliquer sa description complète. Fallback sur cadre.texte si le
+     * catalogue ne fournit pas encore d'instruction dédiée.
      */
     function appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -1856,69 +1409,64 @@
     }
 
     /**
-     * 18/08/2026 (Simplification UI Événement galactique, point 6) : un
-     * cadre "choix" (options exclusives, ex. +3 Crédit / -1 Science pour
-     * une Technologie) n'affiche plus ses boutons directement sur la
+     * Un cadre "choix" (options exclusives, ex. +3 Crédit / -1 Science pour
+     * une Technologie) n'affiche pas ses boutons directement sur la
      * carte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre une
      * seule popup listant les effets possibles (contexte
      * 'resoudre_cadre_evenement', voir strategieService.js), un clic sur
      * une option = résolution immédiate (pas de double confirmation :
-     * l'ancienne popup de confirmation dédiée à l'option Technologie a
-     * disparu, son rappel "-N Science, technologie à choisir sur Plat.
-     * maison" est désormais directement le libellé de cette option dans
-     * la liste). `actionsCadre_` construit la liste normalisée
-     * (delta simple / proportionnel / technologie / cube) réutilisée à
-     * la fois pour savoir si le cadre est cliquable (renderCadresEvenement_)
-     * et pour résoudre le choix une fois la popup validée.
+     * l'option Technologie n'a pas de popup de confirmation dédiée, son
+     * rappel "-N Science, technologie à choisir sur Plat. maison" est
+     * directement le libellé de cette option dans la liste).
+     * `actionsCadre_` construit la liste normalisée (delta simple /
+     * proportionnel / technologie / cube) réutilisée à la fois pour savoir
+     * si le cadre est cliquable (renderCadresEvenement_) et pour résoudre
+     * le choix une fois la popup validée.
      *
-     * 18/08/2026 (Cadre 3 générique, Événement B Cycle 1) : une option
-     * "cube" (activer_cube / deployer_cube_secteur_mere) délègue à
-     * appliquerCadreFocusEngineEtRafraichir_ (GameService.
+     * Une option "cube" (activer_cube / deployer_cube_secteur_mere)
+     * délègue à appliquerCadreFocusEngineEtRafraichir_ (GameService.
      * appliquerCadreChoixFocusEngine -> FocusEngine.resoudreEffet) — pour
      * "déployer", une SECONDE popup imbriquée s'ouvre (choix du type de
      * Flotte, contexte 'deployer_cube' déjà existant côté Focus) :
      * comportement attendu, pas un bug.
      *
-     * 19/08/2026 (Construire une Installation / Établir une Guilde
-     * portées) : une option "etablir_guilde"/"construire_installation"
-     * (ex. Cadre 2 Événement C Cycle 1) suit désormais le même chemin que
-     * "cube" ci-dessus (même fonction générique, cleFocusEnginePourOptionCadre_
-     * les reconnaît aussi) — délègue à appliquerCadreFocusEngineEtRafraichir_,
-     * qui ouvre la popup imbriquée 'construire' (secteur + type, voir
-     * strategieService.js). Le fallback "manuel" ci-dessous ne sert plus
-     * qu'à une future option de cadre "choix" sans mécanique automatisée.
+     * Une option "etablir_guilde"/"construire_installation" suit le même
+     * chemin que "cube" ci-dessus (même fonction générique,
+     * cleFocusEnginePourOptionCadre_ les reconnaît aussi) — délègue à
+     * appliquerCadreFocusEngineEtRafraichir_, qui ouvre la popup imbriquée
+     * 'construire' (secteur + type, voir strategieService.js). Le
+     * fallback "manuel" ci-dessous ne sert qu'à une option de cadre
+     * "choix" sans mécanique automatisée.
      *
-     * 19/08/2026 (retour utilisateur, principe à garder pour les
-     * prochains événements) : le libellé d'une option "delta simple"
-     * (ex. +3 Crédit) suit désormais le gabarit du jeu à l'infinitif
-     * ("Gagner 3 Crédits" — libelleActionCadre_) plutôt que le brut
-     * "Appliquer : +3 Crédit". Une option qui nécessite un geste manuel
-     * complémentaire (ex. Technologie : coût automatisable mais choix de
-     * LA technologie hors périmètre) porte désormais un `sousTexte`
-     * séparé (rendu en italique, plus petit, sous le libellé principal
-     * dans le bouton — voir strategieService.js) plutôt que noyé dans le
-     * même libellé entre parenthèses.
+     * Le libellé d'une option "delta simple" (ex. +3 Crédit) suit le
+     * gabarit du jeu à l'infinitif ("Gagner 3 Crédits" —
+     * libelleActionCadre_) plutôt que le brut "Appliquer : +3 Crédit".
+     * Une option qui nécessite un geste manuel complémentaire (ex.
+     * Technologie : coût automatisable mais choix de LA technologie hors
+     * périmètre) porte un `sousTexte` séparé (rendu en italique, plus
+     * petit, sous le libellé principal dans le bouton — voir
+     * strategieService.js) plutôt que noyé dans le même libellé entre
+     * parenthèses.
      */
     function actionsCadre_(cadre) {
       var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
         return action.proportionnel
           ? {
               proportionnel: true, plafond: action.plafond, action: action,
-              label: 'Échanger ' + (LABEL_RESSOURCE_CADRE_[action.ressourceCout] || action.ressourceCout) +
-                ' → ' + (LABEL_RESSOURCE_CADRE_[action.ressourceGain] || action.ressourceGain)
+              label: 'Échanger ' + libelleRessourceCadre_(action.ressourceCout) +
+                ' → ' + libelleRessourceCadre_(action.ressourceGain)
             }
           : { proportionnel: false, action: action, label: libelleActionCadre_(action.delta) };
       });
 
       if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
         cadre.effet.options.forEach(function (option, indexOption) {
-          // 21/08/2026 (Événement F, Cycle 1, Cadre 1) : option `type:
-          // 'placement'` (avec `critere` de Population) au sein d'un
-          // cadre "choix" — nouveau gabarit, distinct des options
-          // {cle, valeur} ci-dessous (cleFocusEnginePourOptionCadre_) qui
-          // n'ont pas de `critere`/secteur à choisir. Vérifié en premier
-          // (une option de ce type n'a jamais de `cle`, les blocs
-          // suivants la laisseraient de toute façon passer).
+          // Option `type: 'placement'` (avec `critere` de Population) au
+          // sein d'un cadre "choix" — distinct des options {cle, valeur}
+          // ci-dessous (cleFocusEnginePourOptionCadre_) qui n'ont pas de
+          // `critere`/secteur à choisir. Vérifié en premier (une option
+          // de ce type n'a jamais de `cle`, les blocs suivants la
+          // laisseraient de toute façon passer).
           if (option.type === 'placement' && option.elements) {
             actions.push({
               proportionnel: false, placementChoix: true, indexOption: indexOption,
@@ -2002,12 +1550,11 @@
     }
 
     /**
-     * 21/08/2026 (Événement F, Cycle 1, Cadre 1) : résout UNE option
-     * `type: 'placement'` d'un cadre "choix" (voir actionsCadre_/
-     * libelleOptionPlacementChoix_ ci-dessus) — ouvre la popup dédiée
-     * 'placement_critere' (StrategieService, secteur déterminé par
-     * `option.critere`, second <select> de type de Guilde si l'élément
-     * "guilde" est générique), puis persiste via GameService.
+     * Résout UNE option `type: 'placement'` d'un cadre "choix" (voir
+     * actionsCadre_/libelleOptionPlacementChoix_ ci-dessus) — ouvre la
+     * popup dédiée 'placement_critere' (StrategieService, secteur
+     * déterminé par `option.critere`, second <select> de type de Guilde si
+     * l'élément "guilde" est générique), puis persiste via GameService.
      * appliquerCadreChoixPlacement (revalide tout côté SecteurService,
      * jamais confiance à cette popup) — même pattern que
      * appliquerCadrePlacementEtRafraichir_/
@@ -2037,66 +1584,45 @@
     }
 
     /**
-     * 18/08/2026 (Refonte affichage Événement galactique) : rend les
-     * Cadres (moitié gauche de la carte, résolus en Phase Préparation —
-     * voir docs-rules-cycle-de-jeu.md §1.5), un par ligne : bordure pleine/
-     * pointillée selon `obligatoire` (§1.5.1/§1.5.2), badge de résolution
-     * (§1.5.3), texte intégral, puis un bouton "Appliquer" par action que
-     * GameService.actionsSimplesCadre reconnaît comme un simple delta sur
-     * les 5 ressources déjà suivies par l'app.
-     *
-     * 18/08/2026 (Événement galactique A, Cycle 1 — Cadre 1) : premier
-     * cadre de type "placement" (zone "secteur_neant_adjacent") sorti de
-     * ce hors-périmètre — bouton "Placer" dédié
-     * (appliquerCadrePlacementEtRafraichir_ ci-dessus) qui ouvre la
-     * modale de choix générique des actions de Focus pour sélectionner le
-     * secteur, puis persiste via GameService.appliquerCadrePlacement. Le
-     * reste d'un cadre (Gloire, jetons, Civilisation, Corruption...) reste
-     * hors périmètre (la plupart des sous-points de §1.5 sont ❌/🚫 dans
-     * les docs de règles) : affiché en texte seul, à résoudre manuellement.
-     * cadresAppliques (persisté sur evenements.cycleN, voir gameService.js)
-     * empêche une double application et affiche "✓ Appliqué".
-     *
-     * 18/08/2026 (Simplification UI Événement galactique, points 1/5/6) :
-     * plus aucun bouton "Placer"/"Appliquer"/"Gagner une technologie" sur
-     * la carte elle-même — dès qu'un cadre non résolu a au moins une
-     * action possible (placement OU actionsCadre_ non vide), c'est tout
-     * le cadre (.cadre-carte-cliquable, role="button"/tabindex) qui ouvre
-     * la popup adaptée (placement_secteur_neant_adjacent ou
-     * resoudre_cadre_evenement). Le texte "✓ Appliqué" d'un cadre
-     * "placement" ne réaffiche plus le détail des éléments posés
-     * (implicite, toujours les mêmes pour ce cadre) : juste le secteur.
-     *
-     * 18/08/2026 (Cadre 3 générique, Événement B Cycle 1) : un cadre
-     * résolu via une option "cube" (GameService.appliquerCadreChoixCube)
-     * stocke { resume, le } dans cadresAppliques[ordre] (au lieu de
-     * { delta, le }) — `applique.resume` (déjà le libellé du journal
-     * FocusEngine, ex. "+1 cube(s) activé(s)") prime sur le rendu delta
-     * générique ci-dessous.
-     *
-     * 19/08/2026 (Cadre 2 générique, Événement B Cycle 1 — "Placez une
-     * Corruption sur l'offre de Programme Domination") : un cadre
-     * `effet.type === 'gain'` (aucune ressource plateauMaison suivie
-     * derrière, contrairement à "échange"/"choix") sort à son tour du
-     * hors-périmètre ci-dessus — cliquable comme les autres (data-manuel),
-     * ouvre une popup générique de confirmation (contexte 'confirmation'
-     * de StrategieService.demanderChoix, réutilisé tel quel) invitant à
-     * résoudre l'effet manuellement sur le plateau physique ; Valider
-     * marque juste le cadre comme fait (GameService.appliquerCadreManuel,
-     * aucun delta), affiché "✓ Appliqué (manuellement)" (19/08/2026,
-     * retour utilisateur : "Appliqué" toujours préféré à "Fait",
-     * "manuellement" à "à la main" — voir mémoire projet). Générique à
-     * tout futur cadre "gain" du catalogue, pas figé sur ce seul cadre.
-     *
-     * 20/08/2026 (EVOLUTION 1 — gain de place, voir TODO.md) : le texte
-     * "✓ Appliqué (...)" passe désormais par abregerResumeCadre_(applique.
-     * resume) / libelleDeltaCadreAbrege_(applique.delta) (au lieu de
-     * applique.resume brut / libelleDeltaCadre_) — Population/Secteur
-     * abrégés ("Pop."/"Sec."), noms de ressource/Guilde abrégés à 3
-     * lettres et colorés comme sur Plat. maison, "augmentée de 1"/"établie
-     * sur" remplacés par un préfixe "+1". Rendu seulement, aucune donnée
-     * persistée modifiée (cadresAppliques[ordre].resume/.delta inchangés
-     * en base) — voir JSDoc de ces 2 fonctions plus haut dans ce fichier.
+     * Rend les Cadres (moitié gauche de la carte, résolus en Phase
+     * Préparation — voir docs-rules-cycle-de-jeu.md §1.5), un par ligne :
+     * bordure pleine/pointillée selon `obligatoire` (§1.5.1/§1.5.2), badge
+     * de résolution (§1.5.3), texte intégral. Dès qu'un cadre non résolu a
+     * au moins une action possible (placement OU actionsCadre_ non vide),
+     * tout le cadre (.cadre-carte-cliquable, role="button"/tabindex) est
+     * cliquable et ouvre la popup adaptée (placement_secteur_neant_adjacent,
+     * resoudre_cadre_evenement, ou une confirmation générique pour un
+     * cadre "gain" non automatisable). cadresAppliques (persisté sur
+     * evenements.cycleN, voir gameService.js) empêche une double
+     * application et pilote le texte "✓ Appliqué (...)" :
+     * - Cadre "placement" (zone secteur_neant_adjacent) : "✓ Appliqué
+     *   (Secteur N)" — le détail des éléments posés n'est pas réaffiché
+     *   (implicite, toujours les mêmes pour ce cadre).
+     * - Cadre "placement_multiple" : plusieurs jeux d'éléments, chacun
+     *   posé sur un secteur du Néant adjacent déterminé par un critère de
+     *   Population (SecteurService.resoudrePlacementMultipleNeantAdjacent)
+     *   — "✓ Appliqué (Secteur(s) N [et M])".
+     * - Cadre "gain" non automatisable (cadreGainCorruptionAutomatisable
+     *   renvoie faux, ou effet différent de "gain") : résolu manuellement
+     *   sur le plateau physique via une popup de confirmation générique
+     *   (contexte 'confirmation' de StrategieService.demanderChoix) ;
+     *   Valider marque juste le cadre comme fait
+     *   (GameService.appliquerCadreManuel, aucun delta) — "✓ Appliqué
+     *   (manuellement)" (toujours "Appliqué"/"manuellement", jamais
+     *   "Fait"/"à la main", voir mémoire projet).
+     * - Cadre résolu via une option "cube" (GameService.appliquerCadreChoixCube)
+     *   stocke { resume, le } dans cadresAppliques[ordre] (au lieu de
+     *   { delta, le }) — `applique.resume` (déjà le libellé du journal
+     *   FocusEngine, ex. "+1 cube(s) activé(s)") prime sur le rendu delta
+     *   générique.
+     * - Sinon : le texte passe par abregerResumeCadre_(applique.resume) /
+     *   libelleDeltaCadreAbrege_(applique.delta) — Population/Secteur
+     *   abrégés ("Pop."/"Sec."), noms de ressource/Guilde abrégés à 3
+     *   lettres et colorés comme sur Plat. maison, "augmentée de 1"/
+     *   "établie sur" remplacés par un préfixe "+1". Rendu seulement,
+     *   aucune donnée persistée modifiée (cadresAppliques[ordre].resume/
+     *   .delta inchangés en base) — voir JSDoc de ces 2 fonctions plus
+     *   haut dans ce fichier.
      */
     function renderCadresEvenement_(partie, cycle, evenementActuel) {
       var conteneur = document.getElementById('evenement-cadres');
@@ -2115,22 +1641,18 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
-          // 19/08/2026 (Événement galactique C, Cycle 1 — Cadre 1 "Vestiges
-          // du Domineum") : nouveau type de cadre "placement_multiple" —
-          // plusieurs jeux d'éléments, chacun sur un secteur du Néant
-          // adjacent déterminé par un critère de Population (voir
+          // Cadre "placement_multiple" : plusieurs jeux d'éléments, chacun
+          // sur un secteur du Néant adjacent déterminé par un critère de
+          // Population (voir
           // SecteurService.resoudrePlacementMultipleNeantAdjacent), pas un
           // libre choix comme "placement" simple.
           var estPlacementMultiple = !!(cadre.effet && cadre.effet.type === 'placement_multiple');
-          // 21/08/2026 (effet "Gagner une Corruption", voir
-          // GameService.resoudreCiblesCadreGainCorruption_/
-          // cadreGainCorruptionAutomatisable) : un cadre "gain" dont la
-          // cible est automatisable (secteur/piste/Programme/Technologie,
-          // avec repli éventuel — jamais "offre_programme" ou un cadre
-          // composé, voir son JSDoc) sort du hors-périmètre "estManuel"
-          // ci-dessous — reste manuel SEULEMENT si non automatisable
-          // (inchangé pour tous les autres cadres "gain" du catalogue,
-          // aucune régression).
+          // Un cadre "gain" dont la cible est automatisable
+          // (secteur/piste/Programme/Technologie, avec repli éventuel —
+          // jamais "offre_programme" ou un cadre composé, voir
+          // GameService.cadreGainCorruptionAutomatisable) sort du
+          // hors-périmètre "estManuel" ci-dessous — reste manuel SEULEMENT
+          // si non automatisable.
           var estGainCorruption = !!(cadre.effet && cadre.effet.type === 'gain' &&
             typeof GameService !== 'undefined' && GameService.cadreGainCorruptionAutomatisable(cadre));
           var estManuel = !!(cadre.effet && cadre.effet.type === 'gain') && !estGainCorruption;
@@ -2243,12 +1765,11 @@
     }
 
     /**
-     * 18/08/2026 (Refonte affichage Événement galactique) : rend les
-     * Objectifs (moitié droite de la carte, évalués en Phase Évaluation —
-     * §3.3 docs-rules-cycle-de-jeu.md), groupés par bloc avec le
-     * séparateur imprimé sur la carte ("OU" entre deux blocs alternatifs).
-     * Affichage seul pour l'instant : leur résolution automatique reste
-     * hors périmètre de ce lot (contrairement aux Cadres ci-dessus).
+     * Rend les Objectifs (moitié droite de la carte, évalués en Phase
+     * Évaluation — §3.3 docs-rules-cycle-de-jeu.md), groupés par bloc avec
+     * le séparateur imprimé sur la carte ("OU" entre deux blocs
+     * alternatifs). Affichage seul : leur résolution automatique reste
+     * hors périmètre (contrairement aux Cadres ci-dessus).
      */
     function renderObjectifsEvenement_(evenementActuel) {
       var conteneur = document.getElementById('evenement-objectifs');
@@ -2268,19 +1789,16 @@
     }
 
     /**
-     * 17/08/2026 (Session 12 — restauration IHM Partie) : sélection de
-     * l'événement galactique du cycle en cours — portage direct de
-     * renderCycleActuel (app-2.html GAS), simplifié (pas de gestion de
-     * pool de tirage aléatoire ici, cette partie reste hors périmètre —
-     * seul le choix manuel d'un événement est branché). Masqué si la
-     * partie est terminée (cycleActuel === 'termine').
+     * Sélection de l'événement galactique du cycle en cours — pas de
+     * gestion de pool de tirage aléatoire (hors périmètre), seul le choix
+     * manuel d'un événement est branché. Masqué si la partie est terminée
+     * (cycleActuel === 'termine').
      *
-     * 18/08/2026 (Refonte affichage Événement galactique) : le nombre de
-     * manches (coin supérieur droit de la carte, §2 Introduction) rejoint
-     * le titre "Cycle X" (#plateau-galactique-manches) ; le texte de
-     * l'événement est désormais rendu par renderCadresEvenement_/
-     * renderObjectifsEvenement_ (#evenement-cycle-detail), plus par un
-     * simple <p> à plat (#evenement-cycle-texte, supprimé).
+     * Le nombre de manches (coin supérieur droit de la carte, §2
+     * Introduction) rejoint le titre "Cycle X"
+     * (#plateau-galactique-manches) ; le texte de l'événement est rendu
+     * par renderCadresEvenement_/renderObjectifsEvenement_
+     * (#evenement-cycle-detail).
      */
     function renderEvenementCycle_(partie) {
       var bloc = document.getElementById('bloc-evenement-cycle');
@@ -2295,8 +1813,8 @@
 
       var select = document.getElementById('select-evenement-cycle');
       var evenementActuel = (partie.evenements || {})['cycle' + cycle] || null;
-      // 19/08/2026 (retour utilisateur) : dès qu'au moins un Cadre a été
-      // appliqué, le choix de l'Événement galactique est verrouillé (select
+      // Dès qu'au moins un Cadre a été appliqué, le choix de l'Événement
+      // galactique est verrouillé (select
       // désactivé, onchange non attaché) — changer d'événement en cours de
       // résolution laisserait des cadresAppliques orphelins (ordre d'un
       // cadre d'un autre événement).
@@ -2331,17 +1849,16 @@
               partieCourante = partieMaj;
               select.disabled = false;
               renderEvenementCycle_(partieMaj);
-              // 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le
-              // visage du mal", voir strategieService.js v31 —
-              // evenementConserveCorruptionActif_) : StrategieService garde
-              // son propre `partieAffichee` en cache (Piège n°2, CLAUDE.md),
-              // jamais rafraîchi automatiquement par ce select — un
-              // changement d'Événement galactique influence pourtant
-              // désormais le comportement du retrait de Corruption sur
-              // Plat. maison. Sans cet appel, `partieAffichee` resterait
-              // périmé (ancien Événement) jusqu'à la prochaine action qui
-              // rafraîchit StrategieService, ce qui aurait pu laisser
-              // passer/bloquer à tort la conservation du compteur.
+              // StrategieService garde son propre `partieAffichee` en
+              // cache (Piège n°2, CLAUDE.md), jamais rafraîchi
+              // automatiquement par ce select — le choix de l'Événement
+              // galactique influence pourtant le comportement du retrait
+              // de Corruption sur Plat. maison (voir
+              // evenementConserveCorruptionActif_ dans
+              // strategieService.js). Sans cet appel, `partieAffichee`
+              // resterait périmé (ancien Événement) jusqu'à la prochaine
+              // action qui rafraîchit StrategieService, ce qui pourrait
+              // laisser passer/bloquer à tort la conservation du compteur.
               if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
             })
             .catch(function (erreur) {
@@ -2354,16 +1871,15 @@
       });
     }
 
-    // Portage direct de secteurs.html (GAS) — labels bruts -> texte lisible,
-    // n'affiche que les valeurs non nulles (gain de place sur smartphone).
+    // Labels bruts -> texte lisible, n'affiche que les valeurs non nulles
+    // (gain de place sur smartphone).
     //
-    // 17/08/2026 (Lot G — corrections mineures, suite) : labels compactés
-    // pour le tableau Secteurs (gain de place supplémentaire, décision
-    // utilisateur) — Guildes réduites aux 3 premières lettres + point
-    // (Fer./Ing./Min./Ban./Sci.), "Chantier"/"Défense" abrégés en "Ch."/
-    // "Def." dans LABEL_INSTALLATION (uniquement la colonne du tableau —
-    // TYPES_INSTALLATION plus bas, qui alimente le <select> du formulaire
-    // Construire, reste inchangé avec les noms complets).
+    // Labels compactés pour le tableau Secteurs (gain de place) — Guildes
+    // réduites aux 3 premières lettres + point (Fer./Ing./Min./Ban./Sci.),
+    // "Chantier"/"Défense" abrégés en "Ch."/"Def." dans LABEL_INSTALLATION
+    // (uniquement la colonne du tableau — TYPES_INSTALLATION plus bas, qui
+    // alimente le <select> du formulaire Construire, garde les noms
+    // complets).
     var LABEL_GUILDE = {
       guildeFermiers: 'Fer.', guildeIngenieurs: 'Ing.', guildeMineurs: 'Min.',
       guildeBanquiers: 'Ban.', guildeScientifiques: 'Sci.'
@@ -2378,9 +1894,9 @@
     };
     // jetonPrime/jetonLiberation : vrais compteurs (nombre de jetons face
     // cachée sur le secteur). jetonGloire est différent — un TABLEAU de
-    // valeurs (21/08/2026, correctif — retour utilisateur : un secteur peut
-    // porter plusieurs jetons Gloire, docs-rules-cycle-de-jeu.md §1.5.5,
-    // voir secteurService.js/ligneSecteurParDefaut_ pour le détail complet)
+    // valeurs (un secteur peut porter plusieurs jetons Gloire,
+    // docs-rules-cycle-de-jeu.md §1.5.5, voir
+    // secteurService.js/ligneSecteurParDefaut_ pour le détail complet)
     // — chaque valeur est celle d'un jeton Gloire distinct posé sur le
     // secteur (voir js/strategieService.js, résolution 'envahir' : chaque
     // valeur est recopiée dans un emplacement Gloire libre de la fiche
@@ -2423,39 +1939,23 @@
         '</tr>';
     }
 
-    var TYPES_INSTALLATION = [
-      { valeur: 'chantier_naval', label: 'Chantier Naval' },
-      { valeur: 'defense_secteur', label: 'Défense Secteur' },
-      { valeur: 'base_stellaire', label: 'Base Stellaire' }
-    ];
-    var TYPES_GUILDE = [
-      { valeur: 'fermiers', label: 'Fermiers' },
-      { valeur: 'ingenieurs', label: 'Ingénieurs' },
-      { valeur: 'mineurs', label: 'Mineurs' },
-      { valeur: 'banquiers', label: 'Banquiers' },
-      { valeur: 'scientifiques', label: 'Scientifiques' }
-    ];
-    var TYPES_VAISSEAU = [
-      { valeur: 'corvette', label: 'Corvette' },
-      { valeur: 'sentinelle', label: 'Sentinelle' },
-      { valeur: 'destroyer', label: 'Destroyer' },
-      { valeur: 'cuirasse', label: 'Cuirassé' },
-      { valeur: 'porte_vaisseau', label: 'Porte-Vaisseau' }
-    ];
+    // TYPES_INSTALLATION/TYPES_GUILDE/TYPES_VAISSEAU sont des alias directs
+    // des tables StrategieService.TYPES_INSTALLATION_CONSTRUIRE_/
+    // TYPES_GUILDE_CONSTRUIRE_/TYPES_VAISSEAU (clé `cle`, voir
+    // optionsHTML_ ci-dessous).
+    var TYPES_INSTALLATION = StrategieService.TYPES_INSTALLATION_CONSTRUIRE_;
+    var TYPES_GUILDE = StrategieService.TYPES_GUILDE_CONSTRUIRE_;
+    var TYPES_VAISSEAU = StrategieService.TYPES_VAISSEAU;
 
     function optionsHTML_(liste) {
-      return liste.map(function (o) { return '<option value="' + o.valeur + '">' + o.label + '</option>'; }).join('');
+      return liste.map(function (o) { return '<option value="' + o.cle + '">' + o.label + '</option>'; }).join('');
     }
 
     /**
-     * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-     * formulaire "Construire" (secteur éligible + catégorie + type) —
-     * portage simplifié de la partie "construction" de strategie.html GAS
-     * (le formulaire complet gérait aussi Déployer/Envahir/Regrouper dans
-     * le même écran ; ceux-ci restent hors périmètre de cette session,
-     * voir le résumé de fin de session). Le sélecteur de secteur ne liste
-     * que ceux avec au moins un emplacement libre pour la catégorie
-     * choisie (SecteurService.obtenirSecteursEligiblesConstruction).
+     * Formulaire "Construire" (secteur éligible + catégorie + type). Le
+     * sélecteur de secteur ne liste que ceux avec au moins un emplacement
+     * libre pour la catégorie choisie
+     * (SecteurService.obtenirSecteursEligiblesConstruction).
      */
     function renderFormulaireConstruire_(partie) {
       var selectSecteur = document.getElementById('construire-secteur');
@@ -2510,9 +2010,7 @@
     }
 
     /**
-     * 17/08/2026 (Session 13) : formulaire "Rappeler un cube" (secteur +
-     * type de vaisseau) — portage simplifié, même remarque de périmètre
-     * que renderFormulaireConstruire_ ci-dessus.
+     * Formulaire "Rappeler un cube" (secteur + type de vaisseau).
      */
     function renderFormulaireRappelerCube_(partie) {
       var selectSecteur = document.getElementById('rappel-secteur');
@@ -2552,27 +2050,14 @@
     }
 
     /**
-     * Reprise directe de l'ancienne App.afficherSecteurs_ (index.html v7),
-     * simplement redirigée vers le conteneur de screen-secteurs.
-     *
-     * 17/08/2026 (Session 11 — restauration IHM) : colonnes restaurées à
-     * l'identique de secteurs.html (GAS) — N°/Pop./Guildes/Installations/
-     * Flotte/Gardiens (portage direct, voir ligneSecteurHTML_ ci-dessus).
-     * La colonne "Type" (Secteur-Mère/Déchue/Avant-poste) et le total PN
-     * agrégé introduits lors du portage initial n'existaient pas dans le
-     * legacy — supprimés (le Secteur-Mère et le Corrompu restent visibles
-     * autrement : ligne colorée pour Corrompu, Guildes/Installations pour
-     * distinguer visuellement le Secteur-Mère).
-     *
-     * 17/08/2026 (Session 13) : colonne Action (bouton "Retirer" la
-     * corruption) + branchement des formulaires Construire/Rappeler un
-     * cube, désormais possibles (SecteurService.construire/rappelerCube
-     * portés, voir secteurService.js v2).
-     *
-     * 17/08/2026 (Lot F — corrections mineures) : en-tête de colonne
-     * "Gardiens" -> "Gard." (gain de place) — purement visuel, le champ
-     * de données sous-jacent (secteur.nombreGardien, secteurService.js)
-     * est inchangé.
+     * Colonnes : N°/Pop./Guildes/Installations/Flotte/Gard./Jetons/Action
+     * (voir ligneSecteurHTML_ ci-dessus). Pas de colonne "Type"
+     * (Secteur-Mère/Déchue/Avant-poste) ni de total PN agrégé — le
+     * Secteur-Mère et le Corrompu restent visibles autrement : ligne
+     * colorée pour Corrompu, Guildes/Installations pour distinguer
+     * visuellement le Secteur-Mère. La colonne Action porte le bouton
+     * "Retirer" la corruption ; les formulaires Construire/Rappeler un
+     * cube sont branchés sur SecteurService.construire/rappelerCube.
      */
     function renderEcranSecteurs_(partie) {
       var conteneur = document.getElementById('secteurs-conteneur');
@@ -2653,12 +2138,11 @@
 
     versionApp.textContent = 'v' + APP_VERSION;
 
-    // 19/08/2026 (correctif Piège n°1) : la détection native de mise à jour
-    // du navigateur ne se déclenche que si service-worker.js change au
-    // niveau octet — un simple incrément d'APP_VERSION (version.js, importé
-    // par service-worker.js) ne suffit donc pas à réinstaller le Service
-    // Worker, qui continue de servir un cache périmé indéfiniment (bug
-    // constaté en local, potentiellement aussi en production). On vérifie
+    // La détection native de mise à jour du navigateur ne se déclenche que
+    // si service-worker.js change au niveau octet — un simple incrément
+    // d'APP_VERSION (version.js, importé par service-worker.js) ne suffit
+    // donc pas à réinstaller le Service Worker, qui continuerait de servir
+    // un cache périmé indéfiniment (voir Piège n°1, CLAUDE.md). On vérifie
     // donc ici, à chaque chargement, la version réellement servie par le
     // réseau (fetch avec paramètre anti-cache pour forcer un aller-retour
     // réseau même sous un Service Worker actif — voir js/catalogueSync.js
@@ -2723,26 +2207,18 @@
         });
     });
 
-    // --------------------------------------------------------
-    // 17/08/2026 (Session 8, Phase 6) : la liste "Parties enregistrées"
-    // (Continuer/Archiver/Supprimer) qui vivait ici depuis la Session 4 a
-    // été retirée — remplacée par l'écran Historique dédié, enrichi
+    // La liste "Parties enregistrées" (Continuer/Archiver/Supprimer) est
+    // remplacée par l'écran Historique dédié, enrichi
     // (événements/technologies/vainqueur), voir historiqueVueService.js.
-    // --------------------------------------------------------
 
-    // 17/08/2026 (Session 7) : remplace l'ancien btn-retour-accueil-creation
-    // (n'existe plus, screen-partie-creee a disparu) — déclenche l'événement
-    // partagé voidfall:retour-accueil, réutilisé aussi par scoreVueService.js
-    // après l'enregistrement d'une fin de partie.
-    // 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-    // avancerCycle est désormais porté (voir gameService.js v7) — bouton
-    // "Fin du cycle" simplifié par rapport au legacy (pas de modale
-    // "Phase C" : la résolution d'escarmouche et le paiement de
-    // l'entretien restent manuels pour l'instant, l'entretien dû est
-    // affiché juste au-dessus à titre indicatif). La pile d'annulation
-    // est entièrement vidée à chaque cycle (règle tranchée dès la Session
-    // 4, voir annulationService.js en-tête — jusqu'ici jamais appelée,
-    // faute d'avancerCycle porté).
+    // Déclenche l'événement partagé voidfall:retour-accueil, réutilisé
+    // aussi par scoreVueService.js après l'enregistrement d'une fin de
+    // partie.
+    // Bouton "Fin du cycle" : pas de modale "Phase C" — la résolution
+    // d'escarmouche et le paiement de l'entretien restent manuels,
+    // l'entretien dû est affiché juste au-dessus à titre indicatif. La
+    // pile d'annulation est entièrement vidée à chaque cycle (voir
+    // annulationService.js en-tête).
     document.getElementById('btn-fin-cycle').addEventListener('click', function () {
       var partie = App.getPartieCourante();
       if (!partie) return;
@@ -2776,11 +2252,9 @@
         });
     });
 
-    // 18/08/2026 (Réorganisation Plat. Galactique, retour utilisateur) :
-    // remplace #btn-retour-accueil-partie (supprimé, voir screen-plateau-
-    // galactique) — le titre de l'app sert désormais de "Retour à
-    // l'accueil" depuis n'importe quel onglet, même événement partagé
-    // (voidfall:retour-accueil, réutilisé par scoreVueService.js).
+    // Le titre de l'app sert de "Retour à l'accueil" depuis n'importe quel
+    // onglet (même événement partagé voidfall:retour-accueil, réutilisé
+    // par scoreVueService.js).
     document.getElementById('topbar-titre').addEventListener('click', function () {
       document.dispatchEvent(new Event('voidfall:retour-accueil'));
     });

@@ -1,26 +1,18 @@
 /**
  * setupService.js
  * Écran "Créer une partie" — Voidfall Companion PWA
- * Version 2 — 19/08/2026 (retour utilisateur — tri maisons par complexité + étoiles ★/☆)
  *
- * Portage de setup.html (GAS, Version 2 — 10/08/2026) : logique de
- * l'écran de création de partie (choix manuel/aléatoire, mise en place
- * manuelle). Même logique métier, adaptée pour appeler GameService.js
- * directement (plus d'appel Api.xxx ni de google.script.run).
+ * Logique de l'écran de création de partie (choix manuel/aléatoire, mise
+ * en place manuelle).
  *
- * Simplification par rapport à la version GAS : rafraichirTechnologieDepart_
- * et rafraichirTechnologiesSansPoint_ lisaient un sous-ensemble de maisons
- * via un aller-retour serveur dédié (Api.getDetailMaisons), pour limiter
- * le poids du payload réseau. Ici, GameService.obtenirMaisonsCatalogue()
- * a déjà tout rapatrié une fois (IndexedDB local, pas de coût réseau) et
- * reste en cache dans maisonsCache : ces deux fonctions filtrent
- * simplement ce cache, en synchrone, sans nouvel appel.
+ * GameService.obtenirMaisonsCatalogue() rapatrie tout le catalogue une
+ * fois (IndexedDB local, pas de coût réseau) et le garde en cache dans
+ * maisonsCache : rafraichirTechnologieDepart_ et
+ * rafraichirTechnologiesSansPoint_ filtrent simplement ce cache, en
+ * synchrone, sans nouvel appel.
  *
  * Dépend de db.js (DB), gameService.js (GameService) et d'un petit objet
- * global `App` défini dans index.html (App.afficherEcran/App.afficherPartieCreee)
- * — remplace App.showScreen/App.renderPartie côté GAS ; le futur js/app.js
- * (orchestration complète, Phases 3+) prendra le relai quand plus
- * d'écrans existeront.
+ * global `App` défini dans index.html (App.afficherEcran/App.afficherPartieCreee).
  */
 
 var SetupService = (function () {

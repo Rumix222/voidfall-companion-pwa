@@ -1,34 +1,18 @@
 /**
  * focusService.js
  * Cartes Focus — Voidfall Companion PWA
- * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-2 — retrait de 3 exports publics jamais appelés)
  *
- * 21/08/2026 (docs/docs-rapport.md CM-2) : obtenirCartesFocus/
- * obtenirFocusParFamille/obtenirPoolHeroique retirés de l'API publique
- * (zéro appelant dans tout le repo). Aucun changement de comportement
- * pour les fonctions restantes.
+ * Catalogue des cartes Focus uniquement (regroupement des lignes "focus"
+ * en cartes, mise en place par maison, pool héroïque) — aucune dépendance
+ * DOM ici.
  *
- * Phase 4 (partielle) du plan de migration : portage de FocusService.js
- * (GAS, 263 l.), UNIQUEMENT la partie catalogue (regroupement des lignes
- * "focus" en cartes, mise en place par maison, pool héroïque). Aucune
- * dépendance RPC ni DOM ici.
- *
- * HORS PÉRIMÈTRE (volontairement, voir docs-migration-pwa-plan.md
- * section 1, remarque Phase 4) : le moteur coût/effet (jouerAction_/
- * appliquerJson_, ~3405 l. embarquées dans strategie.html côté GAS) —
- * c'est la plus grosse pièce du portage, fortement couplée au DOM et
- * explicitement signalée comme à traiter en session dédiée (extraction
- * d'un focusEngine.js pur d'abord, puis rebranchement DOM). Cette
- * session se limite à ce qui permet de remplir partie.focusJoueur à la
- * création (GameService.creerPartie) — les cartes ne sont pas encore
- * jouables.
- *
- * tirerFocusHeroiques (GAS) n'est PAS porté : déjà noté comme mort côté
- * GAS ("plus utilisée depuis le passage au choix manuel des Focus
- * héroïques... aucun code du projet ne l'appelle plus").
+ * HORS PÉRIMÈTRE (volontairement) : le moteur coût/effet des actions
+ * Focus vit dans js/focusEngine.js (pur), pas ici — ce module se limite à
+ * ce qui permet de remplir partie.focusJoueur à la création
+ * (GameService.creerPartie).
  *
  * Dépend de db.js (DB, store catalogue "focus", peuplé par
- * catalogueSync.js — Phase 1) : à charger avant ce fichier.
+ * catalogueSync.js) : à charger avant ce fichier.
  */
 
 var FocusService = (function () {
@@ -38,11 +22,10 @@ var FocusService = (function () {
   var TYPE_HEROIQUE_NORM = 'heroique';
 
   /**
-   * cout/effet sont des colonnes jsonb Supabase : déjà des objets JS une
-   * fois passés par catalogueSync.js (PostgREST les renvoie déjà
-   * parsés). Ce filet de sécurité gère quand même le cas d'une chaîne
-   * (ex. import manuel futur d'un JSON de secours) sans jamais bloquer
-   * l'affichage — même principe que parseJsonSafe_ côté GAS.
+   * cout/effet sont déjà des objets JS une fois chargés depuis le JSON du
+   * catalogue (data/catalogue/focus.json). Ce filet de sécurité gère quand
+   * même le cas d'une chaîne (ex. import manuel futur d'un JSON de
+   * secours) sans jamais bloquer l'affichage.
    */
   function parseJsonSafe_(valeur) {
     if (!valeur) return {};
@@ -71,7 +54,7 @@ var FocusService = (function () {
    * Regroupe les lignes brutes du store "focus" en cartes (clé
    * Focus+Type), chaque carte portant la liste de ses 2-3 actions
    * (Action/Coût/Effet/Texte). Ignore les lignes sans focus ou sans type
-   * (données incomplètes, tolérant comme côté GAS).
+   * (données incomplètes).
    */
   function obtenirCartesFocus_() {
     return DB.getAll('focus').then(function (lignes) {
@@ -146,10 +129,9 @@ var FocusService = (function () {
   }
 
   /**
-   * Noms des Focus héroïques disponibles (pour peupler les listes
-   * déroulantes de choix manuel en cours de partie — Phase 4 suite,
-   * choisirFocusHeroique reste hors périmètre pour l'instant, voir
-   * gameService.js).
+   * Noms des Focus héroïques disponibles — utilisé pour peupler les
+   * listes déroulantes de choix manuel en cours de partie (voir
+   * GameService.choisirFocusHeroique).
    */
   function obtenirNomsPoolHeroique_() {
     return obtenirPoolHeroique_().then(function (cartes) {
@@ -168,12 +150,6 @@ var FocusService = (function () {
     });
   }
 
-  // 21/08/2026 (docs/docs-rapport.md CM-2) : obtenirCartesFocus/
-  // obtenirFocusParFamille/obtenirPoolHeroique retirés de l'API publique
-  // (zéro appelant dans tout le repo, confirmé par recherche globale) —
-  // obtenirCartesFocus_/obtenirPoolHeroique_ restent des fonctions
-  // privées, toujours utilisées en interne par obtenirMiseEnPlace_/
-  // obtenirNomsPoolHeroique_/obtenirCarteHeroiqueParNom_ ci-dessous.
   return {
     obtenirMiseEnPlace: obtenirMiseEnPlace_,
     obtenirNomsPoolHeroique: obtenirNomsPoolHeroique_,

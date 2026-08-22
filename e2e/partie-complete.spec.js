@@ -10,9 +10,9 @@
  * Piège n°1 manuellement.
  *
  * Capture aussi toute erreur JS console/page pendant tout le parcours : ce
- * test aurait détecté le Piège n°2 (ReferenceError silencieux sur un appel
- * cross-fichier à une fonction de rendu privée) et le bug de navigation de
- * scoreVueService.js documentés dans docs/docs-rapport.md.
+ * test attraperait le Piège n°2 (ReferenceError silencieux sur un appel
+ * cross-fichier à une fonction de rendu privée) ou un bouton de navigation
+ * pointant vers un écran inexistant.
  */
 var test = require('@playwright/test').test;
 var expect = require('@playwright/test').expect;

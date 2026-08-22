@@ -178,9 +178,8 @@ test('retirerCorruption : passe corrompu à false', function () {
   });
 });
 
-// 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-// TODO.md) : obtenirSecteursEligiblesRetraitCorruption — seuls les
-// secteurs POSSÉDÉS (appartientAuJoueur_) ET Corrompus sont éligibles.
+// obtenirSecteursEligiblesRetraitCorruption — seuls les secteurs
+// POSSÉDÉS (appartientAuJoueur_) ET Corrompus sont éligibles.
 test('obtenirSecteursEligiblesRetraitCorruption : ne retourne que les secteurs possédés ET Corrompus', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
@@ -212,11 +211,11 @@ test('placerCorruption : passe corrompu à true', function () {
   });
 });
 
-// 21/08/2026 (effet "Gagner une Corruption", voir docs-rules-corruption-
-// gardiens-refuges-technoConsume.md §1) : miroir INVERSÉ d'obtenirSecteursEligiblesRetraitCorruption
-// — secteurs POSSÉDÉS ET PAS Corrompus, à l'exclusion du Secteur-Mère
-// (immunisé à la Corruption, "sauf un secteur immunisé... comme un
-// Secteur-Mère standard", §1) — seule différence structurelle avec le
+// Miroir INVERSÉ d'obtenirSecteursEligiblesRetraitCorruption — secteurs
+// POSSÉDÉS ET PAS Corrompus, à l'exclusion du Secteur-Mère (immunisé à
+// la Corruption, voir docs-rules-corruption-gardiens-refuges-
+// technoConsume.md §1 : "sauf un secteur immunisé... comme un
+// Secteur-Mère standard") — seule différence structurelle avec le
 // retrait, qui n'a pas besoin de cette exclusion (un Secteur-Mère ne peut
 // de toute façon jamais être Corrompu).
 test('obtenirSecteursEligiblesGainCorruption : ne retourne que les secteurs possédés, PAS Corrompus, hors Secteur-Mère', function () {
@@ -243,11 +242,11 @@ test('obtenirSecteursEligiblesGainCorruption : ne retourne que les secteurs poss
 // obtenirAgregatsInfluenceSecteursPurs
 // ---------------------------------------------------------------
 
-// 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
-// secteur Pur", voir focusEngine.js) : agrégats calculés UNIQUEMENT sur
-// les secteurs "Purs" (possédés ET pas Corrompus) — un secteur Corrompu
-// ou du Néant (non possédé) ne doit compter dans AUCUN agrégat, même s'il
-// porte des Guildes/Installations/cubes.
+// Agrégats calculés UNIQUEMENT sur les secteurs "Purs" (possédés ET pas
+// Corrompus) — utilisés par le gain d'Influence variable "N par
+// Guilde/Installation/cube/secteur Pur" (voir focusEngine.js). Un
+// secteur Corrompu ou du Néant (non possédé) ne doit compter dans AUCUN
+// agrégat, même s'il porte des Guildes/Installations/cubes.
 test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes/secteurs sur les secteurs Purs uniquement', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };

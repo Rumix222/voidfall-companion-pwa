@@ -1,7 +1,97 @@
 /**
  * version.js
- * Version 51 — 2026-08-21
+ * Version 54 — 2026-08-22
  * Source de vérité unique pour la version de l'application.
+ *
+ * 22/08/2026 (nettoyage des commentaires historiques + mise à jour de la
+ * documentation) : passage sur l'ensemble du code applicatif
+ * (`index.html`, `css/style.css`, tout `js/*.js` y compris les fichiers de
+ * test, `service-worker.js`) pour retirer les commentaires qui ne
+ * racontaient que l'historique du projet (dates, "Session N"/"Lot X",
+ * "retour utilisateur", numéros de version, références à
+ * `docs/docs-rapport.md`, narration de portage depuis le legacy Google
+ * Apps Script) — conservé partout : le POURQUOI non évident du
+ * comportement actuel (invariants, contournements de bug, périmètres
+ * volontairement hors scope), reformulé sans la référence historique.
+ * `version.js` n'est PAS concerné (reste le changelog daté du projet, par
+ * design). Un correctif de documentation réel trouvé au passage :
+ * `gameService.js` `creerPartie` affirmait à tort qu'aucun secteur n'est
+ * instancié, alors que `SecteurService.instancierSecteurs` est bien
+ * appelé — JSDoc corrigée pour refléter le code réel. `docs/docs-
+ * architecture-pwa.md` mis à jour en profondeur pour refléter l'état
+ * actuel du code (API publiques de chaque module, catalogue complet des
+ * 18 `contexte.type` de `demanderChoix`, stratégie de test à jour —
+ * `civilisationService.js`/`combatService.js` désormais testés,
+ * `scoreService.js` seul module pur restant sans test dédié — dette
+ * connue réévaluée : extractions `strategieService.js`/`index.html` et
+ * refetch `gameService.js` examinés et documentés comme des choix
+ * délibérés plutôt que de la dette). `CLAUDE.md` mis à jour en
+ * conséquence (tailles de fichiers, points résolus). Aucun changement de
+ * comportement : validé par les 104 tests `*.test.js` + les 7 fichiers
+ * `*_test.js`/`test_*.js` + `e2e/partie-complete.spec.js` +
+ * `e2e/partie-aleatoire.spec.js` (14 maisons).
+ *
+ * 22/08/2026 (docs/docs-rapport.md DUP-1 + DUP-4, suite de la reprise des
+ * corrections du rapport d'audit) :
+ * - DUP-1 : index.html ne tient plus ses propres copies de
+ *   LABEL_RESSOURCE_CADRE_/COULEUR_RESSOURCE_CADRE_/TYPES_INSTALLATION/
+ *   TYPES_GUILDE/TYPES_VAISSEAU/COULEUR_PAR_GUILDE_CADRE_ — lit désormais
+ *   StrategieService.CHAMP_RESSOURCE/TYPES_INSTALLATION_CONSTRUIRE_/
+ *   TYPES_GUILDE_CONSTRUIRE_/TYPES_VAISSEAU/GUILDE_VERS_RESSOURCE
+ *   (nouvellement exposées) — nouveau helper index.html
+ *   libelleRessourceCadre_, COULEUR_PAR_GUILDE_CADRE_ recalculée (2 hops
+ *   via les tables exposées) au lieu d'une 3ᵉ copie figée des 5 couleurs.
+ *   2 divergences de libellé trouvées entre les anciennes copies,
+ *   tranchées par l'utilisateur : "Défense Secteur" -> "Défense de
+ *   Secteur" (formulaire Construire, écran Secteurs) et "Cuirasse" ->
+ *   "Cuirassé" (corrigé côté strategieService.js, désormais cohérent avec
+ *   combatService.js qui utilisait déjà l'accent). LABEL_GUILDE/
+ *   LABEL_INSTALLATION/LABEL_PN (tableau Secteurs, libellés abrégés,
+ *   clés `guildeFermiers` etc.) restent des tables à part — pas une
+ *   duplication au sens strict (texte ET clés différents des tables
+ *   `cle`/`label` ci-dessus).
+ * - DUP-4 : LABEL_GUILDE_INFLUENCE_ (strategieService.js, copie exacte de
+ *   TYPES_GUILDE_CONSTRUIRE_) supprimée, remplacée par labelGuilde_(cle)
+ *   (même principe que labelVaisseau_/MUT-6). CHAMP_RESSOURCE vs
+ *   RESSOURCES_TOUTES (strategieService.js) restent volontairement
+ *   séparées (déjà documenté avant ce lot — portées différentes, voir
+ *   commentaire en tête de RESSOURCES_TOUTES).
+ * Aucun changement de comportement à l'exception des 2 libellés
+ * corrigés ci-dessus (décision utilisateur) : validé par les 80 tests
+ * `*.test.js` + les 51 tests `*_test.js`/`test_*.js` +
+ * e2e/partie-complete.spec.js + e2e/partie-aleatoire.spec.js (14 maisons).
+ *
+ * 22/08/2026 (docs/docs-rapport.md GAP-1 + ARCH-6, reprise des corrections
+ * du rapport d'audit) :
+ * - GAP-1 : `texteAmeliore` (catalogue technologies.json, rempli sur les 28
+ *   entrées mais jamais affiché) désormais visible en tooltip sur la case
+ *   "Améliorée" cochée — Technologie de départ ET les 5 emplacements
+ *   "Technologies obtenues" (Plat. maison). js/gameService.js
+ *   (obtenirMaisonsCatalogue_/formatMaison_ propagent désormais
+ *   texteAmeliore, comme texte déjà avant), index.html (nouveau helper
+ *   titreTechnologie_, title dynamique sur #technologie-depart-plateau-
+ *   maison et chaque `.check-amelioree` de renderTechnologiesObtenues_ —
+ *   lookup par nom dans partie.joueur.technologies/toutesLesTechs, aucun
+ *   changement de schéma persisté).
+ * - ARCH-6 : commentaire obsolète `index.html` (écran Secteurs, mentionnait
+ *   "SecteurService.obtenirSecteurMere n'est plus appelé" — faux, utilisé
+ *   par js/strategieService.js popup 'deployer_cube' mode 'secteur_mere')
+ *   corrigé ; `.subsection-title` (h3, 4 occurrences statiques + 1
+ *   générée en JS) stylée pour la première fois (css/style.css, même
+ *   gabarit que `.card h3`, sans le trait orange — délibérément absent,
+ *   voir commentaire index.html) ; js/civilisationService.js : 9
+ *   échappements `\uXXXX` résiduels (mélangés aux caractères accentués
+ *   directs utilisés partout ailleurs dans ce fichier) remplacés par leur
+ *   caractère direct (`’` -> apostrophe ASCII `'`, cohérent avec le
+ *   reste du fichier, pas de guillemet typographique ailleurs — 2
+ *   occurrences réécrites en `\'` pour rester dans une chaîne à guillemets
+ *   simples). La plage regex de la ligne 133 (normalisation Unicode des
+ *   diacritiques, U+0300 à U+036F) n'est PAS concernée, laissée telle
+ *   quelle (pas un problème de cohérence, un vrai intervalle de code
+ *   points illustrable seulement en échappement).
+ * Aucun changement de comportement (sauf l'ajout du tooltip GAP-1, prévu) :
+ * validé par les 80 tests `*.test.js` + les 51 tests `*_test.js`/
+ * `test_*.js`.
  *
  * 21/08/2026 (docs/docs-rapport.md MUT-2 à MUT-8 + DUP-2/DUP-3, suite de
  * la relecture complète) :
@@ -1440,4 +1530,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260821.13';
+var APP_VERSION = '20260822.3';

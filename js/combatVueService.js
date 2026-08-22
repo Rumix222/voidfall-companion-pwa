@@ -1,22 +1,17 @@
 /**
  * combatVueService.js
  * Écran Combat — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 6, Phase 5 — Combat/Invasion)
  *
- * Portage DOM de la partie interface de combat.html (GAS, render_/setMode_/
- * simuler_/afficherDetails_/init/chargerPartie) — la logique de résolution
- * elle-même vit dans js/combatService.js (pur, testable en Node). Séparé
- * de js/strategieService.js : écran indépendant, pas de dépendance à
- * focusEngine.js/annulationService.js (le combat ne touche aucun champ
- * persisté — c'est un calculateur, le joueur applique le résultat
- * manuellement sur le plateau physique/l'écran Secteurs, comme prévu tant
- * que les actions secteur restent hors périmètre — voir combatService.js
- * en-tête).
+ * La logique de résolution vit dans js/combatService.js (pur, testable
+ * en Node) ; ce fichier ne gère que le rendu/les listeners. Écran
+ * indépendant de js/strategieService.js : pas de dépendance à
+ * focusEngine.js/annulationService.js — le combat ne touche aucun champ
+ * persisté, c'est un calculateur, le joueur applique le résultat
+ * manuellement sur le plateau physique/l'écran Secteurs (voir
+ * combatService.js en-tête).
  *
- * Simplification par rapport à combat.html : "Détails" utilise
- * window.alert() (le composant modal-info générique de strategie.html/
- * index-2.html GAS n'existe pas dans cette PWA — pas construit cette
- * session, aurait élargi le périmètre au-delà de Combat/Invasion).
+ * Simplification : "Détails" utilise window.alert() (pas de modal-info
+ * générique dans cette PWA).
  *
  * Dépend de : js/combatService.js (moteur pur, à charger avant ce
  * fichier) et de l'objet global App défini dans index.html

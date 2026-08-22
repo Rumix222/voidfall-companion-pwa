@@ -1,128 +1,15 @@
 /**
  * css/style.css
- * Version 15 — 19/08/2026 (retour utilisateur — espacement ligne Cube + input/bouton Activer)
  *
- * 17/08/2026 (Lot F — corrections mineures) : nouvelles classes
- * .ligne-cubes/-titre/-item (ligne Cube inactif/actif/déployé compactée
- * sur une seule ligne, écran Plat. maison — voir js/strategieService.js
- * v13, renderCubes_). .civilisation-actions-globales retirée (n'habillait
- * plus que les 2 boutons globaux retirés du DOM, voir index.html v18).
+ * Style de l'app (thème sombre spatial, fond violet/nébuleuse, accent
+ * corail). Organisé par écran : Accueil/Créer une partie, Partie,
+ * Stratégie (ressources, Focus, pistes de Civilisation), Secteurs,
+ * Combat, Fin de partie/Historique — plus les composants partagés
+ * (boutons, modale de choix générique `demanderChoix`, badges).
  *
- * 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : nouvelles
- * classes .rappel-ressources-footer/.rappel-chip/-label/-valeur (bandeau
- * fixe de rappel des ressources, écran Focus) + #screen-focus (padding-
- * bottom, pour ne pas laisser le bandeau recouvrir le bas du contenu).
- * Voir index.html (v17) et js/strategieService.js (v12) pour le HTML/
- * rendu correspondants.
- *
- * 17/08/2026 (Lot A/B — restructuration Partie) : ajout de
- * .champ-technologie-fixe (Technologie de départ en texte fixe, écran
- * Plat. maison — voir index.html v14). Aucune classe existante modifiée :
- * les blocs déplacés (carte-joueur, technologies-obtenues-liste,
- * plateau-influence) sont réutilisés tels quels, seulement changés de
- * conteneur DOM.
- *
- * 17/08/2026 (Lot 3 — finitions Stratégie) : classes copiées telles
- * quelles depuis style.html — pistes de Civilisation (.piste-civilisation-
- * bloc/-item/-label/-prochaines/-prochaine, liste verticale au lieu
- * d'une grille de cartes) et cartes Focus (.focus-card/.focus-id/
- * .focus-action-corps/.focus-action-side/.focus-action-nom, au lieu d'un
- * bouton "Jouer cette action" pleine largeur). Voir js/strategieService.js
- * (v9) pour le rendu correspondant.
- *
- * 17/08/2026 (Lot 1 — maisons déchues) : .badge/.badge-type-* remplacées
- * par les valeurs exactes de style.html (même situation que le Lot 2 —
- * écrites sans référence CSS legacy la première fois) ; ajout de
- * .card-joueur/.card-list/.card h3/.card p (absentes jusqu'ici),
- * copiées telles quelles. Voir index.html (v13) pour le rendu
- * correspondant (carte joueur + maisons déchues, écran Partie).
- *
- * 17/08/2026 (Lot 2, révisé — style.html ajouté en Project Knowledge) :
- * le premier jet du Lot 2 (grille de ressources) avait été écrit SANS
- * référence CSS legacy disponible ("réécriture fidèle au comportement").
- * Une fois style.html fourni, toutes les classes concernées (.field-
- * ressource/.pastille-ressource/.ressource-niveau/.ressource-fleche/
- * .ressource-revenu/.ressource-input/.ressource-delta/.jeton-champ/
- * .jeton-input/.ressources-liste/.ressources-jetons) ont été remplacées
- * par une copie exacte de style.html (mêmes valeurs de grille, tailles,
- * couleurs, ordre de cascade — .field-ressource déplacé après le bloc
- * "Écran Fin de partie" pour préserver la même résolution de spécificité
- * CSS que le legacy face à .field label, à spécificité égale). Noms de
- * classes déjà corrects dans la version précédente (JS non retouché
- * ici) — seules les RÈGLES CSS elles-mêmes changent.
- * Écart assumé et signalé : .ressources-liste redevient une colonne flex
- * (comme en legacy, où elle est partagée par le bloc ressources
- * principales ET le bloc Cubes) — #ressources-cubes (toujours en
- * .ressource-case, non porté en .field-ressource, hors périmètre de ce
- * lot) passe donc de 3 cartes en grille à 3 cartes empilées verticalement.
- *
- * 17/08/2026 (Lot 2 — grille de ressources) : réécriture du bloc
- * #ressources-principales (écran Stratégie) — nouvelles classes .field-
- * ressource/.pastille-ressource/.ressource-niveau/.ressource-fleche/
- * .ressource-revenu/.ressource-input/.ressource-delta (grille fixe à 6
- * colonnes par ressource, portage de champRessourceHTML_) et .jeton-champ/
- * .jeton-input (Commerce/Prime/Libération éditables, portage de
- * champJetonHTML_) qui remplacent l'usage de .ressource-case sur ces deux
- * conteneurs (règle ".ressources-jetons .ressource-case" retirée, devenue
- * inutile ; .ressource-case reste utilisée telle quelle pour Cube inactif/
- * actif/déployé, inchangé). Voir js/strategieService.js (v8) pour le
- * rendu correspondant.
- *
- * 17/08/2026 (Session 14 — action secteur "Regrouper" portée) : ajout de
- * .regrouper-liste/.btn-lien/.regrouper-form (popup Regrouper, écran
- * Stratégie — voir js/strategieService.js), portées telles quelles depuis
- * style.html (GAS).
- *
- * 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
- * ajout de .techno-obtenue-ligne (écran Partie — select + case Améliorée
- * par emplacement de technologie obtenue).
- *
- * 17/08/2026 (Session 12 — restauration IHM Partie) : ajout de
- * .check-amelioree (case "Technologie de départ améliorée", écran
- * Partie) — même pattern que .piste-civilisation-corrompue. Voir aussi
- * index.html et js/gameService.js.
- *
- * 17/08/2026 (Session 11 — restauration IHM Secteurs) : .nav-ecrans passe
- * en scroll horizontal (overflow-x:auto, boutons flex-shrink:0) — 4
- * boutons (Partie/Stratégie/Secteurs/Combat) ne tenaient plus sur une
- * largeur de smartphone depuis l'ajout de "Combat". Demande explicite de
- * l'utilisateur (le nouveau bouton "Combat" est accepté à condition que le
- * menu reste utilisable).
- *
- * 17/08/2026 (Session 10 — restauration IHM Stratégie/Partie) : ajout de
- * .ressources-cubes (séparateur), .ressources-gloire/.gloire-emplacements/
- * .gloire-jeton (widget Gloire 5 emplacements) et .plateau-influence/
- * .losange-argente (Influence sur l'écran Partie) — portage direct de
- * style.html GAS, mêmes variables couleur déjà en place ici. Voir
- * index.html et js/strategieService.js pour le HTML/rendu correspondants.
- *
- * 17/08/2026 (Session 4, Phase 4 suite — rebranchement DOM) : ajout de la
- * nav Partie/Stratégie/Secteurs (.barre-navigation-partie, .nav-ecrans),
- * de l'écran Stratégie (ressources, cartes Focus jouables, pastilles de
- * coût, journal, bouton Annuler) et de la modale de choix générique
- * (.modal-overlay/.modal-box/.modal-actions) — reprise des classes de
- * strategie.html/style.html GAS, adaptées aux variables CSS déjà en place
- * ici (mêmes couleurs, pas de nouvelle palette).
- *
- * 17/08/2026 (Phase 3) : ajout de .table-secteurs / .ligne-corrompue —
- * affichage du plateau des secteurs sur l'écran de confirmation de
- * création de partie (voir index.html, App.afficherPartieCreee).
- *
- * Sous-ensemble de style.html (app GAS legacy, 1368 l.) extrait pour les
- * écrans Accueil + Créer une partie (Session 3). Mêmes variables/classes
- * que l'app d'origine (identité visuelle inchangée), MAIS seuls les
- * sélecteurs réellement utilisés par ces écrans ont été copiés — pas un
- * port intégral de style.html. Les prochains écrans portés
- * (Partie/Stratégie/Combat, Phases 4+) ajouteront leurs propres blocs
- * ici au fur et à mesure, plutôt que de tout importer d'un coup.
- *
- * Contenu ajouté : variables racine, fond étoilé/nébuleuse, conteneur
- * #app, topbar, .screen (bascule d'écrans), .section-title,
- * .hint/.hint-inline, boutons (.btn/.btn-primary/.btn-secondary/
- * .btn-toggle/.btn-danger), .mode-toggle, .setup-bloc(-imbrique), select,
- * .setup-actions, .card (cartes "parties enregistrées" sur l'accueil),
- * mise en place manuelle (.case-mise-en-place-manuelle, .label-section,
- * .techno-sans-point-*), .table-secteurs.
+ * Pas de media query : sur smartphone, les blocs qui débordent (nav
+ * d'écrans, ligne Cube...) passent en scroll horizontal plutôt qu'en
+ * disposition alternative.
  */
 
 :root {
@@ -214,12 +101,10 @@ html, body {
   margin: 0;
 }
 
-/* 18/08/2026 (Réorganisation Plat. Galactique) : le titre de l'app fait
-   désormais office de bouton "Retour à l'accueil", cliquable depuis
-   n'importe quel onglet (remplace #btn-retour-accueil-partie, retiré de
-   l'écran Plat. Galactique — décision utilisateur). Pas de <button> ici :
-   un <h1> n'est pas un contenu de "phrasing" valide dans <button>, un
-   simple curseur pointer + listener JS suffit (voir index.html). */
+/* Le titre de l'app sert de bouton "Retour à l'accueil", cliquable depuis
+   n'importe quel onglet. Pas de <button> ici : un <h1> n'est pas un
+   contenu de "phrasing" valide dans <button>, un simple curseur pointer +
+   listener JS suffit (voir index.html). */
 .topbar-titre { cursor: pointer; }
 
 .topbar-accent {
@@ -244,6 +129,19 @@ html, body {
   margin: 0 0 12px;
   padding-left: 12px;
   border-left: 3px solid var(--color-coral);
+}
+
+/* Même gabarit que .card h3, sans le trait orange (délibéré — réservé aux
+   3 sections promues d'Événement galactique, voir .section-title
+   ci-dessus et index.html). Utilisée pour les sous-titres secondaires
+   (Construire/Rappeler un cube/Attaquant/Défenseur, "Objectifs — Phase
+   Évaluation"...). */
+.subsection-title {
+  font-family: var(--font-display);
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .hint {
@@ -378,16 +276,12 @@ input:disabled {
   padding: 16px 18px;
 }
 
-/* 17/08/2026 (Lot 1 — maisons déchues) : copiées telles quelles depuis
-   style.html GAS — jusqu'ici absentes de la PWA. .card-joueur (bordure
-   corail, cf. #carte-joueur, index.html) et .card-list (grille auto-fill,
-   cf. #liste-adversaires — remplace l'ancien style inline
-   "display:flex;flex-direction:column" qui empilait les maisons déchues
-   en une seule colonne pleine largeur) redonnent à l'écran Partie son
-   agencement legacy. .card h3/.card p uniformisent la typographie des
-   cartes maison (nom + lignes de détail) ; sans effet sur les autres
-   usages de .card (cartes Focus, résultat de combat) qui n'imbriquent
-   pas de <h3>/<p> nus. */
+/* .card-joueur (bordure corail, cf. #carte-joueur, index.html) et
+   .card-list (grille auto-fill, cf. #liste-adversaires) donnent leur
+   agencement à l'écran Partie. .card h3/.card p uniformisent la
+   typographie des cartes maison (nom + lignes de détail) ; sans effet sur
+   les autres usages de .card (cartes Focus, résultat de combat) qui
+   n'imbriquent pas de <h3>/<p> nus. */
 .card-joueur {
   border-color: var(--color-coral);
   box-shadow: 0 0 0 1px rgba(255, 107, 82, 0.15), 0 8px 28px -10px rgba(255, 107, 82, 0.35);
@@ -410,15 +304,10 @@ input:disabled {
   line-height: 1.4;
 }
 
-/* 18/08/2026 (Réorganisation Plat. Galactique) : nombre de manches à
-   droite du titre "Événement galactique" (§2 Introduction,
-   docs-rules-cycle-de-jeu.md — coin supérieur droit de la carte).
-   Renommée .section-title-cycle -> .section-title-avec-suffixe : cette
-   classe habillait initialement le titre "Cycle X" lui-même (retiré du
-   flux des .section-title, voir .titre-cycle/.plateau-galactique-entete
-   ci-dessous — le nombre de manches est rapatrié sur "Événement
-   galactique" à la demande de l'utilisateur), mais reste utile telle
-   quelle pour n'importe quel section-title avec un suffixe à droite. */
+/* Nombre de manches à droite du titre "Événement galactique" (§2
+   Introduction, docs-rules-cycle-de-jeu.md — coin supérieur droit de la
+   carte). Générique : utilisable pour n'importe quel .section-title avec
+   un suffixe à droite. */
 .section-title-avec-suffixe {
   display: flex;
   align-items: baseline;
@@ -434,14 +323,12 @@ input:disabled {
   white-space: nowrap;
 }
 
-/* 18/08/2026 (Réorganisation Plat. Galactique) : bandeau d'en-tête de
-   l'écran — titre "Cycle X" (+ Entretien dû, en petit dessous) à gauche,
-   bouton "Fin du cycle"/"Terminer la partie" à droite (décision
-   utilisateur : les deux remontent en haut de l'écran, plus besoin de
-   descendre toute la page pour les atteindre). .titre-cycle n'a
-   volontairement PAS le trait orange de .section-title (réservé aux 3
-   sections en dessous — Événement galactique/Technologies avancées/Focus
-   héroïques) : c'est un titre de page, pas une section. */
+/* Bandeau d'en-tête de l'écran — titre "Cycle X" (+ Entretien dû, en
+   petit dessous) à gauche, bouton "Fin du cycle"/"Terminer la partie" à
+   droite. .titre-cycle n'a volontairement PAS le trait orange de
+   .section-title (réservé aux 3 sections en dessous — Événement
+   galactique/Technologies avancées/Focus héroïques) : c'est un titre de
+   page, pas une section. */
 .plateau-galactique-entete {
   display: flex;
   align-items: flex-start;
@@ -483,11 +370,9 @@ input:disabled {
 }
 .cadre-carte-obligatoire { border-style: solid; }
 .cadre-carte-optionnel { border-style: dashed; }
-/* 18/08/2026 (Simplification UI Événement galactique) : cadre entier
-   cliquable (remplace le bouton "Placer" dédié sous le texte, cf.
-   renderCadresEvenement_/pseudoBoutonCarte_ dans index.html) pour les
-   cadres à résoudre via popup sans choix affiché en dur dans la carte
-   (ex. placement Défense de Secteur + Guilde). */
+/* Cadre entier cliquable (cf. renderCadresEvenement_/pseudoBoutonCarte_
+   dans index.html) pour les cadres résolus via popup sans choix affiché
+   en dur dans la carte (ex. placement Défense de Secteur + Guilde). */
 .cadre-carte-cliquable {
   cursor: pointer;
   touch-action: manipulation;
@@ -508,14 +393,12 @@ input:disabled {
   font-size: 0.85rem;
   color: var(--color-coral);
 }
-/* 18/08/2026 (Simplification UI Événement galactique, points 1/6) :
-   .cadre-actions/.btn-cadre-appliquer(-proportionnel)/.btn-cadre-
-   technologie/.btn-cadre-placement retirées — plus aucun bouton n'est
-   rendu directement sur la carte, toute résolution passe désormais par
-   .cadre-carte-cliquable + la popup générique 'resoudre_cadre_evenement'
-   (voir index.html/strategieService.js). .cadre-action-proportionnelle et
-   .cadre-input-proportionnel sont conservées : réutilisées telles
-   quelles à l'intérieur de cette popup (.modal-choix-boutons). */
+/* .cadre-action-proportionnelle et .cadre-input-proportionnel sont
+   utilisées à l'intérieur de la popup générique
+   'resoudre_cadre_evenement' (.modal-choix-boutons) — toute résolution de
+   cadre passe par .cadre-carte-cliquable + cette popup (voir
+   index.html/strategieService.js), aucun bouton n'est rendu directement
+   sur la carte. */
 .cadre-action-proportionnelle {
   display: flex;
   align-items: center;
@@ -531,11 +414,10 @@ input:disabled {
   font-family: var(--font-body);
   font-size: 0.9rem;
 }
-/* 19/08/2026 (retour utilisateur, principe à garder pour les prochains
-   événements) : sous-texte optionnel d'une option de popup
-   'resoudre_cadre_evenement' (ex. "Choisir la technologie manuellement
-   sur Plat. maison") — plus petit et en italique que le libellé
-   principal du bouton, jamais confondu avec lui. */
+/* Sous-texte optionnel d'une option de popup 'resoudre_cadre_evenement'
+   (ex. "Choisir la technologie manuellement sur Plat. maison") — plus
+   petit et en italique que le libellé principal du bouton, jamais
+   confondu avec lui. */
 .cadre-action-sous-texte {
   display: block;
   margin-top: 2px;
@@ -669,8 +551,7 @@ input:disabled {
   color: var(--color-coral);
 }
 
-/* Écran Secteurs — tableau minimal (repris de style.html, 11/08/2026,
-   avant plateau visuel) */
+/* Écran Secteurs — tableau minimal */
 .table-secteurs {
   width: 100%;
   border-collapse: collapse;
@@ -698,11 +579,11 @@ input:disabled {
   margin-bottom: 22px;
 }
 .barre-navigation-partie[hidden] { display: none; }
-/* 17/08/2026 (Session 11 — restauration IHM) : 4 boutons (ajout "Combat")
-   ne tiennent plus sur une largeur de smartphone — scroll horizontal
-   plutôt que compression/débordement des boutons. -webkit-overflow-
-   scrolling pour un scroll fluide sur iOS Safari ; scrollbar masquée
-   (cohérent avec le reste de l'app, pas de scrollbar visible ailleurs). */
+/* 4 boutons (Partie/Stratégie/Secteurs/Combat) ne tiennent pas sur une
+   largeur de smartphone — scroll horizontal plutôt que compression/
+   débordement des boutons. -webkit-overflow-scrolling pour un scroll
+   fluide sur iOS Safari ; scrollbar masquée (cohérent avec le reste de
+   l'app, pas de scrollbar visible ailleurs). */
 .nav-ecrans {
   display: flex;
   gap: 8px;
@@ -744,15 +625,11 @@ input:disabled {
   font-size: 1.25rem;
   color: var(--color-coral);
 }
-/* 17/08/2026 (Lot 2, révisé après ajout de style.html en Project
-   Knowledge) : copiée telle quelle depuis style.html GAS (nowrap +
-   espace réparti, pour garder Commerce/Prime/Libération sur une seule
-   ligne sur smartphone) — remplace la version wrap/gap:10px du premier
-   jet de ce lot, écrite sans référence CSS legacy disponible à l'époque.
-   Détail des .jeton-champ/.jeton-input eux-mêmes : voir plus bas dans ce
-   fichier (après la section "Écran Fin de partie"), placés au même
-   endroit relatif que dans style.html pour préserver l'ordre de cascade
-   avec .field label (voir note à cet endroit). */
+/* nowrap + espace réparti : garde Commerce/Prime/Libération sur une seule
+   ligne sur smartphone. Détail des .jeton-champ/.jeton-input eux-mêmes :
+   voir plus bas dans ce fichier (après la section "Écran Fin de partie"),
+   placés à cet endroit pour préserver l'ordre de cascade avec .field
+   label (voir note à cet endroit). */
 .ressources-jetons {
   display: flex;
   flex-wrap: nowrap;
@@ -763,12 +640,10 @@ input:disabled {
   margin-bottom: 12px;
 }
 
-/* 17/08/2026 (Session 10 — restauration IHM) : ligne Cube inactif/actif/
-   déployé — même séparateur visuel que .ressources-jetons (bordure du
-   haut), portage direct de style.html GAS.
-   17/08/2026 (Lot F — corrections mineures) : contenu (.ligne-cubes)
-   compacté sur une seule ligne, "Cube" affiché une seule fois — voir
-   renderCubes_, js/strategieService.js. Le conteneur garde .ressources-liste
+/* Ligne Cube inactif/actif/déployé — même séparateur visuel que
+   .ressources-jetons (bordure du haut). Contenu (.ligne-cubes) compacté
+   sur une seule ligne, "Cube" affiché une seule fois — voir renderCubes_,
+   js/strategieService.js. Le conteneur garde .ressources-liste
    (display:flex column, un seul enfant désormais donc sans effet visible)
    pour ne pas toucher le HTML (id="ressources-cubes"). */
 .ressources-cubes {
@@ -819,9 +694,7 @@ input:disabled {
   background: rgba(255, 107, 82, 0.08);
 }
 
-/* 17/08/2026 (Session 10 — restauration IHM) : Gloire — 5 emplacements,
-   portage direct de style.html GAS (mêmes variables CSS, déjà en place
-   ici). */
+/* Gloire — 5 emplacements. */
 .ressources-gloire {
   display: flex;
   align-items: center;
@@ -859,9 +732,8 @@ input:disabled {
   background: rgba(255,107,82,0.12);
 }
 
-/* 17/08/2026 (Session 10 — restauration IHM) : Influence — déménagée sur
-   l'écran Partie (voir index.html App.renderEcranGame_), portage direct de
-   style.html GAS (.plateau-influence/.losange-argente). */
+/* Influence — affichée sur l'écran Partie (voir index.html
+   App.renderEcranGame_). */
 .plateau-influence {
   display: flex;
   align-items: center;
@@ -887,10 +759,9 @@ input:disabled {
   box-shadow: 0 0 2px rgba(255,255,255,0.5);
 }
 
-/* 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2 "Le visage du
-   mal") : bloc "Corruption" (plateauMaison.corruptionMaison) affiché à
-   gauche d'Influence — .plateau-influence-ligne place les 2 blocs côte à
-   côte (ils gardent chacun leur propre bordure/label .plateau-influence),
+/* Bloc "Corruption" (plateauMaison.corruptionMaison) affiché à gauche
+   d'Influence — .plateau-influence-ligne place les 2 blocs côte à côte
+   (ils gardent chacun leur propre bordure/label .plateau-influence),
    .losange-corail reprend .losange-argente en corail (couleur Corruption
    dans le reste de l'app — voir .piste-civilisation-corrompue). */
 .plateau-influence-ligne {
@@ -963,14 +834,13 @@ input:disabled {
   white-space: nowrap;
 }
 
-/* 17/08/2026 (Lot E — réorganisation Focus, bandeau de rappel) : bandeau
-   permanent en bas de l'écran Focus (#focus-rappel-ressources, voir
-   index.html/js/strategieService.js), position fixed — pas d'ancêtre
-   avec transform/filter entre lui et le viewport (#app est en position:
-   relative simple, voir plus haut), donc fixed reste bien relatif à
-   l'écran et non à #app. #screen-focus reçoit un padding-bottom dédié
-   pour que le bandeau ne recouvre jamais le bas du contenu (Vos Focus/
-   dernières cartes de la liste). */
+/* Bandeau permanent en bas de l'écran Focus (#focus-rappel-ressources,
+   voir index.html/js/strategieService.js), position fixed — pas
+   d'ancêtre avec transform/filter entre lui et le viewport (#app est en
+   position: relative simple, voir plus haut), donc fixed reste bien
+   relatif à l'écran et non à #app. #screen-focus reçoit un padding-bottom
+   dédié pour que le bandeau ne recouvre jamais le bas du contenu (Vos
+   Focus/dernières cartes de la liste). */
 #screen-focus {
   padding-bottom: 92px;
 }
@@ -1010,13 +880,8 @@ input:disabled {
   line-height: 1;
 }
 
-/* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
-   17/08) : classes/valeurs copiées telles quelles depuis style.html GAS —
-   remplace la grille de 3 cartes carrées (Session 5, écrite sans
-   référence legacy) par une liste verticale de lignes horizontales.
-   .btn-avancer-piste (bouton "Avancer" par piste) n'a pas d'équivalent
-   legacy — décision utilisateur : conservé, inséré dans .piste-
-   civilisation-item qui reste en flex-wrap, donc passe à la ligne
+/* .btn-avancer-piste (bouton "Avancer" par piste) est inséré dans
+   .piste-civilisation-item qui reste en flex-wrap, donc passe à la ligne
    proprement sur petit écran plutôt que de casser la mise en page. */
 .pistes-civilisation-liste {
   display: flex;
@@ -1085,9 +950,8 @@ input:disabled {
   color: var(--color-coral);
   font-weight: 600;
 }
-/* 17/08/2026 (Session 12 — restauration IHM Partie) : case "Technologie
-   améliorée" (écran Partie) — même pattern que .piste-civilisation-
-   corrompue. */
+/* Case "Technologie améliorée" (écran Partie) — même pattern que
+   .piste-civilisation-corrompue. */
 .check-amelioree {
   display: flex;
   align-items: center;
@@ -1102,8 +966,7 @@ input:disabled {
   height: 16px;
   accent-color: var(--color-coral);
 }
-/* 17/08/2026 (Session 13 — moteur secteurs/cycle branché sur l'IHM) :
-   ligne Technologie obtenue (écran Partie) — select + case Améliorée. */
+/* Ligne Technologie obtenue (écran Partie) — select + case Améliorée. */
 .techno-obtenue-ligne {
   display: flex;
   align-items: center;
@@ -1118,36 +981,20 @@ input:disabled {
   margin-top: 0;
   flex-shrink: 0;
 }
-/* 17/08/2026 (Lot B — restructuration Partie) : Technologie de départ,
-   écran Plat. maison — remplace le <select> de .techno-obtenue-ligne par
-   un texte fixe (la Technologie de départ n'a jamais été un <select>,
-   choisie une seule fois à la création de partie), même gabarit de ligne
-   (flex:1, comme select ci-dessus) pour un alignement identique avec la
-   case "Améliorée". */
+/* Technologie de départ, écran Plat. maison — texte fixe plutôt qu'un
+   <select> comme .techno-obtenue-ligne (la Technologie de départ n'est
+   choisie qu'une seule fois, à la création de partie), même gabarit de
+   ligne (flex:1, comme select ci-dessus) pour un alignement identique
+   avec la case "Améliorée". */
 .champ-technologie-fixe {
   flex: 1;
   min-width: 0;
   font-size: 0.92rem;
   color: var(--color-text);
 }
-/* 17/08/2026 (Lot F — corrections mineures) : .civilisation-actions-globales
-   retirée — n'habillait plus que les 2 boutons globaux "Avancer la moins
-   avancée"/"Avancer la piste Corrompue", retirés du DOM (voir index.html
-   et js/strategieService.js), devenue inutile. */
-
-/* 17/08/2026 (Lot 3 — finitions Stratégie, suite à l'audit UI/UX du
-   17/08) : classes copiées telles quelles depuis style.html GAS —
-   remplace le bouton "Jouer cette action" pleine largeur (Session 4,
-   écrit sans référence legacy) par le gabarit .focus-action-corps/-side
-   (texte à gauche, pastilles de coût + bouton rond "▶" à droite). Voir
-   js/strategieService.js pour le rendu correspondant.
-   17/08) : copiées telles quelles depuis style.html GAS — remplace la
-   version précédente (Session 4, écrite sans référence legacy) qui
-   empilait tout verticalement avec un bouton "Jouer cette action" pleine
-   largeur. Structure legacy : .focus-action-corps (texte, à gauche) +
-   .focus-action-side (pastilles de coût + bouton rond "▶", à droite,
-   empilés). Voir js/strategieService.js pour le rendu correspondant
-   (carteFocusJoueurHTML_/pastillesCoutHTML_). */
+/* Gabarit .focus-action-corps/-side : texte à gauche, pastilles de coût +
+   bouton rond "▶" à droite (empilés). Voir js/strategieService.js pour le
+   rendu correspondant (carteFocusJoueurHTML_/pastillesCoutHTML_). */
 .focus-card { position: relative; }
 .focus-id {
   font-family: var(--font-display);
@@ -1234,17 +1081,10 @@ input:disabled {
   outline: 2px solid #e0364f;
   outline-offset: 1px;
 }
-/* 17/08/2026 (Lot 1 — maisons déchues, prérequis) : .badge/.badge-type-*
-   remplacées par les valeurs exactes de style.html GAS — la version
-   précédente (uppercase, pill 999px, sans fond) avait été écrite sans
-   référence CSS legacy disponible (même situation que le Lot 2). .badge
-   est PARTAGÉE par le type de carte Focus (badge-type-*, écran
+/* .badge est PARTAGÉE par le type de carte Focus (badge-type-*, écran
    Stratégie) et par les badges technologie (badge-sans-point, écrans
-   Partie/Historique) — un seul .badge dans le legacy, comme ici. Effet de
-   bord assumé et attendu : les badges de type sur les cartes Focus
-   (Stratégie) changent d'apparence en même temps (fond plein au lieu de
-   juste une bordure) — c'est le même correctif de fidélité, pas une
-   régression. */
+   Partie/Historique) — une seule classe de base pour les deux usages,
+   attention en la modifiant. */
 .badge {
   display: inline-block;
   background: var(--color-surface-2);
@@ -1304,12 +1144,9 @@ input:disabled {
   gap: 10px;
   margin-bottom: 16px;
 }
-/* 18/08/2026 (Simplification UI Événement galactique, retour utilisateur) :
-   marge sous la ddl seule de la popup de placement (#placement-select-
-   secteur) — sans elle elle était collée aux boutons Annuler/Valider
-   (.modal-actions), aucun autre élément entre les deux (le label
-   "Secteur du Néant" a été retiré, jugé redondant avec le titre de la
-   popup "Choisir un secteur"). */
+/* Marge sous la liste déroulante seule de la popup de placement
+   (#placement-select-secteur) — sans elle elle serait collée aux boutons
+   Annuler/Valider (.modal-actions), aucun autre élément entre les deux. */
 .modal-choix-select {
   margin-bottom: 16px;
 }
@@ -1337,8 +1174,7 @@ input:disabled {
 .modal-actions .btn { flex: 1; }
 .modal-actions .btn[hidden] { display: none; }
 
-/* --- Popup "Regrouper" (déplacement de Puissance Navale), portée telle
-   quelle depuis strategie.html (GAS) — 17/08/2026 (Session 14) --- */
+/* --- Popup "Regrouper" (déplacement de Puissance Navale) --- */
 .regrouper-liste {
   list-style: none;
   margin: 0 0 12px;
@@ -1449,16 +1285,12 @@ input[type="number"]:focus-visible {
   outline-offset: 2px;
 }
 
-/* 17/08/2026 (Lot 2 — grille de ressources, révisé après ajout de
-   style.html en Project Knowledge) : classes copiées TELLES QUELLES depuis
-   style.html GAS — grille fixe à 6 colonnes (Libellé | Niveau | → |
-   Revenu | Stock éditable | Delta), portage de champRessourceHTML_
-   (strategie-2.html). Placé ICI (après .field/.form-grid/input[type=number]
-   ci-dessus, avant .total-influence) pour respecter le même ordre de
-   cascade que style.html : .field-ressource label et .field label ont la
-   même spécificité (une classe + un élément) — c'est l'ordre d'apparition
-   dans le fichier qui décide laquelle l'emporte, exactement comme dans le
-   legacy. */
+/* Grille fixe à 6 colonnes (Libellé | Niveau | → | Revenu | Stock
+   éditable | Delta). Placée ICI (après .field/.form-grid/
+   input[type=number] ci-dessus, avant .total-influence) pour l'ordre de
+   cascade : .field-ressource label et .field label ont la même
+   spécificité (une classe + un élément) — c'est l'ordre d'apparition dans
+   le fichier qui décide laquelle l'emporte. */
 .field-ressource {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18px 10px 26px 40px 28px;
@@ -1518,8 +1350,8 @@ input[type="number"]:focus-visible {
   cursor: help;
 }
 
-/* Commerce/Prime/Libération (écran Stratégie) — copiées telles quelles
-   depuis style.html GAS, portage de champJetonHTML_. */
+/* Commerce/Prime/Libération (écran Stratégie), portage de
+   champJetonHTML_. */
 .jeton-champ {
   display: flex;
   align-items: center;

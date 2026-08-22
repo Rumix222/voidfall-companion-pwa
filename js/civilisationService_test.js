@@ -4,15 +4,6 @@
 // (test_secteurService_placement.js, focusEngine_test.js). Charge les
 // vrais fichiers sources (civilisationService.js + focusEngine.js, dont
 // dépend directement CivilisationService.avancerPiste) via vm.
-//
-// 20/08/2026 (EVOLUTION 4 — rappel manuel + journal simplifié pour un
-// effet "à appliquer manuellement" déclenché par l'avancement d'une piste
-// de Civilisation, voir TODO.md) : premier fichier de test pour ce module
-// (civilisationService.js n'en avait aucun jusqu'ici — dette connue,
-// signalée dans CLAUDE.md). Couvre uniquement le comportement ajouté par
-// cette évolution (le reste du module — avancerPisteMoinsAvancee/
-// definirCorruption/avancerPisteCorrompue/obtenirDetailPistes — reste
-// hors périmètre de ce lot, non testé ici).
 const vm = require('vm');
 const fs = require('fs');
 const assert = require('assert');
@@ -75,14 +66,10 @@ test('effet simple (influence) : aucun rappel, demanderChoix jamais appelé', fu
   });
 });
 
-// 20/08/2026 (EVOLUTION 6 — effet "avance_rapide" de piste Civilisation,
-// voir TODO.md) : "simplement incrémenter le niveau de la piste
-// concernée" — la piste avance d'UN niveau supplémentaire (en plus de
-// l'avancement normal), sans résoudre l'effet de la nouvelle case.
-// 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
-// doit faire gagner le bonus de la case atteinte") : avance_rapide
-// résout désormais l'EFFET de la case suivante (plus seulement son
-// niveau).
+// "avance_rapide" fait avancer la piste d'UN niveau supplémentaire (en
+// plus de l'avancement normal) ET résout l'EFFET de la case atteinte —
+// pas seulement son niveau : un bonus de case bien réel doit être gagné,
+// pas juste le compteur qui avance dans le vide.
 test('avance_rapide : fait gagner le BONUS de la case atteinte (pas seulement le niveau)', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Économie', caseNumero: 1, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) },
@@ -208,11 +195,10 @@ test('gagner_programme "force" (type imposé) : rappel avec type, journal simpli
   });
 });
 
-// 20/08/2026 (EVOLUTION 5 — voir TODO.md) : "retirer_corruption" est
-// désormais portée par focusEngine.js (nouveau cas dédié, plus dans
-// CLES_SECTEUR_HORS_PERIMETRE) — "effet_secteur" la remplace comme
-// témoin d'une clé générique hors périmètre pour CE test (même choix que
-// focusEngine_test.js).
+// "effet_secteur" sert de témoin d'une clé générique hors périmètre pour
+// CE test (même choix que focusEngine_test.js) — "retirer_corruption" ne
+// peut pas servir de témoin : elle est portée par focusEngine.js (voir
+// test dédié plus bas).
 test('clé hors périmètre autre que technologie/programme (effet_secteur) : rappel générique (texte de la case), journal INCHANGÉ', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Gouvernement', caseNumero: 4, texte: 'Effet de secteur non automatisé.', effet: JSON.stringify({ effet_secteur: 1 }) }
@@ -229,12 +215,11 @@ test('clé hors périmètre autre que technologie/programme (effet_secteur) : ra
   });
 });
 
-// 20/08/2026 (EVOLUTION 5 — effet "Retirer une Corruption", voir
-// TODO.md) : depuis une piste de Civilisation, "retirer_corruption" est
-// désormais automatisée via la popup dédiée (strategieService.js,
-// contexte 'retirer_corruption') au lieu du rappel manuel générique —
-// AUCUNE popup de rappel EVOLUTION 4 ne doit apparaître ici (seul le
-// contexte 'retirer_corruption' est appelé, jamais 'confirmation').
+// Depuis une piste de Civilisation, "retirer_corruption" est automatisée
+// via la popup dédiée (strategieService.js, contexte
+// 'retirer_corruption') au lieu du rappel manuel générique — AUCUNE
+// popup de rappel générique ne doit apparaître ici (seul le contexte
+// 'retirer_corruption' est appelé, jamais 'confirmation').
 test('retirer_corruption (piste Civilisation) : délègue à demanderChoix({type:"retirer_corruption"}), pas de rappel manuel', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Économie', caseNumero: 6, texte: 'Retirez une Corruption.', effet: JSON.stringify({ retirer_corruption: 1 }) }
@@ -277,10 +262,8 @@ test('choice inclusif "et/ou" où seule une option automatisée est choisie : au
 });
 
 // ---------------------------------------------------------------
-// 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
-// du mal", voir en-tête de fichier) : definirCorruption/avancerPisteSansEffet
-// — jusqu'ici entièrement hors périmètre de ce fichier de test (voir
-// commentaire d'en-tête d'origine).
+// definirCorruption / avancerPisteSansEffet — utilisés par l'Événement
+// galactique G, Cycle 1, Cadres 1 et 2 ("Le visage du mal").
 // ---------------------------------------------------------------
 
 test('definirCorruption : place une Corruption -> +1 sur corruptionMaison', function () {
@@ -308,11 +291,12 @@ test('definirCorruption : retire une Corruption -> -1 sur corruptionMaison (sans
   });
 });
 
-// 21/08/2026 (Événement galactique G, Cycle 1, Cadre 2, permanent : "chaque
-// fois que vous retirez une Corruption... gardez-la dans votre zone de jeu
-// personnelle... jusqu'à la phase Évaluation") : options.conserverCorruptionRetiree
-// (fourni par l'appelant — strategieService.js — quand ce Cadre est actif
-// pour le cycle en cours) empêche la décrémentation du compteur.
+// Événement galactique G, Cycle 1, Cadre 2, effet permanent : "chaque
+// fois que vous retirez une Corruption... gardez-la dans votre zone de
+// jeu personnelle... jusqu'à la phase Évaluation" —
+// options.conserverCorruptionRetiree (fourni par l'appelant —
+// strategieService.js — quand ce Cadre est actif pour le cycle en cours)
+// empêche la décrémentation du compteur.
 test('definirCorruption : retrait + conserverCorruptionRetiree -> corruptionMaison INCHANGÉ, corruptionMaisonConservee=true', function () {
   var ctx = creerContexte_([]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ corruptionMaison: 2, civCorrompueEconomie: true });

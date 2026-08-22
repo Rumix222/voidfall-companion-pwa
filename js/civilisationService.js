@@ -1,114 +1,20 @@
 /**
  * civilisationService.js
  * Pistes de Civilisation — Voidfall Companion PWA
- * Version 5 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 : avancerPisteSansEffet + compteur plateauMaison.corruptionMaison)
- *
- * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
- * du mal") :
- * - Cadre 1 ("Gagnez une Corruption sur un emplacement de Programme ou sur
- *   une piste de Civilisation. Si la Corruption est placée sur une piste
- *   et que son marqueur n'est pas dans la case la plus à droite, le joueur
- *   doit avancer sur cette piste [en ignorant le bénéfice de la case
- *   atteinte]") : nouvelle fonction avancerPisteSansEffet — avance une
- *   piste précise d'une case sans résoudre l'effet de la case ET SANS
- *   décocher "Corrompue" (contrairement à avancerPisteCorrompue, qui
- *   décoche — sémantique différente, voir sa JSDoc). Reste no-op si la
- *   piste est déjà au niveau maximum ("case la plus à droite" = rien à
- *   avancer, correspond exactement à la condition du Cadre). Câblée côté
- *   gameService.js (resoudreCiblesCadreGainCorruption_ reconnaît
- *   désormais cet effet_conditionnel précis) et strategieService.js
- *   (popup 'gagner_corruption', option "piste").
- * - Cadre 2 (permanent au Cycle 1 : "chaque fois que vous retirez une
- *   Corruption, ... gardez-la dans votre zone de jeu personnelle ...
- *   jusqu'à la phase Évaluation") : definirCorruption tient désormais à
- *   jour un nouveau compteur générique plateauMaison.corruptionMaison
- *   (Corruptions actuellement sur la fiche Maison — utile au-delà de ce
- *   seul Cadre, voir CHAMPS_PLATEAU_MAISON_AUTORISES/gameService.js) :
- *   +1/-1 automatique quand une piste de Civilisation devient/cesse
- *   d'être Corrompue ; le retrait peut être empêché de décrémenter via
- *   `options.conserverCorruptionRetiree` (fourni par l'appelant quand ce
- *   Cadre est actif pour le cycle en cours). Programmes/Chambres de
- *   décontamination restent hors périmètre (compteur ajusté manuellement
- *   par le joueur pour ces 2 sources, comme le reste de leurs jetons).
- *
- * 20/08/2026 (correctif — retour utilisateur : "l'effet avance rapide
- * doit faire gagner le bonus de la case atteinte") : avancerPiste
- * (refonte de la mécanique EVOLUTION 6, voir TODO.md) résout désormais
- * l'EFFET de la case suivante quand l'effet résolu est "avance_rapide" —
- * la première version de cette évolution se contentait d'incrémenter le
- * niveau ("simplement incrémenter le niveau", lecture initiale de
- * TODO.md, corrigée par ce retour). Extraction d'une fonction récursive
- * dédiée, resoudreCaseEtChainerAvanceRapide_, qui résout une case, PUIS
- * — si son effet est encore "avance_rapide" — enchaîne automatiquement
- * sur la case suivante (chaîne à profondeur illimitée, plafonnée par
- * NIVEAU_MAX ; vérifié sur tout data/catalogue/pistesCivilisation.json :
- * aucune case n'a jamais "avance_rapide" ET un autre effet en même
- * temps, donc chaque case de la chaîne est soit "avance_rapide" (enchaîne
- * encore), soit un effet normal résolu normalement — jamais les deux).
- * Toutes les mutations d'effet (ressources/cube/etc.) de CHAQUE case
- * traversée sont appliquées ET persistées au fil de la chaîne ; `pm` est
- * maintenu à jour localement pour que la case suivante voie le plateau
- * réel. Une SEULE mutation de champNiveau reste empilée dans la pile
- * d'annulation (ancien -> niveau FINAL, aucune étape intermédiaire) pour
- * qu'"Annuler" revienne correctement en un coup, quel que soit le nombre
- * de sauts. `resultat.texte` concatène désormais les textes de TOUTES
- * les cases traversées (jointes par un espace) — plus seulement celui de
- * la première. Un effet manuel (EVOLUTION 4) ou retirer_corruption
- * (EVOLUTION 5) sur une case ATTEINTE par avance_rapide déclenche
- * normalement sa propre popup/rappel, comme n'importe quelle case
- * atteinte par un avancement classique. Tests dans
- * civilisationService_test.js réécrits pour ce nouveau comportement
- * (gain effectif du bonus, chaîne à 2 sauts, déjà au maximum en cours de
- * chaîne).
- *
- * 20/08/2026 (EVOLUTION 4 — effet manuel de piste Civilisation, voir
- * TODO.md) : avancerPiste affiche désormais un rappel temporaire (popup
- * `demanderChoix({type:'confirmation'})`, même mécanisme déjà utilisé
- * côté Cadre "gain" d'Événement galactique — index.html,
- * appliquerCadreManuelEtRafraichir_) quand l'Effet résolu par
- * FocusEngine.resoudreEffet retombe sur une clé non automatisée. Texte
- * dédié pour gagner_technologie ("Choisir une technologie [de base ou
- * avancée] manuellement") et gagner_programme ("Choisir un programme
- * [<type>] manuellement", type omis pour la valeur numérique générique) ;
- * repli générique (texte imprimé de la case) pour toute autre clé non
- * automatisée. Le journal Focus ("Actions réalisées") est simplifié
- * UNIQUEMENT pour ces 2 clés ("technologie choisie manuellement"/
- * "programme choisi manuellement" — pas de rappel du choix base/avancée
- * ni du type de Programme, comme demandé) ; toute autre clé garde son
- * texte technique existant ("⚠️ ... non automatisé..."), inchangé. Aucune
- * modification de focusEngine.js (seule source de vérité sur ce qui est
- * automatisé) : le rappel est détecté après coup, via le suffixe commun
- * "— à appliquer manuellement." des lignes de journal concernées — donc
- * strictement propre à avancerPiste, sans aucun effet sur les actions
- * Focus (qui appellent le même moteur mais n'affichent jamais ce rappel).
- * Purement informatif : n'affecte jamais la persistance déjà faite
- * (avancement de piste + mutations de l'Effet). Nouveau fichier de test
- * dédié (civilisationService_test.js — le module en était jusqu'ici
- * dépourvu, dette connue signalée dans CLAUDE.md).
- *
- * Portage de CivilisationService.js (GAS, 206 l.) — contrairement à ce que
- * les en-têtes précédents de gameService.js/focusEngine.js laissaient
- * supposer ("fonctions dédiées, portées en Phase 3/5"), cette logique
- * s'avère PURE côté GAS (aucune RPC Postgres, juste une lecture de
- * l'onglet PisteCivilisation + une mutation en mémoire) : entièrement
- * portable telle quelle, adaptée pour lire le store catalogue
- * IndexedDB `pistesCivilisation` (voir db.js, colonnes type/piste/
- * caseNumero/texte/effet) au lieu de DataService.getPistesCivilisation().
  *
  * Avancer une piste fait deux choses successivement :
  *   1. Incrémente le niveau de la piste (persisté via
- *      GameService.majCivilisation, nouveau cette session).
+ *      GameService.majCivilisation).
  *   2. Résout l'Effet de la case atteinte, en réutilisant le moteur
- *      focusEngine.js (FocusEngine.resoudreEffet — wrapper public ajouté
- *      cette session, aucune duplication de logique coût/effet).
+ *      focusEngine.js (FocusEngine.resoudreEffet), sans duplication de
+ *      logique coût/effet.
  * Les deux mutations (niveau de piste + effet de la case) sont empilées
  * comme UNE SEULE entrée dans la pile d'annulation (annulationService.js),
  * pour qu'"Annuler la dernière action" revienne bien sur les deux à la
  * fois — cohérent avec la sémantique "une action jouée = une entrée".
  *
- * Règle portée telle quelle (voir CivilisationService.js GAS) : en cas
- * d'égalité pour "la piste la moins avancée", ordre fixe Société >
- * Gouvernement > Économie (pas de choix proposé au joueur).
+ * Règle : en cas d'égalité pour "la piste la moins avancée", ordre fixe
+ * Société > Gouvernement > Économie (pas de choix proposé au joueur).
  *
  * Dépend de : db.js (DB), gameService.js (GameService.majCivilisation/
  * majPlateauMaison), focusEngine.js (FocusEngine.resoudreEffet),
@@ -144,23 +50,21 @@ var CivilisationService = (function () {
   }
 
   // ------------------------------------------------------------
-  // 20/08/2026 (EVOLUTION 4 — effet manuel de piste Civilisation, voir
-  // TODO.md) : quand l'Effet d'une case résolue par FocusEngine.
-  // resoudreEffet retombe sur une clé "hors périmètre"/non reconnue (voir
-  // focusEngine.js — CLES_SECTEUR_HORS_PERIMETRE/CLES_CIVILISATION_
-  // HORS_PERIMETRE/produire_*/repli générique), la ligne de journal
-  // correspondante se termine TOUJOURS par "— à appliquer manuellement."
-  // (les 4 branches concernées partagent ce même suffixe) — c'est le seul
-  // signal utilisé ici pour détecter qu'un rappel est nécessaire, plutôt
-  // que de dupliquer la liste des clés non automatisées de focusEngine.js
-  // (qui reste ainsi la SEULE source de vérité sur ce qui est automatisé
-  // ou non). focusEngine.js n'est PAS modifié par cette évolution :
-  // aucune régression possible côté Focus (qui appelle le même
-  // resoudreCle_ mais n'affiche jamais ce rappel, propre à avancerPiste
-  // ci-dessous).
+  // Quand l'Effet d'une case résolue par FocusEngine.resoudreEffet retombe
+  // sur une clé "hors périmètre"/non reconnue (voir focusEngine.js —
+  // CLES_SECTEUR_HORS_PERIMETRE/CLES_CIVILISATION_HORS_PERIMETRE/
+  // produire_*/repli générique), la ligne de journal correspondante se
+  // termine TOUJOURS par "— à appliquer manuellement." (les 4 branches
+  // concernées partagent ce même suffixe) — c'est le seul signal utilisé
+  // ici pour détecter qu'un rappel est nécessaire, plutôt que de dupliquer
+  // la liste des clés non automatisées de focusEngine.js (qui reste ainsi
+  // la SEULE source de vérité sur ce qui est automatisé ou non).
+  // focusEngine.js n'est pas modifié par ce mécanisme : les actions Focus
+  // (qui appellent le même resoudreCle_) n'affichent jamais ce rappel,
+  // propre à avancerPiste ci-dessous.
   // ------------------------------------------------------------
 
-  var SUFFIXE_MANUEL_ = '\u2014 \u00e0 appliquer manuellement.';
+  var SUFFIXE_MANUEL_ = '— à appliquer manuellement.';
 
   /**
    * Extrait le nom de clé Effet ("gagner_technologie", "retirer_corruption",
@@ -173,9 +77,9 @@ var CivilisationService = (function () {
    * prudence plutôt que de lever une erreur sur un futur gabarit).
    */
   function extraireCleManuelle_(ligneJournal) {
-    var mGuillemets = /"([a-z_]+)"\s+non automatis\u00e9/.exec(ligneJournal);
+    var mGuillemets = /"([a-z_]+)"\s+non automatisé/.exec(ligneJournal);
     if (mGuillemets) return mGuillemets[1];
-    var mGenerique = /effet non chiffr\u00e9 \(([a-z_]+)/.exec(ligneJournal);
+    var mGenerique = /effet non chiffré \(([a-z_]+)/.exec(ligneJournal);
     if (mGenerique) return mGenerique[1];
     return null;
   }
@@ -237,30 +141,28 @@ var CivilisationService = (function () {
   var TYPES_PROGRAMME_CONNUS_ = ['force', 'soutien', 'domination', 'richesse'];
 
   /**
-   * Construit le texte de rappel (popup) ET, pour les 2 clés explicitement
-   * demandées par TODO.md (EVOLUTION 4), le libellé simplifié à écrire à
-   * la place de la ligne de journal technique — `journal: null` pour
-   * toute autre clé (générique) signifie "garder la ligne de journal
-   * telle quelle" (TODO.md ne demande la simplification que pour
-   * gagner_technologie/gagner_programme). Le repli générique réutilise le
-   * texte imprimé de la case (`texteCase`, déjà lisible), même principe
-   * que le rappel manuel déjà en place côté Cadre d'Événement galactique
-   * "gain" (index.html, appliquerCadreManuelEtRafraichir_ :
-   * cadre.instruction || cadre.texte).
+   * Construit le texte de rappel (popup) ET, pour gagner_technologie/
+   * gagner_programme, le libellé simplifié à écrire à la place de la
+   * ligne de journal technique — `journal: null` pour toute autre clé
+   * (générique) signifie "garder la ligne de journal telle quelle". Le
+   * repli générique réutilise le texte imprimé de la case (`texteCase`,
+   * déjà lisible), même principe que le rappel manuel côté Cadre
+   * d'Événement galactique "gain" (index.html,
+   * appliquerCadreManuelEtRafraichir_ : cadre.instruction || cadre.texte).
    */
   function texteRappelPourCle_(cle, valeur, texteCase) {
     if (cle === 'gagner_technologie') {
       var estArray = Array.isArray(valeur);
       var aBase = estArray ? valeur.indexOf('base') !== -1 : valeur === 'base';
       var aAmelioree = estArray ? valeur.indexOf('amelioree') !== -1 : valeur === 'amelioree';
-      var precisionTech = (aBase && aAmelioree) ? ' de base ou avanc\u00e9e' : (aBase ? ' de base' : (aAmelioree ? ' avanc\u00e9e' : ''));
+      var precisionTech = (aBase && aAmelioree) ? ' de base ou avancée' : (aBase ? ' de base' : (aAmelioree ? ' avancée' : ''));
       return { rappel: 'Choisir une technologie' + precisionTech + ' manuellement', journal: 'technologie choisie manuellement' };
     }
     if (cle === 'gagner_programme') {
       var type = (typeof valeur === 'string' && TYPES_PROGRAMME_CONNUS_.indexOf(valeur) !== -1) ? valeur : '';
       return { rappel: 'Choisir un programme' + (type ? ' ' + type : '') + ' manuellement', journal: 'programme choisi manuellement' };
     }
-    return { rappel: texteCase || 'Effet \u00e0 r\u00e9soudre manuellement.', journal: null };
+    return { rappel: texteCase || 'Effet à résoudre manuellement.', journal: null };
   }
 
   /**
@@ -291,43 +193,28 @@ var CivilisationService = (function () {
 
     return Promise.resolve(demanderChoix({
       type: 'confirmation',
-      titre: 'Effet \u00e0 r\u00e9soudre manuellement',
+      titre: 'Effet à résoudre manuellement',
       message: '<em>' + rappels.join('<br>') + '</em>',
       texteValider: 'Valider'
     })).then(function () { return journalAjuste; });
   }
 
   /**
-   * 20/08/2026 (EVOLUTION 6 — effet "avance_rapide" de piste Civilisation,
-   * voir TODO.md) : "simplement incrémenter le niveau de la piste
-   * concernée" — SANS résoudre l'effet de la nouvelle case atteinte (même
-   * principe que CivilisationService.avancerPisteCorrompue, qui avance
-   * aussi sans bénéfice de case). Cette clé n'apparaît QUE dans
-   * data/catalogue/pistesCivilisation.json (jamais evenements.json/
-   * focus.json — vérifié), toujours seule (jamais nichée dans un
-   * "choice"), toujours sur la piste en cours d'avancement elle-même
-   * ("la piste concernée", TODO.md) : repérée ici via le même signal
-   * qu'EVOLUTION 4 (extraireLignesManuelles_, ligne de journal
-   * "à appliquer manuellement." pour la clé "avance_rapide", puisque
-   * focusEngine.js la laisse volontairement dans
-   * CLES_CIVILISATION_HORS_PERIMETRE — aucune mutation de piste n'y
-   * transiterait de toute façon, hors du diff générique de focusEngine.js,
-   * voir son en-tête). Si la piste est déjà au niveau maximum, aucun
-   * incrément supplémentaire n'est possible : le journal le signale
-   * simplement, sans écriture. Retourne { niveauFinal, journal } —
-   * `journal` a la ligne "avance_rapide" remplacée par un texte clair, le
-   * reste inchangé (pour un éventuel effet manuel resté sur la MÊME
-   * case, cf. EVOLUTION 4, résolu séparément par l'appelant).
-   */
-  /**
-   * 20/08/2026 (EVOLUTION 6 — correctif, retour utilisateur : "l'effet
-   * avance rapide doit faire gagner le bonus de la case atteinte") :
-   * résout récursivement la case au niveau `niveau` de `piste`, et
-   * CHAÎNE automatiquement sur la case SUIVANTE tant que l'effet résolu
-   * est "avance_rapide" — CETTE case suivante voit désormais son propre
-   * effet RÉSOLU (et pas seulement son niveau atteint, comme la première
-   * version de cette évolution le faisait par erreur). Toutes les
-   * mutations d'effet (ressources/cube/etc., jamais celles de
+   * Résout récursivement la case au niveau `niveau` de `piste`, et CHAÎNE
+   * automatiquement sur la case SUIVANTE tant que l'effet résolu est
+   * "avance_rapide" — chaque case atteinte par la chaîne voit son propre
+   * effet RÉSOLU (pas seulement son niveau atteint). Cette clé n'apparaît
+   * QUE dans data/catalogue/pistesCivilisation.json (jamais
+   * evenements.json/focus.json), toujours seule (jamais nichée dans un
+   * "choice"), toujours sur la piste en cours d'avancement elle-même :
+   * repérée ici via le même signal que le reste du fichier
+   * (extraireLignesManuelles_, ligne de journal "à appliquer
+   * manuellement." pour la clé "avance_rapide", puisque focusEngine.js la
+   * laisse volontairement dans CLES_CIVILISATION_HORS_PERIMETRE). Si la
+   * piste est déjà au niveau maximum, aucun incrément supplémentaire
+   * n'est possible : le journal le signale simplement, sans écriture.
+   *
+   * Toutes les mutations d'effet (ressources/cube/etc., jamais celles de
    * `champNiveau` — gérées par une SEULE mutation entry construite par
    * l'appelant, avancerPiste, pour un "Annuler" correct en un coup même
    * après plusieurs sauts) sont accumulées dans `mutationsAccumulees`,
@@ -367,7 +254,7 @@ var CivilisationService = (function () {
             textesAccumules.push(ligne.texte || '');
 
             if (!resultatEffet.succes) {
-              journalAccumule.push(source + ' : effet annul\u00e9 (choix refus\u00e9) — seul l\u2019avancement de piste est conserv\u00e9.');
+              journalAccumule.push(source + ' : effet annulé (choix refusé) — seul l\'avancement de piste est conservé.');
               return { niveauFinal: niveau, succes: false };
             }
 
@@ -385,12 +272,12 @@ var CivilisationService = (function () {
 
             var niveauSuivant = Math.min(NIVEAU_MAX, niveau + 1);
             if (niveauSuivant === niveau) {
-              journalCase[ligneAvanceRapide.index] = 'Avance rapide \u2014 piste d\u00e9j\u00e0 au niveau maximum.';
+              journalCase[ligneAvanceRapide.index] = 'Avance rapide — piste déjà au niveau maximum.';
               journalAccumule.push.apply(journalAccumule, journalCase);
               return { niveauFinal: niveau, succes: true };
             }
 
-            journalCase[ligneAvanceRapide.index] = 'Avance rapide \u2014 la piste avance encore, jusqu\u2019au niveau ' + niveauSuivant + '.';
+            journalCase[ligneAvanceRapide.index] = 'Avance rapide — la piste avance encore, jusqu\'au niveau ' + niveauSuivant + '.';
             journalAccumule.push.apply(journalAccumule, journalCase);
 
             return resoudreCaseEtChainerAvanceRapide_(
@@ -429,10 +316,9 @@ var CivilisationService = (function () {
   /**
    * Avance une piste précise d'une case (aucun effet, pas d'écriture, ne
    * fait rien si déjà au maximum) : {piste, ancienNiveau, nouveauNiveau,
-   * texte, effetJournal, effetSucces, dejaMaximum}. 20/08/2026
-   * (EVOLUTION 6, corrigée le jour même — voir en-tête de fichier) :
-   * "texte" peut désormais résumer PLUSIEURS cases si un "avance_rapide"
-   * a chaîné sur une case suivante (jointes par un espace).
+   * texte, effetJournal, effetSucces, dejaMaximum}. "texte" peut résumer
+   * PLUSIEURS cases si un "avance_rapide" a chaîné sur une case suivante
+   * (jointes par un espace).
    */
   function avancerPiste(partieId, nomMaison, piste, demanderChoix) {
     if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
@@ -461,7 +347,7 @@ var CivilisationService = (function () {
         // en un coup à `ancien`, même après plusieurs sauts avance_rapide
         // (AnnulationService.annulerDerniere_ applique ses mutations dans
         // l'ordre, sans inversion — 2 mutations sur le même champ
-        // s'écraseraient l'une l'autre, voir EVOLUTION 6 d'origine).
+        // s'écraseraient l'une l'autre).
         var mutations = [{ champ: champNiveau, avant: ancien, apres: resultatChaine.niveauFinal }].concat(mutationsRessources);
 
         return AnnulationService.empiler(partieId, { source: source, mutations: mutations }).then(function () {
@@ -496,19 +382,18 @@ var CivilisationService = (function () {
    * Coche/décoche la piste "Corrompue" — marqueur manuel, aucun effet de
    * case.
    *
-   * 21/08/2026 (Événement galactique G, Cycle 1 — Cadre 2 "Permanent au
-   * Cycle 1 : ... gardez [la Corruption retirée] dans votre zone de jeu
-   * personnelle... jusqu'à la phase Évaluation") : tient désormais aussi à
-   * jour `plateauMaison.corruptionMaison` — compteur générique du nombre
-   * de Corruptions actuellement sur la fiche Maison du joueur (pistes de
-   * Civilisation Corrompues ; Programmes/Chambres de décontamination
-   * restent hors périmètre, ajustés manuellement par le joueur — voir
-   * CHAMPS_PLATEAU_MAISON_AUTORISES, gameService.js). +1 quand une piste
-   * devient Corrompue, -1 quand elle cesse de l'être — SAUF si l'appelant
-   * fournit `options.conserverCorruptionRetiree` (Cadre G ci-dessus actif
-   * pour le cycle en cours) : le compteur n'est alors PAS décrémenté au
-   * retrait (`resultat.corruptionMaisonConservee` renvoyé à `true`, pour
-   * que l'appelant — strategieService.js — affiche un petit rappel dans le
+   * Tient aussi à jour `plateauMaison.corruptionMaison` — compteur
+   * générique du nombre de Corruptions actuellement sur la fiche Maison
+   * du joueur (pistes de Civilisation Corrompues ; Programmes/Chambres de
+   * décontamination restent hors périmètre, ajustés manuellement par le
+   * joueur — voir CHAMPS_PLATEAU_MAISON_AUTORISES, gameService.js). +1
+   * quand une piste devient Corrompue, -1 quand elle cesse de l'être —
+   * SAUF si l'appelant fournit `options.conserverCorruptionRetiree` (cas
+   * d'un Cadre d'Événement galactique qui garde la Corruption retirée
+   * dans la zone de jeu personnelle jusqu'à la phase Évaluation) : le
+   * compteur n'est alors PAS décrémenté au retrait
+   * (`resultat.corruptionMaisonConservee` renvoyé à `true`, pour que
+   * l'appelant — strategieService.js — affiche un petit rappel dans le
    * journal). Ne mute le compteur QUE si l'état Corrompue change
    * réellement (idempotent si appelé deux fois avec la même valeur).
    */
@@ -583,17 +468,15 @@ var CivilisationService = (function () {
   }
 
   /**
-   * 21/08/2026 (Événement galactique G, Cycle 1 — Cadre 1 "Le visage du
-   * mal" : "Si la Corruption est placée sur une piste et que son marqueur
-   * n'est pas dans la case la plus à droite, le joueur doit avancer sur
-   * cette piste [et donc ignorer le bénéfice rapporté par la case qu'il
-   * atteint]") : avance une piste précise d'une case SANS résoudre l'effet
-   * de la case (contrairement à avancerPiste ci-dessus) et SANS toucher au
-   * marqueur "Corrompue" (contrairement à avancerPisteCorrompue ci-dessus,
-   * qui décoche — ici la Corruption qui vient d'être placée doit rester).
-   * Ne fait rien si la piste est déjà au niveau maximum ("la case la plus
-   * à droite" — rien à avancer, correspond exactement à la condition du
-   * Cadre). Empile une entrée d'annulation comme les fonctions sœurs.
+   * Avance une piste précise d'une case SANS résoudre l'effet de la case
+   * (contrairement à avancerPiste ci-dessus) et SANS toucher au marqueur
+   * "Corrompue" (contrairement à avancerPisteCorrompue ci-dessus, qui
+   * décoche — ici la Corruption qui vient d'être placée doit rester).
+   * Utilisée pour l'effet de Cadre d'Événement galactique qui force à
+   * avancer sur une piste tout en ignorant le bénéfice de la case
+   * atteinte. Ne fait rien si la piste est déjà au niveau maximum ("la
+   * case la plus à droite" — rien à avancer). Empile une entrée
+   * d'annulation comme les fonctions sœurs.
    */
   function avancerPisteSansEffet(partieId, piste) {
     if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
@@ -622,7 +505,7 @@ var CivilisationService = (function () {
   /**
    * Détail complet (texte des 7 cases) des 3 pistes pour une maison —
    * donnée de référence statique, une seule lecture du store catalogue
-   * pour les 21 cases (même optimisation que côté GAS).
+   * pour les 21 cases.
    */
   function obtenirDetailPistes(nomMaison) {
     return DB.getAll('pistesCivilisation').then(function (lignes) {

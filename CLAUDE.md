@@ -65,13 +65,13 @@ fonctions de rendu concernées après persistance :
 | Plateau des secteurs (construire, envahir, regrouper, déployer un cube, placement d'Événement) | `js/secteurService.js` |
 | Coût/Effet d'une carte Focus (ce qui est automatisé) | `js/focusEngine.js` (moteur pur) |
 | Catalogue Focus (cartes par maison/héroïque) | `js/focusService.js` |
-| Écran Plat. maison / Focus / la modale de choix générique (`demanderChoix`) | `js/strategieService.js` (2100+ lignes — le plus gros fichier) |
+| Écran Plat. maison / Focus / la modale de choix générique (`demanderChoix`) | `js/strategieService.js` (2800+ lignes — le plus gros fichier) |
 | Combat (calculateur Envahir/Escarmouche) | `js/combatService.js` (pur) + `js/combatVueService.js` (DOM) |
 | Pistes de Civilisation | `js/civilisationService.js` |
 | Annulation d'action Focus | `js/annulationService.js` |
 | Fin de partie / Historique | `js/scoreService.js` + `js/scoreVueService.js` / `js/historiqueVueService.js` |
 | Création de partie | `js/setupService.js` |
-| Écrans/nav/App/modale (markup + orchestration) | `index.html` (~1900 lignes, tout est dans un `<script>` embarqué) |
+| Écrans/nav/App/modale (markup + orchestration) | `index.html` (2200+ lignes, tout est dans un `<script>` embarqué) |
 | Style | `css/style.css` (pas de media queries, mobile = scroll horizontal de la nav) |
 | Données de règles (maisons, technos, focus, événements, secteurs...) | `data/catalogue/*.json` — voir §3 de la doc archi pour le schéma de chacun |
 | Schéma IndexedDB | `js/db.js` (`STORES`, source de vérité) |
@@ -97,16 +97,16 @@ fonctions de rendu concernées après persistance :
 
 `node --test` ou `node <fichier>.test.js` directement — zéro dépendance
 npm, charge les vrais fichiers sources via `vm` avec une IndexedDB factice.
-Fichiers existants : `js/focusEngine.test.js`,
+Fichiers existants : `js/focusEngine.test.js`, `js/combatService.test.js`,
 `js/gameService_cycle_focus_technologie.test.js`,
 `js/gameService_evenements_technologie.test.js`,
 `js/gameService_technologies_avancees_test.js`,
 `js/secteurService_actions.test.js`, `js/civilisationService_test.js` et
 plusieurs autres `*_test.js`/`test_*.js` (convention de nommage pas
 encore unifiée — `node --test` seul ne matche que `*.test.js`, lancer les
-autres individuellement). Pas de test pour `combatService.js`/
-`scoreService.js` (dette connue, `combatService.js` en priorité vu la
-complexité de sa logique de résolution).
+autres individuellement). Pas de test pour `scoreService.js` (dette
+connue, priorité moindre que `combatService.js` — logique plus simple,
+essentiellement un calcul de score final).
 
 ## Tests E2E (Playwright)
 
@@ -136,11 +136,11 @@ test de moteur pur ne peut pas voir.
   (voir en-tête du fichier) — un run est toujours reproductible, y
   compris entre deux process Playwright différents. Génère un rapport
   Markdown par (maison, seed) dans `e2e/rapports/` (généré, ignoré par
-  git) — a déjà trouvé un vrai bug (`#modal-choix-valider` restant
-  bloqué entre deux popups, voir `docs/docs-rapport.md` BUG-3). Ne vise
-  pas l'exhaustivité combinatoire (irréaliste vu le nombre de
-  combinaisons maisons × événements × technologies × focus) : c'est du
-  fuzzing seedé, pas une énumération.
+  git) — c'est ce test qui attrape les bugs de blocage d'UI (ex. un
+  bouton de modale resté désactivé entre deux popups) qu'un test de
+  moteur pur ne peut pas voir. Ne vise pas l'exhaustivité combinatoire
+  (irréaliste vu le nombre de combinaisons maisons × événements ×
+  technologies × focus) : c'est du fuzzing seedé, pas une énumération.
 
 ## Serveur de dev
 
