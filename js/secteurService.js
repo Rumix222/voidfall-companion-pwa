@@ -1,7 +1,19 @@
 /**
  * secteurService.js
  * Plateau des secteurs — Voidfall Companion PWA
- * Version 13 — 21/08/2026 (correctif — jetonGloire devient un tableau, un secteur peut porter plusieurs jetons Gloire)
+ * Version 14 — 21/08/2026 (docs/docs-rapport.md MUT-7/MUT-8 — factorisation installationsUtilisees_/guildesUtilisees_ + clé composite regrouper)
+ *
+ * 21/08/2026 (docs/docs-rapport.md) :
+ * - MUT-7 : `installationsUtilisees_(secteur)`/`guildesUtilisees_(secteur)`
+ *   factorisent le calcul "emplacements utilisés" recopié 4 fois
+ *   (construire, obtenirSecteursEligiblesConstruction, getEntretien,
+ *   obtenirSecteursEligiblesPlacementNeantAdjacent) — même principe que
+ *   totalPn_ déjà en place.
+ * - MUT-8 : `regrouper` utilise désormais un objet imbriqué
+ *   {depart: {type: quantite}} plutôt qu'une clé composite "depart:type"
+ *   reparsée via lastIndexOf(':').
+ * Aucun changement de comportement (22 tests secteurService_actions.test.js
+ * + e2e/partie-aleatoire.spec.js).
  *
  * 21/08/2026 (gain d'Influence variable "N par Guilde/Installation/cube/
  * secteur Pur", voir focusEngine.js v12) : nouvelle
@@ -348,6 +360,19 @@ var SecteurService = (function () {
     return (secteur.pnNeant || 0) === 0 && totalPn_(secteur) > 0;
   }
 
+  // 21/08/2026 (docs/docs-rapport.md MUT-7) : mêmes principe que totalPn_
+  // ci-dessus — "emplacements Installations/Guildes utilisés sur ce
+  // secteur" recopié 4 fois (construire, obtenirSecteursEligiblesConstruction,
+  // getEntretien, obtenirSecteursEligiblesPlacementNeantAdjacent).
+  function installationsUtilisees_(secteur) {
+    return (secteur.installationChantierNaval || 0) + (secteur.installationDefenseSecteur || 0) + (secteur.installationBaseStellaire || 0);
+  }
+
+  function guildesUtilisees_(secteur) {
+    return (secteur.guildeFermiers || 0) + (secteur.guildeIngenieurs || 0) + (secteur.guildeMineurs || 0) +
+      (secteur.guildeBanquiers || 0) + (secteur.guildeScientifiques || 0);
+  }
+
   /**
    * 17/08/2026 (Session 12) : portage direct de la RPC secteur_construire
    * (rpc.json). Construit une installation ou une Guilde sur un secteur
@@ -379,11 +404,11 @@ var SecteurService = (function () {
           if (categorie === 'installation') {
             champ = { chantier_naval: 'installationChantierNaval', defense_secteur: 'installationDefenseSecteur', base_stellaire: 'installationBaseStellaire' }[type];
             max = typeSecteur ? (typeSecteur.nombreInstallationMax || 0) : 0;
-            utilises = secteur.installationChantierNaval + secteur.installationDefenseSecteur + secteur.installationBaseStellaire;
+            utilises = installationsUtilisees_(secteur);
           } else {
             champ = { fermiers: 'guildeFermiers', ingenieurs: 'guildeIngenieurs', mineurs: 'guildeMineurs', banquiers: 'guildeBanquiers', scientifiques: 'guildeScientifiques' }[type];
             max = typeSecteur ? (typeSecteur.nombreGuildeMax || 0) : 0;
-            utilises = secteur.guildeFermiers + secteur.guildeIngenieurs + secteur.guildeMineurs + secteur.guildeBanquiers + secteur.guildeScientifiques;
+            utilises = guildesUtilisees_(secteur);
           }
 
           if (!champ) throw new Error('Type "' + type + '" inconnu pour la catégorie ' + categorie + '.');
@@ -646,20 +671,24 @@ var SecteurService = (function () {
               if (!appartientAuJoueur_(sArrivee)) throw new Error('Le secteur ' + m.arrivee + ' ne vous appartient pas.');
             });
 
-            var retireParCle = {};
+            // 21/08/2026 (docs/docs-rapport.md MUT-8) : objet imbriqué
+            // {depart: {type: quantite}} plutôt qu'une clé composite
+            // "depart:type" reparsée via lastIndexOf(':') — plus direct,
+            // et ne casserait pas si `type` contenait un jour ':'.
+            var retireParDepart = {};
             mouvements.forEach(function (m) {
-              var cle = m.depart + ':' + m.type;
-              retireParCle[cle] = (retireParCle[cle] || 0) + Number(m.quantite);
+              retireParDepart[m.depart] = retireParDepart[m.depart] || {};
+              retireParDepart[m.depart][m.type] = (retireParDepart[m.depart][m.type] || 0) + Number(m.quantite);
             });
-            Object.keys(retireParCle).forEach(function (cle) {
-              var idx = cle.lastIndexOf(':');
-              var depart = Number(cle.slice(0, idx));
-              var type = cle.slice(idx + 1);
-              var champ = CHAMP_PN_PAR_TYPE[type];
-              var dispo = secteursParNumero[depart][champ] || 0;
-              if (dispo < retireParCle[cle]) {
-                throw new Error('Stock insuffisant : secteur ' + depart + ' n\'a pas ' + retireParCle[cle] + ' ' + type + ' (dispo ' + dispo + ').');
-              }
+            Object.keys(retireParDepart).forEach(function (depart) {
+              Object.keys(retireParDepart[depart]).forEach(function (type) {
+                var champ = CHAMP_PN_PAR_TYPE[type];
+                var demande = retireParDepart[depart][type];
+                var dispo = secteursParNumero[depart][champ] || 0;
+                if (dispo < demande) {
+                  throw new Error('Stock insuffisant : secteur ' + depart + ' n\'a pas ' + demande + ' ' + type + ' (dispo ' + dispo + ').');
+                }
+              });
             });
 
             mouvements.forEach(function (m) {
@@ -801,10 +830,10 @@ var SecteurService = (function () {
             var max, utilises;
             if (categorie === 'installation') {
               max = typeSecteur.nombreInstallationMax || 0;
-              utilises = s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire;
+              utilises = installationsUtilisees_(s);
             } else {
               max = typeSecteur.nombreGuildeMax || 0;
-              utilises = s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques;
+              utilises = guildesUtilisees_(s);
             }
             if (utilises < max) resultat.push({ numero: s.numero, emplacementsLibres: max - utilises });
           });
@@ -837,10 +866,10 @@ var SecteurService = (function () {
             var typeSecteur = ligneScenario ? typesParId[ligneScenario.type] : null;
             if (!typeSecteur) return;
 
-            var guildesUtilisees = s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques;
+            var guildesUtilisees = guildesUtilisees_(s);
             if ((typeSecteur.nombreGuildeMax || 0) > 0 && guildesUtilisees >= typeSecteur.nombreGuildeMax) total += 1;
 
-            var installationsUtilisees = s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire;
+            var installationsUtilisees = installationsUtilisees_(s);
             if ((typeSecteur.nombreInstallationMax || 0) > 0 && installationsUtilisees >= typeSecteur.nombreInstallationMax) total += 1;
           });
           return total;
@@ -973,8 +1002,8 @@ var SecteurService = (function () {
           var typeSecteur = ligneScenario ? typesParId[ligneScenario.type] : null;
           if (!typeSecteur) return;
 
-          var installationsUtilisees = s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire;
-          var guildesUtilisees = s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques;
+          var installationsUtilisees = installationsUtilisees_(s);
+          var guildesUtilisees = guildesUtilisees_(s);
           var emplacementsInstallationLibres = (typeSecteur.nombreInstallationMax || 0) - installationsUtilisees;
           var emplacementsGuildeLibres = (typeSecteur.nombreGuildeMax || 0) - guildesUtilisees;
 
@@ -1173,6 +1202,11 @@ var SecteurService = (function () {
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,
     appliquerPlacementMultipleNeantAdjacent: appliquerPlacementMultipleNeantAdjacent,
-    getEntretien: getEntretien
+    getEntretien: getEntretien,
+    // 21/08/2026 (docs/docs-rapport.md DUP-2) : exposée publiquement —
+    // strategieService.js en gardait une copie identique
+    // (CHAMP_PN_PAR_TYPE_VUE), désormais supprimée au profit de cette
+    // seule source de vérité.
+    CHAMP_PN_PAR_TYPE: CHAMP_PN_PAR_TYPE
   };
 })();

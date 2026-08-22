@@ -1,8 +1,12 @@
 /**
  * Test fumée — gameService.js (choisirTechnologieAvancee /
- * definirTechnologieAvanceeAmelioree / obtenirTechnologiesAvanceesGroupes)
+ * obtenirTechnologiesAvanceesGroupes)
  * Lot C — Plat. Galactique, Technologies avancées (17/08/2026)
  * Exécution : node --test gameService_technologies_avancees_test.js
+ *
+ * 21/08/2026 (docs/docs-rapport.md CM-1) : tests de
+ * definirTechnologieAvanceeAmelioree retirés — fonction supprimée
+ * (zéro appelant réel), voir gameService.js en-tête.
  */
 
 var assert = require('assert');
@@ -176,73 +180,13 @@ test('choisirTechnologieAvancee : nom vide -> retire du slot', function () {
 });
 
 // ---------------------------------------------------------------
-// definirTechnologieAvanceeAmelioree
+// definirTechnologieAvanceeAmelioree supprimée le 21/08/2026
+// (docs/docs-rapport.md CM-1) — zéro appelant réel (aucune UI ne
+// l'invoquait). Le champ technologiesAvanceesAmeliorees qu'elle écrivait
+// reste lu par focusEngine.js (effet influence_par_technologie_amelioree,
+// voir focusEngine.test.js) mais aucun code ne peut plus l'alimenter —
+// gap fonctionnel connu, pas re-testé ici.
 // ---------------------------------------------------------------
-
-test('definirTechnologieAvanceeAmelioree : cycle 1 -> rejette (aucun groupe actif)', function () {
-  var db = creerDbFactice_();
-  db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 1 });
-  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { technologiesAvanceesChoisies: LES_4_CHOISIES });
-  var ctx = creerContexte_(db);
-
-  return ctx.GameService.definirTechnologieAvanceeAmelioree('p1', 'A1', true).then(function () {
-    assert.fail('aurait dû rejeter');
-  }, function (erreur) {
-    assert.match(erreur.message, /pas améliorable/i);
-  });
-});
-
-test('definirTechnologieAvanceeAmelioree : cycle 2, technologie du groupe A (choisies) -> autorisé', function () {
-  var db = creerDbFactice_();
-  db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 2 });
-  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { technologiesAvanceesChoisies: LES_4_CHOISIES });
-  var ctx = creerContexte_(db);
-
-  return ctx.GameService.definirTechnologieAvanceeAmelioree('p1', 'B1', true).then(function (partie) {
-    assert.strictEqual(partie.technologiesAvanceesAmeliorees.B1, true);
-  });
-});
-
-test('definirTechnologieAvanceeAmelioree : cycle 2, technologie hors groupe A -> rejette', function () {
-  var db = creerDbFactice_();
-  db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 2 });
-  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { technologiesAvanceesChoisies: LES_4_CHOISIES });
-  var ctx = creerContexte_(db);
-
-  // A2 fait partie des 8 mais pas des 4 choisies (groupe A) : pas
-  // améliorable au cycle 2 (il deviendra améliorable au cycle 3, avec le
-  // reste du complément).
-  return ctx.GameService.definirTechnologieAvanceeAmelioree('p1', 'A2', true).then(function () {
-    assert.fail('aurait dû rejeter');
-  }, function (erreur) {
-    assert.match(erreur.message, /pas améliorable/i);
-  });
-});
-
-test('definirTechnologieAvanceeAmelioree : cycle 3, technologie du complément (groupe B) -> autorisé', function () {
-  var db = creerDbFactice_();
-  db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 3 });
-  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { technologiesAvanceesChoisies: LES_4_CHOISIES });
-  var ctx = creerContexte_(db);
-
-  // A2/B2/C2/D2 = le complément des 4 choisies (A1/B1/C1/D1).
-  return ctx.GameService.definirTechnologieAvanceeAmelioree('p1', 'A2', true).then(function (partie) {
-    assert.strictEqual(partie.technologiesAvanceesAmeliorees.A2, true);
-  });
-});
-
-test('definirTechnologieAvanceeAmelioree : cycle 3, technologie du groupe A (plus actif) -> rejette', function () {
-  var db = creerDbFactice_();
-  db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 3 });
-  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { technologiesAvanceesChoisies: LES_4_CHOISIES });
-  var ctx = creerContexte_(db);
-
-  return ctx.GameService.definirTechnologieAvanceeAmelioree('p1', 'A1', true).then(function () {
-    assert.fail('aurait dû rejeter');
-  }, function (erreur) {
-    assert.match(erreur.message, /pas améliorable/i);
-  });
-});
 
 // ---------------------------------------------------------------
 // obtenirTechnologiesAvanceesGroupes (fonction pure)

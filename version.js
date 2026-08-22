@@ -1,7 +1,85 @@
 /**
  * version.js
- * Version 47 — 2026-08-21
+ * Version 51 — 2026-08-21
  * Source de vérité unique pour la version de l'application.
+ *
+ * 21/08/2026 (docs/docs-rapport.md MUT-2 à MUT-8 + DUP-2/DUP-3, suite de
+ * la relecture complète) :
+ * - MUT-2 : focusEngine.js — motif demanderChoix/journal répété 7 fois
+ *   dans resoudreCle_ factorisé en `demanderChoixEtJournaliser_`.
+ * - MUT-3/MUT-4/MUT-5/MUT-6 : strategieService.js — `secteurEstPossede_`/
+ *   `creerSecteurParNumero_`/`construireAdjacenceMap_`/`labelVaisseau_`
+ *   factorisent ce qui était dupliqué entre les popups Regrouper/
+ *   Déployer un cube/Envahir.
+ * - MUT-7/MUT-8 : secteurService.js — `installationsUtilisees_`/
+ *   `guildesUtilisees_` factorisent le calcul d'emplacements utilisés
+ *   (8 occurrences) ; `regrouper` utilise un objet imbriqué plutôt
+ *   qu'une clé composite reparsée.
+ * - DUP-2 : `SecteurService.CHAMP_PN_PAR_TYPE` exposée publiquement,
+ *   copie locale de strategieService.js supprimée.
+ * - DUP-3 : gameService.js/focusEngine.js — tables de ressources
+ *   identiques documentées par des commentaires croisés plutôt que
+ *   fusionnées (gameService.js charge avant focusEngine.js et doit
+ *   rester utilisable sans lui).
+ * DUP-1/DUP-4 (index.html duplique des tables de strategieService.js)
+ * non traités — plus gros volume, laissés pour une session dédiée.
+ * Aucun changement de comportement : validé par 80 tests `*.test.js` +
+ * 51 tests `*_test.js`/`test_*.js` + e2e/partie-complete.spec.js +
+ * e2e/partie-aleatoire.spec.js (14 maisons + 10 seeds supplémentaires).
+ *
+ * 21/08/2026 (docs/docs-rapport.md MUT-1 + code mort CM-1 à CM-8/CM-10,
+ * suite de la relecture complète) :
+ * - MUT-1 : gameService.js — les 8 fonctions `appliquerCadre*` (~15
+ *   lignes de boilerplate répétées + refetch dupliqué 11 fois)
+ *   factorisées via `chargerCadreOuvrable_`/`rechargerPartie_`.
+ * - CM-1 : gameService.js — `definirTechnologieAvanceeAmelioree`
+ *   supprimée (zéro appelant réel). Le champ `technologiesAvanceesAmeliorees`
+ *   qu'elle écrivait est CONSERVÉ : lu par un effet récent et testé de
+ *   focusEngine.js (`influence_par_technologie_amelioree`) — gap
+ *   fonctionnel (UI manquante), pas du code mort, corrigé dans le
+ *   rapport d'audit initial.
+ * - CM-2 : focusService.js — 3 exports jamais appelés retirés
+ *   (obtenirCartesFocus/obtenirFocusParFamille/obtenirPoolHeroique).
+ * - CM-3 : strategieService.js — avancerMoinsAvancee_/avancerCorrompue_
+ *   supprimées (boutons DOM retirés depuis le Lot F, listeners jamais
+ *   attachés).
+ * - CM-4 : combatService.js — NOMS_VAISSEAUX/totalNavale retirés de
+ *   l'API publique.
+ * - CM-5 : css/style.css — .resultat-partie-creee/.carte-partie-actions
+ *   (vestiges d'écrans supprimés) retirées.
+ * - CM-6 : db.js — DB.ouvrir/DB.vider/DB.NOMS_STORES retirés de l'API
+ *   publique (vider() supprimée entièrement, zéro appelant même en
+ *   interne).
+ * - CM-7 : historiqueVueService.js — export ouvrirHistorique retiré.
+ * - CM-8 : annulationService.js — export LIMITE_PAR_PARTIE retiré.
+ * - CM-10 : data/catalogue/technologies.json — champ idSheet (résidu
+ *   d'export Google Sheets) retiré des 28 entrées.
+ * CM-9 (data/catalogue/scenarioTrousDeVer.json vide) non traité —
+ * nécessite une décision produit (fonctionnalité prévue ou fichier à
+ * retirer), pas une suppression mécanique.
+ * Validé par les 80 tests `*.test.js` + les 51 tests `*_test.js`/
+ * `test_*.js` + e2e/partie-complete.spec.js + e2e/partie-aleatoire.spec.js
+ * (14 maisons).
+ *
+ * 21/08/2026 (docs/docs-rapport.md BUG-1 et BUG-2, relecture complète du
+ * 21/08/2026) :
+ * - BUG-1 : js/scoreVueService.js — #btn-retour-fin appelait
+ *   App.afficherEcran('game'), écran renommé depuis en
+ *   'plateau-galactique' → écran vide au clic depuis Fin de partie.
+ * - BUG-2 : js/gameService.js — cleFocusEnginePourOptionCadre_ exposée
+ *   publiquement (GameService.cleFocusEnginePourOptionCadre) ;
+ *   index.html en gardait une copie recopiée à la main (déjà cause d'un
+ *   Cadre non cliquable par le passé), supprimée au profit de la seule
+ *   source de vérité.
+ *
+ * 21/08/2026 (bug trouvé par le nouveau scénario E2E aléatoire,
+ * e2e/partie-aleatoire.spec.js) : js/strategieService.js — demanderChoix
+ * ne réinitialisait jamais #modal-choix-valider.disabled à l'ouverture
+ * d'une nouvelle popup. Si un chemin de sortie d'une popup précédente
+ * (parmi ~10 qui désactivent ce bouton pendant un appel async) oubliait
+ * de le réactiver, TOUTE popup suivante — même un simple 'confirmation' —
+ * restait bloquée sans aucun indice visuel. Reset défensif ajouté en
+ * tête de demanderChoix.
  * Chargé à la fois par index.html (contexte navigateur, via <script src>)
  * et par service-worker.js (contexte Service Worker, via importScripts).
  *
@@ -1362,4 +1440,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260821.9';
+var APP_VERSION = '20260821.13';

@@ -1,6 +1,16 @@
 /**
  * focusEngine.js
  * Moteur coût/effet des actions Focus — Voidfall Companion PWA
+ * Version 14 — 21/08/2026 (docs/docs-rapport.md MUT-2 — factorisation demanderChoixEtJournaliser_)
+ *
+ * 21/08/2026 (docs/docs-rapport.md MUT-2) : motif
+ * `demanderChoix -> journal.push -> return true/false` répété 7 fois
+ * dans resoudreCle_ (construire, augmenter_population_pure,
+ * retirer_corruption, gain_corruption, avancer_civilisation,
+ * ameliorer_gloire, regrouper) factorisé en `demanderChoixEtJournaliser_`.
+ * Aucun changement de comportement (35 tests focusEngine.test.js +
+ * e2e/partie-aleatoire.spec.js sur les 14 maisons).
+ *
  * Version 13 — 21/08/2026 (correctif — "ameliorer_gloire" réellement reconnue, déléguée à demanderChoix({type:'ameliorer_gloire'}))
  *
  * 21/08/2026 (retour utilisateur : "Implémenter le gain d'influence, il y
@@ -249,6 +259,14 @@ var FocusEngine = (function () {
     liberation: 'jetonLiberation'
   };
   var CLES_SIMPLES = Object.keys(CHAMP_PAR_CLE);
+  // 21/08/2026 (docs/docs-rapport.md DUP-3) : RESSOURCES_PRODUCTION est
+  // identique à gameService.js/RESSOURCES_SIMPLES_CADRE, et les 5
+  // premières entrées de CHAMP_PAR_CLE ci-dessus correspondent à
+  // gameService.js/CHAMP_RESSOURCE_PLATEAU_MAISON_ — PAS fusionnées
+  // (focusEngine.js charge après gameService.js, voir index.html, et
+  // les deux fichiers restent volontairement indépendants l'un de
+  // l'autre). Si l'une de ces 5 ressources change ici, vérifier l'autre
+  // copie côté gameService.js.
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
   var NB_CUBES_TOTAL = 14;
 
@@ -383,6 +401,25 @@ var FocusEngine = (function () {
 
   function reponseAnnulee_(reponse) {
     return !reponse || reponse.annule === true;
+  }
+
+  /**
+   * 21/08/2026 (docs/docs-rapport.md MUT-2) : motif répété 7 fois dans
+   * resoudreCle_ (construire, augmenter_population_pure, retirer_corruption,
+   * gain_corruption, avancer_civilisation, ameliorer_gloire, regrouper) —
+   * ouvre une popup dédiée dont le contenu ET la persistance sont gérés
+   * entièrement par elle (focusEngine reste pur, aucun accès DB ici),
+   * n'annule TOUT l'effet que si la popup est annulée, sinon journalise
+   * un résumé. `formatterMessage(reponse)` optionnel pour les popups dont
+   * le résumé n'est pas simplement `source + ' : ' + reponse.detail`
+   * (ex. "regrouper", qui préfixe avec le nombre de déplacements).
+   */
+  function demanderChoixEtJournaliser_(contexte, source, journal, demanderChoix, formatterMessage) {
+    return Promise.resolve(demanderChoix(contexte)).then(function (reponse) {
+      if (reponseAnnulee_(reponse)) return false;
+      journal.push(formatterMessage ? formatterMessage(reponse) : (source + ' : ' + reponse.detail));
+      return true;
+    });
   }
 
   // ------------------------------------------------------------
@@ -537,17 +574,13 @@ var FocusEngine = (function () {
     // préfixe verbe, rencontrées dans des tableaux "choice") sont les mêmes
     // clés que "construire_installation"/"etablir_guilde". ---
     if (CLES_CONSTRUIRE.indexOf(cle) !== -1 && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'construire',
         categorie: CATEGORIE_PAR_CLE_CONSTRUIRE_[cle],
         typeForce: TYPE_FORCE_PAR_CLE_CONSTRUIRE_[cle],
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Augmenter une Population Pure : Effet UNIQUEMENT (signe > 0).
@@ -575,15 +608,11 @@ var FocusEngine = (function () {
     // fichier — et retombe donc sur le repli générique, journalisé en
     // avertissement, pas de régression. ---
     if ((cle === 'augmenter_population_pure' || cle === 'augmenter_population') && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'augmenter_population_pure',
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Retirer une Corruption : Effet UNIQUEMENT (signe > 0). Ouvre une
@@ -604,15 +633,11 @@ var FocusEngine = (function () {
     // population_pure ci-dessus — focusEngine reste pur, aucun accès DB
     // ici) ; resoudreCle_ relaie juste le résumé dans le journal. ---
     if (cle === 'retirer_corruption' && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'retirer_corruption',
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Gagner une Corruption : Effet UNIQUEMENT (signe > 0). Miroir de
@@ -636,15 +661,11 @@ var FocusEngine = (function () {
     // choix ET la persistance (focusEngine reste pur, aucun accès DB
     // ici) ; resoudreCle_ relaie juste le résumé dans le journal. ---
     if (cle === 'gain_corruption' && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'gagner_corruption',
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Avancer sur une piste de Civilisation : Effet UNIQUEMENT (signe
@@ -666,16 +687,12 @@ var FocusEngine = (function () {
     // (focusEngine reste pur, aucun accès DB ici) ; resoudreCle_ relaie
     // juste le résumé dans le journal. ---
     if (CLES_AVANCER_CIVILISATION_.indexOf(cle) !== -1 && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'avancer_civilisation',
         piste: PISTE_PAR_CLE_AVANCER_CIVILISATION_[cle] || null,
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Améliorer un jeton Gloire : Effet UNIQUEMENT (signe > 0). Aucun
@@ -692,15 +709,11 @@ var FocusEngine = (function () {
     // à la valeur maximale 5), la popup annule l'effet entier (comme
     // n'importe quel autre effet bloquant faute de cible).
     if (cle === 'ameliorer_gloire' && signe > 0) {
-      return Promise.resolve(demanderChoix({
+      return demanderChoixEtJournaliser_({
         type: 'ameliorer_gloire',
         source: source,
         partieId: etat.partieId
-      })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : ' + reponse.detail);
-        return true;
-      });
+      }, source, journal, demanderChoix);
     }
 
     // --- Toute autre clé contenant "cube" (ex. activer_cube, cube) :
@@ -806,10 +819,8 @@ var FocusEngine = (function () {
     // "Annuler" bloque toute l'action (même règle que "choice"/
     // "choice_repeat" ci-dessus, cohérent avec le popup Envahir legacy). ---
     if (cle === 'regrouper' || cle === 'regroupe') {
-      return Promise.resolve(demanderChoix({ type: 'regrouper', source: source, partieId: etat.partieId })).then(function (reponse) {
-        if (reponseAnnulee_(reponse)) return false;
-        journal.push(source + ' : Regrouper — ' + reponse.deplacements + ' déplacement(s) (' + reponse.detail + ').');
-        return true;
+      return demanderChoixEtJournaliser_({ type: 'regrouper', source: source, partieId: etat.partieId }, source, journal, demanderChoix, function (reponse) {
+        return source + ' : Regrouper — ' + reponse.deplacements + ' déplacement(s) (' + reponse.detail + ').';
       });
     }
 

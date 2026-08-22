@@ -9,8 +9,12 @@ Règles du jeu annotées : `docs/docs-rules-*.md`.
 ## Stack — contraintes à respecter
 
 - **Vanilla JS, zéro build, zéro dépendance npm au runtime.** Pas de React/
-  Vue/bundler. Pas de `package.json`. N'en introduis pas sans demande
-  explicite.
+  Vue/bundler. L'app livrée (tout ce que `service-worker.js` met en cache)
+  reste 100 % vanilla JS servie telle quelle. `package.json` existe
+  uniquement pour l'outillage de test (Playwright, voir § Tests E2E
+  ci-dessous) — ce sont des `devDependencies`, jamais chargées par
+  `index.html` ni par le Service Worker. N'ajoute pas de dépendance
+  runtime sans demande explicite.
 - **IIFE + suffixe `_`** : chaque module est `var X = (function(){'use
   strict'; ...; return {...};})();`. Privé = suffixe `_`. Respecte ce
   pattern pour tout nouveau code.
@@ -97,9 +101,46 @@ Fichiers existants : `js/focusEngine.test.js`,
 `js/gameService_cycle_focus_technologie.test.js`,
 `js/gameService_evenements_technologie.test.js`,
 `js/gameService_technologies_avancees_test.js`,
-`js/secteurService_actions.test.js`. Pas de test pour
-`civilisationService.js`/`combatService.js`/`scoreService.js` (dette
-connue).
+`js/secteurService_actions.test.js`, `js/civilisationService_test.js` et
+plusieurs autres `*_test.js`/`test_*.js` (convention de nommage pas
+encore unifiée — `node --test` seul ne matche que `*.test.js`, lancer les
+autres individuellement). Pas de test pour `combatService.js`/
+`scoreService.js` (dette connue, `combatService.js` en priorité vu la
+complexité de sa logique de résolution).
+
+## Tests E2E (Playwright)
+
+Complète les tests ci-dessus (moteur pur, IndexedDB factice) par un
+parcours dans un **vrai navigateur** : DOM réel, `index.html`,
+`service-worker.js`, tous les écrans. Seul moyen d'attraper les bugs de
+rendu/navigation (Piège n°2, écran qui reste vide après un clic) qu'un
+test de moteur pur ne peut pas voir.
+
+- `devDependencies` uniquement (`package.json`, `node_modules/` — jamais
+  livrés, jamais dans le cache du Service Worker). `npm install` puis
+  `npx playwright install chromium` pour l'installation initiale.
+- `npm run test:e2e` (ou `npm run test:e2e:ui` en mode interactif) lance
+  les scénarios de `e2e/*.spec.js` contre le serveur de dev
+  (`python -m http.server`, démarré automatiquement par
+  `playwright.config.js` si besoin).
+- Chaque test démarre avec un contexte navigateur neuf (IndexedDB/cache
+  vides, aucun Service Worker déjà enregistré) — pas besoin de gérer le
+  Piège n°1 manuellement dans ces tests.
+- `e2e/partie-complete.spec.js` : smoke test léger (création de partie +
+  navigation sur tous les écrans), fait partie de `npm run test:e2e`.
+- `e2e/partie-aleatoire.spec.js` (`npm run test:e2e:aleatoire`, ~2-3 min
+  pour les 14 maisons) : joue une partie complète semi-aléatoire (3
+  cycles + fin de partie — Événement, Cadres, 3 Focus héroïques, 1
+  technologie, 2 actions Focus par cycle) pour chaque maison du
+  catalogue, en cliquant réellement dans le DOM. Seeds déterministes
+  (voir en-tête du fichier) — un run est toujours reproductible, y
+  compris entre deux process Playwright différents. Génère un rapport
+  Markdown par (maison, seed) dans `e2e/rapports/` (généré, ignoré par
+  git) — a déjà trouvé un vrai bug (`#modal-choix-valider` restant
+  bloqué entre deux popups, voir `docs/docs-rapport.md` BUG-3). Ne vise
+  pas l'exhaustivité combinatoire (irréaliste vu le nombre de
+  combinaisons maisons × événements × technologies × focus) : c'est du
+  fuzzing seedé, pas une énumération.
 
 ## Serveur de dev
 

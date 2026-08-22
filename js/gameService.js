@@ -1,7 +1,38 @@
 /**
  * gameService.js
  * Cycle de vie de partie — Voidfall Companion PWA
- * Version 22 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 automatisés)
+ * Version 24 — 21/08/2026 (docs/docs-rapport.md MUT-1/CM-1 — factorisation appliquerCadre* + suppression de definirTechnologieAvanceeAmelioree)
+ *
+ * 21/08/2026 (docs/docs-rapport.md MUT-1) : les 8 fonctions `appliquerCadre*`
+ * répétaient ~15 lignes de boilerplate identique (chargement partie +
+ * garde-fous anti-double-application + résolution du cadre dans le
+ * catalogue de l'Événement) et le refetch final (parties+plateauMaison ->
+ * assemblerPartie_) réapparaissait 11 fois dans le fichier. Factorisés en
+ * `chargerCadreOuvrable_(partieId, cycle, ordreCadre)` et
+ * `rechargerPartie_(partieId)`. Aucun changement de comportement (validé
+ * par les 5 fichiers de test dédiés aux Cadres + e2e/partie-aleatoire.spec.js
+ * sur les 14 maisons).
+ *
+ * 21/08/2026 (docs/docs-rapport.md CM-1) : `definirTechnologieAvanceeAmelioree`
+ * supprimée — confirmé zéro appelant en dehors de son propre fichier de
+ * test (aucun bouton index.html ne l'invoque). Attention, correction par
+ * rapport à l'analyse initiale du rapport : SEULE cette fonction était
+ * morte. Le champ `technologiesAvanceesAmeliorees` qu'elle écrivait
+ * reste, lui, VIVANT et TESTÉ — lu par focusEngine.js pour l'effet
+ * "influence_par_technologie_amelioree" (voir focusEngine.test.js,
+ * ajouté le 21/08/2026). Sa valeur reste structurellement toujours `{}`
+ * en usage réel (aucune UI ne l'alimente, `majPlateauMaison` ne
+ * l'autorise pas non plus via CHAMPS_PLATEAU_MAISON_AUTORISES) — un vrai
+ * gap fonctionnel (UI manquante pour marquer une Technologie avancée
+ * améliorée), pas du code mort à supprimer sans discussion. Non traité
+ * ici, à ajouter à docs/docs-rapport.md si une UI dédiée est souhaitée.
+ *
+ * 21/08/2026 (docs/docs-rapport.md BUG-2) : cleFocusEnginePourOptionCadre_
+ * exposée publiquement (GameService.cleFocusEnginePourOptionCadre) —
+ * index.html en gardait une copie recopiée à la main, déjà cause d'un
+ * Cadre non cliquable par le passé faute de synchronisation manuelle.
+ * Supprimée côté index.html, qui lit désormais directement cette
+ * fonction. Aucun changement de comportement.
  *
  * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
  * du mal") :
@@ -591,6 +622,15 @@ var GameService = (function () {
   // reste hors périmètre (docs-rules-cycle-de-jeu.md §1.5, la plupart des
   // sous-points sont ❌/🚫) et s'affiche en texte brut, à résoudre
   // manuellement par le joueur.
+  // 21/08/2026 (docs/docs-rapport.md DUP-3) : RESSOURCES_SIMPLES_CADRE
+  // est identique à FocusEngine.RESSOURCES_PRODUCTION, et
+  // CHAMP_RESSOURCE_PLATEAU_MAISON_ est un sous-ensemble exact de
+  // FocusEngine.CHAMP_PAR_CLE (les 5 premières entrées) — PAS fusionnées :
+  // gameService.js charge avant focusEngine.js (index.html) et reste
+  // volontairement utilisable sans lui (seule exception déjà existante :
+  // appliquerCadreChoixFocusEngine, qui vérifie `typeof FocusEngine`
+  // avant utilisation). Si l'une de ces 5 ressources change ici, vérifier
+  // l'autre copie côté focusEngine.js.
   var RESSOURCES_SIMPLES_CADRE = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
   var CHAMP_RESSOURCE_PLATEAU_MAISON_ = {
     nourriture: 'ressourceNourriture', energie: 'ressourceEnergie', materiel: 'ressourceMateriel',
@@ -956,6 +996,62 @@ var GameService = (function () {
   }
 
   /**
+   * 21/08/2026 (docs/docs-rapport.md MUT-1) : relit parties+plateauMaison
+   * et réassemble une `partie` à jour — dernière étape, identique, de
+   * quasiment toute mutation de ce fichier (une écriture ne renvoie jamais
+   * l'objet persisté directement, toujours un aller-retour DB frais).
+   * Factorisée ici (11 occurrences avant factorisation) plutôt que
+   * dupliquée à chaque fonction.
+   */
+  function rechargerPartie_(partieId) {
+    return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r) {
+      return assemblerPartie_(r[0], r[1]);
+    });
+  }
+
+  /**
+   * 21/08/2026 (docs/docs-rapport.md MUT-1) : boilerplate commun aux 8
+   * fonctions `appliquerCadre*` (résolution d'un Cadre d'Événement
+   * galactique) — lit parties+plateauMaison, assemble la `partie`,
+   * retrouve l'Événement galactique du cycle, applique le garde-fou
+   * anti-double-application (un Cadre déjà résolu ne peut pas l'être une
+   * seconde fois), et retrouve le `cadre` lui-même dans le catalogue de
+   * l'Événement (`evenementCycle.cadres`) — présent même pour les
+   * appelants qui n'en ont pas besoin (appliquerCadreEffet/
+   * appliquerCadreManuel), le coût d'un `.filter` sur un tableau de
+   * quelques éléments est négligeable face à la duplication qu'il évite.
+   * Chaque appelant reste responsable de sa propre validation métier
+   * (type de cadre attendu, option, etc.) et de la persistance finale
+   * (`evenementCycle.cadresAppliques[ordreCadre] = ...` puis
+   * `sauvegarderPartie`) — cette fonction ne fait que le chargement.
+   */
+  function chargerCadreOuvrable_(partieId, cycle, ordreCadre) {
+    return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+      var lignePlateauMaison = resultats[1];
+      var partie = assemblerPartie_(resultats[0], lignePlateauMaison);
+      if (!partie) throw new Error('Partie introuvable.');
+
+      var cleCycle = 'cycle' + cycle;
+      var evenementCycle = (partie.evenements || {})[cleCycle];
+      if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
+      evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
+      if (evenementCycle.cadresAppliques[ordreCadre]) {
+        throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
+      }
+
+      var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
+
+      return {
+        partie: partie,
+        lignePlateauMaison: lignePlateauMaison,
+        cleCycle: cleCycle,
+        evenementCycle: evenementCycle,
+        cadre: cadre
+      };
+    });
+  }
+
+  /**
    * Retire de l'objet partie tout ce qui a une colonne/clé dédiée
    * ailleurs, avant persistance dans parties.etatJson (voir en-tête).
    */
@@ -1029,6 +1125,18 @@ var GameService = (function () {
      * poids de payload réseau à optimiser ici.
      */
     obtenirMaisonsCatalogue: obtenirMaisonsCatalogue_,
+
+    /**
+     * 21/08/2026 (docs/docs-rapport.md BUG-2) : exposée publiquement pour
+     * index.html, qui en gardait jusqu'ici une copie recopiée à la main
+     * (cleFocusEnginePourOptionCadre_/LABEL_OPTION_FOCUSENGINE_ dans
+     * actionsCadre_) pour savoir si un bouton d'option de Cadre doit être
+     * cliquable — un oubli de synchronisation avait déjà rendu un Cadre
+     * non cliquable par le passé (voir commentaire index.html historique).
+     * index.html lit désormais directement cette fonction au lieu de la
+     * redéfinir : une seule source de vérité.
+     */
+    cleFocusEnginePourOptionCadre: cleFocusEnginePourOptionCadre_,
 
     /**
      * Crée une nouvelle partie. Portage de GameService.creerPartie (GAS),
@@ -1462,18 +1570,8 @@ var GameService = (function () {
      * toute écriture, jamais fait confiance à l'appelant.
      */
     appliquerCadreEffet: function (partieId, cycle, ordreCadre, delta) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
-
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, lignePlateauMaison = ctx.lignePlateauMaison, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle;
 
         var champsPlateauMaison = {};
         Object.keys(delta || {}).forEach(function (ressource) {
@@ -1499,9 +1597,7 @@ var GameService = (function () {
           GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
         ]);
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1517,27 +1613,15 @@ var GameService = (function () {
      * toucher plateauMaison (aucun delta à appliquer).
      */
     appliquerCadreManuel: function (partieId, cycle, ordreCadre) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
-
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle;
 
         evenementCycle.cadresAppliques[ordreCadre] = { manuel: true, le: new Date().toISOString() };
         partie.evenements[cleCycle] = evenementCycle;
 
         return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1564,20 +1648,9 @@ var GameService = (function () {
      * quel cadre "placement" du catalogue, quels que soient ses éléments.
      */
     appliquerCadrePlacement: function (partieId, cycle, ordreCadre, numeroSecteur) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         if (!cadre || !cadre.effet || cadre.effet.type !== 'placement') {
           throw new Error('Cadre de placement introuvable pour cet ordre.');
         }
@@ -1588,9 +1661,7 @@ var GameService = (function () {
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
         });
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1610,20 +1681,9 @@ var GameService = (function () {
      * appliquerCadrePlacement ci-dessus.
      */
     appliquerCadrePlacementMultiple: function (partieId, cycle, ordreCadre, ciblesParGroupe) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         if (!cadre || !cadre.effet || cadre.effet.type !== 'placement_multiple') {
           throw new Error('Cadre de placement multiple introuvable pour cet ordre.');
         }
@@ -1638,9 +1698,7 @@ var GameService = (function () {
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
         });
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1674,20 +1732,9 @@ var GameService = (function () {
      * Population).
      */
     appliquerCadreChoixPlacement: function (partieId, cycle, ordreCadre, indexOption, numeroSecteur, typeGuildeChoisi) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
           ? cadre.effet.options[indexOption] : null;
         if (!option || option.type !== 'placement' || !option.elements) {
@@ -1719,9 +1766,7 @@ var GameService = (function () {
             });
           });
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1750,20 +1795,9 @@ var GameService = (function () {
      * cadre précis.
      */
     appliquerCadreChoixManuel: function (partieId, cycle, ordreCadre, indexOption, resume) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
           ? cadre.effet.options[indexOption] : null;
         if (!option) throw new Error('Option de cadre introuvable pour cet ordre.');
@@ -1773,9 +1807,7 @@ var GameService = (function () {
 
         return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -1817,20 +1849,9 @@ var GameService = (function () {
      * directement sur secteursPartie par la popup, voir strategieService.js).
      */
     appliquerCadreChoixFocusEngine: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, lignePlateauMaison = ctx.lignePlateauMaison, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
           ? cadre.effet.options[indexOption] : null;
         var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
@@ -1893,9 +1914,7 @@ var GameService = (function () {
               ecrirePlateauMaison,
               GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
             ]).then(function () {
-              return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-                return assemblerPartie_(r2[0], r2[1]);
-              });
+              return rechargerPartie_(partieId);
             });
           });
       });
@@ -1943,20 +1962,9 @@ var GameService = (function () {
      * le Cadre et d'en placer au-delà de ce que la carte autorise.
      */
     appliquerCadreGainCorruption: function (partieId, cycle, ordreCadre, demanderChoix) {
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var lignePartie = resultats[0], lignePlateauMaison = resultats[1];
-        var partie = assemblerPartie_(lignePartie, lignePlateauMaison);
-        if (!partie) throw new Error('Partie introuvable.');
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
 
-        var cleCycle = 'cycle' + cycle;
-        var evenementCycle = (partie.evenements || {})[cleCycle];
-        if (!evenementCycle) throw new Error('Aucun événement galactique choisi pour ce cycle.');
-        evenementCycle.cadresAppliques = evenementCycle.cadresAppliques || {};
-        if (evenementCycle.cadresAppliques[ordreCadre]) {
-          throw new Error('Ce cadre a déjà été appliqué pour ce cycle.');
-        }
-
-        var cadre = (evenementCycle.cadres || []).filter(function (c) { return c.ordre === ordreCadre; })[0];
         var config = resoudreCiblesCadreGainCorruption_(cadre && cadre.effet);
         if (!config) throw new Error('Ce cadre n’est pas automatisable pour le gain de Corruption.');
 
@@ -1994,9 +2002,7 @@ var GameService = (function () {
 
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
             .then(function () {
-              return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-                return assemblerPartie_(r2[0], r2[1]);
-              });
+              return rechargerPartie_(partieId);
             });
         });
       });
@@ -2036,9 +2042,7 @@ var GameService = (function () {
         ligne.technologiesObtenues = technologiesObtenues;
         return DB.put('plateauMaison', ligne);
       }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-          return assemblerPartie_(resultats[0], resultats[1]);
-        });
+        return rechargerPartie_(partieId);
       });
     },
 
@@ -2182,9 +2186,7 @@ var GameService = (function () {
         return GameService.majPlateauMaison(partieId, { technologiesObtenues: technologies }).then(function () {
           return ajouterHistorique_(partieId, 'technologie_obtenue_slot' + slot, nomTechnologie || '(retirée)');
         }).then(function () {
-          return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-            return assemblerPartie_(r2[0], r2[1]);
-          });
+          return rechargerPartie_(partieId);
         });
       });
     },
@@ -2233,46 +2235,7 @@ var GameService = (function () {
         return GameService.majPlateauMaison(partieId, { technologiesAvanceesChoisies: choisies }).then(function () {
           return ajouterHistorique_(partieId, 'technologie_avancee_slot' + slot, nomTechnologie || '(retirée)');
         }).then(function () {
-          return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-            return assemblerPartie_(r2[0], r2[1]);
-          });
-        });
-      });
-    },
-
-    /**
-     * 17/08/2026 (Lot C — Plat. Galactique, Technologies avancées) : marque
-     * une Technologie avancée (identifiée par son nom, pas un slot — elle
-     * peut appartenir au groupe du cycle 2 ou à celui du cycle 3) comme
-     * améliorée ou non. Écrit directement sur `plateauMaison`, même
-     * pattern que definirTechnologieAmelioree (pas de passage par
-     * majPlateauMaison, cette technique a "sa propre fonction dédiée").
-     * Rejette si la technologie n'est pas dans le groupe actif du cycle en
-     * cours (groupeActifTechnologiesAvancees_) — règle confirmée par
-     * l'utilisateur : le groupe du cycle 1 n'est jamais améliorable, celui
-     * du cycle 2 l'est uniquement au cycle 2, celui du cycle 3
-     * (complément, calculé) uniquement au cycle 3.
-     */
-    definirTechnologieAvanceeAmelioree: function (partieId, nomTechnologie, amelioree) {
-      amelioree = !!amelioree;
-      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
-        var partie = assemblerPartie_(resultats[0], resultats[1]);
-        if (!partie) throw new Error('Partie introuvable.');
-
-        var groupeActif = groupeActifTechnologiesAvancees_(partie);
-        if (groupeActif.indexOf(nomTechnologie) === -1) {
-          throw new Error('Cette technologie avancée n\'est pas améliorable ce cycle-ci.');
-        }
-
-        return DB.get('plateauMaison', partieId).then(function (ligne) {
-          var ameliorees = Object.assign({}, ligne.technologiesAvanceesAmeliorees || {});
-          ameliorees[nomTechnologie] = amelioree;
-          ligne.technologiesAvanceesAmeliorees = ameliorees;
-          return DB.put('plateauMaison', ligne);
-        });
-      }).then(function () {
-        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (r2) {
-          return assemblerPartie_(r2[0], r2[1]);
+          return rechargerPartie_(partieId);
         });
       });
     },

@@ -1439,52 +1439,13 @@
       });
     }
 
-    /**
-     * 18/08/2026 (Simplification UI Événement galactique — Cadre 3
-     * générique, Événement B Cycle 1 : "activer 1 cube / déployer 1 cube
-     * sur le Secteur-Mère") : reconnaît une option de cadre "choix"
-     * portant sur les cubes de Puissance Navale — même correspondance
-     * que GameService.cleFocusEnginePourOptionCadre_ (dupliquée ici
-     * uniquement pour savoir si le cadre est cliquable/pour l'étiquette
-     * de la popup ; la revalidation faisant foi reste côté GameService,
-     * comme pour optionTechnologieViaScience_ ci-dessus). Retourne la clé
-     * FocusEngine correspondante (voir focusEngine.js, CLES_DEPLOYER_CUBE
-     * et la clé générique "cube"), ou null.
-     *
-     * 19/08/2026 (Construire une Installation / Établir une Guilde
-     * portées) : etablir_guilde/construire_installation ajoutés (identité
-     * — voir CLES_CONSTRUIRE côté focusEngine.js, gameService.js v14).
-     */
-    function cleFocusEnginePourOptionCadre_(option) {
-      if (!option || !option.cle) return null;
-      if (option.cle === 'activer_cube') return 'activer_cube';
-      if (option.cle === 'deployer_cube') {
-        if (option.cible === 'secteur_mere') return 'deployer_cube_secteur_mere';
-        if (!option.cible) return 'deployer_cube';
-      }
-      if (option.cle === 'etablir_guilde' || option.cle === 'construire_installation') return option.cle;
-      // 19/08/2026 (Événement galactique D, Cycle 1 — Cadre 2, retour
-      // utilisateur) : etablir_guilde_banquier (même popup 'construire'
-      // que etablir_guilde, type "Banquiers" forcé) / augmenter_population_pure
-      // (nouvelle popup dédiée) — voir focusEngine.js (v6).
-      if (option.cle === 'etablir_guilde_banquier' || option.cle === 'augmenter_population_pure') return option.cle;
-      // 20/08/2026 (EVOLUTION 5 — retirer_corruption — correctif : cette
-      // copie locale avait été oubliée lors de l'ajout côté gameService.js,
-      // rendant un Cadre "choix" portant sur cette clé non cliquable en
-      // pratique malgré GameService.appliquerCadreChoixFocusEngine déjà
-      // prêt à la résoudre. EVOLUTION 7 — mêmes clés qu'ajoutées côté
-      // gameService.js (avancer_civilisation au choix + 3 variantes piste
-      // imposée), voir focusEngine.js v9.
-      if (option.cle === 'retirer_corruption') return option.cle;
-      if (option.cle === 'avancer_civilisation' || option.cle === 'avancer_civilisation_societe' ||
-        option.cle === 'avancer_civilisation_gouvernement' || option.cle === 'avancer_civilisation_economie') {
-        return option.cle;
-      }
-      // 21/08/2026 (effet "Améliorer un jeton Gloire") : même mécanisme
-      // générique — focusEngine.js v10.
-      if (option.cle === 'ameliorer_gloire') return option.cle;
-      return null;
-    }
+    // 21/08/2026 (docs/docs-rapport.md BUG-2) : cleFocusEnginePourOptionCadre_
+    // vivait ici en copie recopiée à la main depuis GameService.js (déjà
+    // cause d'un bug réel — un ajout de clé oublié côté copie locale avait
+    // rendu un Cadre "choix" non cliquable en pratique malgré le moteur
+    // déjà prêt à le résoudre, voir historique de cette section). Supprimée
+    // : tous les appels utilisent désormais GameService.cleFocusEnginePourOptionCadre
+    // directement, une seule source de vérité.
 
     function libelleOptionCube_(option, cleFocusEngine) {
       var valeur = Number(option.valeur) || 1;
@@ -1973,7 +1934,7 @@
             });
             return;
           }
-          var cleFocusEngine = cleFocusEnginePourOptionCadre_(option);
+          var cleFocusEngine = GameService.cleFocusEnginePourOptionCadre(option);
           if (cleFocusEngine) {
             actions.push({
               proportionnel: false, focusEngine: true, indexOption: indexOption,

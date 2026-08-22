@@ -1,6 +1,8 @@
 /**
  * annulationService.js
  * Pile d'annulation des actions Focus — Voidfall Companion PWA
+ * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-8 — retrait de l'export LIMITE_PAR_PARTIE jamais lu)
+ *
  * Version 1 — 17/08/2026 (Session 4, Phase 4 suite)
  *
  * Permet d'annuler la dernière action Focus jouée, puis l'avant-dernière,
@@ -118,12 +120,14 @@ var AnnulationService = (function () {
     return obtenirPileTriee_(partieId).then(function (pile) { return pile.length; });
   }
 
+  // 21/08/2026 (docs/docs-rapport.md CM-8) : LIMITE_PAR_PARTIE retirée de
+  // l'API publique (zéro appelant hors du fichier) — reste une constante
+  // privée, toujours utilisée en interne par empiler_.
   return {
     empiler: empiler_,
     annulerDerniere: annulerDerniere_,
     viderPile: viderPile_,
     obtenirPile: obtenirPile_,
-    compter: compter_,
-    LIMITE_PAR_PARTIE: LIMITE_PAR_PARTIE
+    compter: compter_
   };
 })();

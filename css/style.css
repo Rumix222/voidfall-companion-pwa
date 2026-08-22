@@ -669,26 +669,6 @@ input:disabled {
   color: var(--color-coral);
 }
 
-/* --- Résultat de création (temporaire, en attendant l'écran de partie
-   complet — Phase 3/4) --- */
-.resultat-partie-creee {
-  padding: 18px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  text-align: center;
-}
-.resultat-partie-creee h3 {
-  font-family: var(--font-display);
-  color: var(--color-coral);
-  margin: 0 0 8px;
-}
-.resultat-partie-creee p {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  margin: 4px 0;
-}
-
 /* Écran Secteurs — tableau minimal (repris de style.html, 11/08/2026,
    avant plateau visuel) */
 .table-secteurs {
@@ -735,17 +715,6 @@ input:disabled {
 .nav-ecrans .btn-toggle {
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-/* --- Cartes "parties enregistrées" (accueil) : bouton Continuer --- */
-.carte-partie-actions {
-  display: flex;
-  gap: 8px;
-}
-.carte-partie-actions .btn {
-  flex: 1;
-  padding: 8px 10px;
-  font-size: 0.82rem;
 }
 
 /* --- Écran Stratégie : suivi de ressources --- */

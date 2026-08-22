@@ -1,6 +1,8 @@
 /**
  * historiqueVueService.js
  * Écran Historique — Voidfall Companion PWA
+ * Version 3 — 21/08/2026 (docs/docs-rapport.md CM-7 — retrait de l'export ouvrirHistorique jamais appelé)
+ *
  * Version 2 — 17/08/2026 (Lot G — corrections mineures, suite)
  *
  * 17/08/2026 (Lot G — corrections mineures, suite) : libellé du bouton
@@ -214,5 +216,8 @@ var HistoriqueVueService = (function () {
       });
   });
 
-  return { ouvrirHistorique: ouvrirHistorique_ };
+  // 21/08/2026 (docs/docs-rapport.md CM-7) : export ouvrirHistorique
+  // retiré (zéro appelant — le listener #btn-historique ci-dessus est
+  // déjà branché en interne, le module n'a besoin d'exposer aucune API).
+  return {};
 })();

@@ -1,7 +1,6 @@
 [
   {
     "nom": "Nacelles",
-    "idSheet": 2,
     "maison": "Valnis",
     "type": "Combat",
     "permanent": {
@@ -28,7 +27,6 @@
   },
   {
     "nom": "Boucliers",
-    "idSheet": 1,
     "maison": "Valnis",
     "type": "Combat",
     "permanent": {
@@ -67,7 +65,6 @@
   },
   {
     "nom": "Ciblage",
-    "idSheet": 3,
     "maison": "Belitan",
     "type": "Combat",
     "permanent": {
@@ -104,7 +101,6 @@
   },
   {
     "nom": "Collecte de données",
-    "idSheet": 4,
     "maison": "Belitan",
     "type": "Production",
     "permanent": {
@@ -128,7 +124,6 @@
   },
   {
     "nom": "Quais orbitaux",
-    "idSheet": 5,
     "maison": "Dunlork",
     "type": "Déploiement",
     "permanent": {
@@ -154,7 +149,6 @@
   },
   {
     "nom": "Cellules énergétiques",
-    "idSheet": 6,
     "maison": "Dunlork",
     "type": "Combat",
     "permanent": {
@@ -185,7 +179,6 @@
   },
   {
     "nom": "Torpilles",
-    "idSheet": 7,
     "maison": "Cortozaar",
     "type": "Combat",
     "permanent": {
@@ -225,7 +218,6 @@
   },
   {
     "nom": "Bases Stellaires",
-    "idSheet": 8,
     "maison": "Cortozaar",
     "type": "Déploiement",
     "permanent": {
@@ -258,7 +250,6 @@
   },
   {
     "nom": "Destroyers",
-    "idSheet": 9,
     "maison": "Zenor",
     "type": "Combat",
     "permanent": {
@@ -282,7 +273,6 @@
   },
   {
     "nom": "Clonage",
-    "idSheet": 10,
     "maison": "Zenor",
     "type": "Civilisation",
     "permanent": {},
@@ -302,7 +292,6 @@
   },
   {
     "nom": "Terraformation",
-    "idSheet": 11,
     "maison": "Thegwyn",
     "type": "Développement",
     "permanent": {
@@ -338,7 +327,6 @@
   },
   {
     "nom": "Matrice neuronale",
-    "idSheet": 12,
     "maison": "Thegwyn",
     "type": "Production",
     "permanent": {
@@ -366,7 +354,6 @@
   },
   {
     "nom": "Cuirassés",
-    "idSheet": 13,
     "maison": "Shiveus",
     "type": "Combat",
     "permanent": {
@@ -400,7 +387,6 @@
   },
   {
     "nom": "Chambres de décontamination",
-    "idSheet": 14,
     "maison": "Shiveus",
     "type": "Corruption",
     "permanent": {
@@ -433,7 +419,6 @@
   },
   {
     "nom": "Hyperpropulsion",
-    "idSheet": 15,
     "maison": "Yarvek",
     "type": "Mouvement",
     "permanent": {
@@ -458,7 +443,6 @@
   },
   {
     "nom": "Transports tactiques",
-    "idSheet": 16,
     "maison": "Yarvek",
     "type": "Action",
     "permanent": {
@@ -487,7 +471,6 @@
   },
   {
     "nom": "Robotique",
-    "idSheet": 17,
     "maison": "Nervo",
     "type": "Action",
     "permanent": {
@@ -514,7 +497,6 @@
   },
   {
     "nom": "Vaisseaux-Arches",
-    "idSheet": 18,
     "maison": "Nervo",
     "type": "Développement",
     "permanent": {
@@ -541,7 +523,6 @@
   },
   {
     "nom": "Missiles longue portée",
-    "idSheet": 19,
     "maison": "Astoran",
     "type": "Combat",
     "permanent": {
@@ -580,7 +561,6 @@
   },
   {
     "nom": "Sentinelles",
-    "idSheet": 20,
     "maison": "Astoran",
     "type": "Combat",
     "permanent": {
@@ -612,7 +592,6 @@
   },
   {
     "nom": "Porte-Vaisseaux",
-    "idSheet": 21,
     "maison": "Fenrax",
     "type": "Combat",
     "permanent": {
@@ -652,7 +631,6 @@
   },
   {
     "nom": "Surveillance centrale",
-    "idSheet": 22,
     "maison": "Fenrax",
     "type": "Politique",
     "permanent": {
@@ -682,7 +660,6 @@
   },
   {
     "nom": "Scanner de récupération",
-    "idSheet": 23,
     "maison": "Kradmor",
     "type": "Invasion",
     "permanent": {
@@ -718,7 +695,6 @@
   },
   {
     "nom": "Purificateur",
-    "idSheet": 24,
     "maison": "Kradmor",
     "type": "Corruption",
     "permanent": {
@@ -754,7 +730,6 @@
   },
   {
     "nom": "Drones autonomes",
-    "idSheet": 25,
     "maison": "Marqualos",
     "type": "Combat",
     "permanent": {
@@ -800,7 +775,6 @@
   },
   {
     "nom": "Nexus de commerce",
-    "idSheet": 26,
     "maison": "Marqualos",
     "type": "Commerce",
     "permanent": {
@@ -828,7 +802,6 @@
   },
   {
     "nom": "Réplicateurs de combat",
-    "idSheet": 27,
     "maison": "Novaris",
     "type": "Combat",
     "permanent": {
@@ -859,7 +832,6 @@
   },
   {
     "nom": "Cybernétique",
-    "idSheet": 28,
     "maison": "Novaris",
     "type": "Production",
     "permanent": {

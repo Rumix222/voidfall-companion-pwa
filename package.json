@@ -1,0 +1,13 @@
+{
+  "name": "voidfall-companion-e2e",
+  "private": true,
+  "description": "Outillage de test uniquement (devDependencies). L'application elle-même reste vanilla JS, zéro build, zéro dépendance runtime — voir CLAUDE.md.",
+  "scripts": {
+    "test:e2e": "playwright test e2e/partie-complete.spec.js",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:aleatoire": "playwright test e2e/partie-aleatoire.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

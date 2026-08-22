@@ -1,7 +1,12 @@
 /**
  * focusService.js
  * Cartes Focus — Voidfall Companion PWA
- * Version 1 — 17/08/2026
+ * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-2 — retrait de 3 exports publics jamais appelés)
+ *
+ * 21/08/2026 (docs/docs-rapport.md CM-2) : obtenirCartesFocus/
+ * obtenirFocusParFamille/obtenirPoolHeroique retirés de l'API publique
+ * (zéro appelant dans tout le repo). Aucun changement de comportement
+ * pour les fonctions restantes.
  *
  * Phase 4 (partielle) du plan de migration : portage de FocusService.js
  * (GAS, 263 l.), UNIQUEMENT la partie catalogue (regroupement des lignes
@@ -163,26 +168,14 @@ var FocusService = (function () {
     });
   }
 
+  // 21/08/2026 (docs/docs-rapport.md CM-2) : obtenirCartesFocus/
+  // obtenirFocusParFamille/obtenirPoolHeroique retirés de l'API publique
+  // (zéro appelant dans tout le repo, confirmé par recherche globale) —
+  // obtenirCartesFocus_/obtenirPoolHeroique_ restent des fonctions
+  // privées, toujours utilisées en interne par obtenirMiseEnPlace_/
+  // obtenirNomsPoolHeroique_/obtenirCarteHeroiqueParNom_ ci-dessous.
   return {
-    obtenirCartesFocus: obtenirCartesFocus_,
-
-    /**
-     * Regroupe les cartes par famille (exploration libre de toutes les
-     * cartes, indépendamment de la maison jouée).
-     */
-    obtenirFocusParFamille: function () {
-      return obtenirCartesFocus_().then(function (cartes) {
-        var parFamille = {};
-        cartes.forEach(function (c) {
-          if (!parFamille[c.focus]) parFamille[c.focus] = [];
-          parFamille[c.focus].push(c);
-        });
-        return parFamille;
-      });
-    },
-
     obtenirMiseEnPlace: obtenirMiseEnPlace_,
-    obtenirPoolHeroique: obtenirPoolHeroique_,
     obtenirNomsPoolHeroique: obtenirNomsPoolHeroique_,
     obtenirCarteHeroiqueParNom: obtenirCarteHeroiqueParNom_
   };

@@ -1,6 +1,12 @@
 /**
  * combatService.js
  * Moteur de combat (Envahir / Escarmouche) — Voidfall Companion PWA
+ * Version 2 — 21/08/2026 (docs/docs-rapport.md CM-4 — retrait de 2 exports publics jamais appelés)
+ *
+ * 21/08/2026 (docs/docs-rapport.md CM-4) : NOMS_VAISSEAUX/totalNavale
+ * retirés de l'API publique (zéro appelant hors du fichier). Aucun
+ * changement de comportement.
+ *
  * Version 1 — 17/08/2026 (Session 6, Phase 5 — Combat/Invasion)
  *
  * Portage QUASI TEXTUEL de combat.html (GAS, module `Combat`, 544 l.) —
@@ -388,11 +394,12 @@ var CombatService = (function () {
     return resultat;
   }
 
+  // 21/08/2026 (docs/docs-rapport.md CM-4) : NOMS_VAISSEAUX/totalNavale_
+  // retirés de l'API publique (zéro appelant hors de ce fichier) — les
+  // deux restent des symboles privés, toujours utilisés en interne.
   return {
-    NOMS_VAISSEAUX: NOMS_VAISSEAUX,
     vaisseauxDebloques: vaisseauxDebloques,
     construireCamp: construireCamp,
-    totalNavale: totalNavale_,
     resoudreCombat: resoudreCombat,
     resoudreInvasion: resoudreInvasion
   };

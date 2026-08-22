@@ -1,6 +1,13 @@
 /**
  * db.js
  * Wrapper IndexedDB — Voidfall Companion PWA
+ * Version 4 — 21/08/2026 (docs/docs-rapport.md CM-6 — retrait de 3 exports publics jamais appelés)
+ *
+ * 21/08/2026 (docs/docs-rapport.md CM-6) : DB.ouvrir/DB.vider/
+ * DB.NOMS_STORES retirés de l'API publique (zéro appelant dans tout le
+ * repo) ; vider() supprimée entièrement, ouvrir_ reste privée. Aucun
+ * changement de comportement pour get/getAll/put/putTout/supprimer.
+ *
  * Version 3 — 17/08/2026
  *
  * 17/08/2026 (Session 4, Phase 4 suite) : ajout du store `pileAnnulation`
@@ -220,29 +227,16 @@ var DB = (function () {
     });
   }
 
-  /**
-   * Vide entièrement un store (sans réinsertion).
-   */
-  function vider(nomStore) {
-    verifierStore_(nomStore);
-    return ouvrir_().then(function (base) {
-      return new Promise(function (resoudre, rejeter) {
-        var transaction = base.transaction(nomStore, 'readwrite');
-        transaction.objectStore(nomStore).clear();
-        transaction.oncomplete = function () { resoudre(); };
-        transaction.onerror = function () { rejeter(transaction.error); };
-      });
-    });
-  }
-
+  // 21/08/2026 (docs/docs-rapport.md CM-6) : ouvrir_/vider/NOMS_STORES
+  // retirés de l'API publique (zéro appelant dans tout le repo) — vider()
+  // supprimée entièrement (rien ne l'appelait, même en interne) ;
+  // ouvrir_ reste privée, toujours utilisée en interne par get/getAll/
+  // put/putTout/supprimer.
   return {
-    ouvrir: ouvrir_,
     get: get,
     getAll: getAll,
     put: put,
     putTout: putTout,
-    supprimer: supprimer,
-    vider: vider,
-    NOMS_STORES: Object.keys(STORES)
+    supprimer: supprimer
   };
 })();

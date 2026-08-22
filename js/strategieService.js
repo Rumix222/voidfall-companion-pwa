@@ -1,7 +1,36 @@
 /**
  * strategieService.js
  * Écrans Focus (ex-Stratégie), Plat. Galactique et Plat. maison — Voidfall Companion PWA
- * Version 31 — 21/08/2026 (Événement galactique G, Cycle 1 "Le visage du mal" — Cadres 1 et 2 : popup 'gagner_corruption'/toggleCorruption_/retirer_corruption informés)
+ * Version 33 — 21/08/2026 (docs/docs-rapport.md CM-3/MUT-3 à MUT-6 — nettoyage code mort + factorisation popups Regrouper/Déployer un cube/Envahir)
+ *
+ * 21/08/2026 (docs/docs-rapport.md) :
+ * - CM-3 : avancerMoinsAvancee_/avancerCorrompue_ supprimées (boutons DOM
+ *   retirés depuis le Lot F, listeners jamais attachés).
+ * - MUT-3 : `secteurEstPossede_(secteur)` factorise le critère "vous
+ *   appartient" (pas de Néant, PN à vous) dupliqué dans les popups
+ *   Regrouper/Déployer un cube/Envahir.
+ * - MUT-4 : `creerSecteurParNumero_(secteurs)` factorise le lookup
+ *   numéro -> secteur dupliqué dans Regrouper/Envahir.
+ * - MUT-5 : `construireAdjacenceMap_(adjacences)` factorise la
+ *   construction de la table d'adjacence dupliquée dans Regrouper/Envahir.
+ * - MUT-6 : `labelVaisseau_(cle)` factorise le lookup de libellé
+ *   TYPES_VAISSEAU répété 4 fois.
+ * Aucun changement de comportement (extraction mécanique, mêmes
+ * conditions/formules) — validé par e2e/partie-aleatoire.spec.js (14
+ * maisons + 10 seeds supplémentaires sur Thegwyn, confirmant que
+ * Construire/Regrouper/Déployer un cube sont bien exercés sans erreur).
+ *
+ * 21/08/2026 (bug trouvé par le nouveau scénario E2E aléatoire,
+ * e2e/partie-aleatoire.spec.js) : demanderChoix ne réinitialisait jamais
+ * #modal-choix-valider.disabled à l'ouverture d'une nouvelle popup.
+ * fermerModale_ ne fait que masquer la modale (jamais réinitialiser
+ * .disabled), et ~10 branches désactivent ce bouton pendant un appel
+ * async pour le réactiver dans leur .then/.catch — un seul chemin de
+ * sortie oublié y laisse le bouton bloqué pour TOUTE popup suivante,
+ * même un simple 'confirmation' qui ne touche jamais lui-même à
+ * .disabled (aucun style ne distingue visuellement un bouton disabled
+ * ici, donc invisible pour un joueur). Reset défensif ajouté en tête de
+ * demanderChoix plutôt que de traquer laquelle des branches a la fuite.
  *
  * 21/08/2026 (Événement galactique G, Cycle 1 — Cadres 1 et 2, "Le visage
  * du mal") :
@@ -589,10 +618,54 @@ var StrategieService = (function () {
     { cle: 'cuirasse', label: 'Cuirasse' },
     { cle: 'porte_vaisseau', label: 'Porte-Vaisseau' }
   ];
-  var CHAMP_PN_PAR_TYPE_VUE = {
-    corvette: 'pnCorvette', sentinelle: 'pnSentinelle', destroyer: 'pnDestroyer',
-    cuirasse: 'pnCuirasse', porte_vaisseau: 'pnPorteVaisseau'
-  };
+  // 21/08/2026 (docs/docs-rapport.md DUP-2) : CHAMP_PN_PAR_TYPE_VUE
+  // (copie locale identique) supprimée — SecteurService.CHAMP_PN_PAR_TYPE
+  // est désormais exposée publiquement, seule source de vérité.
+
+  /**
+   * 21/08/2026 (docs/docs-rapport.md MUT-3/MUT-4/MUT-6) : helpers partagés
+   * par les popups Regrouper/Déployer un cube/Envahir (jusque-là chacune
+   * réimplémentait sa propre version identique).
+   */
+
+  // MUT-3 : critère "vous appartient" (pas de Néant, au moins une unité
+  // de Puissance Navale à vous) — même règle que Construire/Rappeler un
+  // cube, prend directement un objet secteur (pas un numéro : chaque
+  // popup garde son propre secteurParNumero_/secteurs local pour la
+  // résolution numéro -> secteur, voir MUT-4 ci-dessous).
+  function secteurEstPossede_(secteur) {
+    if (!secteur || (secteur.pnNeant || 0) > 0) return false;
+    return ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0)
+      + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0)) > 0;
+  }
+
+  // MUT-4 : fabrique un lookup numéro -> secteur fermé sur un tableau de
+  // secteurs donné (chaque popup a le sien, chargé de façon asynchrone) —
+  // évite de redéfinir la même fonction filter(...)[0] à chaque popup.
+  function creerSecteurParNumero_(secteurs) {
+    return function (numero) {
+      return secteurs.filter(function (s) { return s.numero === numero; })[0];
+    };
+  }
+
+  // MUT-6 : libellé d'affichage d'un type de vaisseau à partir de sa clé.
+  function labelVaisseau_(cle) {
+    var type = TYPES_VAISSEAU.filter(function (t) { return t.cle === cle; })[0];
+    return type ? type.label : cle;
+  }
+
+  // MUT-5 : table d'adjacence bidirectionnelle {numero: [numeros voisins]}
+  // à partir du tableau brut SecteurService.obtenirAdjacences.
+  function construireAdjacenceMap_(adjacences) {
+    var adjacenceMap = {};
+    (adjacences || []).forEach(function (a) {
+      adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
+      adjacenceMap[a.numeroA].push(a.numeroB);
+      adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
+      adjacenceMap[a.numeroB].push(a.numeroA);
+    });
+    return adjacenceMap;
+  }
 
   // 19/08/2026 (Construire une Installation / Établir une Guilde portées) :
   // mêmes clés que CHAMP_ELEMENT_PLACEMENT_ (secteurService.js) — pour le
@@ -1168,14 +1241,6 @@ var StrategieService = (function () {
       cb.addEventListener('change', function () { toggleCorruption_(cb.dataset.piste, cb.checked, cb); });
     });
 
-    // 17/08/2026 (Lot F — corrections mineures) : #btn-avancer-corrompue
-    // n'est plus dans le DOM (bouton global retiré, voir index.html) —
-    // gardé en null-safe plutôt que supprimé, la fonction CivilisationService
-    // sous-jacente (avancerPisteCorrompue) reste appelable par un futur
-    // pont Focus -> Civilisation (voir avancerCorrompue_ ci-dessous).
-    var btnAvancerCorrompue = document.getElementById('btn-avancer-corrompue');
-    if (btnAvancerCorrompue) btnAvancerCorrompue.disabled = !PISTES_ORDRE.some(function (p) { return corrompues[p]; });
-
     if (nomMaison) {
       obtenirDetailPistesCache_(nomMaison).then(function (detail) {
         PISTES_ORDRE.forEach(function (piste) {
@@ -1248,51 +1313,14 @@ var StrategieService = (function () {
       });
   }
 
-  function avancerMoinsAvancee_() {
-    var btn = document.getElementById('btn-avancer-moins-avancee');
-    if (btn.disabled) return;
-    var partie = partieAffichee;
-    var nomMaison = partie.joueur ? partie.joueur.nom : null;
-    if (!nomMaison) return;
-    var texteOriginal = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Passage en cours…';
-
-    CivilisationService.avancerPisteMoinsAvancee(partie.id, nomMaison, demanderChoix)
-      .then(function (resultat) {
-        journal.push('Piste la moins avancée (' + LABEL_PISTE[resultat.piste] + ') : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
-          ' — ' + (resultat.texte || 'aucun effet de case.'));
-        journal = journal.concat(resultat.effetJournal || []);
-        return App.rafraichirPartieCourante();
-      })
-      .then(function (partieFraiche) { afficher(partieFraiche); })
-      .catch(function (erreur) {
-        window.alert('Échec de l\'avancement : ' + erreur.message);
-        btn.disabled = false;
-        btn.textContent = texteOriginal;
-      });
-  }
-
-  function avancerCorrompue_() {
-    var btn = document.getElementById('btn-avancer-corrompue');
-    if (btn.disabled) return;
-    var partie = partieAffichee;
-    var texteOriginal = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Passage en cours…';
-
-    CivilisationService.avancerPisteCorrompue(partie.id)
-      .then(function (resultat) {
-        journal.push('Piste Corrompue (' + LABEL_PISTE[resultat.piste] + ') : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau + ' (sans bénéfice de case).');
-        return App.rafraichirPartieCourante();
-      })
-      .then(function (partieFraiche) { afficher(partieFraiche); })
-      .catch(function (erreur) {
-        window.alert('Échec : ' + erreur.message);
-        btn.disabled = false;
-        btn.textContent = texteOriginal;
-      });
-  }
+  // 21/08/2026 (docs/docs-rapport.md CM-3) : avancerMoinsAvancee_/
+  // avancerCorrompue_ supprimées — leurs boutons DOM (#btn-avancer-moins-
+  // avancee/#btn-avancer-corrompue) ont été retirés d'index.html depuis
+  // le Lot F, les listeners ne s'attachaient donc plus jamais. Les
+  // fonctions CivilisationService sous-jacentes (avancerPisteMoinsAvancee/
+  // avancerPisteCorrompue) restent, elles, en place et testées
+  // (civilisationService_test.js) pour un futur pont Focus -> Civilisation
+  // — seule cette couche IHM inatteignable est retirée.
 
   function toggleCorruption_(piste, valeur, cb) {
     cb.disabled = true;
@@ -1664,6 +1692,19 @@ var StrategieService = (function () {
     var btnValider = document.getElementById('modal-choix-valider');
     var btnAnnuler = document.getElementById('modal-choix-annuler');
 
+    // 21/08/2026 (trouvé par le scénario E2E aléatoire, e2e/partie-aleatoire.spec.js) :
+    // plusieurs branches ci-dessous désactivent btnValider pendant un appel
+    // async puis le réactivent dans leur .then/.catch — mais btnValider est
+    // un nœud DOM unique réutilisé par TOUTES les popups (fermerModale_ ne
+    // fait que masquer la modale, jamais réinitialiser .disabled). Un
+    // chemin de sortie qui oublierait de réactiver le bouton laisserait
+    // donc la PROCHAINE popup — même un simple type 'confirmation' qui ne
+    // touche jamais lui-même à .disabled — bloquée sans indice visuel
+    // (aucun style ne distingue un bouton disabled ici). Reset défensif
+    // systématique à l'ouverture de toute nouvelle popup plutôt que de
+    // traquer laquelle des ~10 branches a la fuite.
+    btnValider.disabled = false;
+
     return new Promise(function (resolve) {
 
       if (contexte.type === 'option_exclusive') {
@@ -1766,25 +1807,15 @@ var StrategieService = (function () {
           SecteurService.obtenirAdjacences(partie.scenarioId)
         ]).then(function (resultats) {
           var secteurs = resultats[0] || [];
-          var adjacences = resultats[1] || [];
-
-          var adjacenceMap = {};
-          adjacences.forEach(function (a) {
-            adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
-            adjacenceMap[a.numeroA].push(a.numeroB);
-            adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
-            adjacenceMap[a.numeroB].push(a.numeroA);
-          });
+          var adjacenceMap = construireAdjacenceMap_(resultats[1]);
 
           var mouvements = []; // état local à cette ouverture de popup
 
-          function secteurParNumero_(numero) {
-            return secteurs.filter(function (s) { return s.numero === numero; })[0];
-          }
+          var secteurParNumero_ = creerSecteurParNumero_(secteurs);
 
           function stockRestant_(numero, type) {
             var secteur = secteurParNumero_(numero);
-            var champ = CHAMP_PN_PAR_TYPE_VUE[type];
+            var champ = SecteurService.CHAMP_PN_PAR_TYPE[type];
             var stockInitial = secteur ? (secteur[champ] || 0) : 0;
             var dejaPris = mouvements
               .filter(function (m) { return m.depart === numero && m.type === type; })
@@ -1792,14 +1823,8 @@ var StrategieService = (function () {
             return stockInitial - dejaPris;
           }
 
-          // Même critère "vous appartient" que Construire/Rappeler un cube :
-          // pas de Néant sur le secteur, au moins une unité de Puissance
-          // Navale à vous déjà présente.
           function vousAppartient_(numero) {
-            var secteur = secteurParNumero_(numero);
-            if (!secteur || (secteur.pnNeant || 0) > 0) return false;
-            return ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0)
-              + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0)) > 0;
+            return secteurEstPossede_(secteurParNumero_(numero));
           }
 
           function render() {
@@ -1807,7 +1832,7 @@ var StrategieService = (function () {
 
             var listeHTML = mouvements.length
               ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
-                  var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === m.type; })[0].label;
+                  var labelType = labelVaisseau_(m.type);
                   return '<li>' + m.quantite + '× ' + labelType + ' : Secteur ' + m.depart + ' → Secteur ' + m.arrivee +
                     ' <button type="button" class="btn-lien regrouper-retirer" data-index="' + i + '">retirer</button></li>';
                 }).join('') + '</ul>'
@@ -1888,7 +1913,7 @@ var StrategieService = (function () {
               SecteurService.regrouper(partie.id, mouvements)
                 .then(function () {
                   var detail = mouvements.map(function (m) {
-                    var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === m.type; })[0].label;
+                    var labelType = labelVaisseau_(m.type);
                     return m.quantite + '× ' + labelType + ' ' + m.depart + '→' + m.arrivee;
                   }).join(', ');
                   fermerModale_();
@@ -1925,12 +1950,8 @@ var StrategieService = (function () {
         };
 
         function vousAppartientDeploiement_(secteurs) {
-          return function (numero) {
-            var secteur = secteurs.filter(function (s) { return s.numero === numero; })[0];
-            if (!secteur || (secteur.pnNeant || 0) > 0) return false;
-            return ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0)
-              + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0)) > 0;
-          };
+          var parNumero = creerSecteurParNumero_(secteurs);
+          return function (numero) { return secteurEstPossede_(parNumero(numero)); };
         }
 
         function demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale) {
@@ -2133,24 +2154,12 @@ var StrategieService = (function () {
           SecteurService.obtenirAdjacences(partieEnvahir.scenarioId)
         ]).then(function (resultats) {
           var secteurs = resultats[0] || [];
-          var adjacences = resultats[1] || [];
+          var adjacenceMap = construireAdjacenceMap_(resultats[1]);
 
-          var adjacenceMap = {};
-          adjacences.forEach(function (a) {
-            adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
-            adjacenceMap[a.numeroA].push(a.numeroB);
-            adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
-            adjacenceMap[a.numeroB].push(a.numeroA);
-          });
-
-          function secteurParNumero_(numero) {
-            return secteurs.filter(function (s) { return s.numero === numero; })[0];
-          }
+          var secteurParNumero_ = creerSecteurParNumero_(secteurs);
 
           function vousAppartientEnvahir_(numero) {
-            var s = secteurParNumero_(numero);
-            if (!s || (s.pnNeant || 0) > 0) return false;
-            return ((s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0)) > 0;
+            return secteurEstPossede_(secteurParNumero_(numero));
           }
 
           // Portage direct de calculerCiblesEnvahir_ : la Corruption est
@@ -2177,7 +2186,7 @@ var StrategieService = (function () {
 
           function stockRestantType_(numero, type) {
             var s = secteurParNumero_(numero);
-            var champ = CHAMP_PN_PAR_TYPE_VUE[type];
+            var champ = SecteurService.CHAMP_PN_PAR_TYPE[type];
             var initial = s ? (s[champ] || 0) : 0;
             var pris = contributions.filter(function (c) { return c.secteur === numero && c.type === type; })
               .reduce(function (som, c) { return som + c.quantite; }, 0);
@@ -2196,7 +2205,7 @@ var StrategieService = (function () {
 
             var listeHTML = contributions.length
               ? '<ul class="regrouper-liste">' + contributions.map(function (c, i) {
-                  var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === c.type; })[0].label;
+                  var labelType = labelVaisseau_(c.type);
                   return '<li>' + c.quantite + '× ' + labelType + ' : Secteur ' + c.secteur + ' → Secteur ' + cible +
                     ' <button type="button" class="btn-lien envahir-retirer" data-index="' + i + '">retirer</button></li>';
                 }).join('') + '</ul>'
@@ -2290,7 +2299,7 @@ var StrategieService = (function () {
               var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
 
               var detailContributions = contributions.map(function (c) {
-                var labelType = TYPES_VAISSEAU.filter(function (t) { return t.cle === c.type; })[0].label;
+                var labelType = labelVaisseau_(c.type);
                 return c.quantite + '× ' + labelType + ' (secteur ' + c.secteur + ')';
               }).join(', ');
               var maisonCible = maisonDechue_(secteurCible);
@@ -3405,15 +3414,6 @@ var StrategieService = (function () {
   }
 
   document.getElementById('btn-annuler-action').addEventListener('click', annulerDerniereAction_);
-  // 17/08/2026 (Lot F — corrections mineures) : boutons globaux
-  // "Avancer la moins avancée"/"Avancer la piste Corrompue" retirés du
-  // DOM (décision utilisateur, voir index.html) — liaisons en null-safe.
-  // avancerMoinsAvancee_/avancerCorrompue_ restent définies, prêtes pour
-  // un futur appel depuis une action Focus plutôt que depuis un bouton.
-  var btnAvancerMoinsAvanceeGlobal = document.getElementById('btn-avancer-moins-avancee');
-  if (btnAvancerMoinsAvanceeGlobal) btnAvancerMoinsAvanceeGlobal.addEventListener('click', avancerMoinsAvancee_);
-  var btnAvancerCorrompueGlobal = document.getElementById('btn-avancer-corrompue');
-  if (btnAvancerCorrompueGlobal) btnAvancerCorrompueGlobal.addEventListener('click', avancerCorrompue_);
 
   return {
     afficher: afficher,

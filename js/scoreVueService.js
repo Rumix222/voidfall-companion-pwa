@@ -1,7 +1,12 @@
 /**
  * scoreVueService.js
  * Écran Fin de partie — Voidfall Companion PWA
- * Version 1 — 17/08/2026 (Session 7, Phase 5 — Score)
+ * Version 2 — 21/08/2026 (docs/docs-rapport.md BUG-1 — fix bouton Retour vers écran inexistant)
+ *
+ * 21/08/2026 (docs/docs-rapport.md BUG-1) : #btn-retour-fin appelait
+ * App.afficherEcran('game'), écran renommé depuis en
+ * 'plateau-galactique' — le clic affichait un écran totalement vide.
+ * Corrigé.
  *
  * Portage DOM de la partie "Fin de partie" de score.html (GAS) —
  * construireFormulaire/majTotalAffiche/ouvrirEcranFin/init (le bloc
@@ -105,7 +110,7 @@ var ScoreVueService = (function () {
   }
 
   document.getElementById('btn-terminer-partie').addEventListener('click', ouvrirEcranFin_);
-  document.getElementById('btn-retour-fin').addEventListener('click', function () { App.afficherEcran('game'); });
+  document.getElementById('btn-retour-fin').addEventListener('click', function () { App.afficherEcran('plateau-galactique'); });
   document.getElementById('btn-enregistrer-fin').addEventListener('click', enregistrer_);
   // Petit ajout non présent côté GAS (score.html n'avait pas ce listener) :
   // le total affiché ne se mettait à jour que via les champs du barème,
