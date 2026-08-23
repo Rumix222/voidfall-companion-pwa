@@ -2107,10 +2107,12 @@ var GameService = (function () {
      *     popup dédiée (`demanderChoix({type:'choisir_emplacement_programme'})`)
      *     pour choisir lequel remplacer ; annulé -> le Programme reste en
      *     main.
-     * Si l'emplacement remplacé était Corrompu, `corruptionMaison` est
-     * décrémenté de 1 (cette source de Corruption disparaît avec
-     * l'ancienne carte) — le nouvel emplacement démarre toujours
-     * `entretienActif:false, corrompu:false`.
+     * La Corruption est liée à l'EMPLACEMENT, pas à la carte qui l'occupe
+     * (case "Corrompu" cochable/décochable même à vide, voir
+     * renderProgrammesPlateauMaison_) : placer un Programme dans un
+     * emplacement déjà Corrompu conserve ce `corrompu:true` tel quel (et
+     * ne touche donc pas `corruptionMaison`) — seul `entretienActif`
+     * redémarre à `false` pour la carte entrante.
      */
     utiliserProgramme: function (partieId, nomProgramme, demanderChoix) {
       return Promise.all([DB.get('plateauMaison', partieId), DB.getAll('programmes')]).then(function (resultats) {
@@ -2140,15 +2142,11 @@ var GameService = (function () {
 
             var enMain = Array.isArray(ligneFraiche.programmesEnMain) ? ligneFraiche.programmesEnMain.slice() : [];
             var slots = Array.isArray(ligneFraiche.programmesUtilises) ? ligneFraiche.programmesUtilises.slice() : programmesUtilisesParDefaut_();
-            var corruptionMaison = ligneFraiche.corruptionMaison || 0;
 
             var indexConflit = -1;
             for (var i = 1; i <= 3; i++) { if (slots[i] && slots[i].nom && catalogue.filter(function (p) { return p.nom === slots[i].nom; })[0].type === carte.type) { indexConflit = i; break; } }
 
             function placer_(indexCible) {
-              if (indexCible !== -1 && slots[indexCible] && slots[indexCible].corrompu) {
-                corruptionMaison = Math.max(0, corruptionMaison - 1);
-              }
               var enMainSansCarte = enMain.filter(function (n) { return n !== nomProgramme; });
               var resume = resultatEffet.journal.map(function (ligne) {
                 var prefixe = source + ' : ';
@@ -2156,16 +2154,17 @@ var GameService = (function () {
               }).join(' ');
 
               if (indexCible === -1) {
-                ligneFraiche.corruptionMaison = corruptionMaison;
                 return DB.put('plateauMaison', ligneFraiche).then(function () {
                   return { place: false, nom: carte.nom, type: carte.type, resume: resume };
                 });
               }
 
-              slots[indexCible] = { nom: nomProgramme, entretienActif: false, corrompu: false };
+              // Corruption liée à l'emplacement, pas à la carte : conserve
+              // le `corrompu` déjà présent sur ce slot (voir JSDoc ci-dessus).
+              var corrompuExistant = !!(slots[indexCible] && slots[indexCible].corrompu);
+              slots[indexCible] = { nom: nomProgramme, entretienActif: false, corrompu: corrompuExistant };
               ligneFraiche.programmesEnMain = enMainSansCarte;
               ligneFraiche.programmesUtilises = slots;
-              ligneFraiche.corruptionMaison = corruptionMaison;
               return DB.put('plateauMaison', ligneFraiche).then(function () {
                 return { place: true, nom: carte.nom, type: carte.type, resume: resume };
               });

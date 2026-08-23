@@ -103,7 +103,7 @@ test('utiliserProgramme : succès, emplacement 1-3 vide -> placé directement, a
   });
 });
 
-test('utiliserProgramme : conflit de type, confirmation ACCEPTÉE -> remplace l\'emplacement, décrémente corruptionMaison si il était Corrompu', function () {
+test('utiliserProgramme : conflit de type, confirmation ACCEPTÉE -> remplace l\'emplacement, conserve le Corrompu lié au slot (corruptionMaison inchangé)', function () {
   var plateau = plateauBase_({
     programmesEnMain: ['Syndicat Commercial'],
     programmesUtilises: [null, { nom: 'Haute Société', entretienActif: true, corrompu: true }, slotVide_(), slotVide_(true)],
@@ -123,8 +123,8 @@ test('utiliserProgramme : conflit de type, confirmation ACCEPTÉE -> remplace l\
     assert.strictEqual(resultat.place, true);
     var ligne = ctx.plateauMaison[PARTIE_ID];
     assert.strictEqual(ligne.programmesUtilises[1].nom, 'Syndicat Commercial');
-    assert.strictEqual(ligne.programmesUtilises[1].corrompu, false);
-    assert.strictEqual(ligne.corruptionMaison, 1, 'décrémenté : l\'ancien emplacement Corrompu a été remplacé');
+    assert.strictEqual(ligne.programmesUtilises[1].corrompu, true, 'la Corruption reste sur l\'emplacement, pas sur la carte remplacée');
+    assert.strictEqual(ligne.corruptionMaison, 2, 'inchangé : la Corruption ne quitte pas le plateau, elle reste sur le slot');
   });
 });
 
@@ -168,7 +168,8 @@ test('utiliserProgramme : 3 emplacements pleins, aucun conflit -> popup choisir_
     assert.strictEqual(resultat.place, true);
     var ligne = ctx.plateauMaison[PARTIE_ID];
     assert.strictEqual(ligne.programmesUtilises[3].nom, 'Front Uni');
-    assert.strictEqual(ligne.corruptionMaison, 0, 'décrémenté : slot 3 remplacé était Corrompu');
+    assert.strictEqual(ligne.programmesUtilises[3].corrompu, true, 'la Corruption reste sur l\'emplacement 3, pas sur la carte remplacée');
+    assert.strictEqual(ligne.corruptionMaison, 1, 'inchangé (valeur de plateauBase_) : la Corruption ne quitte pas le plateau');
   });
 });
 

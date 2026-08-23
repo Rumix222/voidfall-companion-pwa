@@ -1,9 +1,30 @@
 /**
  * version.js
- * Version 63 — 2026-08-23
+ * Version 64 — 2026-08-23
  * Source de vérité unique pour la version de l'application.
  *
- * 23/08/2026, dernière fois (Programmes — câblage de l'emplacement 0,
+ * 23/08/2026, dernière fois (Programmes — la case "Corrompu" d'un
+ * emplacement (Plat. maison) reste cochable à vide, retour utilisateur) :
+ * la Corruption d'un emplacement du plateau Programme est liée à
+ * l'EMPLACEMENT lui-même, pas à la carte qui l'occupe — la case
+ * "Corrompu" des emplacements 1-3 (`index.html`,
+ * `renderProgrammesPlateauMaison_`) n'est donc plus désactivée quand
+ * l'emplacement est vide (seule la case "Entretien" le reste, un
+ * emplacement vide n'a pas d'Entretien à payer). Corrige en cascade
+ * `GameService.utiliserProgramme` : placer un Programme dans un
+ * emplacement déjà Corrompu conservait auparavant `corrompu:false` sur
+ * la nouvelle carte et décrémentait `corruptionMaison` (comme si la
+ * Corruption appartenait à l'ancienne carte remplacée) — désormais le
+ * `corrompu` déjà présent sur le slot est conservé tel quel et
+ * `corruptionMaison` n'est plus touché par ce chemin (seul le toggle
+ * manuel de la case, `persisterSlots_`, ajuste ce compteur). 2 tests de
+ * `js/gameService_utiliser_programme_test.js` mis à jour en conséquence.
+ * Validé par les 128 tests `*.test.js`/`*_test.js`/`test_*.js` existants
+ * + un parcours Playwright ponctuel (créé puis supprimé) : emplacement
+ * vide, case Entretien désactivée/case Corrompu activable, coché ->
+ * `#corruption-maison-input` +1, décoché -> -1.
+ *
+ * 23/08/2026, juste avant (Programmes — câblage de l'emplacement 0,
  * "Programme de départ") : `GameService.creerPartie` détermine désormais
  * le Programme de départ du joueur (maison + technologie de départ tirée
  * ou choisie) via un nouveau helper `obtenirProgrammeDepart_(nomMaison,
@@ -1892,4 +1913,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260823.12';
+var APP_VERSION = '20260823.13';
