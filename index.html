@@ -887,11 +887,13 @@
             '</div>';
         } else {
           ligneDepart = '<div class="card" style="margin-bottom:14px;">' +
-            '<h3>Programme de départ — ' + carteDepart.maison + ', Origine ' + carteDepart.origine + '</h3>' +
+            '<h3 class="programme-nom-toggle" data-slot-detail="0">' + carteDepart.maison + ' - ' + carteDepart.origine + '</h3>' +
+            '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="0" hidden>' +
             carteDepart.objectifs.map(function (o) { return '<p>' + o + '</p>'; }).join('') +
-            (carteDepart.bonusPermanent ? '<p><strong>' + carteDepart.bonusPermanent + '</strong></p>' : '') +
-            '<label class="check-amelioree"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
-            (slot0.entretienActif ? ' checked' : '') + '> Entretien</label>' +
+            (carteDepart.bonusPermanent ? '<p>' + carteDepart.bonusPermanent + '</p>' : '') +
+            '</div>' +
+            '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
+            (slot0.entretienActif ? ' checked' : '') + '> Ent.</label>' +
             '</div>';
         }
 
@@ -899,16 +901,27 @@
           var slot = slots[index] || { nom: null, entretienActif: false, corrompu: false };
           var carte = slot.nom ? parNom[slot.nom] : null;
           var libelle = slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —';
-          return '<div class="techno-obtenue-ligne">' +
-            '<span class="champ-technologie-fixe">' + libelle + '</span>' +
-            '<label class="check-amelioree"><input type="checkbox" class="check-programme-entretien" data-slot="' + index + '"' +
-            (slot.entretienActif ? ' checked' : '') + (slot.nom ? '' : ' disabled') + '> Entretien</label>' +
-            '<label class="check-amelioree"><input type="checkbox" class="check-programme-corrompu" data-slot="' + index + '"' +
-            (slot.corrompu ? ' checked' : '') + '> Corrompu</label>' +
+          var detail = carte ? [carte.objectif1, carte.objectif2].filter(Boolean).map(function (o) { return '<p>' + o + '</p>'; }).join('') : '';
+          return '<div class="programme-plateau-item">' +
+            '<div class="techno-obtenue-ligne">' +
+            '<span class="champ-technologie-fixe' + (detail ? ' programme-nom-toggle' : '') + '" data-slot-detail="' + index + '">' + libelle + '</span>' +
+            '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="' + index + '"' +
+            (slot.entretienActif ? ' checked' : '') + (slot.nom ? '' : ' disabled') + '> Ent.</label>' +
+            '<label class="check-amelioree" title="Corrompu"><input type="checkbox" class="check-programme-corrompu" data-slot="' + index + '"' +
+            (slot.corrompu ? ' checked' : '') + '> Cor.</label>' +
+            '</div>' +
+            (detail ? '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="' + index + '" hidden>' + detail + '</div>' : '') +
             '</div>';
         }).join('');
 
         container.innerHTML = ligneDepart + lignesUtilisees;
+
+        Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
+          nomEl.addEventListener('click', function () {
+            var cible = container.querySelector('[data-slot-detail-cible="' + nomEl.dataset.slotDetail + '"]');
+            if (cible) cible.hidden = !cible.hidden;
+          });
+        });
 
         function persisterSlots_(nouveauxSlots, corruptionDelta, elementDeclencheur) {
           elementDeclencheur.disabled = true;
@@ -1053,11 +1066,9 @@
 
       SecteurService.getEntretien(partie.id).then(function (unitesSecteurs) {
         var total = unitesSecteurs + entretienProgrammes;
-        el.textContent = total
-          ? 'Entretien dû : ' + total + ' unité(s)' +
-            (entretienProgrammes ? ' (dont ' + entretienProgrammes + ' de Programmes)' : '') +
-            ' — par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.'
-          : 'Entretien dû : aucun.';
+        el.textContent = 'Entretien : ' + total;
+        el.title = 'Par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.' +
+          (entretienProgrammes ? ' Dont ' + entretienProgrammes + ' de Programmes.' : '');
       }).catch(function () {
         el.textContent = '';
       });

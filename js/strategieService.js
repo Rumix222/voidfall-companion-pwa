@@ -933,18 +933,21 @@ var StrategieService = (function () {
   /**
    * Programmes obtenus par le joueur mais pas encore joués
    * (partie.plateauMaison.programmesEnMain, tableau non borné — voir
-   * GameService.gagnerProgramme) — nom, type, les 2 Focus liés et
-   * l'action de Programme (règle FIXE par type,
-   * GameService.INFO_PROGRAMME_PAR_TYPE, pas de champ par carte — voir
-   * gameService.js). PAS objectif1/objectif2 (ceux-ci ne servent qu'à la
-   * popup de sélection 'gagner_programme', décision utilisateur
-   * explicite). Bouton "Utiliser" (Phase 3) ouvre la popup
-   * 'utiliser_programme' (GameService.utiliserProgramme) — si l'action va
-   * au bout ET qu'un emplacement lui est attribué, le Programme quitte
-   * cette liste pour le plateau Programme (Plat. maison,
-   * renderProgrammesPlateauMaison_, index.html) : rafraîchit donc les
-   * deux écrans au retour de la popup. Même gabarit `.card` que
-   * carteFocusJoueurHTML_ ci-dessus.
+   * GameService.gagnerProgramme) — les 2 Focus liés et l'action de
+   * Programme (règle FIXE par type, GameService.INFO_PROGRAMME_PAR_TYPE,
+   * pas de champ par carte — voir gameService.js) en haut, séparés par une
+   * barre ; le nom de la carte en dessous, petit/italique (`.hint
+   * hint-inline`). Type volontairement PAS affiché (bruit visuel, peu
+   * utile une fois les Focus liés visibles). PAS objectif1/objectif2
+   * (ceux-ci ne servent qu'à la popup de sélection 'gagner_programme',
+   * décision utilisateur explicite). Gabarit `.focus-action`/
+   * `.focus-action-corps`/`.focus-action-side` réutilisé tel quel
+   * (carteFocusJoueurHTML_ ci-dessus) : le bouton rond "▶" (même icône que
+   * pour jouer une action Focus) ouvre la popup 'utiliser_programme'
+   * (GameService.utiliserProgramme) — si l'action va au bout ET qu'un
+   * emplacement lui est attribué, le Programme quitte cette liste pour le
+   * plateau Programme (Plat. maison, renderProgrammesPlateauMaison_,
+   * index.html) : rafraîchit donc les deux écrans au retour de la popup.
    */
   function renderProgrammesEnMain_(partie) {
     var container = document.getElementById('programmes-main-liste');
@@ -965,10 +968,15 @@ var StrategieService = (function () {
         var type = carte ? carte.type : '';
         var info = GameService.INFO_PROGRAMME_PAR_TYPE[type] || null;
         return '<div class="card">' +
-          '<h3>' + nom + '</h3>' +
-          '<p>Type : ' + (type || '?') + '</p>' +
-          (info ? '<p>Focus liés : ' + info.focusLies.join(', ') + '</p><p>Action : ' + info.action + '</p>' : '') +
-          '<button class="btn btn-secondary btn-utiliser-programme" data-nom="' + nom + '" data-type="' + type + '" style="width:100%;margin-top:8px;">Utiliser</button>' +
+          '<div class="focus-action">' +
+          '<div class="focus-action-corps">' +
+          '<p class="focus-action-nom">' + (info ? info.focusLies.join(', ') + ' | ' + info.action : '(inconnu)') + '</p>' +
+          '<p class="hint hint-inline" style="margin:0;">' + nom + '</p>' +
+          '</div>' +
+          '<div class="focus-action-side">' +
+          '<button class="btn-jouer-action btn-utiliser-programme" data-nom="' + nom + '" data-type="' + type + '" title="Utiliser ce Programme" aria-label="Utiliser ce Programme">▶</button>' +
+          '</div>' +
+          '</div>' +
           '</div>';
       }).join('');
 

@@ -992,6 +992,20 @@ input:disabled {
   font-size: 0.92rem;
   color: var(--color-text);
 }
+/* Nom de Programme cliquable (Plat. maison, renderProgrammesPlateauMaison_)
+   pour afficher/masquer .programme-detail-texte sans occuper de place tant
+   que replié. */
+.programme-nom-toggle {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.programme-detail-texte {
+  margin: 6px 0 8px;
+}
+.programme-detail-texte p {
+  margin: 0 0 4px;
+}
 /* Gabarit .focus-action-corps/-side : texte à gauche, pastilles de coût +
    bouton rond "▶" à droite (empilés). Voir js/strategieService.js pour le
    rendu correspondant (carteFocusJoueurHTML_/pastillesCoutHTML_). */

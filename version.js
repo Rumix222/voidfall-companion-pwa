@@ -1,9 +1,38 @@
 /**
  * version.js
- * Version 64 — 2026-08-23
+ * Version 65 — 2026-08-23
  * Source de vérité unique pour la version de l'application.
  *
- * 23/08/2026, dernière fois (Programmes — la case "Corrompu" d'un
+ * 23/08/2026, dernière fois (Programmes — gain de place + textes raccourcis,
+ * retour utilisateur) :
+ * - `chargerEntretien_` (index.html) : texte de l'Entretien dû raccourci en
+ *   "Entretien : N" (le détail — "par unité, au choix..." + décompte
+ *   Programmes — passe en `title` de #entretien-secteurs, plus de bandeau
+ *   permanent).
+ * - `renderProgrammesPlateauMaison_` (index.html) : titre du Programme de
+ *   départ raccourci en "Maison - Origine" (ex. "Belitan - A", plus
+ *   "Programme de départ — Belitan, Origine A") ; labels "Entretien"/
+ *   "Corrompu" abrégés en "Ent."/"Cor." (title conservé pour clarté) sur
+ *   les 4 emplacements ; le nom de chaque Programme (départ + emplacements
+ *   1-3) devient cliquable (`.programme-nom-toggle`) pour afficher/masquer
+ *   son texte (`.programme-detail-texte`, replié par défaut) — les
+ *   emplacements 1-3 affichent désormais aussi objectif1/objectif2 du
+ *   catalogue `programmes` (absents avant ce changement).
+ * - `data/catalogue/programmesDepart.json` : `bonusPermanent` reformulé en
+ *   "Prod <Ressource> + 1" (ex. "Prod Énergie + 1"), plus la phrase
+ *   complète "Votre Niveau de Production d'Énergie augmente de 1." — pur
+ *   changement de texte d'affichage, aucune logique n'en dépend
+ *   (`bonusPermanent` n'est lu que par `renderProgrammesPlateauMaison_`).
+ * - `renderProgrammesEnMain_` (js/strategieService.js) : carte
+ *   restructurée sur le gabarit `.focus-action`/`.focus-action-corps`/
+ *   `.focus-action-side` (déjà utilisé par carteFocusJoueurHTML_) — Focus
+ *   liés + action sur une ligne ("FocusA, FocusB | Action"), nom de la
+ *   carte en dessous en petit italique (`.hint hint-inline`), type de
+ *   Programme retiré de l'affichage ; bouton "Utiliser" remplacé par le
+ *   même bouton rond "▶" (`.btn-jouer-action`) que pour jouer une action
+ *   Focus (même style, popup 'utiliser_programme' inchangée derrière).
+ *
+ * 23/08/2026, avant (Programmes — la case "Corrompu" d'un
  * emplacement (Plat. maison) reste cochable à vide, retour utilisateur) :
  * la Corruption d'un emplacement du plateau Programme est liée à
  * l'EMPLACEMENT lui-même, pas à la carte qui l'occupe — la case
@@ -1913,4 +1942,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260823.13';
+var APP_VERSION = '20260823.14';
