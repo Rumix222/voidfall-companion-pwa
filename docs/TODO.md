@@ -24,6 +24,7 @@ Certaines actions de focus peux aussi entrainer cette effet
 
 #EVOLUTION 4 : Effet piste civilisation, effet manuel
 ✅ Traité (20/08/2026) — civilisationService.js : popup de rappel (contexte 'confirmation') affichée quand une case de piste retombe sur un effet non automatisé ; journal Focus simplifié pour gagner_technologie/gagner_programme uniquement.
+✅ gagner_programme retraité (23/08/2026, chantier Programmes Phase 1+2) — n'est plus un rappel manuel : FocusEngine.resoudreCle_ ouvre désormais une popup dédiée ('gagner_programme', strategieService.js) qui persiste réellement le Programme choisi (GameService.gagnerProgramme) ; le journal Focus affiche le Programme obtenu, plus "programme choisi manuellement". resoudreCaseEtChainerAvanceRapide_ appelant déjà FocusEngine.resoudreEffet, le chemin piste de Civilisation en bénéficie automatiquement, sans code spécifique. gagner_technologie reste inchangé (toujours manuel, hors périmètre de ce lot).
 Gagner une techonologie, gagner un programme, et temporairement les effets non implémenté sont a faire manuellement
 Lorsqu'un effet a faire manuellement se déclenche suite a l'anvancement d'un piste civilisation, afficher un rappel par exemple dans une popup temporaire
 Exemple de texte dans cette popup : "Choisir une technologie manuellement", "Choisir un programme manuellement", "Choisir une technologie de base ou avancé manuellement", "Choisir un programme force manuellement"

@@ -52,6 +52,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './data/catalogue/scenarioTrousDeVer.json',
   './data/catalogue/typesSecteur.json',
   './data/catalogue/originesMaison.json',
+  './data/catalogue/programmesDepart.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

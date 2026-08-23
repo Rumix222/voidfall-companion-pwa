@@ -52,13 +52,13 @@
  *     dans resoudreCle_ ci-dessous ; secteurService.js PWA ne porte que
  *     l'instanciation/lecture pour rappeler_cube/effet_secteur, actions
  *     hors périmètre — cf. son en-tête)
- *   - Civilisation : avance_rapide, avancer_civilisation_moins_avancee,
- *     avancer_piste_corrompue ("avancer_civilisation" et ses variantes
- *     "_societe"/"_gouvernement"/"_economie" ont un cas dédié ci-dessous
- *     qui délègue à CivilisationService.avancerPiste ; CHAMPS_PLATEAU_
- *     MAISON_AUTORISES de gameService.js exclut toujours civSociete/
- *     civGouvernement/civEconomie — ces champs restent sous la seule
- *     responsabilité de CivilisationService)
+ *   - Civilisation : avance_rapide, avancer_piste_corrompue
+ *     ("avancer_civilisation" et ses variantes "_societe"/"_gouvernement"/
+ *     "_economie"/"_moins_avancee" ont chacune un cas dédié ci-dessous qui
+ *     délègue à CivilisationService.avancerPiste(MoinsAvancee) ;
+ *     CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js exclut toujours
+ *     civSociete/civGouvernement/civEconomie — ces champs restent sous la
+ *     seule responsabilité de CivilisationService)
  *   - Production : produire_ressource, produire_deux_ressources,
  *     produire_<ressource> (niveauxProduction dépend d'un calcul agrégé
  *     sur secteursPartie — population × guildes — non porté côté PWA)
@@ -166,7 +166,7 @@ var FocusEngine = (function () {
   // avancerPisteMoinsAvancee/avancerPisteCorrompue) mais aucune popup
   // Focus/Cadre n'est branchée dessus.
   var CLES_CIVILISATION_HORS_PERIMETRE = [
-    'avance_rapide', 'avancer_civilisation_moins_avancee', 'avancer_piste_corrompue'
+    'avance_rapide', 'avancer_piste_corrompue'
   ];
   // Clé Focus/Cadre -> piste imposée (identifiant CivilisationService.PISTES)
   // — absente pour "avancer_civilisation" (piste au choix, voir
@@ -189,6 +189,16 @@ var FocusEngine = (function () {
     { label: 'Gagnez un jeton Prime.', effet: { gagner_prime: 1 } },
     { label: 'Gagnez 1 Science.', effet: { science: 1 } }
   ];
+
+  // Clé "programme_<type>" bare (focus.json, ex. {"choice":["programme_force",
+  // "programme_richesse"]}) -> type imposé reconnu par la popup
+  // 'gagner_programme' (voir le cas dédié dans resoudreCle_ ci-dessous,
+  // même mécanique que "gagner_programme":"force" mais vocabulaire de clé
+  // plutôt que de valeur).
+  var CLE_PROGRAMME_VERS_TYPE_ = {
+    programme_force: 'Force', programme_soutien: 'Soutien',
+    programme_domination: 'Domination', programme_richesse: 'Richesse'
+  };
 
   // Gain d'Influence variable "par Guilde/Installation/cube/secteur Pur" :
   // clés dont le montant dépend d'un comptage sur secteursPartie — voir le
@@ -515,6 +525,25 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Avancer sur la piste de Civilisation la MOINS avancée : Effet
+    // UNIQUEMENT (signe > 0). Réutilise la MÊME popup 'avancer_civilisation'
+    // que ci-dessus (contexte.moinsAvancee:true plutôt que contexte.piste
+    // imposé) — la popup calcule elle-même quelle piste est la moins
+    // avancée (identique au tri de CivilisationService.
+    // avancerPisteMoinsAvancee, js/civilisationService.js) puis se
+    // comporte comme le mode "piste imposée" ci-dessus. Utilisée par
+    // l'action de Programme de type Force (voir gameService.js,
+    // EFFET_PROGRAMME_PAR_TYPE_). ---
+    if (cle === 'avancer_civilisation_moins_avancee' && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'avancer_civilisation',
+        piste: null,
+        moinsAvancee: true,
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
     // --- Améliorer un jeton Gloire : Effet UNIQUEMENT (signe > 0). Aucun
     // choix utilisateur — cible TOUJOURS le jeton Gloire de plus petite
     // valeur parmi ceux posés sur la fiche Maison (règle : incrémente d'1,
@@ -533,6 +562,40 @@ var FocusEngine = (function () {
         type: 'ameliorer_gloire',
         source: source,
         partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
+    // --- Gagner un Programme : Effet UNIQUEMENT (signe > 0). Deux
+    // vocabulaires rencontrés dans le catalogue pour la même mécanique :
+    // "gagner_programme" avec une valeur numérique 1 (tous types ouverts)
+    // ou une chaîne de type ("force"/"soutien"/"domination"/"richesse",
+    // pistesCivilisation.json) ; ou une clé "programme_force"/
+    // "programme_richesse"/etc. bare (focus.json, un type imposé par
+    // clé plutôt que par valeur — CLE_PROGRAMME_VERS_TYPE_ ci-dessus).
+    // Ouvre une popup dédiée (contexte 'gagner_programme',
+    // strategieService.js) qui liste tous les Programmes du catalogue
+    // (filtrés sur `typeImpose` le cas échéant, offre publique mise en
+    // évidence) et fait le choix ET la persistance (comme retirer_
+    // corruption/ameliorer_gloire ci-dessus — focusEngine reste pur,
+    // aucun accès DB ici) ; resoudreCle_ relaie juste le résumé dans le
+    // journal. ---
+    if (cle === 'gagner_programme' && signe > 0) {
+      var typeImposeValeur = (typeof valeur === 'string' && valeur)
+        ? valeur.charAt(0).toUpperCase() + valeur.slice(1).toLowerCase()
+        : null;
+      return demanderChoixEtJournaliser_({
+        type: 'gagner_programme',
+        source: source,
+        partieId: etat.partieId,
+        typeImpose: typeImposeValeur
+      }, source, journal, demanderChoix);
+    }
+    if (CLE_PROGRAMME_VERS_TYPE_[cle] && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'gagner_programme',
+        source: source,
+        partieId: etat.partieId,
+        typeImpose: CLE_PROGRAMME_VERS_TYPE_[cle]
       }, source, journal, demanderChoix);
     }
 

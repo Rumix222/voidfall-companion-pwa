@@ -1,7 +1,369 @@
 /**
  * version.js
- * Version 54 — 2026-08-22
+ * Version 63 — 2026-08-23
  * Source de vérité unique pour la version de l'application.
+ *
+ * 23/08/2026, dernière fois (Programmes — câblage de l'emplacement 0,
+ * "Programme de départ") : `GameService.creerPartie` détermine désormais
+ * le Programme de départ du joueur (maison + technologie de départ tirée
+ * ou choisie) via un nouveau helper `obtenirProgrammeDepart_(nomMaison,
+ * nomTechnologie)` (mirroring `obtenirOrigineMaison_` — lecture complète
+ * de `programmesDepart`, filtre en JS, exclut les entrées
+ * `supplementaire:true` de Marqualos, hors périmètre) et le place dans
+ * `programmesUtilises[0]` : `{code, entretienActif:true, corrompu:false,
+ * depart:true}`, ou `null` si aucune correspondance (catalogue non
+ * synchronisé — tolérant, comme pour `originesMaison`). Slot 0 est donc
+ * identifié par `code` (pas `nom`, ces Programmes n'en ont pas) —
+ * `programmesUtilisesParDefaut_(slot0)` accepte désormais un paramètre
+ * optionnel pour ce slot au lieu de toujours le laisser `null`.
+ * `index.html` (`renderProgrammesPlateauMaison_`) : le slot 0 n'est plus
+ * un placeholder texte fixe — recherche l'entrée `programmesDepart`
+ * correspondante (`DB.getAll('programmesDepart')`, en plus du catalogue
+ * `programmes` déjà chargé) et affiche ses `objectifs` + `bonusPermanent`
+ * éventuel, avec un toggle "Entretien" (actif par défaut, contrairement
+ * aux emplacements 1-3) — toujours AUCUNE case "Corrompu" pour ce slot
+ * (n'existe pas pour le Programme de départ, inchangé). Bug latent
+ * corrigé au passage dans les handlers Entretien/Corrompu (emplacements
+ * 1-3) : ils reconstruisaient le slot modifié avec un littéral
+ * `{nom: s.nom, ...}` figé, qui aurait silencieusement perdu le champ
+ * `code` du slot 0 dès qu'un AUTRE emplacement était coché/décoché sur le
+ * même écran (tous les slots repassent par le même tableau reconstruit
+ * en mémoire) — remplacé par `Object.assign({}, s, {...})`, générique
+ * quel que soit le champ identifiant du slot. `chargerEntretien_`
+ * (déjà générique, somme `entretienActif` sur les 4 emplacements sans
+ * distinction) prend donc automatiquement en compte le Programme de
+ * départ sans modification. Validé par les 128 tests `*.test.js`/
+ * `*_test.js`/`test_*.js` existants (aucune régression, `programmesUtilises
+ * ParDefaut_` reste rétrocompatible sans argument) + un parcours
+ * Playwright ponctuel (créé puis supprimé) : partie Valnis (technologie
+ * de départ tirée aléatoirement, code attendu recalculé dynamiquement
+ * depuis `programmesDepart.json`) — slot 0 affiche le bon `code`/
+ * objectifs/bonus, Entretien actif par défaut (+2 vérifié sur
+ * `#entretien-secteurs`), décoché -> +2 retiré, aucune case Corrompu
+ * présente.
+ *
+ * 23/08/2026, dernière fois (Catalogue — Programmes de départ, dernière
+ * maison confirmée) : image de la page confirmant Kradmor/Astoran (déjà
+ * exacts) et Shiveus (H7-A/B, dernière maison encore `incertain:true`) —
+ * la coupure déduite par comparaison de formulation était la bonne, aucun
+ * changement de contenu, juste `incertain` passé à `false`. Les 30
+ * entrées de data/catalogue/programmesDepart.json sont désormais toutes
+ * confirmées par image (plus aucune `incertain:true`) — reste seulement
+ * `nom`/`type` inexistants pour ces Programmes (confirmé précédemment,
+ * pas une donnée manquante) et le câblage sur l'emplacement 0 du plateau
+ * Programme, toujours non traité (Phase 3 reste inchangée).
+ *
+ * 23/08/2026, toujours (Catalogue — Programmes de départ, correctif de
+ * contenu Thegwyn) : image de la page 20/52 du livret, confirmant
+ * Belitan/Novaris/Fenrax (déjà exacts) et révélant une erreur sur Thegwyn
+ * — H6-A ne fait que 2 objectifs ("secteurs Purs" + "Guildes de Fermiers
+ * Pures"), sans bonus de Production ; tout le reste (ressource 8 unités,
+ * piste Gouvernement, Guildes Banquiers/Scientifiques + bonus Énergie et
+ * Matériel) appartient à H6-B, pas répartis 4/3 comme précédemment déduit.
+ * H6-A/H6-B corrigés, `incertain` passé à `false` pour les deux. Seul
+ * Shiveus (H7-A/B) reste `incertain:true`.
+ *
+ * 23/08/2026, encore (Catalogue — Programmes de départ, correctif de
+ * contenu Nervo) : image de la page 19/52 du livret fournie par
+ * l'utilisateur, confirmant Cortozaar/Marqualos/Zenor/Yarvek (déjà
+ * exacts) et révélant une erreur sur Nervo — la phrase "Pour chaque piste
+ * de Civilisation Pure, gagnez respectivement 2/4/6/8 Influence..."
+ * appartient à H9-A (3e objectif), pas à H9-B comme précédemment déduit
+ * par comparaison de formulation (coupure 2/3 supposée, en réalité 3/2).
+ * H9-A/H9-B corrigés dans data/catalogue/programmesDepart.json,
+ * `incertain` passé à `false` pour les deux (désormais confirmés par
+ * image, comme Valnis/Kradmor). Restent `incertain:true` : Shiveus
+ * (H7-A/B) et Thegwyn (H6-A/B), toujours non confirmés.
+ *
+ * 23/08/2026, suite (Catalogue — Programmes de départ, correctif) :
+ * `nom`/`type` retirés de data/catalogue/programmesDepart.json (30
+ * entrées) — décision utilisateur explicite : ces Programmes n'ONT pas de
+ * nom (identifiés par `maison`+`origine`/`code`, ex. "H1-A") ni de type
+ * (Domination/Force/Soutien/Richesse), ce n'est pas une donnée manquante à
+ * compléter plus tard, contrairement à ce que l'entrée précédente
+ * supposait. Corrige aussi les commentaires `js/db.js`/
+ * `docs-architecture-pwa.md` qui présentaient ces deux champs comme
+ * "pas encore renseignés". Aucun changement de comportement (catalogue
+ * pur, toujours non câblé sur le plateau Programme).
+ *
+ * 23/08/2026 (Catalogue — Programmes de départ, préparation avant Phase 4 ;
+ * PAS ENCORE câblé sur le plateau Programme — emplacement 0 de
+ * `programmesUtilises` reste `null` à la création de partie, aucun
+ * changement de comportement en jeu dans ce lot) : nouveau fichier
+ * `data/catalogue/programmesDepart.json` (30 entrées — 1 par Origine A/B
+ * des 14 maisons, +2 "supplémentaires" A2/B2 propres à Marqualos), nouveau
+ * store IndexedDB `programmesDepart` (`js/db.js`, `VERSION_BASE` 2→3 pour
+ * déclencher `onupgradeneeded` chez les joueurs déjà installés — validé en
+ * navigateur réel, le store se recrée bien sans perte des autres),
+ * enregistré dans `js/catalogueSync.js` (`TABLES`, 12→13 fichiers) et
+ * `service-worker.js` (`FICHIERS_A_METTRE_EN_CACHE`).
+ * Schéma (corrigé par l'entrée suivante — voir plus haut) : `{code,
+ * maison, origine ('A'|'B'), technologieDepart, supplementaire,
+ * objectifs:[String], bonusPermanent:String|null, incertain}` — PAS de
+ * `nom`/`type`, ces Programmes n'en ont pas (décision utilisateur, voir
+ * ci-dessus). `type` (Domination/Force/Soutien/Richesse) manquant bloque
+ * le câblage sur `INFO_PROGRAMME_PAR_TYPE`/le plateau Programme (Phase 3),
+ * remis à plus tard. `bonusPermanent` isole la ligne
+ * "+" (Niveau de Production, effet permanent immédiat) des `objectifs`
+ * (scoring, évalués en fin de partie) — distinction confirmée visuellement
+ * par les 2 images fournies. `incertain:true` sur Shiveus (H7-A/B), Nervo
+ * (H9-A/B) et Thegwyn (H6-A/B) : la coupure Origine A/Origine B n'a pu être
+ * déduite que par comparaison de formulation avec les maisons confirmées
+ * (gabarit partagé Valnis/Dunlork/Cortozaar/Belitan, images Valnis/Kradmor,
+ * labels A/A2/B/B2 explicites de Marqualos) — à corriger si besoin
+ * (décision utilisateur, "si trop compliqué je remplirai les données plus
+ * tard"). Aucun changement de comportement en jeu : ce lot est un ajout de
+ * données catalogue pur, aucun code de `creerPartie`/Phase 3 ne lit encore
+ * ce store.
+ *
+ * 23/08/2026 (Programmes — Phase 3 : utiliser un Programme + plateau des
+ * 4 emplacements de la fiche Maison ; Phase 4 "objectifs + score" non
+ * traitée) :
+ * - Séparation de modèle nécessaire : "Programmes en main" (gagné, pas
+ *   encore joué) et "plateau Programme" (joué, actif) sont deux états
+ *   distincts que `programme1-4` (Phase 2) conflait. Nouveaux champs
+ *   `plateauMaison.programmesEnMain` (tableau non borné de noms, même
+ *   famille que `jetonCommerce`) et `plateauMaison.programmesUtilises`
+ *   (tableau fixe de 4, `null`/`{nom,entretienActif,corrompu}`, index 0
+ *   réservé au Programme de départ — laissé vide, données Origine Maison
+ *   pas encore disponibles au catalogue, "on les ajoutera plus tard",
+ *   décision utilisateur ; index 1-3 remplis via "Utiliser"). `programme1-4`
+ *   abandonné (retiré de `CHAMPS_PLATEAU_MAISON_AUTORISES`/`creerPartie`/
+ *   `assemblerPartie_`, aucune migration — IndexedDB n'impose pas de
+ *   schéma). `GameService.gagnerProgramme` (Phase 2) cible désormais
+ *   `programmesEnMain`, sans limite de 4 ; rejette aussi un Programme déjà
+ *   présent dans `programmesUtilises`.
+ * - Nouvelle `GameService.utiliserProgramme(partieId, nomProgramme,
+ *   demanderChoix)` : résout l'action gratuite du Programme (règle fixe
+ *   par type, nouvelle table `EFFET_PROGRAMME_PAR_TYPE_` construite depuis
+ *   `INFO_PROGRAMME_PAR_TYPE` déjà existante — Domination -> `{envahir:1}`,
+ *   Soutien -> `{choice:['activer_cube','construire_installation']}`
+ *   (et/ou), Force -> `{choice:['avancer_civilisation_moins_avancee',
+ *   'gagner_commerce']}` (ou), Richesse -> `{choice:['etablir_guilde',
+ *   {produire_ressource:1}]}` (et/ou) — via `FocusEngine.resoudreEffet`,
+ *   MÊME moteur que les actions Focus, `cout` toujours vide (actions de
+ *   Programme gratuites). `produire_ressource` (Richesse) n'est pas
+ *   automatisé côté PWA (niveaux de production non calculés) mais ne
+ *   bloque rien : en mode "et/ou" une clé non reconnue retombe sur le
+ *   repli générique existant (rappel manuel, jamais un blocage) — le
+ *   Programme part bien en jeu. Si l'action va au bout, le Programme
+ *   quitte `programmesEnMain` pour `programmesUtilises` (emplacements 1-3
+ *   UNIQUEMENT, l'emplacement 0 n'est jamais touché ici) : emplacement
+ *   libre -> placé directement ; emplacement du MÊME type déjà occupé ->
+ *   confirmation (refusée -> reste en main, action déjà résolue non
+ *   annulable) ; 3 emplacements pleins sans conflit -> nouvelle popup de
+ *   choix. Un emplacement remplacé qui était Corrompu décrémente
+ *   `corruptionMaison` de 1.
+ * - `js/focusEngine.js` : nouveau cas `avancer_civilisation_moins_avancee`
+ *   dans `resoudreCle_` (déléguait auparavant au repli générique, retiré
+ *   de `CLES_CIVILISATION_HORS_PERIMETRE`) — délègue à la MÊME popup
+ *   `'avancer_civilisation'` que les variantes existantes, avec un flag
+ *   `moinsAvancee:true` : la popup (`js/strategieService.js`) calcule
+ *   elle-même la piste la moins avancée (même tri que
+ *   `CivilisationService.avancerPisteMoinsAvancee`, fonction déjà
+ *   existante mais jamais câblée sur une popup jusqu'ici) puis réutilise
+ *   tel quel le rendu/la validation du mode "piste imposée".
+ * - Nouvelles popups `js/strategieService.js` : `'utiliser_programme'`
+ *   (affiche l'action, bouton "Résoudre" -> `GameService.utiliserProgramme`,
+ *   relaie la MÊME `demanderChoix` pour toutes les sous-popups imbriquées
+ *   — envahir/options_inclusives/avancer_civilisation/confirmation/etc.,
+ *   exactement comme une vraie action Focus) et
+ *   `'choisir_emplacement_programme'` (menu à 3 boutons, comme
+ *   `gagner_corruption`). `renderProgrammesEnMain_` (Phase 2) : bouton
+ *   "Utiliser" n'est plus un stub désactivé, lit `programmesEnMain` (plus
+ *   `programmes`), rafraîchit toute la partie (`App.rafraichirPartieCourante`)
+ *   au retour pour refléter les mutations ressources/cube/civilisation
+ *   éventuelles ET le déplacement vers Plat. maison.
+ * - Nouvelle section "Programmes" sur Plat. maison (`index.html`, entre
+ *   "Technologies" et "Corruption et Influence") : emplacement 0 en
+ *   placeholder texte ("à renseigner"), emplacements 1-3 (nom+type en
+ *   lecture seule — jamais choisis ici, uniquement via "Utiliser") avec
+ *   toggle "Entretien" (actif = +2 à l'Entretien dû, additionné à
+ *   `SecteurService.getEntretien` dans `chargerEntretien_`, règle du
+ *   livret §3.2.1.1 — icônes Entretien des cartes Programme, jusqu'ici non
+ *   prises en compte) et case "Corrompu" (ajuste `corruptionMaison` de ±1
+ *   au clic, met aussi à jour directement `#corruption-maison-input` — pas
+ *   re-rendu par ce bloc sinon). `creerPartie` : dernier emplacement (index
+ *   3) Corrompu dès la mise en place (règle du livret), `corruptionMaison`
+ *   initialisé à 1 en conséquence.
+ * - `js/gameService_programme_test.js` (7 tests, réécrit pour
+ *   `programmesEnMain`), nouveau `js/gameService_utiliser_programme_test.js`
+ *   (8 tests, FocusEngine mocké — couvre l'orchestration : placement
+ *   direct, conflit de type accepté/refusé, plateau plein choisi/annulé,
+ *   action annulée, Programme introuvable, mutations fusionnées), 2 tests
+ *   ajoutés à `js/focusEngine.test.js`
+ *   (`avancer_civilisation_moins_avancee`). Validé aussi par 2 parcours
+ *   Playwright ponctuels (créés puis supprimés) : Annuler sur l'invasion
+ *   imbriquée laisse le Programme en main ; placement réussi (voie
+ *   Force/Commerce) + toggle Entretien (+2 vérifié sur Plat. Galactique)
+ *   + toggle Corrompu (+1 vérifié, bug de rafraîchissement DOM trouvé et
+ *   corrigé au passage) + conflit de type avec remplacement confirmé — en
+ *   plus des 110 tests `*.test.js` + tous les `*_test.js`/`test_*.js`
+ *   existants + `e2e/partie-complete.spec.js`.
+ *
+ * 23/08/2026 (Programmes — Phase 1 offre + Phase 2 gain, chantier découpé
+ * en 4 phases par l'utilisateur ; Phase 3 "actions de Programme"/Phase 4
+ * "objectifs + score" non traitées ici) :
+ * - Phase 1 — nouvelle section "Offre Programmes" (Plat. Galactique,
+ *   index.html, entre "Focus héroïques" et le bouton "Terminer la
+ *   partie") : 4 emplacements fixes (1 par type Domination/Force/Soutien/
+ *   Richesse), chacun un <select> limité au catalogue de ce type + une
+ *   case Corrompu — persistance directe via GameService.majPlateauMaison
+ *   (nouveau champ `plateauMaison.offresProgramme`, tableau de 4
+ *   `{type, nom, corrompu}`, même famille que `gloire` — non diffable par
+ *   focusEngine.js). renderOffreProgrammes_ (index.html), appelée depuis
+ *   renderEcranPlateauGalactique_.
+ * - Phase 2 — gagner un Programme devient réellement interactif :
+ *   nouvelle popup 'gagner_programme' (strategieService.js, gabarit
+ *   'construire') listant tout le catalogue groupé par type (`<optgroup>`),
+ *   filtré sur un type imposé le cas échéant, excluant les Programmes
+ *   déjà en main, l'offre publique en cours mise en évidence ("★ "), le
+ *   texte (objectif1/objectif2) affiché au changement de sélection.
+ *   Persiste via la nouvelle GameService.gagnerProgramme(partieId,
+ *   nomProgramme) : écrit le 1er emplacement `programme1-4` libre,
+ *   réinitialise l'entrée `offresProgramme` correspondante si le
+ *   Programme choisi en faisait partie. FocusEngine.resoudreCle_ (js/
+ *   focusEngine.js) reconnaît désormais "gagner_programme" (valeur 1 ou
+ *   type en chaîne) ET les clés bare "programme_force"/"programme_soutien"/
+ *   "programme_domination"/"programme_richesse" (2 vocabulaires du
+ *   catalogue pour la même mécanique) — même pattern que
+ *   retirer_corruption/gain_corruption/ameliorer_gloire (popup dédiée,
+ *   resoudreCle_ ne fait que relayer le résumé dans le journal).
+ *   civilisationService.js (resoudreCaseEtChainerAvanceRapide_) appelle
+ *   déjà FocusEngine.resoudreEffet en interne : le chemin piste de
+ *   Civilisation en bénéficie automatiquement, sans code spécifique —
+ *   seul nettoyage nécessaire, la branche "gagner_programme" de
+ *   texteRappelPourCle_ (devenue inatteignable, plus jamais de rappel
+ *   manuel pour cette clé) et TYPES_PROGRAMME_CONNUS_ (orpheline)
+ *   retirées ; gagner_technologie inchangé (toujours manuel, hors
+ *   périmètre de ce lot). Aucun cadre `evenements.json` n'utilise
+ *   gagner_programme en option "choix" (vérifié sur tout le catalogue) —
+ *   aucun changement nécessaire côté Cadres d'Événement galactique.
+ * - Nouvelle section "Programmes en main" (écran Focus, index.html, entre
+ *   "Listes de focus" et "Focus héroïques") : une carte par Programme
+ *   possédé (programme1-4) — nom, type, les 2 Focus liés et l'action de
+ *   Programme, données FIXES PAR TYPE (règle du livret "Actions de
+ *   Programme", pas un champ par carte de data/catalogue/programmes.json)
+ *   portées en dur dans la nouvelle constante GameService.
+ *   INFO_PROGRAMME_PAR_TYPE (même statut que FocusEngine.BONUS_COMMERCE).
+ *   Bouton "Utiliser" en stub désactivé (résolution de l'action =
+ *   Phase 3, non traitée). renderProgrammesEnMain_ (strategieService.js),
+ *   appelée depuis StrategieService.afficher — qui appelle désormais
+ *   aussi App.renderPlateauGalactique(partie) systématiquement (même
+ *   rationale que l'appel déjà existant à App.renderPlateauMaison :
+ *   idempotent, sans risque même hors-sujet) pour que l'offre publique se
+ *   rafraîchisse si un gain de Programme via une action Focus vient d'en
+ *   vider une entrée.
+ * Nouveaux tests : js/gameService_programme_test.js (7 tests,
+ * GameService.gagnerProgramme), 5 tests ajoutés à js/focusEngine.test.js
+ * (gagner_programme valeur 1/type imposé/clé bare/annulé), 2 tests de
+ * js/civilisationService_test.js réécrits pour le nouveau comportement.
+ * Validé aussi par un parcours Playwright ponctuel (créé puis supprimé,
+ * comme pour l'Événement H) couvrant offre → gain via Focus → mise en
+ * évidence de l'offre dans la popup → "Programmes en main" → offre
+ * nettoyée, en plus des 108 tests `*.test.js` + tous les
+ * `*_test.js`/`test_*.js` existants + e2e/partie-complete.spec.js.
+ *
+ * 23/08/2026, suite encore (Événement galactique H, Cycle 1, Cadre 1 —
+ * "Droit en enfer") : Cadre "choix" au vocabulaire inédit dans tout le
+ * reste du catalogue (vérifié par grep sur "gloire"/"recall" à
+ * l'intérieur de tout `cadre.effet`) — 2 options : { gain: {
+ * corruption:1, gloire:1 } } (aucune des deux clés `cle`/`valeur`
+ * attendues par deltaOptionCadre_/cleFocusEnginePourOptionCadre_) et
+ * { recall: { cube:1 } } (mécanique jamais branchée sur un Cadre — seul
+ * un formulaire dédié de l'écran Secteurs existait). Les deux sont
+ * désormais automatisées, en composant des mécaniques déjà existantes
+ * plutôt qu'en en inventant de nouvelles :
+ * - Option Corruption + Gloire : réutilise la popup 'gagner_corruption'
+ *   existante (mêmes 4 cibles que GameService.appliquerCadreGainCorruption,
+ *   aucune cible n'étant précisée par le catalogue pour cette option —
+ *   donc les 4 restent ouvertes) puis ajoute un jeton Gloire de valeur 1
+ *   au premier emplacement libre de plateauMaison.gloire (même geste que
+ *   le clic manuel sur un emplacement vide, ou le dépôt automatique après
+ *   une invasion réussie — strategieService.js). Si les 5 emplacements
+ *   Gloire sont déjà occupés, la Corruption est placée normalement mais
+ *   le jeton Gloire non posé, signalé dans le résumé du cadre (aucune
+ *   défausse/remplacement inventé, cas non couvert par les règles).
+ * - Option Rappel de cube : nouvelle popup 'rappeler_cube'
+ *   (strategieService.js, même gabarit que 'construire' — secteur + type
+ *   de vaisseau, réutilise SecteurService.obtenirSecteurs/rappelerCube,
+ *   secteurEstPossede_ pour l'éligibilité — même règle qu'index.html/
+ *   renderFormulaireRappelerCube_, le formulaire dédié de l'écran
+ *   Secteurs).
+ * js/gameService.js (2 nouvelles fonctions — appliquerCadreChoixCorruptionGloire/
+ * appliquerCadreChoixRappelCube, reconnaissent EXACTEMENT ce gabarit,
+ * même prudence que conditionAvancerPisteSiCorrompue_ — aucune tentative
+ * de généraliser à un futur Cadre au vocabulaire similaire),
+ * js/strategieService.js (contexte 'rappeler_cube'), index.html
+ * (actionsCadre_ reconnaît les 2 nouvelles formes d'option,
+ * ouvrirPopupCadreEtRafraichir_ + 2 nouveaux wrappers
+ * appliquerCadreCorruptionGloireEtRafraichir_/
+ * appliquerCadreRappelCubeEtRafraichir_). Cadre 2 (modificateur_permanent
+ * — surcharge de coût sur TOUT déploiement de cube pour le reste du
+ * Cycle 1) volontairement laissé en l'état (texte seul, non cliquable) :
+ * comme les 8 autres Cadres "modificateur_permanent" du catalogue, aucun
+ * n'est automatisé à ce jour — intercepter un type d'action existant
+ * (deployer_cube) pour lui appliquer un surcoût conditionnel pendant tout
+ * un Cycle est une mécanique transverse d'une nature différente, pas
+ * traitée dans ce lot. Nouveau fichier de test
+ * js/gameService_cadre_h1_test.js (7 tests, même principe que
+ * gameService_cadre_gain_corruption_test.js). Validé aussi par un
+ * parcours Playwright ponctuel (créé puis supprimé, pas conservé dans
+ * e2e/) couvrant les 2 options + le Cadre 2 non cliquable, en plus des
+ * 104 tests `*.test.js` + tous les `*_test.js`/`test_*.js` existants +
+ * e2e/partie-complete.spec.js.
+ *
+ * 23/08/2026, encore (Plat. maison — Influence éditable) : le cadran
+ * Influence (#influence-maison-input) devient un champ numérique
+ * modifiable, même gabarit que Corruption juste à côté (auparavant un
+ * <span> en lecture seule — AUCUN moyen de corriger l'Influence à la
+ * main dans toute l'app, alors que l'évaluation des Objectifs
+ * galactiques/Programme en fin de Cycle (docs-rules-cycle-de-jeu.md
+ * §3.3/3.4) reste hors périmètre de l'automatisation et doit donc être
+ * ajoutée manuellement). index.html (renderEcranPlateauMaison_ —
+ * inputInfluenceMaison.onchange -> GameService.majPlateauMaison(partie.id,
+ * {influence}), champ déjà whitelisté côté gameService.js
+ * CHAMPS_PLATEAU_MAISON_AUTORISES, aucun changement nécessaire là-bas).
+ * Aucune nouvelle classe CSS (réutilise .plateau-influence
+ * .ressource-case-input, déjà stylée pour Corruption).
+ *
+ * 23/08/2026, suite (Fin de partie — score final du joueur) : le champ
+ * "Score final du joueur" (#fin-score-final) est lui aussi pré-rempli à
+ * l'ouverture de l'écran Fin de partie, depuis l'Influence accumulée sur
+ * Plat. maison (partie.plateauMaison.ressources.influence) — c'est la
+ * seule utilité de l'Influence (docs-rules-Influence-et-ressources.md
+ * §1). ⚠️ Au moment de ce lot, ce total ne reflétait QUE les gains
+ * automatisés (Focus/Cadres) — pas l'évaluation des Objectifs galactiques/
+ * Programme, alors hors périmètre ET sans aucun champ pour les ajouter à
+ * la main (corrigé juste au-dessus, même journée). Champ laissé
+ * modifiable. js/scoreVueService.js (preremplirScoreFinal_, rechargement
+ * frais via GameService.obtenirPartie plutôt que partieCourante en
+ * mémoire, potentiellement périmé après une action Focus), index.html (span
+ * .field-auto sous le label du champ). Aucun changement gameService.js/
+ * scoreService.js pour ce complément.
+ *
+ * 23/08/2026 (Fin de partie — automatisation des compteurs d'Influence) :
+ * l'écran Fin de partie pré-remplit désormais les compteurs calculables
+ * depuis l'état déjà suivi par l'app (secteurs de Faille du scénario,
+ * jetons Gardien, cartes Maison Déchue encore sur des secteurs,
+ * Population des secteurs occupés par une Puissance Navale du Néant,
+ * Corruption des secteurs + pistes de Civilisation) — champs laissés
+ * modifiables, le joueur ajuste selon le plateau physique. Le reste
+ * (catastrophes, crises permanentes, refuges incomplets, technologies
+ * consumées, difficulté de base) n'a aucune trace en base et reste
+ * entièrement manuel. js/scoreService.js (nouveau
+ * ScoreService.calculerCompteursAutomatiques/CLES_COMPTEURS_
+ * AUTOMATISABLES, pure calculerCompteursAutomatiquesDepuisEtat_ séparée
+ * du chargement DB), js/scoreVueService.js (preremplirCompteursAutomatiques_,
+ * appelé à l'ouverture de l'écran Fin de partie), css/style.css
+ * (.field-auto). Corrigé au passage : BAREME.secteursFaille valait 60,
+ * la règle indique 30 par secteur de Faille encore sur le plateau (bug
+ * documenté de longue date, docs/docs-rules-cycle-de-jeu.md §4) —
+ * changement de comportement pour toute partie déjà terminée avec au
+ * moins un secteur de Faille non nul dans ses compteurs, aucun impact
+ * sur les parties déjà enregistrées (finDePartie n'est jamais
+ * recalculé rétroactivement). docs/docs-rules-cycle-de-jeu.md et
+ * docs/docs-architecture-pwa.md mis à jour en conséquence.
  *
  * 22/08/2026 (nettoyage des commentaires historiques + mise à jour de la
  * documentation) : passage sur l'ensemble du code applicatif
@@ -1530,4 +1892,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260822.3';
+var APP_VERSION = '20260823.12';

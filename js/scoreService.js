@@ -19,14 +19,16 @@
  * statut déjà en place.
  *
  * Dépend de : gameService.js (GameService.obtenirPartie/sauvegarderPartie/
- * listerParties) — à charger avant ce fichier.
+ * listerParties), secteurService.js (SecteurService.obtenirSecteurs/
+ * SCENARIO_PAR_DEFAUT) et db.js (DB.getAll) — à charger avant ce fichier
+ * (calculerCompteursAutomatiques, voir plus bas).
  */
 
 var ScoreService = (function () {
   'use strict';
 
   var BAREME = {
-    secteursFaille: 60,
+    secteursFaille: 30,
     refugesIncomplets: 20,
     catastrophes: 20,
     gardiens: 10,
@@ -117,11 +119,96 @@ var ScoreService = (function () {
     return acquises;
   }
 
+  // Postes du barème calculables depuis l'état déjà suivi par l'app —
+  // le reste (catastrophes, crises permanentes, refuges incomplets,
+  // technologies consumées, difficulté de base) ne vit que sur le
+  // plateau physique et reste à saisir à la main.
+  var CLES_COMPTEURS_AUTOMATISABLES = ['secteursFaille', 'gardiens', 'maisonsDechues', 'populationNeant', 'corruption'];
+
+  /**
+   * Calcule la part automatisable des compteurs d'Influence à partir de
+   * l'état déjà suivi par l'app (secteurs + Civilisation). Pure — reçoit
+   * les données déjà chargées, ne touche pas IndexedDB elle-même (voir
+   * calculerCompteursAutomatiques ci-dessous pour le chargement).
+   *
+   * - secteursFaille : nombre de secteurs de type "faille" du scénario
+   *   (fixé à la mise en place, jamais retiré du plateau en cours de
+   *   partie — voir docs-rules-secteurs.md/évènements catalogue).
+   * - gardiens : somme de nombreGardien sur tous les secteurs ("plateau
+   *   central", par opposition au plateau Crise non suivi par l'app).
+   * - maisonsDechues : secteurs avec une maison déchue encore assignée
+   *   (maisonAssociee) — la carte reste sur le secteur même après
+   *   invasion, envahirResoudre ne la retire jamais.
+   * - populationNeant : population des secteurs avec de la Puissance
+   *   Navale du Néant (pnNeant > 0) — la règle exclut explicitement les
+   *   secteurs "du Néant" sans aucune Puissance Navale.
+   * - corruption : secteurs Corrompus + pistes de Civilisation
+   *   Corrompues. Partiel : ne compte pas la Corruption des Programmes/
+   *   fiches Maison/offre de Programmes, non suivie par l'app — à
+   *   compléter à la main si besoin.
+   */
+  function compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation) {
+    secteurs = secteurs || [];
+
+    var gardiens = 0;
+    var maisonsDechues = 0;
+    var populationNeant = 0;
+    var corruptionSecteurs = 0;
+
+    secteurs.forEach(function (s) {
+      gardiens += Number(s.nombreGardien) || 0;
+      if (s.maisonAssociee) maisonsDechues += 1;
+      if ((Number(s.pnNeant) || 0) > 0) populationNeant += Number(s.population) || 0;
+      if (s.corrompu) corruptionSecteurs += 1;
+    });
+
+    var corruptionCivilisation = ['societe', 'gouvernement', 'economie'].filter(function (piste) {
+      return corrompuesCivilisation && corrompuesCivilisation[piste];
+    }).length;
+
+    return {
+      secteursFaille: toNombre_(nombreSecteursFaille),
+      gardiens: gardiens,
+      maisonsDechues: maisonsDechues,
+      populationNeant: populationNeant,
+      corruption: corruptionSecteurs + corruptionCivilisation
+    };
+  }
+
+  /**
+   * Charge l'état de la partie (secteurs + scénario + Civilisation) et
+   * calcule la part automatisable des compteurs d'Influence — consommé
+   * par l'écran Fin de partie pour pré-remplir le formulaire (champs
+   * laissés modifiables, voir scoreVueService.js).
+   */
+  function calculerCompteursAutomatiques(partieId) {
+    return Promise.all([
+      GameService.obtenirPartie(partieId),
+      SecteurService.obtenirSecteurs(partieId),
+      DB.getAll('scenarioSecteurs')
+    ]).then(function (resultats) {
+      var partie = resultats[0];
+      var secteurs = resultats[1];
+      var lignesScenario = resultats[2];
+
+      var scenarioId = (partie && partie.scenarioId) || SecteurService.SCENARIO_PAR_DEFAUT;
+      var nombreSecteursFaille = lignesScenario.filter(function (l) {
+        return l.scenarioId === scenarioId && l.type === 'faille';
+      }).length;
+
+      var corrompuesCivilisation = partie && partie.civilisation && partie.civilisation.corrompues;
+
+      return compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation);
+    });
+  }
+
   return {
 
     BAREME: BAREME,
     DIFFICULTES_INFLUENCE_BASE: DIFFICULTES_INFLUENCE_BASE,
+    CLES_COMPTEURS_AUTOMATISABLES: CLES_COMPTEURS_AUTOMATISABLES,
     calculerInfluence: calculerInfluence,
+    calculerCompteursAutomatiques: calculerCompteursAutomatiques,
 
     /**
      * Enregistre la fin de partie : score final saisi + calcul de

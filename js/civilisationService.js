@@ -104,15 +104,18 @@ var CivilisationService = (function () {
    * Cherche récursivement la valeur associée à `cle` dans le JSON Effet
    * BRUT (avant résolution) d'une case — traverse objets, tableaux
    * `choice`/`choice_repeat.options`, et les chaînes "nues" d'un tableau
-   * `choice` (ex. ["gagner_programme", "gagner_commerce"], voir
+   * `choice` (ex. ["gagner_technologie", "gagner_commerce"], voir
    * focusEngine.js/resoudreOption_ : une option-chaîne équivaut à
    * {cle: 1}). Vérifié sur tout data/catalogue/pistesCivilisation.json :
-   * "gagner_technologie"/"gagner_programme" n'apparaissent jamais plus
-   * d'une fois dans l'Effet d'une même case — la première correspondance
-   * trouvée est donc toujours la bonne, même si elle est nichée dans un
-   * "choice" dont une AUTRE option a finalement été résolue (le journal,
-   * lui, dit fiablement QUELLE clé a réellement été appliquée — voir
-   * extraireLignesManuelles_ ci-dessus).
+   * "gagner_technologie" n'apparaît jamais plus d'une fois dans l'Effet
+   * d'une même case — la première correspondance trouvée est donc
+   * toujours la bonne, même si elle est nichée dans un "choice" dont une
+   * AUTRE option a finalement été résolue (le journal, lui, dit fiablement
+   * QUELLE clé a réellement été appliquée — voir extraireLignesManuelles_
+   * ci-dessus). Ne sert plus qu'à "gagner_technologie" (seule clé encore
+   * traitée par texteRappelPourCle_ ci-dessous) — "gagner_programme" est
+   * désormais résolu directement par FocusEngine.resoudreCle_ (popup
+   * dédiée), ne remonte donc plus jamais ici.
    */
   function trouverValeurCle_(effet, cle) {
     if (effet == null) return undefined;
@@ -134,21 +137,25 @@ var CivilisationService = (function () {
     return undefined;
   }
 
-  // Types de Programme reconnus par le catalogue (pistesCivilisation.json,
-  // gagner_programme: "force"/"soutien"/"domination"/"richesse" — la
-  // valeur numérique 1, elle, signifie "un Programme au choix", sans type
-  // imposé).
-  var TYPES_PROGRAMME_CONNUS_ = ['force', 'soutien', 'domination', 'richesse'];
-
   /**
-   * Construit le texte de rappel (popup) ET, pour gagner_technologie/
-   * gagner_programme, le libellé simplifié à écrire à la place de la
-   * ligne de journal technique — `journal: null` pour toute autre clé
-   * (générique) signifie "garder la ligne de journal telle quelle". Le
-   * repli générique réutilise le texte imprimé de la case (`texteCase`,
-   * déjà lisible), même principe que le rappel manuel côté Cadre
-   * d'Événement galactique "gain" (index.html,
-   * appliquerCadreManuelEtRafraichir_ : cadre.instruction || cadre.texte).
+   * Construit le texte de rappel (popup) ET, pour gagner_technologie, le
+   * libellé simplifié à écrire à la place de la ligne de journal
+   * technique — `journal: null` pour toute autre clé (générique) signifie
+   * "garder la ligne de journal telle quelle". Le repli générique
+   * réutilise le texte imprimé de la case (`texteCase`, déjà lisible),
+   * même principe que le rappel manuel côté Cadre d'Événement galactique
+   * "gain" (index.html, appliquerCadreManuelEtRafraichir_ :
+   * cadre.instruction || cadre.texte).
+   *
+   * "gagner_programme" n'a PLUS besoin de cas dédié ici : FocusEngine.
+   * resoudreCle_ le résout désormais lui-même via une popup dédiée
+   * (contexte 'gagner_programme', strategieService.js — voir
+   * FocusEngine.js) — le journal ne contient donc plus jamais la marque
+   * SUFFIXE_MANUEL_ pour cette clé, extraireLignesManuelles_ ne la
+   * remonte plus ici. resoudreCaseEtChainerAvanceRapide_ ci-dessous
+   * appelle déjà FocusEngine.resoudreEffet en interne : ce correctif
+   * s'applique donc automatiquement au chemin piste de Civilisation,
+   * sans changement de logique dans ce fichier.
    */
   function texteRappelPourCle_(cle, valeur, texteCase) {
     if (cle === 'gagner_technologie') {
@@ -157,10 +164,6 @@ var CivilisationService = (function () {
       var aAmelioree = estArray ? valeur.indexOf('amelioree') !== -1 : valeur === 'amelioree';
       var precisionTech = (aBase && aAmelioree) ? ' de base ou avancée' : (aBase ? ' de base' : (aAmelioree ? ' avancée' : ''));
       return { rappel: 'Choisir une technologie' + precisionTech + ' manuellement', journal: 'technologie choisie manuellement' };
-    }
-    if (cle === 'gagner_programme') {
-      var type = (typeof valeur === 'string' && TYPES_PROGRAMME_CONNUS_.indexOf(valeur) !== -1) ? valeur : '';
-      return { rappel: 'Choisir un programme' + (type ? ' ' + type : '') + ' manuellement', journal: 'programme choisi manuellement' };
     }
     return { rappel: texteCase || 'Effet à résoudre manuellement.', journal: null };
   }

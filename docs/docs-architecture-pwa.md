@@ -51,7 +51,7 @@ version.js                   # APP_VERSION, source de vérité unique du cache (
 css/
   style.css                  # tout le style (§7)
 data/
-  catalogue/                 # 12 fichiers JSON = catalogue de règles statique (§3)
+  catalogue/                 # 13 fichiers JSON = catalogue de règles statique (§3)
     maisons.json, technologies.json, focus.json, evenements.json,
     pistesCivilisation.json, programmes.json, scenarios.json,
     scenarioSecteurs.json, scenarioAdjacences.json, scenarioTrousDeVer.json,
@@ -151,7 +151,10 @@ avant d'être utilisable.
   technologiesObtenues, technologiesAvanceesChoisies, technologiesAvanceesAmeliorees,
   joueur: { ..., technologieDepart: { nom, type, amelioree } },
   plateauMaison: { ressources: { nourriture, energie, materiel, credit, science, influence },
-                   cubeActif, jetonPrime, jetonLiberation, jetonCommerce, gloire, programmes: [4] },
+                   cubeActif, jetonPrime, jetonLiberation, jetonCommerce, gloire,
+                   programmesEnMain: [String],       // gagnés, pas encore joués — non borné
+                   programmesUtilises: [4],           // plateau Programme, voir §4.2
+                   offresProgramme: [4] },  // [{type, nom, corrompu}] — offre publique, voir §4.2
   // -- tout ce qui suit vient du blob etatJson --
   adversaires, evenements: { cycle1, cycle2, cycle3 },  // événement formaté ou null,
                                                           // + cadresAppliques ajouté dynamiquement
@@ -167,8 +170,20 @@ avant d'être utilisable.
 Science`, `influence`, `cubeActif`, `jetonPrime`, `jetonLiberation`,
 `jetonCommerce` (array), `gloire` (array `[2,null,null,null,null]`),
 `civSociete/Gouvernement/Economie`, `civCorrompueSociete/Gouvernement/
-Economie` (bool), `programme1-4`, `technologiesObtenues` (array de 5, objets
-ou null), `technologiesAvanceesChoisies` (array de 4),
+Economie` (bool), `programmesEnMain` (array de noms de Programme, non
+borné — gagnés via `GameService.gagnerProgramme`, pas encore joués),
+`programmesUtilises` (array de 4 — plateau Programme de la fiche Maison ;
+index 0 réservé au Programme de départ, `{code, entretienActif:true,
+corrompu:false, depart:true}` (identifié par `code`, PAS de `nom`, voir
+`data/catalogue/programmesDepart.json` ci-dessous) déterminé à la création
+de partie par `GameService.creerPartie`/`obtenirProgrammeDepart_` (maison +
+technologie de départ), `null` si aucune correspondance catalogue (repli
+tolérant, comme `originesMaison`) ; index 1-3, `null` ou `{nom,
+entretienActif, corrompu}`, remplis via `GameService.utiliserProgramme` —
+`programme1-4`, Phase 2, abandonné sans migration), `offresProgramme`
+(array de 4 `{type, nom, corrompu}`, un par type Domination/Force/Soutien/
+Richesse — offre publique, Plat. Galactique, voir §4.2), `technologiesObtenues`
+(array de 5, objets ou null), `technologiesAvanceesChoisies` (array de 4),
 `technologiesAvanceesAmeliorees` (map `{nom: bool}`).
 
 **Ligne `secteursPartie`** : `{partieId, numero, maisonAssociee, population,
@@ -204,6 +219,7 @@ dans `catalogueSync.js:31-44` (`TABLES`).
 | `scenarioTrousDeVer.json` | `scenarioTrousDeVer` | 0 | Liaisons trou de ver — **vide**, aucun scénario du catalogue n'en utilise actuellement |
 | `typesSecteur.json` | `typesSecteur` | 13 | Types de secteur spéciaux (limites Installation/Guilde, effet) |
 | `originesMaison.json` | `originesMaison` | 28 | Cartes Origine (2 par maison) — mise en place détaillée ressources/flotte/civilisation |
+| `programmesDepart.json` | `programmesDepart` | 30 | Programmes de départ (1 par Origine A/B, +2 "supplémentaires" pour Marqualos, exclus de l'auto-placement) — identifiés par `maison`+`origine`/`code`, PAS de `nom` ni de `type` (Domination/Force/Soutien/Richesse) : ces Programmes n'en ont pas, contrairement aux 32 cartes de `programmes.json` (confirmé par l'utilisateur). Les 30 entrées sont confirmées par image du livret (champ `incertain`, toujours `false` à ce jour). Câblé sur l'emplacement 0 du plateau Programme (Plat. maison) : `GameService.creerPartie` cherche l'entrée maison+technologie de départ via `obtenirProgrammeDepart_` et la place dans `programmesUtilises[0]` |
 
 ### 3.1 `evenements.json` — structure détaillée
 
@@ -252,7 +268,7 @@ alternatif au précédent (§3.3 du rulebook).
 
 ### 4.1 `js/catalogueSync.js`
 
-**Rôle** : importe les 12 fichiers `data/catalogue/*.json` vers IndexedDB, en
+**Rôle** : importe les 13 fichiers `data/catalogue/*.json` vers IndexedDB, en
 écrasement complet à chaque synchronisation. Pas pur (fetch réseau + DB), mais
 fonctionne offline dès que les JSON sont mis en cache par le Service Worker.
 
@@ -274,7 +290,7 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
 |---|---|---|
 | `obtenirMaisonsCatalogue` | — | Jointure maisons+technologies → `[{nom, complexite, technologies: [{nom, type, texte, texteAmeliore}]}]` |
 | `cleFocusEnginePourOptionCadre` | `(option)` | Clé `focusEngine.js` correspondant à une option de Cadre "choix" (source de vérité unique, lue à la fois pour savoir si un bouton d'option est cliquable et pour résoudre le choix) |
-| `creerPartie` | `(options)` | Crée une partie (tirage/choix maison+adversaires, origine, civilisation/ressources départ, mise en place Focus via `FocusService`, instanciation secteurs via `SecteurService`) |
+| `creerPartie` | `(options)` | Crée une partie (tirage/choix maison+adversaires, origine, civilisation/ressources départ, Programme de départ → `programmesUtilises[0]`, mise en place Focus via `FocusService`, instanciation secteurs via `SecteurService`) |
 | `obtenirPartie` | `(id)` | Une partie assemblée, ou `null` |
 | `listerParties` | — | Toutes les parties, triées `dateCreation` décroissant |
 | `sauvegarderPartie` | `(partie, action, details)` | Persiste une partie complète + ligne d'historique |
@@ -295,12 +311,16 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
 | `appliquerCadreChoixFocusEngine` | `(partieId, cycle, ordreCadre, indexOption, demanderChoix)` | Cadre "choix" dont une option délègue à `FocusEngine.resoudreEffet` (ex. activer/déployer un cube) — seule source de vérité pour cette mécanique, qu'elle soit déclenchée depuis Focus ou un Cadre |
 | `cadreGainCorruptionAutomatisable` | `(cadre)` | **Pure.** Détecte si un cadre "gain" de Corruption est résolvable automatiquement |
 | `appliquerCadreGainCorruption` | `(partieId, cycle, ordreCadre, demanderChoix)` | Applique un cadre "gain" de Corruption sur une piste de Civilisation |
+| `appliquerCadreChoixCorruptionGloire` | `(partieId, cycle, ordreCadre, indexOption, demanderChoix)` | Option "choix" au gabarit `{gain:{corruption:1,gloire:1}}` (Événement H Cycle 1 Cadre 1, seul cas connu) — ouvre 'gagner_corruption' (4 cibles ouvertes) puis ajoute un jeton Gloire valeur 1 au premier emplacement libre de `plateauMaison.gloire` |
+| `appliquerCadreChoixRappelCube` | `(partieId, cycle, ordreCadre, indexOption, demanderChoix)` | Option "choix" au gabarit `{recall:{cube:1}}` (Événement H Cycle 1 Cadre 1) — ouvre 'rappeler_cube' (secteur + type de vaisseau), qui persiste elle-même via `SecteurService.rappelerCube` |
 | `definirTechnologieAmelioree` | `(partieId, cible, amelioree)` | Marque une techno possédée (`'depart'` ou slot 0-4) améliorée/non |
 | `avancerCycle` | `(partieId)` | Avance `cycleNum`/`cycleTermine` (1→2→3→'termine'), amorce les Focus héroïques du nouveau cycle |
 | `choisirFocusHeroique` | `(partieId, cycle, slot, nom)` | Enregistre/retire un Focus héroïque (slot 0-2), unicité via `focusHeroiquesPioches`, **pas** d'entrée d'historique |
 | `choisirTechnologieObtenue` | `(partieId, slot, nomTechnologie)` | Technologie obtenue (slot 0-4), parmi les 8 des maisons déchues |
 | `choisirTechnologieAvancee` | `(partieId, slot, nomTechnologie)` | Une des 4 Technologies avancées (slot 0-3), cycle 1 uniquement, rejette les doublons |
 | `obtenirTechnologiesAvanceesGroupes` | `(partie)` | **Pure.** `{toutes, groupeA, groupeB, actif}` — `actif` = noms améliorables au cycle en cours |
+| `gagnerProgramme` | `(partieId, nomProgramme)` | Ajoute `nomProgramme` à `programmesEnMain` (non borné, rejette si déjà en main ou déjà dans `programmesUtilises`) ; réinitialise l'entrée `offresProgramme` correspondante si `nomProgramme` en faisait partie. Appelée directement par la popup `'gagner_programme'` (strategieService.js), même principe que `SecteurService.placerCorruption` — aucun historique/rechargement ici |
+| `utiliserProgramme` | `(partieId, nomProgramme, demanderChoix)` | Résout l'action gratuite du Programme (`EFFET_PROGRAMME_PAR_TYPE_`, table fixe par type) via `FocusEngine.resoudreEffet` (`cout` toujours vide) puis, si l'action va au bout, déplace la carte de `programmesEnMain` vers `programmesUtilises` (emplacements 1-3 uniquement) — conflit de type → confirmation, 3 emplacements pleins → popup dédiée, refus → reste en main. Décrémente `corruptionMaison` si l'emplacement remplacé était Corrompu. Appelée par la popup `'utiliser_programme'` (strategieService.js) |
 
 **Constantes clés** :
 - `RESSOURCES_SIMPLES_CADRE` : `['nourriture','energie','materiel','credit','science']`
@@ -312,6 +332,24 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
   `majPlateauMaison` — exclut explicitement `civ*`/`technologieDepart`
   (leurs propres fonctions dédiées).
 - `INFLUENCE_DEPART = 10`, `GLOIRE_DEPART = [2, null, null, null, null]`.
+- `INFO_PROGRAMME_PAR_TYPE` : table de règles fixes du livret ("Actions de
+  Programme") — `{Domination|Force|Soutien|Richesse: {focusLies: [2 noms],
+  action: texte}}`. Les 2 Focus liés et l'action de Programme sont FIXES
+  PAR TYPE (les 8 cartes d'un même type partagent la même action), pas un
+  champ par carte de `data/catalogue/programmes.json` — même statut que
+  `FocusEngine.BONUS_COMMERCE` (donnée de règles figée). Consommée par
+  `index.html`/`strategieService.js` (`renderProgrammesEnMain_`, écran
+  Focus).
+- `EFFET_PROGRAMME_PAR_TYPE_` : JSON Effet FocusEngine correspondant à
+  chaque action de `INFO_PROGRAMME_PAR_TYPE` ci-dessus (Domination →
+  `{envahir:1}`, Soutien → `{choice:['activer_cube','construire_installation']}`,
+  Force → `{choice:['avancer_civilisation_moins_avancee','gagner_commerce']}`,
+  Richesse → `{choice:['etablir_guilde',{produire_ressource:1}]}`) —
+  consommée par `GameService.utiliserProgramme` (Phase 3), le texte de
+  `INFO_PROGRAMME_PAR_TYPE[type].action` servant TEL QUEL de `texteAction`
+  à `FocusEngine.resoudreEffet` ("et/ou" y déclenche le mode choix
+  inclusif, son absence le mode exclusif — voir `focusEngine.js`
+  `resoudreCle_`, cas `"choice"`/`"choix"`).
 
 ### 4.3 `js/secteurService.js` — plateau des secteurs
 
@@ -467,24 +505,53 @@ ressource en cours de combat (Missiles longue portée, Drones autonomes, Focus
 Corvette > Sentinelle > Destroyer > Porte-Vaisseaux > Cuirassé), jamais laissé
 au joueur.
 
-### 4.9 `js/scoreService.js` — fin de partie (185 lignes)
+### 4.9 `js/scoreService.js` — fin de partie
 
 **Rôle** : calcul du barème Influence du Néant, détermination du vainqueur,
 enregistrement + historique enrichi. Pas pur au sens PWA (passe par
-`GameService`), mais logique de calcul elle-même pure.
+`GameService`/`SecteurService`/`DB`), mais logique de calcul elle-même pure
+(`calculerInfluence`, `compteursAutomatiquesDepuisEtat_`).
 
-| Export | Paramètres | Description | Ligne |
-|---|---|---|---|
-| `BAREME` | (constante) | Points par poste (voir ci-dessous) | 34 |
-| `DIFFICULTES_INFLUENCE_BASE` | (constante) | `[60, 100, 140]` | 46 |
-| `calculerInfluence` | `(compteurs)` | **Pure.** Détail + total Influence du Néant | 130 |
-| `enregistrerFinDePartie` | `(partieId, scoreFinal, compteursInfluence)` | Calcule l'Influence, détermine le vainqueur (`scoreFinal > influenceTotal` strictement), persiste `finDePartie`/`terminee` | 137 |
-| `getHistorique` | — | Liste enrichie (événements, technos, vainqueur) pour l'écran Historique | 165 |
+| Export | Paramètres | Description |
+|---|---|---|
+| `BAREME` | (constante) | Points par poste (voir ci-dessous) |
+| `DIFFICULTES_INFLUENCE_BASE` | (constante) | `[60, 100, 140]` |
+| `CLES_COMPTEURS_AUTOMATISABLES` | (constante) | Clés de `BAREME` calculables depuis l'état suivi (voir ci-dessous) |
+| `calculerInfluence` | `(compteurs)` | **Pure.** Détail + total Influence du Néant |
+| `calculerCompteursAutomatiques` | `(partieId)` | Charge secteurs + `scenarioSecteurs` + Civilisation, retourne la part automatisable des compteurs — consommé par `scoreVueService.js` pour pré-remplir le formulaire (champs laissés modifiables) |
+| `enregistrerFinDePartie` | `(partieId, scoreFinal, compteursInfluence)` | Calcule l'Influence, détermine le vainqueur (`scoreFinal > influenceTotal` strictement), persiste `finDePartie`/`terminee` |
+| `getHistorique` | — | Liste enrichie (événements, technos, vainqueur) pour l'écran Historique |
 
-`BAREME` (34-44, points/unité) : `secteursFaille:60`, `refugesIncomplets:20`,
+`BAREME` (points/unité) : `secteursFaille:30`, `refugesIncomplets:20`,
 `catastrophes:20`, `gardiens:10`, `technologiesConsommees:5`,
 `crisesPermanentes:5`, `maisonsDechues:3`, `corruption:2`,
-`populationNeant:1`.
+`populationNeant:1`. `secteursFaille` valait 60 par erreur avant le
+23/08/2026 (voir `docs-rules-cycle-de-jeu.md` §4).
+
+Automatisables (`CLES_COMPTEURS_AUTOMATISABLES`), pré-remplis mais
+modifiables : `secteursFaille` (secteurs de type `faille` du scénario),
+`gardiens` (somme `secteursPartie.nombreGardien`), `maisonsDechues`
+(secteurs avec `maisonAssociee` assignée), `populationNeant` (population
+des secteurs avec `pnNeant > 0`), `corruption` (secteurs `corrompu` +
+pistes de Civilisation Corrompues — partiel, ignore Programmes/fiches
+Maison/offre de Programmes, non suivis par l'app). Le reste
+(`refugesIncomplets`, `catastrophes`, `technologiesConsommees`,
+`crisesPermanentes`, la difficulté de base) n'a aucune trace en base et
+reste entièrement manuel.
+
+Score final du joueur (`#fin-score-final`, écran Fin de partie) : lui
+aussi pré-rempli, mais côté `scoreVueService.js` directement (pas
+`ScoreService`) — c'est un simple recopiage de
+`partie.plateauMaison.ressources.influence` (rechargé frais via
+`GameService.obtenirPartie`), l'Influence étant la seule mesure de score
+du jeu (`docs-rules-Influence-et-ressources.md` §1). Champ laissé
+modifiable. ⚠️ Ce total ne reflète que les gains d'Influence automatisés
+par l'app (Focus/Cadres/Gloire/formules `influence_par_*`) — l'évaluation
+des Objectifs galactiques/Programme en fin de Cycle
+(`docs-rules-cycle-de-jeu.md` §3.3/3.4) reste hors périmètre et doit être
+ajoutée à la main, via le cadran Influence désormais éditable sur Plat.
+maison (`#influence-maison-input`, index.html — même gabarit que
+Corruption, `GameService.majPlateauMaison`).
 
 ### 4.10 Schéma de dépendances
 
@@ -501,7 +568,8 @@ db.js
          └─ focusEngine.js  (pur, sauf jouerActionEtPersister → DB + GameService + AnnulationService)
              └─ civilisationService.js  (→ GameService.majCivilisation/majPlateauMaison,
                                           → FocusEngine.resoudreEffet, → AnnulationService.empiler)
-         └─ scoreService.js  (→ GameService.obtenirPartie/sauvegarderPartie/listerParties)
+         └─ scoreService.js  (→ GameService.obtenirPartie/sauvegarderPartie/listerParties,
+                                → SecteurService.obtenirSecteurs, → DB.getAll('scenarioSecteurs'))
  └─ combatService.js  (indépendant, 100% pur — consommé par les popups liées à "envahir")
 ```
 
@@ -662,7 +730,7 @@ technologies sans point avec compteur/verrou).
 nécessitant une interaction joueur — utilisé par `focusEngine.js` (paramètre
 callback), par `civilisationService.js` et par `index.html` (cadres
 d'Événement galactique). Retourne toujours une `Promise`. Catalogue complet
-des `contexte.type` (18 branches, `if/else if`) :
+des `contexte.type` (22 branches, `if/else if`) :
 
 | `type` | Rôle | `resolve(...)` | Persiste elle-même ? |
 |---|---|---|---|
@@ -675,12 +743,16 @@ des `contexte.type` (18 branches, `if/else if`) :
 | `deployer_cube` | Déployer du Cube actif en Flotte (3 modes) | `{totalCubes, coutParRessource, detail, mouvements}` ou `{annule:true}` | **Oui** — `SecteurService.deployerCube` par ligne (ressources/cubeActif restent gérés par `focusEngine.js`) |
 | `envahir` | Flux complet d'invasion (cible Néant/Maison déchue/Corrompu, engagement multi-source, résolution combat) | `{victoire, jetonPrime, jetonLiberation, influenceGagnee, totalEngage, detail, avertissement}` ou `{annule:true}` | **Oui, largement** — `CombatService.resoudreInvasion` puis `SecteurService.envahirResoudre` ; persiste aussi directement le jeton Gloire (array), hors flux d'annulation |
 | `construire` | Choisir secteur + catégorie + type pour Construire une Installation/Guilde | `{detail, numero, type}` ou `{annule:true}` | **Oui** — `SecteurService.construire` |
+| `rappeler_cube` | Choisir secteur + type de vaisseau pour Rappeler un cube (option "recall" d'un Cadre, Événement H Cycle 1) | `{detail, numero, type}` ou `{annule:true}` | **Oui** — `SecteurService.rappelerCube` |
 | `augmenter_population_pure` | Choisir un secteur Pur éligible pour +1 Population | `{detail, numero}` ou `{annule:true}` | **Oui** — `SecteurService.augmenterPopulationPure` |
 | `retirer_corruption` | Choisir un secteur possédé Corrompu à décocher | `{detail, numero}` ou `{annule:true}` | **Oui** — `SecteurService.retirerCorruption` |
 | `gagner_corruption` | Choisir un secteur possédé non-Corrompu à corrompre | `{detail, numero}` ou `{annule:true}` | **Oui** — `SecteurService.placerCorruption` |
+| `gagner_programme` | Choisir un Programme du catalogue (groupé par type, filtré par `contexte.typeImpose` le cas échéant, offre publique mise en évidence, exclut les Programmes déjà en main) | `{detail, nom, type}` ou `{annule:true}` | **Oui** — `GameService.gagnerProgramme` |
+| `utiliser_programme` | Affiche l'action gratuite du Programme (`INFO_PROGRAMME_PAR_TYPE`), bouton "Résoudre" → `GameService.utiliserProgramme` (relaie la même `demanderChoix` pour toute sous-popup imbriquée — envahir/options_inclusives/avancer_civilisation/confirmation/etc.) | `{detail, place, nom, type}` ou `{annule:true}` | **Oui** — `GameService.utiliserProgramme` |
+| `choisir_emplacement_programme` | Plateau Programme plein (3 emplacements occupés, aucun conflit de type) : choisir lequel remplacer | `{numero}` ou `{annule:true}` | Non — sélection seule, `GameService.utiliserProgramme` persiste |
 | `influence_secteur` | Aucun choix utilisateur : calcule un gain d'Influence variable depuis `SecteurService.obtenirAgregatsInfluenceSecteursPurs` (9 formules), ferme immédiatement | `{montant, detail}` | Non — calcul pur, la persistance du gain reste côté appelant |
 | `ameliorer_gloire` | Choisir un jeton Gloire posé à améliorer (+1 valeur) | `{detail}` ou `{annule:true}` | **Oui** — écrit directement `plateauMaison.gloire`, hors flux d'annulation |
-| `avancer_civilisation` | Choisir une piste de Civilisation à avancer | (résolution interne, pas de `resolve` direct) | **Oui** — délègue à `CivilisationService.avancerPiste` |
+| `avancer_civilisation` | Choisir une piste de Civilisation à avancer — `contexte.moinsAvancee:true` calcule la piste la moins avancée localement (action de Programme Force) plutôt qu'une `piste` imposée/au choix | (résolution interne, pas de `resolve` direct) | **Oui** — délègue à `CivilisationService.avancerPiste` |
 | `resoudre_cadre_evenement` | Liste les options d'un cadre "choix" d'Événement galactique (delta simple / proportionnel / Technologie) | dépend de l'option choisie | Variable selon l'option |
 | `placement_secteur_neant_adjacent` | Choisir un secteur du Néant adjacent éligible (1 groupe d'éléments fixes) | `{numero}` ou `{annule:true}` | Non — sélection seule, l'appelant (`index.html`) persiste via `GameService.appliquerCadrePlacement` |
 | `placement_critere` | Désambiguïser un placement multi-groupes par critère (ex. égalité de Population) — Événement C | `{numero}` ou `{annule:true}` | Non — sélection seule |
@@ -922,7 +994,7 @@ elles indiquent précisément ce que l'app automatise vs laisse manuel.
   actuellement. Décision produit nécessaire (fonctionnalité prévue ou
   store à retirer) — pas une suppression mécanique.
 - **`js/strategieService.js` (3400+ lignes)** : la modale générique
-  `demanderChoix` (§6, 18 branches `contexte.type`) représente à elle seule
+  `demanderChoix` (§6, 22 branches `contexte.type`) représente à elle seule
   près de la moitié du fichier, fonctionnellement indépendante du reste
   (rendu Focus/Plat. maison) — candidate à extraction dans un fichier dédié
   si une refonte de fond est planifiée. Ses branches gagneraient aussi à

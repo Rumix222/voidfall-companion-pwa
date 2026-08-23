@@ -1,0 +1,425 @@
+[
+  {
+    "code": "H1-A",
+    "maison": "Valnis",
+    "origine": "A",
+    "technologieDepart": "Nacelles",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": "Votre Niveau de Production d'Énergie augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H1-B",
+    "maison": "Valnis",
+    "origine": "B",
+    "technologieDepart": "Boucliers",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H3-A",
+    "maison": "Dunlork",
+    "origine": "A",
+    "technologieDepart": "Cellules énergétiques",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Matériel augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H3-B",
+    "maison": "Dunlork",
+    "origine": "B",
+    "technologieDepart": "Quais orbitaux",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H12-A",
+    "maison": "Kradmor",
+    "origine": "A",
+    "technologieDepart": "Scanner de récupération",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 2 Influence pour chaque point d'Entretien.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Installation."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H12-B",
+    "maison": "Kradmor",
+    "origine": "B",
+    "technologieDepart": "Purificateur",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez respectivement 3/6/9/12 Influence si vous avez atteint le Niveau 1/2/3/4 de votre piste de Civilisation Économie Pure."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H7-A",
+    "maison": "Shiveus",
+    "origine": "A",
+    "technologieDepart": "Cuirassés",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 1 Influence toutes les 2 Populations Pures de vos secteurs (divisez votre Population Pure totale par 2 et arrondissez à l'inférieur).",
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H7-B",
+    "maison": "Shiveus",
+    "origine": "B",
+    "technologieDepart": "Chambres de décontamination",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H10-A",
+    "maison": "Astoran",
+    "origine": "A",
+    "technologieDepart": "Sentinelles",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 4 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval.",
+      "Gagnez 1 Influence pour chacune de vos Guildes d'Ingénieurs Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Mineurs Pures.",
+      "Vous devez perdre 1 Influence pour chaque Corruption de votre fiche Maison. Ignorez toute Corruption placée sur les Chambres de Décontamination."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Matériel augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H10-B",
+    "maison": "Astoran",
+    "origine": "B",
+    "technologieDepart": "Missiles longue portée",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez autant d'Influence que votre Population Pure totale.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins 1 cube de Sentinelle.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Vous devez perdre 2 Influence pour chaque Corruption de votre fiche Maison. Ignorez toute Corruption placée sur les Chambres de Décontamination."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H4-A",
+    "maison": "Cortozaar",
+    "origine": "A",
+    "technologieDepart": "Bases Stellaires",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": "Votre Niveau de Production d'Énergie augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H4-B",
+    "maison": "Cortozaar",
+    "origine": "B",
+    "technologieDepart": "Torpilles",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H5-A",
+    "maison": "Zenor",
+    "origine": "A",
+    "technologieDepart": "Destroyers",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 1 Influence pour chacune de vos Technologies de base.",
+      "Gagnez 3 Influence pour chacune de vos Technologies améliorées.",
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H5-B",
+    "maison": "Zenor",
+    "origine": "B",
+    "technologieDepart": "Clonage",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 2 Influence pour chacune de vos Technologies de base.",
+      "Gagnez 4 Influence pour chacune de vos Technologies améliorées.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H9-A",
+    "maison": "Nervo",
+    "origine": "A",
+    "technologieDepart": "Robotique",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs sans aucun emplacement de Guilde vide.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins trois Installations.",
+      "Pour chaque piste de Civilisation Pure, gagnez respectivement 2/4/6/8 Influence si vous avez atteint le Niveau 1/2/3/4."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H9-B",
+    "maison": "Nervo",
+    "origine": "B",
+    "technologieDepart": "Vaisseaux-Arches",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chaque type de ressource dont vous avez au moins 8 unités en réserve.",
+      "Gagnez 5 Influence pour chacun de vos secteurs Purs avec au moins trois Guildes différentes."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H13-A",
+    "maison": "Marqualos",
+    "origine": "A",
+    "technologieDepart": "Drones autonomes",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Matériel augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H13-A2",
+    "maison": "Marqualos",
+    "origine": "A",
+    "technologieDepart": "Drones autonomes",
+    "supplementaire": true,
+    "objectifs": [
+      "Gagnez 1 Influence pour chacun de vos jetons Prime.",
+      "Gagnez 1 Influence pour chaque cube dans vos secteurs Purs."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H13-B",
+    "maison": "Marqualos",
+    "origine": "B",
+    "technologieDepart": "Nexus de commerce",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H13-B2",
+    "maison": "Marqualos",
+    "origine": "B",
+    "technologieDepart": "Nexus de commerce",
+    "supplementaire": true,
+    "objectifs": [
+      "Gagnez 1 Influence pour chaque ressource du type que vous possédez le moins. En cas d'égalité, ne marquez qu'un seul type.",
+      "Gagnez 2 Influence pour chacun de vos jetons Commerce."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H8-A",
+    "maison": "Yarvek",
+    "origine": "A",
+    "technologieDepart": "Hyperpropulsion",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacune de vos Guildes d'Ingénieurs Pures.",
+      "Gagnez 1 Influence pour chacun de vos jetons Libération.",
+      "Gagnez 1 Influence pour chaque paire de jetons Prime en votre possession."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H8-B",
+    "maison": "Yarvek",
+    "origine": "B",
+    "technologieDepart": "Transports tactiques",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins 2 cubes.",
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins 4 Population.",
+      "Gagnez 1 Influence pour chacun de vos jetons Libération.",
+      "Gagnez 1 Influence pour chaque paire de jetons Prime en votre possession."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H2-A",
+    "maison": "Belitan",
+    "origine": "A",
+    "technologieDepart": "Collecte de données",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins une Défense de Secteur.",
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval."
+    ],
+    "bonusPermanent": "Votre Niveau de Production d'Énergie augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H2-B",
+    "maison": "Belitan",
+    "origine": "B",
+    "technologieDepart": "Ciblage",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
+      "Gagnez 6 Influence pour chacun de vos secteurs Purs avec 6 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Nourriture et de Crédits augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H11-A",
+    "maison": "Fenrax",
+    "origine": "A",
+    "technologieDepart": "Surveillance centrale",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 2 Influence pour chaque ressource du type que vous possédez le moins. En cas d'égalité, ne marquez qu'un seul type.",
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins 1 cube de Porte-Vaisseaux.",
+      "Gagnez 1 Influence pour chacune de vos Guildes Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production de Crédits augmente de 1.",
+    "incertain": false
+  },
+  {
+    "code": "H11-B",
+    "maison": "Fenrax",
+    "origine": "B",
+    "technologieDepart": "Porte-Vaisseaux",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez autant d'Influence que votre valeur totale de Gloire.",
+      "Gagnez 1 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval ou une Base Stellaire.",
+      "Gagnez 3 Influence pour chaque série de 3 cubes dans vos secteurs Purs (que les cubes soient dans le même secteur ou non)."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H14-A",
+    "maison": "Novaris",
+    "origine": "A",
+    "technologieDepart": "Cybernétique",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 4 Influence pour chacun de vos secteurs Purs avec au moins 2 cubes.",
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins un Chantier Naval.",
+      "Vous devez perdre 2 Influence pour chaque Corruption de votre fiche Maison. Ignorez toute Corruption placée sur les Chambres de Décontamination."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H14-B",
+    "maison": "Novaris",
+    "origine": "B",
+    "technologieDepart": "Réplicateurs de combat",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chacun de vos secteurs Purs avec au moins 4 Population.",
+      "Gagnez 1 Influence pour chacune de vos Guildes (Pures) de Fermiers, d'Ingénieurs et de Mineurs.",
+      "Perdez 1 Influence pour chaque Corruption de votre fiche Maison. Ignorez toute Corruption placée sur les Chambres de Décontamination."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H6-A",
+    "maison": "Thegwyn",
+    "origine": "A",
+    "technologieDepart": "Terraformation",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 2 Influence pour chacun de vos secteurs Purs.",
+      "Gagnez 2 Influence pour chacune de vos Guildes de Fermiers Pures."
+    ],
+    "bonusPermanent": null,
+    "incertain": false
+  },
+  {
+    "code": "H6-B",
+    "maison": "Thegwyn",
+    "origine": "B",
+    "technologieDepart": "Matrice neuronale",
+    "supplementaire": false,
+    "objectifs": [
+      "Gagnez 3 Influence pour chaque type de ressource dont vous avez au moins 8 unités en réserve.",
+      "Gagnez respectivement 3/6/9/12 Influence si vous avez atteint le Niveau 1/2/3/4 de votre piste de Civilisation Gouvernement Pure.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Banquiers Pures.",
+      "Gagnez 1 Influence pour chacune de vos Guildes de Scientifiques Pures."
+    ],
+    "bonusPermanent": "Votre Niveau de Production d'Énergie et de Matériel augmente de 1.",
+    "incertain": false
+  }
+]

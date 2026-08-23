@@ -931,6 +931,81 @@ var StrategieService = (function () {
   }
 
   /**
+   * Programmes obtenus par le joueur mais pas encore joués
+   * (partie.plateauMaison.programmesEnMain, tableau non borné — voir
+   * GameService.gagnerProgramme) — nom, type, les 2 Focus liés et
+   * l'action de Programme (règle FIXE par type,
+   * GameService.INFO_PROGRAMME_PAR_TYPE, pas de champ par carte — voir
+   * gameService.js). PAS objectif1/objectif2 (ceux-ci ne servent qu'à la
+   * popup de sélection 'gagner_programme', décision utilisateur
+   * explicite). Bouton "Utiliser" (Phase 3) ouvre la popup
+   * 'utiliser_programme' (GameService.utiliserProgramme) — si l'action va
+   * au bout ET qu'un emplacement lui est attribué, le Programme quitte
+   * cette liste pour le plateau Programme (Plat. maison,
+   * renderProgrammesPlateauMaison_, index.html) : rafraîchit donc les
+   * deux écrans au retour de la popup. Même gabarit `.card` que
+   * carteFocusJoueurHTML_ ci-dessus.
+   */
+  function renderProgrammesEnMain_(partie) {
+    var container = document.getElementById('programmes-main-liste');
+    if (!container) return;
+
+    var noms = (partie.plateauMaison || {}).programmesEnMain || [];
+    if (!noms.length) {
+      container.innerHTML = '<p class="hint">Aucun Programme en main pour l\'instant.</p>';
+      return;
+    }
+
+    DB.getAll('programmes').then(function (catalogue) {
+      var parNom = {};
+      catalogue.forEach(function (p) { parNom[p.nom] = p; });
+
+      container.innerHTML = noms.map(function (nom) {
+        var carte = parNom[nom];
+        var type = carte ? carte.type : '';
+        var info = GameService.INFO_PROGRAMME_PAR_TYPE[type] || null;
+        return '<div class="card">' +
+          '<h3>' + nom + '</h3>' +
+          '<p>Type : ' + (type || '?') + '</p>' +
+          (info ? '<p>Focus liés : ' + info.focusLies.join(', ') + '</p><p>Action : ' + info.action + '</p>' : '') +
+          '<button class="btn btn-secondary btn-utiliser-programme" data-nom="' + nom + '" data-type="' + type + '" style="width:100%;margin-top:8px;">Utiliser</button>' +
+          '</div>';
+      }).join('');
+
+      Array.prototype.forEach.call(container.querySelectorAll('.btn-utiliser-programme'), function (btn) {
+        btn.addEventListener('click', function () {
+          btn.disabled = true;
+          demanderChoix({
+            type: 'utiliser_programme',
+            partieId: partie.id,
+            nomProgramme: btn.dataset.nom,
+            typeProgramme: btn.dataset.type
+          }).then(function (resultat) {
+            btn.disabled = false;
+            if (!resultat || resultat.annule) return;
+            // Rechargement complet plutôt qu'une fusion locale :
+            // utiliserProgramme peut avoir muté ressources/cube/gloire/
+            // civilisation/secteurs (selon le type de Programme joué) en
+            // plus de programmesEnMain/programmesUtilises — App.
+            // rafraichirPartieCourante (index.html) relit la partie ET
+            // met à jour partieCourante, seule source de vérité partagée
+            // avec index.html (Piège n°2, CLAUDE.md).
+            if (typeof App === 'undefined' || !App.rafraichirPartieCourante) return;
+            return App.rafraichirPartieCourante().then(function (partieMaj) {
+              if (partieMaj) afficher(partieMaj);
+            });
+          }).catch(function (erreur) {
+            btn.disabled = false;
+            window.alert('Échec de la résolution : ' + erreur.message);
+          });
+        });
+      });
+    }).catch(function () {
+      container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+    });
+  }
+
+  /**
    * Affiche, sur l'écran Focus, le détail jouable (actions/coûts) des
    * Focus héroïques choisis pour le cycle en cours
    * (partie.focusHeroiques['cycle' + cycleActuel], choix fait sur l'écran
@@ -2104,6 +2179,216 @@ var StrategieService = (function () {
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
 
+      } else if (contexte.type === 'rappeler_cube') {
+        // Popup dédiée à l'option "recall" d'un Cadre d'Événement
+        // galactique (voir GameService.appliquerCadreChoixRappelCube,
+        // gameService.js — Événement H Cycle 1 Cadre 1, seul cas connu à
+        // ce jour) — même gabarit que 'construire' ci-dessus (secteur +
+        // type de vaisseau). secteurEstPossede_ reprend exactement la
+        // même règle d'éligibilité que le formulaire dédié de l'écran
+        // Secteurs (index.html, renderFormulaireRappelerCube_) : secteur
+        // sans Puissance Navale du Néant, avec au moins 1 cube. Persiste
+        // directement via SecteurService.rappelerCube au clic sur
+        // Valider (comme construire/augmenter_population_pure ci-dessus)
+        // — resolve({ detail }) pour le journal, ou { annule: true } sur
+        // Annuler.
+        titre.textContent = 'Rappeler un cube';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieRappel = partieAffichee;
+
+        SecteurService.obtenirSecteurs(partieRappel.id).then(function (secteurs) {
+          var eligibles = secteurs.filter(secteurEstPossede_);
+          if (!eligibles.length) {
+            contenu.innerHTML = '<p class="hint">Aucun secteur possédé avec de la Puissance Navale actuellement.</p>';
+            return;
+          }
+
+          contenu.innerHTML = '' +
+            '<select id="rappel-cadre-select-secteur" class="modal-choix-select">' +
+            eligibles.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('') +
+            '</select>' +
+            '<select id="rappel-cadre-select-type" class="modal-choix-select" style="margin-top:8px;">' +
+            TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') +
+            '</select>';
+
+          btnValider.hidden = false;
+          btnValider.textContent = 'Rappeler';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('rappel-cadre-select-secteur').value);
+            var type = document.getElementById('rappel-cadre-select-type').value;
+            btnValider.disabled = true;
+
+            SecteurService.rappelerCube(partieRappel.id, numero, type)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Cube de ' + labelVaisseau_(type) + ' rappelé depuis le Secteur ' + numero + '.', numero: numero, type: type });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du rappel : ' + erreur.message);
+              });
+          };
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
+
+      } else if (contexte.type === 'gagner_programme') {
+        // Effet "Gagner un Programme" (voir focusEngine.js, clé
+        // "gagner_programme"/"programme_force"/etc.) — l'aléatoire de la
+        // pioche physique n'est pas modélisé : liste TOUS les Programmes
+        // du catalogue, groupés par type (<optgroup>, ordre fixe
+        // Domination/Force/Soutien/Richesse — un seul groupe si
+        // `contexte.typeImpose` restreint le type), en excluant ceux déjà
+        // en main (plateauMaison.programmesEnMain) OU déjà en jeu
+        // (plateauMaison.programmesUtilises — Phase 3) et en préfixant "★ " le
+        // Programme actuellement révélé dans l'offre publique
+        // (plateauMaison.offresProgramme) pour le mettre en évidence.
+        // Au changement de sélection, affiche objectif1/objectif2 du
+        // Programme choisi ("son texte"). Persiste directement via
+        // GameService.gagnerProgramme au clic sur Valider (comme
+        // construire/rappeler_cube ci-dessus) — celle-ci retire aussi
+        // l'entrée d'offre correspondante si le Programme choisi en
+        // faisait partie.
+        titre.textContent = 'Gagner un Programme';
+        contenu.innerHTML = '<p class="hint">Chargement des Programmes…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieProgramme = partieAffichee;
+        var TYPES_PROGRAMME_ORDRE_ = ['Domination', 'Force', 'Soutien', 'Richesse'];
+
+        DB.getAll('programmes').then(function (catalogue) {
+          var pm = partieProgramme.plateauMaison || {};
+          var dejaEnJeu = (Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : [])
+            .filter(Boolean).map(function (s) { return s.nom; }).filter(Boolean);
+          var dejaEnMain = (pm.programmesEnMain || []).concat(dejaEnJeu);
+          var offres = Array.isArray(pm.offresProgramme) ? pm.offresProgramme : [];
+          var typesAffiches = contexte.typeImpose ? [contexte.typeImpose] : TYPES_PROGRAMME_ORDRE_;
+
+          var parNom = {};
+          catalogue.forEach(function (p) { parNom[p.nom] = p; });
+
+          var groupes = typesAffiches.map(function (type) {
+            var offreCourante = offres.filter(function (o) { return o.type === type; })[0];
+            var options = catalogue
+              .filter(function (p) { return p.type === type && dejaEnMain.indexOf(p.nom) === -1; })
+              .sort(function (a, b) { return a.nom.localeCompare(b.nom); })
+              .map(function (p) {
+                var estOffre = !!offreCourante && offreCourante.nom === p.nom;
+                return '<option value="' + p.nom + '">' + (estOffre ? '★ ' : '') + p.nom + '</option>';
+              }).join('');
+            return options ? '<optgroup label="' + type + '">' + options + '</optgroup>' : '';
+          }).join('');
+
+          if (!groupes.trim()) {
+            contenu.innerHTML = '<p class="hint">Aucun Programme disponible' +
+              (contexte.typeImpose ? ' de type ' + contexte.typeImpose : '') + ' (déjà tous en main).</p>';
+            return;
+          }
+
+          contenu.innerHTML = '' +
+            '<select id="programme-gain-select" class="modal-choix-select">' + groupes + '</select>' +
+            '<div id="programme-gain-detail" class="hint" style="margin-top:8px;"></div>';
+
+          var selectProgramme = document.getElementById('programme-gain-select');
+          var detailProgramme = document.getElementById('programme-gain-detail');
+          function majDetail_() {
+            var carte = parNom[selectProgramme.value];
+            detailProgramme.innerHTML = carte ? (carte.objectif1 || '') + '<br>' + (carte.objectif2 || '') : '';
+          }
+          selectProgramme.addEventListener('change', majDetail_);
+          majDetail_();
+
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var nomChoisi = selectProgramme.value;
+            btnValider.disabled = true;
+
+            GameService.gagnerProgramme(partieProgramme.id, nomChoisi)
+              .then(function (resultat) {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.', nom: resultat.nom, type: resultat.type });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec de l\'obtention du Programme : ' + erreur.message);
+              });
+          };
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des Programmes : ' + erreur.message);
+        });
+
+      } else if (contexte.type === 'utiliser_programme') {
+        // Utiliser un Programme "en main" (Phase 3) — popup légère :
+        // affiche l'action gratuite du Programme (règle fixe par type,
+        // GameService.INFO_PROGRAMME_PAR_TYPE) et un bouton "Résoudre" qui
+        // délègue TOUT à GameService.utiliserProgramme (choix du type
+        // d'action, éventuel conflit d'emplacement, persistance) — cette
+        // MÊME fonction demanderChoix (celle de cette popup) lui est
+        // transmise telle quelle : chaque sous-popup imbriquée (envahir,
+        // options_inclusives, avancer_civilisation, confirmation de
+        // remplacement, choix d'emplacement...) réutilise donc
+        // #modal-choix normalement, exactement comme une vraie action
+        // Focus. `resolve({detail, place})` en fin de résolution ;
+        // `{annule:true}` si l'action n'est pas allée au bout (voir
+        // GameService.utiliserProgramme).
+        var infoProgrammeUtiliser = GameService.INFO_PROGRAMME_PAR_TYPE[contexte.typeProgramme] || null;
+        titre.textContent = 'Utiliser : ' + contexte.nomProgramme;
+        contenu.innerHTML = '<p class="hint">' + (infoProgrammeUtiliser ? infoProgrammeUtiliser.action : 'Action inconnue.') + '</p>';
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+        btnValider.hidden = false;
+        btnValider.textContent = 'Résoudre';
+        btnValider.onclick = function () {
+          btnValider.disabled = true;
+          GameService.utiliserProgramme(contexte.partieId, contexte.nomProgramme, demanderChoix)
+            .then(function (resultat) {
+              btnValider.disabled = false;
+              if (!resultat || resultat.annule) { fermerModale_(); resolve({ annule: true }); return; }
+              fermerModale_();
+              resolve({
+                detail: resultat.resume + (resultat.place ? '' : ' (Programme resté en main — emplacement non attribué.)'),
+                place: resultat.place, nom: resultat.nom, type: resultat.type
+              });
+            })
+            .catch(function (erreur) {
+              btnValider.disabled = false;
+              window.alert('Échec de la résolution : ' + erreur.message);
+            });
+        };
+
+      } else if (contexte.type === 'choisir_emplacement_programme') {
+        // Plateau Programme plein (3 emplacements 1-3 déjà occupés, aucun
+        // conflit de type) — GameService.utiliserProgramme demande ici
+        // lequel remplacer. `contexte.options` = [{slot, nom, type}, ...]
+        // (déjà préparé par l'appelant). Résout {numero} ou {annule:true}
+        // — même gabarit que 'gagner_corruption' (menu à boutons).
+        titre.textContent = 'Emplacement Programme plein — remplacer lequel ?';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+        contenu.innerHTML = '<div class="modal-choix-boutons">' +
+          (contexte.options || []).map(function (o) {
+            return '<button type="button" class="btn btn-secondary btn-choix-liste" data-slot="' + o.slot + '">' +
+              'Emplacement ' + o.slot + ' — ' + o.nom + ' (' + o.type + ')</button>';
+          }).join('') + '</div>';
+        Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+          btn.addEventListener('click', function () {
+            fermerModale_();
+            resolve({ numero: Number(btn.dataset.slot) });
+          });
+        });
+
       } else if (contexte.type === 'retirer_corruption') {
         // Effet "Retirer une Corruption" : popup à 2 niveaux — un menu de
         // CIBLES possibles, chacune affichée seulement si réellement
@@ -2634,9 +2919,11 @@ var StrategieService = (function () {
         // resolve({detail}) couvre donc aussi ce cas, jamais
         // {annule:true} : cette popup n'est annulable qu'AVANT validation
         // (bouton Annuler), pas après.
-        titre.textContent = contexte.piste
-          ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste]
-          : 'Avancer sur une piste de Civilisation';
+        titre.textContent = contexte.moinsAvancee
+          ? 'Avancer sur votre piste la moins avancée'
+          : (contexte.piste
+            ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste]
+            : 'Avancer sur une piste de Civilisation');
         contenu.innerHTML = '<p class="hint">Chargement…</p>';
         btnValider.hidden = true;
         btnAnnuler.hidden = false;
@@ -2686,6 +2973,26 @@ var StrategieService = (function () {
         }
 
         obtenirDetailPistesCache_(nomMaisonCivilisation).then(function (detail) {
+          if (contexte.moinsAvancee) {
+            // Même tri que CivilisationService.avancerPisteMoinsAvancee
+            // (js/civilisationService.js) : la moins avancée, égalité
+            // départagée par l'ordre fixe Société > Gouvernement >
+            // Économie — calculé ICI plutôt que d'appeler cette fonction
+            // séparément, pour réutiliser TEL QUEL le rendu/la validation
+            // du mode "piste imposée" ci-dessous (résultat identique).
+            var pisteMoinsAvancee = CivilisationService.PISTES.slice().sort(function (a, b) {
+              return (civActuelle[a] || 0) - (civActuelle[b] || 0);
+            })[0];
+            var niveauMoinsAvancee = civActuelle[pisteMoinsAvancee] || 0;
+            contenu.innerHTML = '<p class="hint">Piste la moins avancée : ' + CivilisationService.NOM_PISTE[pisteMoinsAvancee] +
+              ' (niveau ' + niveauMoinsAvancee + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
+              '<p class="hint">' + apercuProchaineCase_(detail, pisteMoinsAvancee) + '</p>';
+            btnValider.hidden = niveauMoinsAvancee >= CivilisationService.NIVEAU_MAX;
+            btnValider.textContent = 'Avancer';
+            btnValider.onclick = function () { validerAvancementPiste_(pisteMoinsAvancee, null); };
+            return;
+          }
+
           if (contexte.piste) {
             var piste = contexte.piste;
             var niveau = civActuelle[piste] || 0;
@@ -2815,12 +3122,19 @@ var StrategieService = (function () {
     // autre appelant de renderEcranPlateauMaison_, l'appelle déjà
     // directement avant afficher()).
     if (typeof App !== 'undefined' && App.renderPlateauMaison) App.renderPlateauMaison(partie);
+    // Un gain de Programme (popup 'gagner_programme') peut retirer une
+    // entrée de l'offre publique (Plat. Galactique) — même rationale que
+    // App.renderPlateauMaison ci-dessus : idempotent, aucun listener/
+    // écriture déclenché par ce rendu, sans risque même appelé après une
+    // action qui ne touche pas les Programmes.
+    if (typeof App !== 'undefined' && App.renderPlateauGalactique) App.renderPlateauGalactique(partie);
     renderRessources_(partie);
     renderRappelRessources_(partie);
     renderCubes_(partie);
     renderGloire_(partie);
     renderPistesCivilisation_(partie);
     renderFocusJoueur_(partie);
+    renderProgrammesEnMain_(partie);
     renderFocusHeroiquesJoueur_(partie);
     renderFocusHeroiques_(partie);
     renderJournal_();

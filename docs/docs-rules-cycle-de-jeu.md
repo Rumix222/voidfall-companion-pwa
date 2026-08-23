@@ -217,16 +217,23 @@ Note importante : vous ne pouvez quasiment jamais marquer de l’Influence pour 
 Après la fin de la phase Évaluation des Cycles 1 et 2, passez à la phase Préparation du prochain Cycle. 🚫
 Après la fin de la phase Évaluation du Cycle 3, passez à la fin de la partie. 🚫
 # 4. FIN DE LA PARTIE
-💬 un formulaire permet de renseigner les valeurs, voir ce qui est automatisable pour future evolution. Erreur sur le nombre de point pour faille
+💬 Formulaire ScoreService/scoreVueService.js (écran Fin de partie) : score
+final + 9 compteurs d'Influence saisis, tous modifiables (✅ ci-dessous =
+champ présent avec le bon barème). Erreur corrigée le 23/08/2026 :
+BAREME.secteursFaille valait 60 au lieu de 30 (js/scoreService.js).
+Depuis le 23/08/2026, 5 des 9 compteurs sont en plus PRÉ-REMPLIS
+automatiquement depuis l'état déjà suivi par l'app
+(ScoreService.calculerCompteursAutomatiques, valeur toujours modifiable
+avant d'enregistrer) — marqué "auto" ci-dessous.
 Calculez l’Influence du Néant dans la galaxie. ✅
-- 60/100/140 Influence (selon la difficulté choisie : voir l’aide de mise en place à ce sujet) ✅ ✅
-- 30 Influence pour chaque secteur de Faille encore sur le plateau ❌
-- 20 Influence pour chaque Refuge incomplet (voir refuge) ✅
-- 20 Ingluence pour chaque jeton Catastrophe placé sur le côté droit du plateau Crise ✅
-- 10 Influence pour chaque jeton Gardien du plateau central (et non du plateau Crise) ✅
-- 5 Influence pour chaque carte Technologie Consumée (améliorée ou non) ✅
-- 5 Influence pour chaque carte Crise permanente du plateau Crise ✅
-- 3 Influence pour chaque carte Maison Déchue encore sur des secteurs ✅
-- 2 Influence pour chaque jeton Corruption des secteurs (quel qu’en soit le propriétaire), des Programmes, des cases de piste de Civilisation, des fiches Maison et de l’offre des Programmes ✅
-- 1 Influence pour chaque Population dans les secteurs du Néant (mais pas les secteurs sans aucune Puissance Navale). ✅
+- 60/100/140 Influence (selon la difficulté choisie : voir l’aide de mise en place à ce sujet) ✅ ✅ — manuel (difficulté choisie hors partie, jamais tracée en base)
+- 30 Influence pour chaque secteur de Faille encore sur le plateau ✅ auto — secteurs de type "faille" du scénario (fixés à la mise en place, jamais retirés du plateau)
+- 20 Influence pour chaque Refuge incomplet (voir refuge) ✅ — manuel (plateau Refuge physique, non suivi par l'app)
+- 20 Ingluence pour chaque jeton Catastrophe placé sur le côté droit du plateau Crise ✅ — manuel (plateau Crise physique, non suivi par l'app)
+- 10 Influence pour chaque jeton Gardien du plateau central (et non du plateau Crise) ✅ auto — somme de secteursPartie.nombreGardien
+- 5 Influence pour chaque carte Technologie Consumée (améliorée ou non) ✅ — manuel (non suivi par l'app)
+- 5 Influence pour chaque carte Crise permanente du plateau Crise ✅ — manuel (plateau Crise physique, non suivi par l'app)
+- 3 Influence pour chaque carte Maison Déchue encore sur des secteurs ✅ auto — secteurs avec maisonAssociee assignée (jamais effacée par une invasion, voir envahirResoudre)
+- 2 Influence pour chaque jeton Corruption des secteurs (quel qu’en soit le propriétaire), des Programmes, des cases de piste de Civilisation, des fiches Maison et de l’offre des Programmes ✅ auto PARTIEL — secteurs Corrompus + pistes de Civilisation Corrompues seulement ; Programmes/fiches Maison/offre de Programmes non suivis par l'app, à ajouter à la main
+- 1 Influence pour chaque Population dans les secteurs du Néant (mais pas les secteurs sans aucune Puissance Navale). ✅ auto — population des secteurs avec pnNeant > 0
 Le joueur doit parvenir au moins à ce total d’Influence. Si c’est bien le cas, le joueur gagne la partie contre le Néant. Sinon, la partie est perdue. ✅

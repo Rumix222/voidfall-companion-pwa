@@ -13,7 +13,7 @@ var DB = (function () {
   'use strict';
 
   var NOM_BASE = 'voidfallCompanion';
-  var VERSION_BASE = 2;
+  var VERSION_BASE = 3;
   var promesseDB_ = null;
 
   /**
@@ -75,6 +75,18 @@ var DB = (function () {
     scenarioTrousDeVer: { keyPath: ['scenarioId', 'numeroA', 'numeroB'], index: [] },
     typesSecteur: { keyPath: 'id', index: [] },
     originesMaison: { keyPath: 'idCarte', index: [] },
+    // Programmes de départ (1-2 par Origine A/B, Marqualos en a 2 "A2"/"B2"
+    // supplémentaires) — voir data/catalogue/programmesDepart.json, câblé
+    // sur l'emplacement 0 du plateau Programme (Plat. maison,
+    // GameService.creerPartie / obtenirProgrammeDepart_ /
+    // programmesUtilisesParDefaut_). Pas de `nom` (identifié par
+    // `maison`+`origine`/`code`) ni de `type` (Domination/Force/Soutien/
+    // Richesse) — ces Programmes n'en ont pas, contrairement aux 32
+    // cartes de programmes.json (confirmé par l'utilisateur, pas juste
+    // une donnée manquante). Champ `incertain` (coupure Origine A/Origine
+    // B) : les 30 entrées sont désormais confirmées par image du livret,
+    // `incertain:false` partout.
+    programmesDepart: { keyPath: 'code', index: [{ nom: 'maison', cle: 'maison' }] },
 
     // --- Technique ---
     meta: { keyPath: 'cle', index: [] }

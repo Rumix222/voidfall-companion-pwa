@@ -184,6 +184,17 @@
       <div id="plateau-galactique-focus-heroiques"></div>
     </div>
 
+    <!-- Offre publique de Programme — 4 emplacements fixes (1 par type),
+         chacun une carte à révéler (aléatoire du jeu physique, non
+         modélisé — simple <select> dans tout le catalogue de ce type) +
+         une case Corrompu. Persiste tel quel jusqu'à ce que le Programme
+         soit pris par le joueur (GameService.gagnerProgramme retire alors
+         l'entrée correspondante) — voir renderOffreProgrammes_. -->
+    <h2 class="section-title" style="margin-top:22px;">Offre Programmes</h2>
+    <div class="game-block" id="bloc-offre-programmes">
+      <div id="offre-programmes-liste"></div>
+    </div>
+
     <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:14px;" hidden>Terminer la partie</button>
   </section>
 
@@ -232,6 +243,18 @@
       <div id="technologies-obtenues-liste"></div>
     </div>
 
+    <!-- Plateau Programme (4 emplacements fixes de la fiche Maison) —
+         emplacement 0 réservé au Programme de départ (données Origine
+         Maison pas encore disponibles au catalogue, laissé en
+         placeholder), emplacements 1-3 remplis via le bouton "Utiliser"
+         d'un Programme "en main" (écran Focus) — voir
+         GameService.utiliserProgramme, renderProgrammesPlateauMaison_
+         ci-dessous. -->
+    <h2 class="section-title" style="margin-top:22px;">Programmes</h2>
+    <div class="game-block" id="bloc-programmes-plateau">
+      <div id="programmes-plateau-liste"></div>
+    </div>
+
     <h2 class="section-title" style="margin-top:22px;">Corruption et Influence</h2>
     <div class="game-block" id="plateau-influence-bloc"></div>
   </section>
@@ -245,6 +268,7 @@
 
     <div class="setup-bloc">
       <label for="fin-score-final">Score final du joueur</label>
+      <span class="field-auto">pré-rempli depuis l'Influence (Plat. maison), à vérifier</span>
       <input type="number" id="fin-score-final" placeholder="Score total">
     </div>
 
@@ -302,6 +326,16 @@
     <h2 class="section-title" style="margin-top:22px;">Listes de focus</h2>
     <div class="game-block" id="bloc-focus-joueur">
       <div class="card-list" id="strategie-focus-joueur" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Programmes obtenus par le joueur (plateauMaison.programme1-4) —
+         nom + les 2 Focus liés + l'action de Programme (règle fixe par
+         type, voir GameService.INFO_PROGRAMME_PAR_TYPE), bouton Utiliser
+         en stub (résolution de l'action = Phase 3, non traitée). Voir
+         renderProgrammesEnMain_, js/strategieService.js. -->
+    <h2 class="section-title" style="margin-top:22px;">Programmes en main</h2>
+    <div class="game-block" id="bloc-programmes-main">
+      <div class="card-list" id="programmes-main-liste" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
 
     <!-- Détail jouable des Focus héroïques choisis pour le cycle en cours
@@ -516,6 +550,7 @@
       }
       renderEvenementCycle_(partie);
       renderTechnologiesAvancees_(partie);
+      renderOffreProgrammes_(partie);
       chargerEntretien_(partie);
     }
 
@@ -640,17 +675,22 @@
       }
 
       // Bloc "Corruption" (plateauMaison.corruptionMaison) à gauche
-      // d'Influence — champ numérique modifiable (mis à jour
-      // automatiquement par CivilisationService.definirCorruption pour les
-      // pistes de Civilisation ; à ajuster manuellement ici pour les
-      // Programmes/Chambres de décontamination). Régénéré à chaque rendu
-      // comme le reste de cet écran — voir Piège n°2, CLAUDE.md.
+      // d'Influence — champs numériques modifiables (Corruption mise à
+      // jour automatiquement par CivilisationService.definirCorruption
+      // pour les pistes de Civilisation, à ajuster manuellement ici pour
+      // les Programmes/Chambres de décontamination ; Influence mise à
+      // jour automatiquement par les actions Focus/Cadres, à ajuster
+      // manuellement ici pour tout ce que l'app n'automatise pas —
+      // notamment l'évaluation des Objectifs galactiques/Programme,
+      // hors périmètre, voir docs-rules-cycle-de-jeu.md §3.3/3.4).
+      // Régénéré à chaque rendu comme le reste de cet écran — voir Piège
+      // n°2, CLAUDE.md.
       document.getElementById('plateau-influence-bloc').innerHTML =
         '<div class="plateau-influence-ligne">' +
         '<div class="plateau-influence"><label><span class="losange-corail"></span> Corruption</label>' +
         '<input type="number" step="1" min="0" class="ressource-case-input" id="corruption-maison-input" value="' + corruptionMaison + '"></div>' +
         '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
-        '<span class="ressource-case-valeur">' + influence + '</span></div>' +
+        '<input type="number" step="1" min="0" class="ressource-case-input" id="influence-maison-input" value="' + influence + '"></div>' +
         '</div>';
 
       var inputCorruptionMaison = document.getElementById('corruption-maison-input');
@@ -663,6 +703,20 @@
             .catch(function (erreur) {
               window.alert('Échec de l\'enregistrement : ' + erreur.message);
               inputCorruptionMaison.value = corruptionMaison;
+            });
+        };
+      }
+
+      var inputInfluenceMaison = document.getElementById('influence-maison-input');
+      if (inputInfluenceMaison) {
+        inputInfluenceMaison.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputInfluenceMaison.value) || 0));
+          inputInfluenceMaison.value = n;
+          GameService.majPlateauMaison(partie.id, { influence: n })
+            .then(function () { partie.plateauMaison.ressources.influence = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputInfluenceMaison.value = influence;
             });
         };
       }
@@ -690,6 +744,7 @@
       }
 
       renderTechnologiesObtenues_(partie);
+      renderProgrammesPlateauMaison_(partie);
     }
 
     /**
@@ -780,16 +835,228 @@
     }
 
     /**
-     * Entretien dû (dernier emplacement Installation/Guilde occupé sur le
-     * plateau des secteurs) — purement informatif : rien n'est déduit
-     * automatiquement des ressources.
+     * Plateau Programme (Plat. maison, Phase 3+) — 4 emplacements fixes
+     * (partie.plateauMaison.programmesUtilises, voir
+     * GameService.programmesUtilisesParDefaut_) :
+     * - Emplacement 0, Programme de départ — rempli à la création de
+     *   partie par GameService.creerPartie (data/catalogue/
+     *   programmesDepart.json, cherché par maison+technologie de départ,
+     *   voir obtenirProgrammeDepart_) : `{code, entretienActif, corrompu:
+     *   false, depart:true}` — identifié par `code` (pas de `nom`, ces
+     *   Programmes n'en ont pas, décision utilisateur), jamais un
+     *   <select> (jamais rechoisi manuellement). Affiche ses objectifs +
+     *   bonus de Production éventuel, un toggle "Entretien" (ACTIF par
+     *   défaut, contrairement aux emplacements 1-3), AUCUNE case
+     *   "Corrompu" (n'existe pas pour le Programme de départ). `null` si
+     *   la recherche catalogue a échoué à la création (catalogue non
+     *   synchronisé) ou pour une partie créée avant ce câblage —
+     *   placeholder, aucun contrôle.
+     * - Emplacements 1-3, remplis via GameService.utiliserProgramme
+     *   (bouton "Utiliser", écran Focus — jamais choisis ici, donc nom en
+     *   texte fixe comme la Technologie de départ ci-dessus, PAS un
+     *   <select>) : nom + type, toggle "Entretien" (actif = +2 à
+     *   l'Entretien dû, voir chargerEntretien_) et case "Corrompu" (ajuste
+     *   corruptionMaison de ±1 au clic) — écriture directe via
+     *   GameService.majPlateauMaison (tableau entier reconstruit en
+     *   mémoire, lecture-fusion-écriture côté client, même principe que
+     *   #corruption-maison-input ci-dessus).
+     */
+    function renderProgrammesPlateauMaison_(partie) {
+      var container = document.getElementById('programmes-plateau-liste');
+      if (!container) return;
+
+      var slots = Array.isArray(partie.plateauMaison && partie.plateauMaison.programmesUtilises)
+        ? partie.plateauMaison.programmesUtilises
+        : [null, null, null, null];
+
+      Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart')]).then(function (resultats) {
+        var catalogue = resultats[0];
+        var catalogueDepart = resultats[1];
+        var parNom = {};
+        catalogue.forEach(function (p) { parNom[p.nom] = p; });
+        var parCode = {};
+        catalogueDepart.forEach(function (p) { parCode[p.code] = p; });
+
+        var slot0 = slots[0];
+        var carteDepart = slot0 && slot0.code ? parCode[slot0.code] : null;
+        var ligneDepart;
+        if (!carteDepart) {
+          ligneDepart = '<div class="card" style="margin-bottom:14px;">' +
+            '<h3>Programme de départ</h3>' +
+            '<p class="hint">Indisponible (catalogue Programmes de départ non synchronisé à la création de cette partie, ou partie créée avant cette fonctionnalité).</p>' +
+            '</div>';
+        } else {
+          ligneDepart = '<div class="card" style="margin-bottom:14px;">' +
+            '<h3>Programme de départ — ' + carteDepart.maison + ', Origine ' + carteDepart.origine + '</h3>' +
+            carteDepart.objectifs.map(function (o) { return '<p>' + o + '</p>'; }).join('') +
+            (carteDepart.bonusPermanent ? '<p><strong>' + carteDepart.bonusPermanent + '</strong></p>' : '') +
+            '<label class="check-amelioree"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
+            (slot0.entretienActif ? ' checked' : '') + '> Entretien</label>' +
+            '</div>';
+        }
+
+        var lignesUtilisees = [1, 2, 3].map(function (index) {
+          var slot = slots[index] || { nom: null, entretienActif: false, corrompu: false };
+          var carte = slot.nom ? parNom[slot.nom] : null;
+          var libelle = slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —';
+          return '<div class="techno-obtenue-ligne">' +
+            '<span class="champ-technologie-fixe">' + libelle + '</span>' +
+            '<label class="check-amelioree"><input type="checkbox" class="check-programme-entretien" data-slot="' + index + '"' +
+            (slot.entretienActif ? ' checked' : '') + (slot.nom ? '' : ' disabled') + '> Entretien</label>' +
+            '<label class="check-amelioree"><input type="checkbox" class="check-programme-corrompu" data-slot="' + index + '"' +
+            (slot.corrompu ? ' checked' : '') + (slot.nom ? '' : ' disabled') + '> Corrompu</label>' +
+            '</div>';
+        }).join('');
+
+        container.innerHTML = ligneDepart + lignesUtilisees;
+
+        function persisterSlots_(nouveauxSlots, corruptionDelta, elementDeclencheur) {
+          elementDeclencheur.disabled = true;
+          var corruptionMaison = Math.max(0, ((partie.plateauMaison && partie.plateauMaison.corruptionMaison) || 0) + corruptionDelta);
+          Promise.all([
+            GameService.majPlateauMaison(partie.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison })
+          ]).then(function () {
+            partie.plateauMaison.programmesUtilises = nouveauxSlots;
+            partie.plateauMaison.corruptionMaison = corruptionMaison;
+            renderProgrammesPlateauMaison_(partie);
+            chargerEntretien_(partie);
+            // #corruption-maison-input (bloc Corruption et Influence,
+            // renderEcranPlateauMaison_ ci-dessus) n'est pas re-rendu par
+            // renderProgrammesPlateauMaison_ — mis à jour ici directement
+            // si l'élément existe déjà dans le DOM (toujours le cas, même
+            // section d'écran), sinon la valeur resterait périmée tant que
+            // l'écran Plat. maison n'est pas quitté puis rouvert.
+            var inputCorruption = document.getElementById('corruption-maison-input');
+            if (inputCorruption) inputCorruption.value = corruptionMaison;
+          }).catch(function (erreur) {
+            elementDeclencheur.disabled = false;
+            window.alert('Échec de l\'enregistrement : ' + erreur.message);
+          });
+        }
+
+        // Object.assign (pas de littéral {nom:...} figé) : l'emplacement 0
+        // (Programme de départ) utilise `code`, les emplacements 1-3
+        // utilisent `nom` — ce handler générique préserve tel quel le
+        // champ identifiant présent sur le slot, quel qu'il soit.
+        Array.prototype.forEach.call(container.querySelectorAll('.check-programme-entretien'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.slot);
+            var nouveauxSlots = slots.map(function (s, i) {
+              return i === index ? Object.assign({}, s, { entretienActif: cb.checked }) : s;
+            });
+            persisterSlots_(nouveauxSlots, 0, cb);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.check-programme-corrompu'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.slot);
+            var nouveauxSlots = slots.map(function (s, i) {
+              return i === index ? Object.assign({}, s, { corrompu: cb.checked }) : s;
+            });
+            persisterSlots_(nouveauxSlots, cb.checked ? 1 : -1, cb);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+      });
+    }
+
+    /**
+     * Offre publique de Programme (Plat. Galactique) — 4 emplacements
+     * fixes, 1 par type (partie.plateauMaison.offresProgramme, toujours
+     * dans l'ordre Domination/Force/Soutien/Richesse — voir
+     * GameService.offresProgrammeParDefaut_). Chaque ligne : un <select>
+     * limité aux Programmes du catalogue de CE type (aléatoire du jeu
+     * physique, non modélisé) + une case Corrompu — même gabarit que
+     * renderTechnologiesObtenues_ ci-dessus (.techno-obtenue-ligne,
+     * select+checkbox). Écriture directe via GameService.majPlateauMaison
+     * (tableau entier reconstruit en mémoire, lecture-fusion-écriture
+     * côté client — comme #corruption-maison-input/#influence-maison-input,
+     * renderEcranPlateauMaison_) : pas de fonction GameService dédiée,
+     * contrairement à choisirTechnologieObtenue, car il n'y a ici aucune
+     * logique métier (juste un set de valeur par type).
+     */
+    function renderOffreProgrammes_(partie) {
+      var container = document.getElementById('offre-programmes-liste');
+      if (!container) return;
+
+      DB.getAll('programmes').then(function (catalogue) {
+        var offres = Array.isArray(partie.plateauMaison && partie.plateauMaison.offresProgramme)
+          ? partie.plateauMaison.offresProgramme
+          : [];
+
+        container.innerHTML = offres.map(function (offre, index) {
+          var options = catalogue.filter(function (p) { return p.type === offre.type; });
+          var optionsHtml = '<option value="">— Aucune —</option>' + options.map(function (p) {
+            return '<option value="' + p.nom + '"' + (offre.nom === p.nom ? ' selected' : '') + '>' + p.nom + '</option>';
+          }).join('');
+          return '<div class="techno-obtenue-ligne">' +
+            '<label style="flex:0 0 auto;min-width:90px;">' + offre.type + '</label>' +
+            '<select class="select-offre-programme" data-index="' + index + '">' + optionsHtml + '</select>' +
+            '<label class="check-amelioree"><input type="checkbox" class="check-offre-programme-corrompue" data-index="' + index + '"' +
+            (offre.corrompu ? ' checked' : '') + '> Corrompu</label>' +
+            '</div>';
+        }).join('') || '<p class="hint">Aucune offre de Programme.</p>';
+
+        function persisterOffres_(nouveauTableau, elementDeclencheur) {
+          elementDeclencheur.disabled = true;
+          GameService.majPlateauMaison(partie.id, { offresProgramme: nouveauTableau })
+            .then(function () {
+              partie.plateauMaison.offresProgramme = nouveauTableau;
+              renderOffreProgrammes_(partie);
+            })
+            .catch(function (erreur) {
+              elementDeclencheur.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        }
+
+        Array.prototype.forEach.call(container.querySelectorAll('.select-offre-programme'), function (select) {
+          select.addEventListener('change', function () {
+            var index = Number(select.dataset.index);
+            var nouveauTableau = offres.map(function (o, i) {
+              return i === index ? { type: o.type, nom: select.value || null, corrompu: o.corrompu } : o;
+            });
+            persisterOffres_(nouveauTableau, select);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.check-offre-programme-corrompue'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.index);
+            var nouveauTableau = offres.map(function (o, i) {
+              return i === index ? { type: o.type, nom: o.nom, corrompu: cb.checked } : o;
+            });
+            persisterOffres_(nouveauTableau, cb);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+      });
+    }
+
+    /**
+     * Entretien dû : emplacements Installation/Guilde occupés sur le
+     * plateau des secteurs (SecteurService.getEntretien) + 2 par
+     * emplacement Programme "Entretien actif" (Plat. maison,
+     * partie.plateauMaison.programmesUtilises[1-3], voir
+     * renderProgrammesPlateauMaison_ — règle du livret §3.2.1.1,
+     * icônes Entretien des cartes Programme) — purement informatif : rien
+     * n'est déduit automatiquement des ressources.
      */
     function chargerEntretien_(partie) {
       var el = document.getElementById('entretien-secteurs');
       if (!el) return;
-      SecteurService.getEntretien(partie.id).then(function (unites) {
-        el.textContent = unites
-          ? 'Entretien dû : ' + unites + ' unité(s) — par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.'
+      var slotsProgramme = (partie.plateauMaison && partie.plateauMaison.programmesUtilises) || [];
+      var entretienProgrammes = slotsProgramme.filter(function (s) { return s && s.entretienActif; }).length * 2;
+
+      SecteurService.getEntretien(partie.id).then(function (unitesSecteurs) {
+        var total = unitesSecteurs + entretienProgrammes;
+        el.textContent = total
+          ? 'Entretien dû : ' + total + ' unité(s)' +
+            (entretienProgrammes ? ' (dont ' + entretienProgrammes + ' de Programmes)' : '') +
+            ' — par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.'
           : 'Entretien dû : aucun.';
       }).catch(function () {
         el.textContent = '';
@@ -1131,6 +1398,62 @@
           // App.renderSecteurs est donc nécessaire — App.afficherEcran ne
           // re-rend rien tout seul (Piège n°2, voir CLAUDE.md), l'onglet
           // Secteurs resterait sinon affiché avec son dernier rendu, périmé.
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Option "gain: {corruption:1, gloire:1}" (voir GameService.
+     * appliquerCadreChoixCorruptionGloire, gameService.js — Événement H
+     * Cycle 1 Cadre 1) — même pattern que
+     * appliquerCadreFocusEngineEtRafraichir_ ci-dessus : la popup
+     * 'gagner_corruption' peut cibler un secteur (App.renderSecteurs
+     * nécessaire) ou une piste de Civilisation/Plat. maison
+     * (StrategieService.afficher nécessaire) — les deux sont rappelés
+     * systématiquement, comme appliquerCadreGainCorruptionEtRafraichir_
+     * ci-dessous le fait déjà pour le même popup hors contexte de cadre
+     * "choix".
+     */
+    function appliquerCadreCorruptionGloireEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixCorruptionGloire(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Option "recall: {cube:1}" (voir GameService.
+     * appliquerCadreChoixRappelCube, gameService.js — Événement H Cycle 1
+     * Cadre 1) — la popup 'rappeler_cube' (strategieService.js) mute
+     * toujours un secteur (App.renderSecteurs nécessaire) ; Plat. maison
+     * n'est jamais concerné par un rappel de cube (cubeActif touché côté
+     * secteursPartie seulement, pas plateauMaison — voir
+     * SecteurService.rappelerCube), StrategieService.afficher est
+     * néanmoins rappelé par cohérence avec les autres wrappers de cadre.
+     */
+    function appliquerCadreRappelCubeEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixRappelCube(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
           App.renderSecteurs(resultat);
           StrategieService.afficher(resultat);
         })
@@ -1490,6 +1813,30 @@
             });
             return;
           }
+          // Option "gain: {corruption:1, gloire:1}"/"recall: {cube:1}" —
+          // gabarit inédit (Événement H Cycle 1 Cadre 1, seul cas connu),
+          // reconnu ici EXACTEMENT (voir GameService.
+          // appliquerCadreChoixCorruptionGloire/appliquerCadreChoixRappelCube,
+          // gameService.js, pour le détail du filtre) plutôt que de passer
+          // par le fallback manuel ci-dessous (les deux options SONT
+          // automatisables, juste avec un vocabulaire que
+          // cleFocusEnginePourOptionCadre_ ne reconnaît pas).
+          if (option.gain && !option.cout && !option.recall &&
+              Object.keys(option.gain).length === 2 && option.gain.corruption === 1 && option.gain.gloire === 1) {
+            actions.push({
+              proportionnel: false, corruptionGloire: true, indexOption: indexOption,
+              label: 'Gagner une Corruption pour un jeton Gloire (valeur 1)'
+            });
+            return;
+          }
+          if (option.recall && !option.gain && !option.cout &&
+              Object.keys(option.recall).length === 1 && option.recall.cube === 1) {
+            actions.push({
+              proportionnel: false, rappelCube: true, indexOption: indexOption,
+              label: 'Rappeler 1 cube de Puissance Navale'
+            });
+            return;
+          }
           // Option dont la `cle` ne correspond à aucune mécanique
           // automatisée connue — reste sélectionnable dans la popup,
           // résolue manuellement (voir LABEL_OPTION_CADRE_MANUELLE_/
@@ -1529,6 +1876,10 @@
           appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
         } else if (choisie.focusEngine) {
           appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.corruptionGloire) {
+          appliquerCadreCorruptionGloireEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.rappelCube) {
+          appliquerCadreRappelCubeEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
         } else if (choisie.placementChoix) {
           resoudreOptionPlacementCritereEtRafraichir_(partie, cycle, ordre, cadre, choisie.indexOption, bouton);
         } else if (choisie.manuel) {

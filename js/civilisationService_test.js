@@ -163,35 +163,44 @@ test('gagner_technologie "base" (seule) : rappel "de base", journal simplifié',
   });
 });
 
-test('gagner_programme (valeur numérique générique) : rappel sans type, journal simplifié', function () {
+// gagner_programme est désormais résolu directement par
+// FocusEngine.resoudreCle_ (popup dédiée 'gagner_programme',
+// strategieService.js) — plus de rappel/simplification de journal côté
+// CivilisationService pour cette clé (voir texteRappelPourCle_,
+// civilisationService.js) : resoudreCaseEtChainerAvanceRapide_ appelle
+// déjà FocusEngine.resoudreEffet en interne, donc le comportement est
+// identique au chemin Focus, sans code spécifique ici.
+test('gagner_programme (valeur numérique générique) : délègue à demanderChoix({type:"gagner_programme", typeImpose:null}), pas de rappel manuel', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Gouvernement', caseNumero: 3, texte: 'Gagnez un Programme.', effet: JSON.stringify({ gagner_programme: 1 }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 2 });
 
   var popup = null;
-  var demanderChoix = function (contexte) { popup = contexte; return { confirme: true }; };
+  var demanderChoix = function (contexte) { popup = contexte; return { detail: 'Programme "Haute Société" (Domination) obtenu.' }; };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'gouvernement', demanderChoix).then(function (resultat) {
-    assert.strictEqual(popup.message, '<em>Choisir un programme manuellement</em>');
+    assert.strictEqual(popup.type, 'gagner_programme');
+    assert.strictEqual(popup.typeImpose, null);
     assert.strictEqual(resultat.effetJournal.length, 1);
-    assert.strictEqual(resultat.effetJournal[0], 'Case 3 — Gouvernement : programme choisi manuellement');
+    assert.strictEqual(resultat.effetJournal[0], 'Case 3 — Gouvernement : Programme "Haute Société" (Domination) obtenu.');
   });
 });
 
-test('gagner_programme "force" (type imposé) : rappel avec type, journal simplifié', function () {
+test('gagner_programme "force" (type imposé) : délègue à demanderChoix({type:"gagner_programme", typeImpose:"Force"}), pas de rappel manuel', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Société', caseNumero: 5, texte: 'Gagnez un Programme Force.', effet: JSON.stringify({ gagner_programme: 'force' }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civSociete: 4 });
 
   var popup = null;
-  var demanderChoix = function (contexte) { popup = contexte; return { confirme: true }; };
+  var demanderChoix = function (contexte) { popup = contexte; return { detail: 'Programme "Poigne de Fer" (Force) obtenu.' }; };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'societe', demanderChoix).then(function (resultat) {
-    assert.strictEqual(popup.message, '<em>Choisir un programme force manuellement</em>');
+    assert.strictEqual(popup.type, 'gagner_programme');
+    assert.strictEqual(popup.typeImpose, 'Force');
     assert.strictEqual(resultat.effetJournal.length, 1);
-    assert.strictEqual(resultat.effetJournal[0], 'Case 5 — Société : programme choisi manuellement');
+    assert.strictEqual(resultat.effetJournal[0], 'Case 5 — Société : Programme "Poigne de Fer" (Force) obtenu.');
   });
 });
 

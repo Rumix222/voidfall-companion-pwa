@@ -65,11 +65,84 @@ var GameService = (function () {
   var INFLUENCE_DEPART = 10;
   var GLOIRE_DEPART = [2, null, null, null, null];
 
+  // Table de règles fixes (livret "Actions de Programme") : les 2 Focus
+  // qui débloquent l'action gratuite d'un Programme, et l'action
+  // elle-même — FIXES PAR TYPE (Domination/Force/Soutien/Richesse), pas
+  // par carte (les 8 cartes d'un même type partagent la même action).
+  // Même statut que BONUS_COMMERCE (focusEngine.js) : donnée de règles
+  // figée, sans risque à porter en dur. Consommée par index.html
+  // ("Programmes en main", écran Focus) et, plus tard, par la résolution
+  // de l'action de Programme elle-même (Phase 3, non traitée ici).
+  var INFO_PROGRAMME_PAR_TYPE = {
+    Domination: { focusLies: ['Tentation', 'Innovation'], action: 'Envahissez un secteur.' },
+    Soutien: { focusLies: ['Conquête', 'Renfort'], action: 'Activez 1 cube et/ou construisez une Installation.' },
+    Force: { focusLies: ['Prospérité', 'Progrès'], action: 'Avancez sur votre piste Civilisation la moins avancée (au choix si égalité) ou gagnez un jeton Commerce.' },
+    Richesse: { focusLies: ['Développement', 'Production'], action: 'Établissez une Guilde et/ou produisez un type de ressource. Si vous faites les deux, vous devez choisir le type de ressource qui correspond à la Guilde établie.' }
+  };
+  // JSON Effet FocusEngine correspondant à chaque action de Programme
+  // ci-dessus — voir GameService.utiliserProgramme. Le texte de
+  // INFO_PROGRAMME_PAR_TYPE[type].action sert TEL QUEL de `texteAction` à
+  // FocusEngine.resoudreEffet : "et/ou" y déclenche le mode choix
+  // INCLUSIF (Soutien/Richesse), son absence le mode EXCLUSIF (Force) —
+  // voir focusEngine.js resoudreCle_, cas "choice"/"choix". Richesse
+  // inclut `produire_ressource`, non automatisé côté PWA (niveaux de
+  // production non calculés) : sans conséquence ici, ce choix retombe
+  // simplement sur le repli générique de resoudreCle_ ("à appliquer
+  // manuellement", ne bloque jamais) — le Programme part bien en jeu,
+  // avec un rappel manuel pour cette moitié de l'action.
+  var EFFET_PROGRAMME_PAR_TYPE_ = {
+    Domination: { envahir: 1 },
+    Soutien: { choice: ['activer_cube', 'construire_installation'] },
+    Force: { choice: ['avancer_civilisation_moins_avancee', 'gagner_commerce'] },
+    Richesse: { choice: ['etablir_guilde', { produire_ressource: 1 }] }
+  };
+  // Ordre d'affichage fixe de l'offre de Programme (Plat. Galactique) —
+  // même ordre que le tableau ci-dessus.
+  var TYPES_PROGRAMME_OFFRE = ['Domination', 'Force', 'Soutien', 'Richesse'];
+
+  function offresProgrammeParDefaut_() {
+    return TYPES_PROGRAMME_OFFRE.map(function (type) {
+      return { type: type, nom: null, corrompu: false };
+    });
+  }
+
+  /**
+   * Plateau Programme par défaut (4 emplacements fixes de la fiche
+   * Maison — voir GameService.utiliserProgramme) : index 0 réservé au
+   * Programme de départ — `slot0` (optionnel, passé par creerPartie une
+   * fois obtenirProgrammeDepart_ résolu) est `{code, entretienActif:
+   * true, corrompu: false, depart: true}` identifié par `code` (pas de
+   * `nom`/`type`, ces Programmes n'en ont pas), ou `null` en repli (aucune
+   * correspondance catalogue trouvée, ou partie créée avant ce câblage).
+   * Index 1-3 : emplacements "utilisés" au fil de la partie, vides au
+   * départ SAUF le dernier (index 3), Corrompu dès la mise en place
+   * (règle du livret) — reflété aussi dans corruptionMaison, voir
+   * creerPartie ci-dessous.
+   */
+  function programmesUtilisesParDefaut_(slot0) {
+    return [
+      slot0 || null,
+      { nom: null, entretienActif: false, corrompu: false },
+      { nom: null, entretienActif: false, corrompu: false },
+      { nom: null, entretienActif: false, corrompu: true }
+    ];
+  }
+
   var CHAMPS_PLATEAU_MAISON_AUTORISES = [
     'ressourceNourriture', 'ressourceEnergie', 'ressourceMateriel',
     'ressourceCredit', 'ressourceScience', 'influence', 'cubeActif',
     'jetonPrime', 'jetonLiberation', 'jetonCommerce', 'gloire',
-    'programme1', 'programme2', 'programme3', 'programme4',
+    // Programmes "en main" (gagnés, pas encore joués — tableau non borné
+    // de noms, même famille que jetonCommerce) et "en jeu" (joués sur la
+    // fiche Maison, 4 emplacements fixes — voir GameService.gagnerProgramme/
+    // utiliserProgramme). Remplace l'ancien programme1-4 (colonnes
+    // abandonnées, jamais migrées — IndexedDB n'impose pas de schéma).
+    'programmesEnMain', 'programmesUtilises',
+    // Offre publique de Programme (4 emplacements fixes, 1 par type,
+    // { type, nom, corrompu } — voir GameService.gagnerProgramme et
+    // index.html/renderOffreProgrammes_). Même famille que `gloire` :
+    // tableau non diffable par focusEngine.js, écrit tel quel.
+    'offresProgramme',
     'technologiesObtenues', 'technologiesAvanceesChoisies',
     // Compteur manuel des Corruptions actuellement stockées sur la
     // Technologie "Chambres de décontamination" (jeton simple, même
@@ -190,6 +263,21 @@ var GameService = (function () {
     return DB.getAll('originesMaison').then(function (origines) {
       return origines.filter(function (o) {
         return o.maison === nomMaison && o.technologie === nomTechnologie;
+      })[0] || null;
+    });
+  }
+
+  /**
+   * Programme de départ (emplacement 0 du plateau Programme, Plat.
+   * maison) — 1 par maison+technologie de départ (data/catalogue/
+   * programmesDepart.json). Exclut volontairement les entrées
+   * `supplementaire:true` (2 cartes bonus de Marqualos, "A2"/"B2",
+   * hors périmètre : aucune règle de sélection automatique établie).
+   */
+  function obtenirProgrammeDepart_(nomMaison, nomTechnologie) {
+    return DB.getAll('programmesDepart').then(function (programmesDepart) {
+      return programmesDepart.filter(function (p) {
+        return p.maison === nomMaison && p.technologieDepart === nomTechnologie && !p.supplementaire;
       })[0] || null;
     });
   }
@@ -637,7 +725,17 @@ var GameService = (function () {
       jetonLiberation: pm.jetonLiberation || 0,
       jetonCommerce: pm.jetonCommerce || [],
       gloire: pm.gloire || [],
-      programmes: [pm.programme1 || null, pm.programme2 || null, pm.programme3 || null, pm.programme4 || null],
+      // Programmes gagnés mais pas encore joués (tableau non borné de
+      // noms) — voir GameService.gagnerProgramme/utiliserProgramme.
+      programmesEnMain: pm.programmesEnMain || [],
+      // Plateau Programme (4 emplacements fixes de la fiche Maison) —
+      // repli sur le défaut pour toute partie créée avant l'ajout de ce
+      // champ (même principe que offresProgramme ci-dessous).
+      programmesUtilises: Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : programmesUtilisesParDefaut_(),
+      // Offre publique de Programme — voir CHAMPS_PLATEAU_MAISON_AUTORISES
+      // ci-dessus. Repli sur le défaut (4 emplacements vides) pour toute
+      // partie créée avant l'ajout de ce champ.
+      offresProgramme: Array.isArray(pm.offresProgramme) ? pm.offresProgramme : offresProgrammeParDefaut_(),
       // Jeton manuel (Corruption(s) actuellement stockée(s) sur la
       // Technologie "Chambres de décontamination") — voir
       // CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
@@ -786,6 +884,11 @@ var GameService = (function () {
      */
     cleFocusEnginePourOptionCadre: cleFocusEnginePourOptionCadre_,
 
+    // Table de règles fixes "Actions de Programme" (voir sa déclaration
+    // plus haut) — exposée pour index.html ("Programmes en main", écran
+    // Focus).
+    INFO_PROGRAMME_PAR_TYPE: INFO_PROGRAMME_PAR_TYPE,
+
     /**
      * Crée une nouvelle partie : tire une maison (ou utilise celle choisie
      * en mode manuel) et ses adversaires, calcule les ressources/
@@ -870,11 +973,20 @@ var GameService = (function () {
                 console.warn('GameService.creerPartie : mise en place Focus échouée (partie créée quand même, sans Focus) :', erreur);
                 return [];
               })
-            : Promise.resolve([])
+            : Promise.resolve([]),
+          // Programme de départ (emplacement 0 du plateau Programme) —
+          // tolérant, une lecture catalogue échouée ne doit jamais
+          // empêcher la création de la partie (repli : slot 0 vide).
+          obtenirProgrammeDepart_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
+            .catch(function (erreur) {
+              console.warn('GameService.creerPartie : lecture programmesDepart a échoué (emplacement 0 laissé vide) :', erreur);
+              return null;
+            })
         ])
           .then(function (resultats) {
             var origineDepart = resultats[0];
             var focusJoueur = resultats[1];
+            var programmeDepart = resultats[2];
             var civilisationDepart = { societe: 0, gouvernement: 0, economie: 0 };
             var ressourcesDepart = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
             var cubeActifDepart = 0;
@@ -950,10 +1062,20 @@ var GameService = (function () {
               civCorrompueSociete: false,
               civCorrompueGouvernement: false,
               civCorrompueEconomie: false,
-              programme1: null,
-              programme2: null,
-              programme3: null,
-              programme4: null,
+              programmesEnMain: [],
+              programmesUtilises: programmesUtilisesParDefaut_(programmeDepart
+                ? { code: programmeDepart.code, entretienActif: true, corrompu: false, depart: true }
+                : null),
+              // Reflète la Corruption initiale du dernier emplacement
+              // Programme (programmesUtilisesParDefaut_, index 3,
+              // corrompu dès la mise en place) — corruptionMaison
+              // additionne déjà la Corruption des pistes de Civilisation
+              // (CivilisationService.definirCorruption) et, désormais,
+              // celle des emplacements Programme (voir
+              // GameService.utiliserProgramme/index.html
+              // renderProgrammesPlateauMaison_).
+              corruptionMaison: 1,
+              offresProgramme: offresProgrammeParDefaut_(),
               technologiesObtenues: [null, null, null, null, null],
               technologiesAvanceesChoisies: [null, null, null, null],
               technologiesAvanceesAmeliorees: {}
@@ -1623,6 +1745,126 @@ var GameService = (function () {
       });
     },
 
+    // ------------------------------------------------------------
+    // Événement H, Cycle 1, Cadre 1 ("Droit en enfer") : 2 options
+    // exclusives au vocabulaire inédit dans tout le reste du catalogue
+    // (vérifié — grep sur "gloire"/"recall" à l'intérieur de tout
+    // `cadre.effet`) : { gain: { corruption:1, gloire:1 } } et
+    // { recall: { cube:1 } }, ni l'une ni l'autre reconnue par
+    // deltaOptionCadre_/cleFocusEnginePourOptionCadre_ ci-dessus (aucune
+    // des deux ne porte de `cle`/`valeur`). Les 2 fonctions ci-dessous
+    // reconnaissent EXACTEMENT ce gabarit (même prudence que
+    // conditionAvancerPisteSiCorrompue_ plus haut) — aucune tentative de
+    // généraliser à un futur Cadre au vocabulaire similaire.
+    // ------------------------------------------------------------
+
+    /**
+     * Option "gain: {corruption:1, gloire:1}" — compose 2 mécaniques déjà
+     * automatisées séparément : ouvre la popup 'gagner_corruption'
+     * existante (mêmes 4 cibles que GameService.appliquerCadreGainCorruption,
+     * aucune cible n'étant précisée par le catalogue pour cette option —
+     * donc les 4 restent ouvertes, sans repli) puis, une fois la
+     * Corruption placée, ajoute un jeton Gloire de valeur 1 au premier
+     * emplacement libre de plateauMaison.gloire (même geste que le clic
+     * manuel sur un emplacement vide — voir renderGloireDOM_,
+     * strategieService.js — et le dépôt automatique de Gloire après une
+     * invasion réussie, même fichier). Relit `plateauMaison` À NEUF après
+     * la popup (jamais le snapshot capturé par chargerCadreOuvrable_ :
+     * la popup 'gagner_corruption' peut avoir déjà écrit dessus elle-même
+     * — option "Technologie — Chambres de décontamination" — voir
+     * l'avertissement équivalent dans appliquerCadreChoixFocusEngine
+     * ci-dessus). Si les 5 emplacements Gloire sont déjà occupés, la
+     * Corruption reste placée normalement mais le jeton Gloire n'est pas
+     * posé — signalé dans le résumé, à corriger manuellement (aucune
+     * défausse/remplacement inventé, cas non couvert par les règles).
+     */
+    appliquerCadreChoixCorruptionGloire: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
+
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        var gain = option && option.gain;
+        var estGabaritReconnu = gain && !option.cout && !option.recall &&
+          Object.keys(gain).length === 2 && gain.corruption === 1 && gain.gloire === 1;
+        if (!estGabaritReconnu) throw new Error('Option de cadre non automatisable pour ce gain Corruption + Gloire.');
+
+        var source = 'Cadre #' + ordreCadre;
+        return Promise.resolve(demanderChoix({
+          type: 'gagner_corruption',
+          source: source,
+          partieId: partieId,
+          ciblesAutorisees: ['secteur', 'piste', 'programme', 'techno']
+        })).then(function (reponse) {
+          if (!reponse || reponse.annule) return { annule: true };
+
+          return DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+            var gloire = Array.isArray(ligneFraiche.gloire) ? ligneFraiche.gloire.slice(0, 5) : [];
+            while (gloire.length < 5) gloire.push(null);
+            var indexLibre = gloire.indexOf(null);
+            if (indexLibre === -1) indexLibre = gloire.indexOf(undefined);
+            var gloirePlacee = indexLibre !== -1;
+
+            var resume = reponse.detail + (gloirePlacee
+              ? ' Jeton Gloire (valeur 1) gagné.'
+              : ' Aucun emplacement Gloire libre — jeton Gloire à ajouter manuellement.');
+            evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
+            partie.evenements[cleCycle] = evenementCycle;
+
+            var ecrireGloire = Promise.resolve();
+            if (gloirePlacee) {
+              gloire[indexLibre] = 1;
+              ligneFraiche.gloire = gloire;
+              ecrireGloire = DB.put('plateauMaison', ligneFraiche);
+            }
+
+            return Promise.all([
+              ecrireGloire,
+              GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+            ]).then(function () {
+              return rechargerPartie_(partieId);
+            });
+          });
+        });
+      });
+    },
+
+    /**
+     * Option "recall: {cube:1}" — ouvre la popup 'rappeler_cube' (nouvelle,
+     * strategieService.js, même gabarit que 'construire' : secteur +
+     * type de vaisseau) qui persiste elle-même via
+     * SecteurService.rappelerCube, comme 'gagner_corruption'/'construire'
+     * le font déjà pour d'autres mécaniques.
+     */
+    appliquerCadreChoixRappelCube: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
+
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        var recall = option && option.recall;
+        var estGabaritReconnu = recall && !option.gain && !option.cout &&
+          Object.keys(recall).length === 1 && recall.cube === 1;
+        if (!estGabaritReconnu) throw new Error('Option de cadre non automatisable pour ce rappel de cube.');
+
+        return Promise.resolve(demanderChoix({
+          type: 'rappeler_cube',
+          source: 'Cadre #' + ordreCadre,
+          partieId: partieId
+        })).then(function (reponse) {
+          if (!reponse || reponse.annule) return { annule: true };
+
+          evenementCycle.cadresAppliques[ordreCadre] = { resume: reponse.detail, le: new Date().toISOString() };
+          partie.evenements[cleCycle] = evenementCycle;
+
+          return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+            .then(function () {
+              return rechargerPartie_(partieId);
+            });
+        });
+      });
+    },
+
     /**
      * Marque une technologie possédée (départ, cible='depart' ; ou l'un
      * des 5 emplacements obtenus, cible=index 0-4) comme améliorée ou
@@ -1784,6 +2026,177 @@ var GameService = (function () {
           return ajouterHistorique_(partieId, 'technologie_obtenue_slot' + slot, nomTechnologie || '(retirée)');
         }).then(function () {
           return rechargerPartie_(partieId);
+        });
+      });
+    },
+
+    /**
+     * Gagner un Programme (data/catalogue/programmes.json) — appelée
+     * directement par la popup 'gagner_programme' (strategieService.js)
+     * au clic sur Valider, qui fait le choix ET délègue ici la
+     * persistance (même principe que SecteurService.placerCorruption/
+     * CivilisationService.definirCorruption pour gagner_corruption :
+     * simple lecture-fusion-écriture, aucun historique/rechargement de
+     * partie ici — c'est l'appelant de plus haut niveau, Focus ou piste
+     * de Civilisation via FocusEngine.resoudreEffet, qui gère déjà son
+     * propre journal/rafraîchissement).
+     *
+     * - Cherche `nomProgramme` dans le catalogue (rejette si absent).
+     * - Rejette si déjà dans programmesEnMain OU déjà joué
+     *   (programmesUtilises) — un Programme est unique dans toute la
+     *   partie (une seule copie physique de chaque carte).
+     * - Ajoute le nom à `programmesEnMain` (tableau non borné, même
+     *   famille que jetonCommerce — voir GameService.utiliserProgramme
+     *   pour le passage "en main" -> "en jeu").
+     * - Si ce Programme correspond à l'offre publique actuellement
+     *   révélée pour son type (plateauMaison.offresProgramme), cette
+     *   entrée est réinitialisée (nom: null, corrompu: false) — l'offre
+     *   "prise" redevient à révéler. Si le joueur a pris un autre
+     *   Programme du même type (pioche, "2 premiers", non suivis par
+     *   l'app), l'offre reste inchangée.
+     */
+    gagnerProgramme: function (partieId, nomProgramme) {
+      return Promise.all([DB.get('plateauMaison', partieId), DB.getAll('programmes')]).then(function (resultats) {
+        var ligne = resultats[0];
+        var catalogue = resultats[1];
+        if (!ligne) throw new Error('Plateau maison introuvable pour cette partie.');
+
+        var carte = catalogue.filter(function (p) { return p.nom === nomProgramme; })[0];
+        if (!carte) throw new Error('Programme "' + nomProgramme + '" introuvable au catalogue.');
+
+        var enMain = Array.isArray(ligne.programmesEnMain) ? ligne.programmesEnMain.slice() : [];
+        var enJeu = Array.isArray(ligne.programmesUtilises) ? ligne.programmesUtilises : programmesUtilisesParDefaut_();
+        if (enMain.indexOf(nomProgramme) !== -1) throw new Error('Ce Programme est déjà en main.');
+        if (enJeu.some(function (s) { return s && s.nom === nomProgramme; })) {
+          throw new Error('Ce Programme est déjà en jeu sur la fiche Maison.');
+        }
+
+        enMain.push(nomProgramme);
+        ligne.programmesEnMain = enMain;
+
+        var offres = Array.isArray(ligne.offresProgramme) ? ligne.offresProgramme.slice() : offresProgrammeParDefaut_();
+        ligne.offresProgramme = offres.map(function (o) {
+          return (o.type === carte.type && o.nom === nomProgramme) ? { type: o.type, nom: null, corrompu: false } : o;
+        });
+
+        return DB.put('plateauMaison', ligne).then(function () {
+          return { nom: carte.nom, type: carte.type };
+        });
+      });
+    },
+
+    /**
+     * Utiliser un Programme "en main" : résout sa vraie action gratuite
+     * (règle fixe par type, voir EFFET_PROGRAMME_PAR_TYPE_/
+     * INFO_PROGRAMME_PAR_TYPE ci-dessus) via FocusEngine.resoudreEffet —
+     * même moteur que les actions Focus, avec un `effet` construit à la
+     * main plutôt qu'une vraie carte catalogue (mêmes principes que
+     * appliquerCadreChoixFocusEngine ci-dessus : `cout` toujours vide,
+     * les actions de Programme sont gratuites). Si l'action va au bout
+     * (`resultatEffet.succes`), la carte quitte `programmesEnMain` pour
+     * rejoindre le plateau Programme (`programmesUtilises`, emplacements
+     * 1-3 UNIQUEMENT — l'emplacement 0, Programme de départ, n'est
+     * jamais touché ici, voir programmesUtilisesParDefaut_) :
+     *   - un emplacement 1-3 porte déjà un Programme du MÊME type ->
+     *     demande confirmation (`demanderChoix({type:'confirmation'})`)
+     *     avant de le remplacer ; refusé -> le Programme reste en main,
+     *     l'action reste résolue/persistée (impossible d'annuler un
+     *     "envahir" déjà joué) ;
+     *   - sinon un emplacement 1-3 est vide -> le cible directement ;
+     *   - sinon (3 emplacements déjà occupés, aucun conflit de type) ->
+     *     popup dédiée (`demanderChoix({type:'choisir_emplacement_programme'})`)
+     *     pour choisir lequel remplacer ; annulé -> le Programme reste en
+     *     main.
+     * Si l'emplacement remplacé était Corrompu, `corruptionMaison` est
+     * décrémenté de 1 (cette source de Corruption disparaît avec
+     * l'ancienne carte) — le nouvel emplacement démarre toujours
+     * `entretienActif:false, corrompu:false`.
+     */
+    utiliserProgramme: function (partieId, nomProgramme, demanderChoix) {
+      return Promise.all([DB.get('plateauMaison', partieId), DB.getAll('programmes')]).then(function (resultats) {
+        var ligneDepart = resultats[0];
+        var catalogue = resultats[1];
+        if (!ligneDepart) throw new Error('Plateau maison introuvable pour cette partie.');
+
+        var carte = catalogue.filter(function (p) { return p.nom === nomProgramme; })[0];
+        if (!carte) throw new Error('Programme "' + nomProgramme + '" introuvable au catalogue.');
+
+        var enMainDepart = Array.isArray(ligneDepart.programmesEnMain) ? ligneDepart.programmesEnMain : [];
+        if (enMainDepart.indexOf(nomProgramme) === -1) {
+          throw new Error('Programme "' + nomProgramme + '" introuvable en main.');
+        }
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+        var effet = EFFET_PROGRAMME_PAR_TYPE_[carte.type];
+        var texteAction = (INFO_PROGRAMME_PAR_TYPE[carte.type] || {}).action || '';
+        var source = 'Programme — ' + nomProgramme;
+        var etatAvecId = Object.assign({ partieId: partieId }, ligneDepart);
+
+        return FocusEngine.resoudreEffet(etatAvecId, effet, source, texteAction, demanderChoix).then(function (resultatEffet) {
+          if (!resultatEffet.succes) return { annule: true };
+
+          return DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+            resultatEffet.mutations.forEach(function (m) { ligneFraiche[m.champ] = resultatEffet.etatResultat[m.champ]; });
+
+            var enMain = Array.isArray(ligneFraiche.programmesEnMain) ? ligneFraiche.programmesEnMain.slice() : [];
+            var slots = Array.isArray(ligneFraiche.programmesUtilises) ? ligneFraiche.programmesUtilises.slice() : programmesUtilisesParDefaut_();
+            var corruptionMaison = ligneFraiche.corruptionMaison || 0;
+
+            var indexConflit = -1;
+            for (var i = 1; i <= 3; i++) { if (slots[i] && slots[i].nom && catalogue.filter(function (p) { return p.nom === slots[i].nom; })[0].type === carte.type) { indexConflit = i; break; } }
+
+            function placer_(indexCible) {
+              if (indexCible !== -1 && slots[indexCible] && slots[indexCible].corrompu) {
+                corruptionMaison = Math.max(0, corruptionMaison - 1);
+              }
+              var enMainSansCarte = enMain.filter(function (n) { return n !== nomProgramme; });
+              var resume = resultatEffet.journal.map(function (ligne) {
+                var prefixe = source + ' : ';
+                return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
+              }).join(' ');
+
+              if (indexCible === -1) {
+                ligneFraiche.corruptionMaison = corruptionMaison;
+                return DB.put('plateauMaison', ligneFraiche).then(function () {
+                  return { place: false, nom: carte.nom, type: carte.type, resume: resume };
+                });
+              }
+
+              slots[indexCible] = { nom: nomProgramme, entretienActif: false, corrompu: false };
+              ligneFraiche.programmesEnMain = enMainSansCarte;
+              ligneFraiche.programmesUtilises = slots;
+              ligneFraiche.corruptionMaison = corruptionMaison;
+              return DB.put('plateauMaison', ligneFraiche).then(function () {
+                return { place: true, nom: carte.nom, type: carte.type, resume: resume };
+              });
+            }
+
+            if (indexConflit !== -1) {
+              return Promise.resolve(demanderChoix({
+                type: 'confirmation',
+                titre: 'Remplacer un Programme ?',
+                message: 'Un Programme de type ' + carte.type + ' (« ' + slots[indexConflit].nom + ' ») est déjà en jeu. Le remplacer par « ' + nomProgramme + ' » ?',
+                texteValider: 'Remplacer'
+              })).then(function (reponse) {
+                return placer_((reponse && reponse.confirme) ? indexConflit : -1);
+              });
+            }
+
+            var indexLibre = -1;
+            for (var j = 1; j <= 3; j++) { if (!slots[j] || !slots[j].nom) { indexLibre = j; break; } }
+            if (indexLibre !== -1) return placer_(indexLibre);
+
+            return Promise.resolve(demanderChoix({
+              type: 'choisir_emplacement_programme',
+              source: source,
+              options: [1, 2, 3].map(function (n) {
+                var carteExistante = catalogue.filter(function (p) { return p.nom === slots[n].nom; })[0];
+                return { slot: n, nom: slots[n].nom, type: carteExistante ? carteExistante.type : '' };
+              })
+            })).then(function (reponse) {
+              return placer_((reponse && !reponse.annule && typeof reponse.numero === 'number') ? reponse.numero : -1);
+            });
+          });
         });
       });
     },

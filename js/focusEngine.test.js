@@ -422,6 +422,121 @@ test('gain_corruption : annulé (popup "Annuler") — bloque toute l’action, c
   });
 });
 
+// "gagner_programme" délègue à demanderChoix({type:'gagner_programme'}) —
+// même contrat que gain_corruption/retirer_corruption ci-dessus (la popup,
+// strategieService.js, fait le choix ET la persistance via
+// GameService.gagnerProgramme). `typeImpose` distingue une valeur
+// numérique générique (1, tous types ouverts, null transmis) d'une valeur
+// de type imposée (chaîne "force"/"soutien"/"domination"/"richesse",
+// capitalisée pour matcher data/catalogue/programmes.json).
+test('gagner_programme (valeur 1) : délègue à demanderChoix({type:"gagner_programme", typeImpose:null}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { gagner_programme: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'gagner_programme');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    assert.strictEqual(contexte.typeImpose, null);
+    return { detail: 'Programme "Haute Société" (Domination) obtenu.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Programme "Haute Société" (Domination) obtenu') !== -1; }));
+  });
+});
+
+test('gagner_programme "force" : délègue à demanderChoix avec typeImpose:"Force" (capitalisé)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { gagner_programme: 'force' }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'gagner_programme');
+    assert.strictEqual(contexte.typeImpose, 'Force');
+    return { detail: 'Programme "Poigne de Fer" (Force) obtenu.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Poigne de Fer') !== -1; }));
+  });
+});
+
+// Vocabulaire alternatif rencontré dans focus.json : une clé bare
+// "programme_force"/"programme_richesse"/etc. (au lieu de
+// "gagner_programme":"force") — même résolution, type imposé dérivé de la
+// CLÉ plutôt que de la valeur.
+test('programme_force (clé bare) : délègue à demanderChoix avec typeImpose:"Force"', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { programme_force: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'gagner_programme');
+    assert.strictEqual(contexte.typeImpose, 'Force');
+    return { detail: 'Programme "Poigne de Fer" (Force) obtenu.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+  });
+});
+
+test('gagner_programme : annulé (popup "Annuler") — bloque toute l’action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { gagner_programme: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+// "avancer_civilisation_moins_avancee" (action de Programme de type
+// Force, voir gameService.js EFFET_PROGRAMME_PAR_TYPE_) délègue à la MÊME
+// popup 'avancer_civilisation' que ci-dessus, avec un flag
+// `moinsAvancee:true` plutôt qu'une `piste` imposée — c'est la popup
+// (strategieService.js) qui calcule quelle piste est la moins avancée,
+// pas focusEngine.js.
+test('avancer_civilisation_moins_avancee : succès — délègue à demanderChoix avec piste:null, moinsAvancee:true', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation_moins_avancee: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'avancer_civilisation');
+    assert.strictEqual(contexte.piste, null);
+    assert.strictEqual(contexte.moinsAvancee, true);
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Piste Économie : niveau 0 -> 1.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('niveau 0') !== -1; }));
+  });
+});
+
+test('avancer_civilisation_moins_avancee : annulé -> bloque toute l\'action', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation_moins_avancee: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 // "influence_valeur_gloire" résolue entièrement en pur (voir
 // docs-architecture-pwa.md) — aucun demanderChoix appelé
 // (demanderChoixSansPopup_ jetterait si c'était le cas), somme des
