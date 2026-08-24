@@ -50,20 +50,25 @@ Si piste précisé : par exemple "Avancer sur la piste Gouvernement", afficher u
 Lors de la validation appliqué l'effet, attention avancer sur une piste peut entrainer de nouveau un choix pour l'utilisateur, bien gérer l'enchainement des popup et des actions en cascade
 
 #EVOLUTION 8 : Correction données origine maison Belitan
+✅ Traité (24/08/2026)
 pour "bonusProd": "nourriture" ajouter aussi un bonus de crédit +1
 
 #EVOLUTION 9 : Correction niveau de production
+✅ Traité (24/08/2026)
 pour le calcul du niveau de production il ne faut pas prendre en compte les secteur qui nous appartiennent pas.
 Prendre en compte uniquement ou il y a au moins une puissance naval du joueur (donc pas du néant), exception pour le secteur mere qui nous appartient toujours (seul secteur ou on peu avoir 0 puissance sans le perdre).
 
 #Evolution 10 : Implementer effet Déplacer corruption
+✅ Traité (24/08/2026)
 Exemple Focus conquête action planifier.
 Dans popup permettre de choisir la corruption a déplacer et la destination, rappel des possibilité dans docs-rules-corruption-gardiens-refuges-technoConsume.md
 
 #Evolution 11 : Annulation effet lorsque 2 effets
+✅ Traité (24/08/2026)
 A vérifier, avant implémentation de evolution 10, j'ai fait l'action planifier, choisi les deux effets, puis sur la popup de choix de programme j'ai fait annuler, le cout de l'action a quand même été débité. SI plusieurs effet il faudrait valider ou annuler tous les effets d'un coup pour éviter ça ?
 
 #Evolution 12 : limite d'utilisation action focus
+✅ Traité (24/08/2026)
 A gere par cycle, réinitialiser lorsqu'on change de cycle :
 - Lorsqu'on fait une action d'un focus, signaler au niveau du titre du focus, que ce focus a été utilisé (trouver un picto qui va bien)
 - Si l'action s'est correctement terminée, griser l'action pour qu'elle ne soit pas réutilisable ce cycle. (trouver un design pour différencier action inutilisable car déjà utilisé de inutilisable car pas assez de ressource)
@@ -93,3 +98,18 @@ Attention a ces regles (cf docs-rules-flottes.md et docs-rules-secteurs.md) :
 
 #Evolution 16 : Perte de puissance naval
 Lorsqu'on perd des cubes de puissance naval ces cube revienne dans les cube actif
+
+#Evolution 17 : Action gratuite
+Developpement - Harmoniser n'a aucun cout, dans l'historique des actions elle est noté comme annulée a cause de ça je crois
+
+#Evolution 18 : Annuler la derniere action en semble pas bien fonctionner
+Exemple :J'ai tenté d'annuler la derniere action COnquete - planifier, la corruption n'a pas été redéplacée. 
+Et le bouton affiche toujours "Passage en cours" (renommer en annulation en cours pendant qu'on y est)
+Bien architecturer le moteur d'action, enregistrer tous les éléments modifier par l'action pour pouvoir l'annuler.
+Peut etre définir les termes employé, Action = Partie d'un focus (ex : planifier), un focus a trois actions.
+Effet = ce que permet l'action ou sous partie d'une action (exemple planifier a 2 Effets : effet 1 : Gagnez un programme, effet 2 : déplacez une corruption)
+Seul autre action que focus (sauf erreur) c'est action de programme en main.
+Effet par contre on en a déclenché, en plus de focus et programme en main, par événement, piste civilisation, technologie..
+L'effet d'un evenement n'a pas a etre annulé, car il n'est jamais pas déclenché par une action. il ne faut meme pas le tracer.
+Par contre les autres effets, consequence d'une action doivent s'annuler en meme temps qu'on annule l'action.
+Pour qua ca soit plus clair dans l'historique d'action, faire un cadre unique pour une action et des sous cadres pour les effets déclenché par cette action.
