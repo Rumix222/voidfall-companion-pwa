@@ -156,6 +156,10 @@ test.describe('Partie aléatoire complète (3 cycles + fin de partie)', function
             await page.click('#nav-plateau-galactique');
             await expect(page.locator('#screen-plateau-galactique')).toBeVisible();
             await page.click('#btn-fin-cycle');
+            // #btn-fin-cycle ouvre désormais la popup "Phase Évaluation"
+            // (paiement de l'Entretien) avant d'avancer le cycle — voir
+            // interactions.resoudrePhaseEvaluation.
+            await interactions.resoudrePhaseEvaluation(page);
             // Cycle 3 déclenche automatiquement l'écran de fin (voir
             // listener #btn-fin-cycle, index.html) — attente large.
             await page.waitForTimeout(400);

@@ -106,9 +106,11 @@ var StrategieService = (function () {
   // Snapshot des ressources au début du cycle en cours, pour le delta
   // affiché sur chaque ligne. Réinitialisé par afficher() dès qu'une
   // nouvelle partie s'ouvre ou que le cycle change (voir
-  // reinitialiserSoldeDebutCycle_) — la PWA n'a pas de modale "Phase C"
-  // (entretien non automatisé), donc pas d'autre point de validation
-  // possible pour ce reset.
+  // reinitialiserSoldeDebutCycle_) — la détection se fait toujours via le
+  // changement de cycleActuel constaté par afficher(), pas depuis la
+  // popup 'phase_evaluation' elle-même (celle-ci persiste puis déclenche
+  // GameService.avancerCycle, qui redéclenche afficher() en aval avec un
+  // cycleActuel différent — même mécanisme qu'avant son introduction).
   var soldeDebutCycle = {};
 
   function reinitialiserSoldeDebutCycle_(partie) {
@@ -3081,6 +3083,150 @@ var StrategieService = (function () {
           });
         });
 
+      } else if (contexte.type === 'phase_evaluation') {
+        // Popup "Phase Évaluation" (bouton "Fin du cycle"/"Terminer la
+        // partie", index.html) — voir docs-rules-cycle-de-jeu.md §3. Seule
+        // la section Entretien (§3.2) est réellement automatisée pour
+        // l'instant ; les 4 autres (Plateau Crise §3.1, Refuge §3.2.3,
+        // Objectifs galactiques §3.3, Objectifs de Programme §3.4, cette
+        // dernière correspondant à la Phase 4 de l'implémentation des
+        // Programmes) ne sont que des rappels textuels — à automatiser
+        // plus tard, chacune indépendamment. "Annuler" ferme la popup sans
+        // rien persister ni avancer de cycle (aucune écriture DB n'a lieu
+        // avant Valider, le paiement d'Entretien ne vit qu'en variables
+        // locales le temps de la popup) — utile pour revenir en arrière si
+        // "Fin du cycle" a été cliqué trop tôt (actions Focus pas encore
+        // toutes jouées).
+        //
+        // Entretien (§3.2.1/3.2.2) : total = SecteurService.getEntretien
+        // (emplacements Installation/Guilde occupés) + 2 par emplacement
+        // Programme "Entretien actif" (partie.plateauMaison.
+        // programmesUtilises, même calcul que chargerEntretien_,
+        // index.html). Paiement par unité, au choix 1 Nourriture OU 2
+        // Énergie OU 2 Matériel (jamais de Crédit/Science ici, sauf
+        // Technologie non modélisée — §3.2.2, hors périmètre) : chaque
+        // clic sur un des 3 boutons décrémente le stock LOCAL (aucune
+        // écriture DB avant Valider, pour rester annulable en fermant
+        // l'onglet) et incrémente `entretienPaye`. "Valider" reste
+        // désactivé tant qu'il reste de l'Entretien impayé ET qu'au moins
+        // une des 3 ressources permet encore de payer une unité (règle
+        // explicite de l'utilisateur : on ne peut pas choisir de perdre de
+        // l'Influence pour économiser des ressources, cf. §3.2.2 aussi) ;
+        // dès que ce n'est plus vrai (Entretien à 0 OU ressources
+        // réellement insuffisantes), Valider s'active et applique en un
+        // seul GameService.majPlateauMaison : les 3 stocks décomptés +
+        // l'Influence diminuée de 3 par unité d'Entretien restée impayée
+        // (`Math.max(0, ...)`, même clamp que #influence-maison-input).
+        titre.textContent = 'Phase Évaluation — Cycle ' + (partieAffichee.cycleActuel || '');
+        contenu.innerHTML = '<p class="hint">Chargement de l’Entretien…</p>';
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+        btnValider.hidden = false;
+        btnValider.textContent = 'Valider et passer au cycle suivant';
+
+        var partieEval = partieAffichee;
+        var ressourcesEval = (partieEval.plateauMaison || {}).ressources || {};
+        var stockEval = {
+          nourriture: ressourcesEval.nourriture || 0,
+          energie: ressourcesEval.energie || 0,
+          materiel: ressourcesEval.materiel || 0
+        };
+        var influenceInitiale = ressourcesEval.influence || 0;
+        var entretienPaye = 0;
+
+        var slotsProgrammeEval = Array.isArray((partieEval.plateauMaison || {}).programmesUtilises)
+          ? partieEval.plateauMaison.programmesUtilises : [];
+        var entretienProgrammesEval = slotsProgrammeEval.filter(function (s) { return s && s.entretienActif; }).length * 2;
+
+        SecteurService.getEntretien(partieEval.id).then(function (unitesSecteursEval) {
+          var entretienTotal = unitesSecteursEval + entretienProgrammesEval;
+
+          function renderPhaseEvaluation_() {
+            var restant = entretienTotal - entretienPaye;
+            var peutPayerNourriture = restant > 0 && stockEval.nourriture >= 1;
+            var peutPayerEnergie = restant > 0 && stockEval.energie >= 2;
+            var peutPayerMateriel = restant > 0 && stockEval.materiel >= 2;
+            var peutEncorePayer = peutPayerNourriture || peutPayerEnergie || peutPayerMateriel;
+
+            var texteEntretien;
+            if (!entretienTotal) {
+              texteEntretien = '<p>Aucun Entretien dû.</p>';
+            } else if (!restant) {
+              texteEntretien = '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — intégralement payé.</p>';
+            } else {
+              texteEntretien = '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — reste <strong>' + restant + '</strong> à payer.</p>' +
+                '<div class="modal-choix-boutons">' +
+                '<button type="button" class="btn btn-secondary" id="phase-eval-payer-nourriture"' + (peutPayerNourriture ? '' : ' disabled') + '>Payer 1 unité — 1 Nourriture (stock ' + stockEval.nourriture + ')</button>' +
+                '<button type="button" class="btn btn-secondary" id="phase-eval-payer-energie"' + (peutPayerEnergie ? '' : ' disabled') + '>Payer 1 unité — 2 Énergie (stock ' + stockEval.energie + ')</button>' +
+                '<button type="button" class="btn btn-secondary" id="phase-eval-payer-materiel"' + (peutPayerMateriel ? '' : ' disabled') + '>Payer 1 unité — 2 Matériel (stock ' + stockEval.materiel + ')</button>' +
+                '</div>' +
+                (peutEncorePayer
+                  ? '<p class="hint">Vous devez payer tant que vous en avez les moyens (aucune substitution par Influence).</p>'
+                  : '<p class="hint">Ressources insuffisantes : ' + restant + ' point(s) d’Entretien non payé(s) — ' + (restant * 3) + ' Influence seront perdus à la validation.</p>');
+            }
+
+            contenu.innerHTML = '' +
+              '<div class="modal-section">' +
+              '<h4 class="modal-section-titre">Plateau Crise</h4>' +
+              '<p class="hint">Non automatisé — résolvez l’Escarmouche sur le plateau physique (docs-rules-cycle-de-jeu.md §3.1).</p>' +
+              '</div>' +
+              '<div class="modal-section">' +
+              '<h4 class="modal-section-titre">Entretien</h4>' +
+              texteEntretien +
+              '</div>' +
+              '<div class="modal-section">' +
+              '<h4 class="modal-section-titre">Refuge</h4>' +
+              '<p class="hint">Non automatisé — à détailler plus tard (§3.2.3).</p>' +
+              '</div>' +
+              '<div class="modal-section">' +
+              '<h4 class="modal-section-titre">Objectifs galactiques</h4>' +
+              '<p class="hint">Non automatisé — à détailler plus tard (§3.3).</p>' +
+              '</div>' +
+              '<div class="modal-section">' +
+              '<h4 class="modal-section-titre">Objectifs de Programme</h4>' +
+              '<p class="hint">Non automatisé — à détailler plus tard (§3.4, Phase 4 des Programmes).</p>' +
+              '</div>';
+
+            var btnPayerNourriture = document.getElementById('phase-eval-payer-nourriture');
+            var btnPayerEnergie = document.getElementById('phase-eval-payer-energie');
+            var btnPayerMateriel = document.getElementById('phase-eval-payer-materiel');
+            if (btnPayerNourriture) btnPayerNourriture.addEventListener('click', function () { stockEval.nourriture -= 1; entretienPaye++; renderPhaseEvaluation_(); });
+            if (btnPayerEnergie) btnPayerEnergie.addEventListener('click', function () { stockEval.energie -= 2; entretienPaye++; renderPhaseEvaluation_(); });
+            if (btnPayerMateriel) btnPayerMateriel.addEventListener('click', function () { stockEval.materiel -= 2; entretienPaye++; renderPhaseEvaluation_(); });
+
+            btnValider.disabled = peutEncorePayer;
+          }
+
+          renderPhaseEvaluation_();
+
+          btnValider.onclick = function () {
+            btnValider.disabled = true;
+            var restant = entretienTotal - entretienPaye;
+            var perteInfluence = restant * 3;
+            var nouvelleInfluence = Math.max(0, influenceInitiale - perteInfluence);
+
+            GameService.majPlateauMaison(partieEval.id, {
+              ressourceNourriture: stockEval.nourriture,
+              ressourceEnergie: stockEval.energie,
+              ressourceMateriel: stockEval.materiel,
+              influence: nouvelleInfluence
+            }).then(function () {
+              partieEval.plateauMaison.ressources.nourriture = stockEval.nourriture;
+              partieEval.plateauMaison.ressources.energie = stockEval.energie;
+              partieEval.plateauMaison.ressources.materiel = stockEval.materiel;
+              partieEval.plateauMaison.ressources.influence = nouvelleInfluence;
+              fermerModale_();
+              resolve({ confirme: true, entretienNonPaye: restant, influencePerdue: perteInfluence });
+            }).catch(function (erreur) {
+              btnValider.disabled = false;
+              window.alert('Échec de l\'enregistrement de l\'Entretien : ' + erreur.message);
+            });
+          };
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement de l’Entretien.</p>';
+          window.alert('Échec du chargement de l\'Entretien : ' + erreur.message);
+        });
+
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les
         // types possibles sont produits par focusEngine.js ci-dessus).
@@ -3100,11 +3246,12 @@ var StrategieService = (function () {
 
   function afficher(partie) {
     var nouvellePartie = !partieAffichee || partieAffichee.id !== partie.id;
-    // La PWA n'a pas de modale "Phase C" (voir en-tête de
-    // soldeDebutCycle) — le passage au cycle suivant (bouton "Fin du
-    // cycle", index.html) rappelle afficher() avec le même partie.id mais
-    // un cycleActuel différent, seul point de détection disponible ici
-    // pour réinitialiser le delta "depuis le début du cycle".
+    // Le passage au cycle suivant (bouton "Fin du cycle", index.html —
+    // via la popup 'phase_evaluation' puis GameService.avancerCycle)
+    // rappelle afficher() avec le même partie.id mais un cycleActuel
+    // différent, seul point de détection disponible ici pour
+    // réinitialiser le delta "depuis le début du cycle" (voir en-tête de
+    // soldeDebutCycle).
     var nouveauCycle = nouvellePartie || partieAffichee.cycleActuel !== partie.cycleActuel;
     if (nouvellePartie) {
       journal = [];

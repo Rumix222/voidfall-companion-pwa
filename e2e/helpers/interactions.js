@@ -212,9 +212,20 @@ async function choisirUneTechnologieAleatoire(page, rng) {
  * héroïque du cycle, écran #screen-focus), résout la popup éventuelle.
  * Retourne un libellé décrivant l'action jouée, ou null si aucune action
  * n'était jouable (coûts insuffisants partout).
+ *
+ * Scopé à #strategie-focus-joueur/#focus-heroiques-joueur (PAS
+ * #screen-focus entier) : "Programmes en main" (#programmes-main-liste,
+ * même écran) réutilise depuis peu le même gabarit .focus-action/
+ * .btn-jouer-action que les cartes Focus (js/strategieService.js,
+ * renderProgrammesEnMain_) — un sélecteur non scopé y piocherait aussi et
+ * déclencherait la popup 'utiliser_programme' au lieu d'une vraie action
+ * Focus.
  */
 async function jouerUneActionFocusAleatoire(page, rng, avertissements) {
-  var boutons = page.locator('#screen-focus .focus-action:not(.focus-action-insuffisant) .btn-jouer-action');
+  var boutons = page.locator(
+    '#strategie-focus-joueur .focus-action:not(.focus-action-insuffisant) .btn-jouer-action, ' +
+    '#focus-heroiques-joueur .focus-action:not(.focus-action-insuffisant) .btn-jouer-action'
+  );
   var nb = await boutons.count();
   if (!nb) return null;
 
@@ -232,6 +243,59 @@ async function jouerUneActionFocusAleatoire(page, rng, avertissements) {
   return carte;
 }
 
+/**
+ * Résout la popup "Phase Évaluation" ouverte par #btn-fin-cycle
+ * (js/strategieService.js, demanderChoix type 'phase_evaluation') : paie
+ * l'Entretien autant que possible via les boutons dédiés (désactivés dès
+ * que les ressources manquent — même règle que côté app, voir
+ * strategieService.js), puis Valide. Popup dédiée à un seul écran (pas de
+ * cascade de sous-popups pour l'instant, les autres sections n'étant que
+ * des rappels textuels) : pas besoin de viderModalesOuvertes/
+ * resoudreUneEtapeModale_ ici, ceux-ci ne re-cliqueraient pas un bouton de
+ * paiement tant qu'il reste actionnable (leur étape 3 clique Valider sans
+ * vérifier .disabled, ce qui échouerait tant que du paiement reste
+ * possible).
+ *
+ * #modal-choix devient visible SYNCHRONEMENT (modal.hidden = false, à la
+ * toute fin de demanderChoix) alors que le contenu réel n'apparaît qu'après
+ * résolution de SecteurService.getEntretien (promesse) — jusque-là,
+ * #modal-choix-contenu affiche juste "Chargement de l'Entretien…", sans
+ * aucun bouton de paiement. Un premier passage de la boucle ci-dessous
+ * AVANT ce rendu la verrait toutes désactivées/absentes et abandonnerait
+ * immédiatement (bug constaté : #modal-choix-valider restait alors
+ * bloqué, l'Entretien jamais payé) — d'où l'attente explicite d'au moins
+ * une `.modal-section` avant de commencer à chercher les boutons.
+ */
+async function resoudrePhaseEvaluation(page) {
+  if (!(await page.locator('#modal-choix').isVisible().catch(function () { return false; }))) return;
+
+  await page.locator('#modal-choix-contenu .modal-section').first().waitFor({ timeout: TIMEOUT_COURT }).catch(function () {});
+
+  var boutonsPaiement = [
+    '#phase-eval-payer-nourriture',
+    '#phase-eval-payer-energie',
+    '#phase-eval-payer-materiel'
+  ];
+  // Plafond large : une partie fuzzée sur 3 cycles peut accumuler un
+  // Entretien total élevé (beaucoup de secteurs construits + ressources
+  // abondantes jamais dépensées avant l'introduction de cette popup).
+  var MAX_PAIEMENTS = 200;
+  for (var i = 0; i < MAX_PAIEMENTS; i++) {
+    var aPaye = false;
+    for (var b = 0; b < boutonsPaiement.length; b++) {
+      var bouton = page.locator(boutonsPaiement[b]);
+      if (await bouton.count() && !(await bouton.isDisabled().catch(function () { return true; }))) {
+        await bouton.click();
+        aPaye = true;
+        break;
+      }
+    }
+    if (!aPaye) break;
+  }
+
+  await page.locator('#modal-choix-valider').click();
+}
+
 module.exports = {
   viderModalesOuvertes: viderModalesOuvertes,
   choisirEvenementAleatoire: choisirEvenementAleatoire,
@@ -239,5 +303,6 @@ module.exports = {
   choisirFocusHeroiquesAleatoire: choisirFocusHeroiquesAleatoire,
   choisirUneTechnologieAleatoire: choisirUneTechnologieAleatoire,
   jouerUneActionFocusAleatoire: jouerUneActionFocusAleatoire,
+  resoudrePhaseEvaluation: resoudrePhaseEvaluation,
   TIMEOUT_COURT: TIMEOUT_COURT
 };

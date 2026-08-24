@@ -2576,42 +2576,53 @@
     // Déclenche l'événement partagé voidfall:retour-accueil, réutilisé
     // aussi par scoreVueService.js après l'enregistrement d'une fin de
     // partie.
-    // Bouton "Fin du cycle" : pas de modale "Phase C" — la résolution
-    // d'escarmouche et le paiement de l'entretien restent manuels,
-    // l'entretien dû est affiché juste au-dessus à titre indicatif. La
-    // pile d'annulation est entièrement vidée à chaque cycle (voir
-    // annulationService.js en-tête).
+    // Bouton "Fin du cycle" : ouvre d'abord la popup "Phase Évaluation"
+    // (StrategieService.demanderChoix, type 'phase_evaluation' —
+    // js/strategieService.js) qui gère le paiement de l'Entretien (seule
+    // section réellement automatisée pour l'instant, les 4 autres restent
+    // de simples rappels textuels — voir le commentaire de ce type dans
+    // strategieService.js). GameService.avancerCycle n'est appelé
+    // qu'après validation de cette popup ("annule" = l'utilisateur a
+    // cliqué trop tôt, on ne touche à rien). La pile d'annulation est
+    // entièrement vidée à chaque cycle (voir annulationService.js
+    // en-tête).
     document.getElementById('btn-fin-cycle').addEventListener('click', function () {
       var partie = App.getPartieCourante();
       if (!partie) return;
       var btn = document.getElementById('btn-fin-cycle');
       if (btn.disabled) return;
-      var texteOriginal = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Passage en cours…';
+      if (typeof StrategieService === 'undefined' || !StrategieService.demanderChoix) return;
 
-      GameService.avancerCycle(partie.id)
-        .then(function (partieMaj) {
-          return AnnulationService.viderPile(partie.id).then(function () { return partieMaj; });
-        })
-        .then(function (partieMaj) {
-          partieCourante = partieMaj;
-          btn.disabled = false;
-          btn.textContent = texteOriginal;
-          if (partieMaj.cycleActuel === 'termine') {
-            document.getElementById('btn-terminer-partie').click();
-            return;
-          }
-          App.renderPlateauGalactique(partieMaj);
-          App.renderPlateauMaison(partieMaj);
-          App.renderSecteurs(partieMaj);
-          if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
-        })
-        .catch(function (erreur) {
-          btn.disabled = false;
-          btn.textContent = texteOriginal;
-          window.alert('Échec du passage au cycle suivant : ' + erreur.message);
-        });
+      StrategieService.demanderChoix({ type: 'phase_evaluation' }).then(function (resultat) {
+        if (!resultat || resultat.annule) return;
+
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        GameService.avancerCycle(partie.id)
+          .then(function (partieMaj) {
+            return AnnulationService.viderPile(partie.id).then(function () { return partieMaj; });
+          })
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            if (partieMaj.cycleActuel === 'termine') {
+              document.getElementById('btn-terminer-partie').click();
+              return;
+            }
+            App.renderPlateauGalactique(partieMaj);
+            App.renderPlateauMaison(partieMaj);
+            App.renderSecteurs(partieMaj);
+            if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec du passage au cycle suivant : ' + erreur.message);
+          });
+      });
     });
 
     // Le titre de l'app sert de "Retour à l'accueil" depuis n'importe quel

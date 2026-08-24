@@ -1,9 +1,48 @@
 /**
  * version.js
- * Version 65 — 2026-08-23
+ * Version 66 — 2026-08-23
  * Source de vérité unique pour la version de l'application.
  *
- * 23/08/2026, dernière fois (Programmes — gain de place + textes raccourcis,
+ * 23/08/2026, dernière fois (Fin de cycle — popup "Phase Évaluation",
+ * retour utilisateur, voir docs-rules-cycle-de-jeu.md §3) :
+ * Le bouton "Fin du cycle"/"Terminer la partie" (index.html) ouvre
+ * désormais StrategieService.demanderChoix({type:'phase_evaluation'})
+ * avant d'appeler GameService.avancerCycle (qui n'est déclenché qu'après
+ * validation de cette popup — "Annuler" referme sans rien persister ni
+ * avancer). La popup affiche 5 sections : Plateau Crise/Refuge/Objectifs
+ * galactiques/Objectifs de Programme sont de simples rappels textuels "à
+ * détailler plus tard" (à automatiser indépendamment plus tard, la
+ * dernière correspondant à la Phase 4 de l'implémentation des
+ * Programmes) ; seule la section Entretien est réellement automatisée :
+ * total = SecteurService.getEntretien + 2 par emplacement Programme
+ * "Entretien actif" (même calcul que chargerEntretien_) ; paiement par
+ * unité au choix (1 Nourriture / 2 Énergie / 2 Matériel, jamais de
+ * substitution par Crédit/Science ni par perte d'Influence volontaire),
+ * un bouton par ressource désactivé dès que le stock local ne suffit
+ * plus (aucune écriture DB avant "Valider" — le paiement ne vit qu'en
+ * variables locales le temps de la popup, annulable en fermant l'onglet
+ * ou via "Annuler") ; "Valider" reste désactivé tant qu'il reste de
+ * l'Entretien impayé ET qu'au moins une ressource permet encore de payer
+ * une unité, et applique en un seul GameService.majPlateauMaison les 3
+ * stocks décomptés + l'Influence diminuée de 3 par unité restée
+ * impayée (`Math.max(0, ...)`, jamais négatif).
+ * `css/style.css` : classes `.modal-section`/`.modal-section-titre`
+ * (séparateur entre les 5 sections de la popup, même style que
+ * `.focus-action`).
+ * `e2e/helpers/interactions.js` : nouveau helper `resoudrePhaseEvaluation`
+ * (paie l'Entretien tant que possible puis Valide) appelé par
+ * `e2e/partie-aleatoire.spec.js` après chaque clic sur `#btn-fin-cycle`.
+ * Corrige aussi une régression introduite par le changement de gabarit
+ * de "Programmes en main" (version précédente) : `jouerUneActionFocusAleatoire`
+ * ciblait `#screen-focus .focus-action .btn-jouer-action` sans le
+ * scoper — les cartes Programme en main réutilisant désormais ce même
+ * gabarit, le sélecteur y piochait aussi par erreur. Restreint
+ * maintenant à `#strategie-focus-joueur`/`#focus-heroiques-joueur`.
+ * Validé par les 110 tests `*.test.js` existants (inchangés, aucune
+ * logique de gameService.js/secteurService.js touchée) + `npm run
+ * test:e2e` + `npm run test:e2e:aleatoire` (14 maisons).
+ *
+ * 23/08/2026, avant (Programmes — gain de place + textes raccourcis,
  * retour utilisateur) :
  * - `chargerEntretien_` (index.html) : texte de l'Entretien dû raccourci en
  *   "Entretien : N" (le détail — "par unité, au choix..." + décompte
@@ -1942,4 +1981,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260823.14';
+var APP_VERSION = '20260823.15';

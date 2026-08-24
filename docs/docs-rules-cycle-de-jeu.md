@@ -176,7 +176,9 @@ Si vous devez ajouter un 4e jeton Catastrophe lors de cette étape, le joueur pe
 ## 2.4 Une fois que le joueur a joué son tour, passez à la prochaine manche de la phase Focus. 🚫
 Une fois que le nombre de manches requis (voir haut de la carte Événement galactique) a été atteint, passez à la phase Évaluation. 🚫
 # 3. PHASE EVALUATION
+💬 Popup "Phase Évaluation" (bouton "Fin du cycle"/"Terminer la partie", index.html — demanderChoix type 'phase_evaluation', js/strategieService.js) : 5 sections (Plateau Crise/Entretien/Refuge/Objectifs galactiques/Objectifs de Programme). Seule la section Entretien (§3.2) est réellement automatisée pour l'instant ; les 4 autres restent de simples rappels textuels "à détailler plus tard", chacune indépendamment. GameService.avancerCycle n'est appelé qu'après validation de cette popup.
 ## 3.1 LE NÉANT CONTRE-ATTAQUE ❌
+💬 Affiché comme section "Plateau Crise" (placeholder, à détailler plus tard) dans la popup "Phase Évaluation" ci-dessus.
 Résolvez le plateau Crise (voir 2.3.3.1). ❌
 ### 3.1.2 Résolvez une Escarmouche. ❌
 Calculez la Puissance Navale totale du Néant. ❌
@@ -186,19 +188,22 @@ Déterminez lequel de vos secteurs est envahi par les forces du Néant. ❌
 Vous pouvez substituer la Nourriture, l’Énergie et/ou le Matériel par des Crédits. ❌
 Vous devez dépenser des ressources si vous en avez. Chaque ressource que vous ne pouvez pas dépenser vous fait perdre 3 Influence. ❌
 ### 3.1.4 Note : si la Puissance Navale totale du Néant lors d’une Escarmouche est 0, vous réussissez automatiquement votre défense contre cette Escarmouche. 🚫
-## 3.2 ENTRETIEN 
-### 3.2.1 Calculez votre coût d’Entretien total comme suit : ❌
-#### 3.2.1.1 Chaque carte Programme (en bas de votre fiche Maison) affiche deux icônes Entretien. ❌
-Prenez en compte chaque icône non recouverte d’un jeton Commerce. ❌
+## 3.2 ENTRETIEN
+💬 Section "Entretien" de la popup "Phase Évaluation" — total = SecteurService.getEntretien (3.2.1.2) + 2 par emplacement Programme "Entretien actif" (3.2.1.1, plateauMaison.programmesUtilises). Paiement par unité au choix (1 Nourriture / 2 Énergie / 2 Matériel), un bouton par ressource, désactivé si le stock ne suffit plus. "Valider" reste bloqué tant qu'il reste de l'Entretien ET qu'au moins une ressource permet encore de payer une unité (3.2.2) ; sinon la validation applique -3 Influence par unité restée impayée (Math.max(0, ...), jamais négatif).
+### 3.2.1 Calculez votre coût d’Entretien total comme suit : ✅
+#### 3.2.1.1 Chaque carte Programme (en bas de votre fiche Maison) affiche deux icônes Entretien. ✅
+Prenez en compte chaque icône non recouverte d’un jeton Commerce. 🔍 le jeton Commerce éventuel sur un emplacement Programme n'est pas déduit du compte (2 par emplacement "Entretien actif", sans distinction) — hors périmètre pour l'instant.
 #### 3.2.1.2 La plupart des secteurs ont des emplacements d’Installation ou de Guilde qui affichent également des icônes Entretien (souvent, une par emplacement). ✅
 Prenez en compte chaque emplacement occupé. ✅
 #### 3.2.1.3 Certains secteurs affichent une ou deux icônes Entretien indépendantes. Si vous contrôlez de tels secteurs, prenez en compte les icônes indépendantes qui s’y trouvent. ❌
-### 3.2.2 Vous devez maintenant satisfaire le coût d’Entretien, en dépensant pour chaque unité soit 1 Nourriture , soit 2 Matériel ou Énergie (ou 1 de chaque). 🔍
-Vous ne pouvez pas dépenser des Crédits ou de la Science pour satisfaire les coûts d’Entretien, sauf si une Technologie vous le permet. 🔍
-Si vous n’avez pas assez de ressources, vous perdez 3 Influuence par unité d’Entretien non satisfaite. 🔍
-Vous n’avez pas le droit de choisir de perdre de l’Influence pour économiser vos ressources. 🔍
+### 3.2.2 Vous devez maintenant satisfaire le coût d’Entretien, en dépensant pour chaque unité soit 1 Nourriture , soit 2 Matériel ou Énergie (ou 1 de chaque). ✅
+Vous ne pouvez pas dépenser des Crédits ou de la Science pour satisfaire les coûts d’Entretien, sauf si une Technologie vous le permet. 🔍 l'exception liée à une Technologie n'est pas modélisée — la popup n'autorise jamais Crédit/Science, quelle que soit la Technologie possédée.
+Si vous n’avez pas assez de ressources, vous perdez 3 Influuence par unité d’Entretien non satisfaite. ✅
+Vous n’avez pas le droit de choisir de perdre de l’Influence pour économiser vos ressources. ✅ "Valider" reste désactivé tant qu'un paiement reste possible.
 ### 3.2.3 Pour chaque secteur Pur que vous contrôlez avec 6 Population et au moins trois Guildes, vous pouvez prendre l’un de vos cubes de Puissance Navale inactif et le placer sur une tuile Refuge. ❌
+💬 Affiché comme section "Refuge" (placeholder, à détailler plus tard) dans la popup "Phase Évaluation".
 ## 3.3 OBJECTIFS GALACTIQUES
+💬 Affiché comme section "Objectifs galactiques" (placeholder, à détailler plus tard) dans la popup "Phase Évaluation".
 Évaluez les objectifs de la partie droite de la carte Événement galactique qui se trouve sur le plateau galactique. ❌
 Évaluer un objectif signifie que vous vérifiez si vous remplissez ses conditions. ❌
 Si une ligne rouge sépare des objectifs, vous ne pouvez en choisir qu’un seul parmi les deux. Si la ligne est verte, en revanche, vous pouvez choisir les deux. ❌
@@ -209,6 +214,7 @@ La condition et le bénéfice sont séparés par le signe “=”. Cela signifie
 La condition et le bénéfice sont séparés par le signe “x”. Cela signifie que vous devez compter combien de fois vous remplissez la condition (souvent, un certain nombre de tel ou tel élément) et que vous gagnez le bénéfice autant de fois que vous remplissez la condition. ❌
 ### 3.3.3 Note : résoudre un bénéfice avec les conditions requises peut permettre de résoudre une Crise permanente du même coup. ❌
 ## 3.4 OBJECTIFS DE PROGRAMME ❌
+💬 Affiché comme section "Objectifs de Programme" (placeholder, à détailler plus tard) dans la popup "Phase Évaluation" — correspond à la Phase 4 de l'implémentation des Programmes.
 Évaluez maintenant les objectifs des cartes Programme des emplacements dédiés de votre fiche Maison, pourvu qu’il n’y ait pas de Corruption dessus (Programmes Purs). ❌
 Chaque carte affiche plusieurs sections que vous devez évaluer une à une et de manière indépendante. Tout comme les cartes Événement galactique (voir 3.3), les objectifs peuvent être des exploits ou des multiplicateurs. ❌
 Note : sur les cartes Programme, le bénéfice est toujours de l’Influence. Voyez le glossaire pour une liste des objectifs de départ et des autres objectifs. ❌
