@@ -114,6 +114,17 @@ var FocusEngine = (function () {
   // pour 1 (jamais Science, jamais un coût qui n'est pas une de ces 3
   // ressources — ex. l'Entretien, hors périmètre de focusEngine.js).
   var RESSOURCES_SUBSTITUABLES_CREDIT_ = ['nourriture', 'energie', 'materiel'];
+  // POC (retour utilisateur, todo.md — "option 1 : systématiquement avoir
+  // la popup pour choisir") : liste de `source` (déjà suffixé " (coût)",
+  // voir resoudreAction plus bas) pour lesquelles la popup
+  // 'paiement_ressource' s'ouvre TOUJOURS, même quand la réserve seule
+  // suffit — pas seulement en cas de manque (comportement par défaut,
+  // voir le test juste en dessous). Volontairement limité à UNE carte
+  // (Focus Conquête "Préparer") pour évaluer l'expérience avant
+  // d'envisager une généralisation (l'utilisateur hésite entre 3 options :
+  // systématique partout, seulement pour la Nourriture — pour économiser
+  // en vue de l'Entretien —, ou un 2e bouton dédié sur chaque action).
+  var POC_TOUJOURS_PROPOSER_SUBSTITUTION_ = ['Conquête — Préparer (coût)'];
 
   var CLES_MODIFICATEURS_SILENCIEUSES = ['sans_benefice_case', 'exclude', 'restriction', 'same_sector', 'meme_secteur', 'tie_break'];
 
@@ -296,27 +307,32 @@ var FocusEngine = (function () {
     // §2 : "les crédits peuvent être utilisés comme substitut pour une
     // dépense de Nourriture, Énergie, ou Matériel à raison de 1 pour 1"
     // — jamais Science, jamais l'Entretien, hors périmètre de ce cas).
-    // Coût UNIQUEMENT (signe < 0), et UNIQUEMENT si la réserve ne suffit
-    // PAS à couvrir le montant seule (`etat[champ] < valeur`) — testé
-    // AVANT le repli CLES_SIMPLES générique ci-dessous, qui continue de
-    // gérer SILENCIEUSEMENT (aucune popup, comportement inchangé) le cas
-    // courant où la ressource seule suffit (la substitution ne devient
-    // pertinente QUE face à un manque — ouvrir une popup à CHAQUE dépense
-    // de ces 3 ressources, même quand la réserve est large, interromprait
-    // inutilement la quasi-totalité des actions Focus), un GAIN de ces
-    // mêmes ressources (Effet, signe > 0 : la substitution n'a de sens que
-    // pour une DÉPENSE), et les 5 autres clés simples (credit/science/
-    // influence/prime/liberation, jamais substituables). Ouvre une popup
-    // dédiée (contexte 'paiement_ressource', strategieService.js) qui
-    // laisse le joueur choisir librement la répartition entre le reste de
-    // la ressource et le Crédit — SANS obligation d'épuiser d'abord la
+    // Coût UNIQUEMENT (signe < 0), et — SAUF POC ci-dessus — UNIQUEMENT si
+    // la réserve ne suffit PAS à couvrir le montant seule
+    // (`etat[champ] < valeur`) — testé AVANT le repli CLES_SIMPLES
+    // générique ci-dessous, qui continue de gérer SILENCIEUSEMENT (aucune
+    // popup, comportement inchangé) le cas courant où la ressource seule
+    // suffit (la substitution ne devient pertinente QUE face à un manque
+    // — ouvrir une popup à CHAQUE dépense de ces 3 ressources, même quand
+    // la réserve est large, interromprait inutilement la quasi-totalité
+    // des actions Focus ; le POC ci-dessus fait exception pour UNE carte
+    // choisie, en attendant une décision), un GAIN de ces mêmes ressources
+    // (Effet, signe > 0 : la substitution n'a de sens que pour une
+    // DÉPENSE), et les 5 autres clés simples (credit/science/influence/
+    // prime/liberation, jamais substituables). Ouvre une popup dédiée
+    // (contexte 'paiement_ressource', strategieService.js) qui laisse le
+    // joueur choisir librement la répartition entre le reste de la
+    // ressource et le Crédit — SANS obligation d'épuiser d'abord la
     // ressource jusqu'à son dernier point (le joueur peut préférer la
-    // préserver et payer davantage en Crédit). "Annuler" bloque le Coût
-    // (RÈGLE MÉTIER : "coût annulé après effet déjà réussi", déjà tolérée
-    // plus bas dans resoudreAction) — notamment quand ni la ressource ni
-    // le Crédit disponible, même combinés, ne suffisent à couvrir le
-    // montant. ---
-    if (RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && typeof valeur === 'number' && signe < 0 && etat[CHAMP_PAR_CLE[cle]] < valeur) {
+    // préserver et payer davantage en Crédit ; c'est aussi ce qui rend le
+    // POC ci-dessus utilisable même quand la réserve suffit déjà : le
+    // montant "à payer en ressource" est pré-rempli au maximum possible
+    // mais reste modifiable). "Annuler" bloque le Coût (RÈGLE MÉTIER :
+    // "coût annulé après effet déjà réussi", déjà tolérée plus bas dans
+    // resoudreAction) — notamment quand ni la ressource ni le Crédit
+    // disponible, même combinés, ne suffisent à couvrir le montant. ---
+    if (RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && typeof valeur === 'number' && signe < 0 &&
+      (etat[CHAMP_PAR_CLE[cle]] < valeur || POC_TOUJOURS_PROPOSER_SUBSTITUTION_.indexOf(source) !== -1)) {
       var champRessourceSubstituable_ = CHAMP_PAR_CLE[cle];
       return Promise.resolve(demanderChoix({
         type: 'paiement_ressource',

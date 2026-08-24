@@ -1,9 +1,36 @@
 /**
  * version.js
- * Version 83 — 2026-08-24
+ * Version 84 — 2026-08-24
  * Source de vérité unique pour la version de l'application.
  *
- * 24/08/2026, dernière fois (Substitution Crédit pour un coût en
+ * 24/08/2026, dernière fois (POC — popup de paiement systématique pour
+ * Focus Conquête "Préparer", retour utilisateur) :
+ * Suite à la substitution Crédit (entrée précédente) : l'utilisateur
+ * hésite entre 3 options pour proposer la substitution même quand la
+ * réserve suffit déjà (préserver la Nourriture en vue de l'Entretien
+ * notamment) — systématique partout, seulement pour la Nourriture, ou un
+ * 2e bouton dédié par action. Ce POC teste la 1re option, VOLONTAIREMENT
+ * limité à UNE seule carte pour évaluer l'expérience avant de trancher.
+ * - `focusEngine.js` : nouvelle constante `POC_TOUJOURS_PROPOSER_
+ *   SUBSTITUTION_` (liste de `source`, aujourd'hui une seule entrée
+ *   "Conquête — Préparer (coût)") — quand la `source` en cours y figure,
+ *   la popup 'paiement_ressource' s'ouvre MÊME si la réserve suffit
+ *   seule (contournant la condition `etat[champ] < valeur` habituelle).
+ *   Aucun changement de comportement ailleurs : la popup pré-remplie déjà
+ *   son montant au maximum possible en ressource (voir entrée
+ *   précédente), donc dans ce cas elle affiche par défaut EXACTEMENT ce
+ *   qui se serait passé automatiquement, tout en restant modifiable —
+ *   aucun redesign de la popup n'a été nécessaire.
+ * 2 tests ajoutés dans `focusEngine.test.js` (popup ouverte malgré
+ * réserve suffisante sur cette carte précisément ; comportement par
+ * défaut inchangé sur une AUTRE carte avec un coût matériel similaire,
+ * confirme le scope limité à cette seule carte). Vérifié aussi
+ * manuellement dans un vrai navigateur (Playwright, script ad-hoc) :
+ * réserve à 10 Matériel (coût 3), popup quand même ouverte, choix de
+ * payer entièrement en Crédit validé, Matériel resté intact.
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js, version.js.
+ *
+ * 24/08/2026, avant (Substitution Crédit pour un coût en
  * Nourriture/Énergie/Matériel — retour utilisateur,
  * docs-rules-Influence-et-ressources.md §2, marqué 🔍 "à vérifier") :
  * Règle jusqu'ici non implémentée : "les crédits peuvent être utilisés
@@ -2602,4 +2629,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260824.17';
+var APP_VERSION = '20260824.18';

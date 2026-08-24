@@ -103,6 +103,46 @@ test('coût Énergie : réserve suffisante seule -> aucune popup (comportement i
   });
 });
 
+// POC (todo.md, retour utilisateur — "option 1 : systématiquement avoir
+// la popup pour choisir") : Focus Conquête "Préparer" (cout:{materiel:3})
+// est volontairement en liste POC_TOUJOURS_PROPOSER_SUBSTITUTION_ — la
+// popup s'ouvre MÊME quand la réserve suffit seule, contrairement au
+// comportement par défaut testé ci-dessus.
+test('POC — Conquête "Préparer" : popup "paiement_ressource" MÊME quand la réserve suffit seule', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Conquête' };
+  var action = { action: 'Préparer', effet: { activer_cube: 2 }, cout: { materiel: 3 }, texte: '' }; // PLATEAU_BASE.ressourceMateriel = 5, largement suffisant
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    assert.strictEqual(contexte.ressource, 'materiel');
+    assert.strictEqual(contexte.montant, 3);
+    assert.strictEqual(contexte.stockRessource, 5); // la réserve N'A PAS encore été débitée
+    return { utiliseRessource: 1 }; // le joueur choisit de préserver 4 Matériel et de payer 2 en Crédit
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 4); // 5 - 1
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, 1); // 3 - 2
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('dont 2 substitués par Crédit') !== -1; }));
+  });
+});
+
+// Autre carte (hors POC) : comportement par défaut inchangé même avec un
+// coût matériel similaire — confirme que le POC est bien scopé à UNE
+// seule carte, pas à la clé "materiel" en général.
+test('POC — autre carte que "Conquête Préparer" avec un coût matériel : comportement par défaut (aucune popup si suffisant)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: {}, cout: { materiel: 3 }, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 2);
+  });
+});
+
 test('coût Énergie : réserve insuffisante -> délègue à demanderChoix({type:"paiement_ressource"}), substitution partielle en Crédit', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
