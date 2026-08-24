@@ -109,6 +109,11 @@ var FocusEngine = (function () {
   // ici, vérifier l'autre copie côté gameService.js.
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
   var NB_CUBES_TOTAL = 14;
+  // todo.md (retour utilisateur) — docs-rules-Influence-et-ressources.md
+  // §2 : les 3 SEULES ressources qu'un coût de Crédit peut substituer à 1
+  // pour 1 (jamais Science, jamais un coût qui n'est pas une de ces 3
+  // ressources — ex. l'Entretien, hors périmètre de focusEngine.js).
+  var RESSOURCES_SUBSTITUABLES_CREDIT_ = ['nourriture', 'energie', 'materiel'];
 
   var CLES_MODIFICATEURS_SILENCIEUSES = ['sans_benefice_case', 'exclude', 'restriction', 'same_sector', 'meme_secteur', 'tie_break'];
 
@@ -284,7 +289,53 @@ var FocusEngine = (function () {
   // (annulation de TOUT le JSON en cours — voir resoudreJsonInterne_).
   // ------------------------------------------------------------
 
-  function resoudreCle_(cle, valeur, signe, source, texteAction, etat, journal, demanderChoix) {
+  function resoudreCle_(cle, valeur, signe, source, texteAction, etat, journal, demanderChoix, jsonParent) {
+
+    // --- Coût en Nourriture/Énergie/Matériel : substitution en Crédit
+    // (todo.md, retour utilisateur — docs-rules-Influence-et-ressources.md
+    // §2 : "les crédits peuvent être utilisés comme substitut pour une
+    // dépense de Nourriture, Énergie, ou Matériel à raison de 1 pour 1"
+    // — jamais Science, jamais l'Entretien, hors périmètre de ce cas).
+    // Coût UNIQUEMENT (signe < 0), et UNIQUEMENT si la réserve ne suffit
+    // PAS à couvrir le montant seule (`etat[champ] < valeur`) — testé
+    // AVANT le repli CLES_SIMPLES générique ci-dessous, qui continue de
+    // gérer SILENCIEUSEMENT (aucune popup, comportement inchangé) le cas
+    // courant où la ressource seule suffit (la substitution ne devient
+    // pertinente QUE face à un manque — ouvrir une popup à CHAQUE dépense
+    // de ces 3 ressources, même quand la réserve est large, interromprait
+    // inutilement la quasi-totalité des actions Focus), un GAIN de ces
+    // mêmes ressources (Effet, signe > 0 : la substitution n'a de sens que
+    // pour une DÉPENSE), et les 5 autres clés simples (credit/science/
+    // influence/prime/liberation, jamais substituables). Ouvre une popup
+    // dédiée (contexte 'paiement_ressource', strategieService.js) qui
+    // laisse le joueur choisir librement la répartition entre le reste de
+    // la ressource et le Crédit — SANS obligation d'épuiser d'abord la
+    // ressource jusqu'à son dernier point (le joueur peut préférer la
+    // préserver et payer davantage en Crédit). "Annuler" bloque le Coût
+    // (RÈGLE MÉTIER : "coût annulé après effet déjà réussi", déjà tolérée
+    // plus bas dans resoudreAction) — notamment quand ni la ressource ni
+    // le Crédit disponible, même combinés, ne suffisent à couvrir le
+    // montant. ---
+    if (RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && typeof valeur === 'number' && signe < 0 && etat[CHAMP_PAR_CLE[cle]] < valeur) {
+      var champRessourceSubstituable_ = CHAMP_PAR_CLE[cle];
+      return Promise.resolve(demanderChoix({
+        type: 'paiement_ressource',
+        ressource: cle,
+        montant: valeur,
+        stockRessource: etat[champRessourceSubstituable_],
+        stockCredit: etat.ressourceCredit,
+        source: source
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        var utiliseRessource = Math.min(valeur, Math.max(0, Math.floor(Number(reponse.utiliseRessource)) || 0));
+        var utiliseCredit = valeur - utiliseRessource;
+        etat[champRessourceSubstituable_] = Math.max(0, etat[champRessourceSubstituable_] - utiliseRessource);
+        etat.ressourceCredit = Math.max(0, etat.ressourceCredit - utiliseCredit);
+        journal.push(source + ' : −' + valeur + ' ' + cle +
+          (utiliseCredit > 0 ? ' (dont ' + utiliseCredit + ' substitué' + (utiliseCredit > 1 ? 's' : '') + ' par Crédit)' : '') + '.');
+        return true;
+      });
+    }
 
     // --- Ressources/jetons simples (nourriture, energie, materiel,
     // credit, science, influence, prime, liberation) ---
@@ -600,12 +651,28 @@ var FocusEngine = (function () {
     // avancerPisteMoinsAvancee, js/civilisationService.js) puis se
     // comporte comme le mode "piste imposée" ci-dessus. Utilisée par
     // l'action de Programme de type Force (voir gameService.js,
-    // EFFET_PROGRAMME_PAR_TYPE_). ---
+    // EFFET_PROGRAMME_PAR_TYPE_) et par le Focus Héroïque Renfort
+    // "Accélérer" (focus.json id 106).
+    //
+    // `tie_break: "au_choix"` (todo.md, retour utilisateur) : clé SŒUR
+    // facultative, dans le MÊME objet JSON que cette clé (ex. focus.json
+    // id 106 : `{tie_break:"au_choix", avancer_civilisation_moins_avancee:1}`)
+    // — lue ici via `jsonParent` (voir resoudreJsonInterne_ ci-dessus).
+    // Quand elle vaut "au_choix", la popup laisse le joueur choisir PARMI
+    // les pistes À ÉGALITÉ pour la moins avancée, plutôt que de retomber
+    // silencieusement sur l'ordre fixe Société > Gouvernement > Économie
+    // (comportement par défaut, inchangé, pour tout appelant SANS ce
+    // marqueur — ex. l'action de Programme Force ci-dessus, qui le porte
+    // désormais elle aussi, son texte imprimé disant lui aussi "au choix
+    // si égalité"). Répare le bug rapporté : sur Renfort "Accélérer",
+    // seule la piste la mieux placée dans cet ordre fixe (ex. Gouvernement)
+    // était proposée même quand Économie était À ÉGALITÉ. ---
     if (cle === 'avancer_civilisation_moins_avancee' && signe > 0) {
       return demanderChoixEtJournaliser_({
         type: 'avancer_civilisation',
         piste: null,
         moinsAvancee: true,
+        tieBreakAuChoix: !!(jsonParent && jsonParent.tie_break === 'au_choix'),
         source: source,
         partieId: etat.partieId
       }, source, journal, demanderChoix);
@@ -627,6 +694,31 @@ var FocusEngine = (function () {
     if (cle === 'ameliorer_gloire' && signe > 0) {
       return demanderChoixEtJournaliser_({
         type: 'ameliorer_gloire',
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
+    // --- Défausser un jeton Gloire : Coût UNIQUEMENT (signe < 0) — ex.
+    // Focus Progrès Héroïque "Restaurer" (focus.json id 102) et
+    // Commandement Héroïque "Utiliser" (id 92), tous deux
+    // cout:{defausser_gloire:1}. AUCUN choix utilisateur (retour
+    // utilisateur, todo.md) : cible TOUJOURS le jeton Gloire de plus
+    // PETITE valeur posé sur la fiche Maison — miroir de "ameliorer_gloire"
+    // ci-dessus (même détermination déterministe, plus petite valeur),
+    // mais pour le RETIRER plutôt que l'améliorer : contrairement à
+    // ameliorer_gloire, aucun plafond ici, un jeton déjà à 5 reste
+    // éligible à la défausse. Le jeton Gloire (array, 5 emplacements)
+    // n'est PAS suivi par CHAMPS_DIFF_SUIVIS (non diffable par ce moteur
+    // au clone JSON) : la popup dédiée (contexte 'defausser_gloire',
+    // strategieService.js) fait donc le calcul ET la persistance
+    // directement (comme ameliorer_gloire ci-dessus) ; resoudreCle_ relaie
+    // juste le résumé dans le journal. Si aucun jeton Gloire n'est posé,
+    // la popup annule l'action entière (comme n'importe quel autre coût
+    // bloquant faute de cible). ---
+    if (cle === 'defausser_gloire' && signe < 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'defausser_gloire',
         source: source,
         partieId: etat.partieId
       }, source, journal, demanderChoix);
@@ -932,7 +1024,13 @@ var FocusEngine = (function () {
     return cles.reduce(function (promesse, cle) {
       return promesse.then(function (succesPrecedent) {
         if (succesPrecedent === false) return false;
-        return resoudreCle_(cle, json[cle], signe, source, texteAction, etat, journal, demanderChoix);
+        // `json` (l'objet JSON complet en cours de résolution, pas
+        // seulement la clé/valeur courante) est passé en dernier paramètre
+        // — utilisé par le cas "avancer_civilisation_moins_avancee"
+        // ci-dessus pour lire une éventuelle clé sœur "tie_break" (EVOLUTION
+        // todo.md, Focus Héroïque Renfort "Accélérer") sans dupliquer la
+        // boucle de résolution.
+        return resoudreCle_(cle, json[cle], signe, source, texteAction, etat, journal, demanderChoix, json);
       });
     }, Promise.resolve(true));
   }

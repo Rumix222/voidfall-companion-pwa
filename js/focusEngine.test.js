@@ -89,6 +89,104 @@ test('action simple : effet crédite, coût débite, mutations correctes', funct
   });
 });
 
+// todo.md (retour utilisateur) — docs-rules-Influence-et-ressources.md §2 :
+// substitution Crédit pour un coût en Nourriture/Énergie/Matériel.
+test('coût Énergie : réserve suffisante seule -> aucune popup (comportement inchangé)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { science: 1 }, cout: { energie: 3 }, texte: '' }; // PLATEAU_BASE.ressourceEnergie = 5
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 2);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit); // jamais touché
+  });
+});
+
+test('coût Énergie : réserve insuffisante -> délègue à demanderChoix({type:"paiement_ressource"}), substitution partielle en Crédit', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { science: 1 }, cout: { energie: 7 }, texte: '' }; // PLATEAU_BASE.ressourceEnergie = 5, manque 2
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    assert.strictEqual(contexte.ressource, 'energie');
+    assert.strictEqual(contexte.montant, 7);
+    assert.strictEqual(contexte.stockRessource, 5);
+    assert.strictEqual(contexte.stockCredit, 3);
+    return { utiliseRessource: 5 }; // 5 Énergie (tout le stock) + 2 Crédit (le reste)
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 0);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, 1); // 3 - 2
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('dont 2 substitués par Crédit') !== -1; }));
+  });
+});
+
+test('coût Énergie : le joueur choisit de préserver une partie de la ressource et de payer davantage en Crédit (pas d’obligation de l’épuiser)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  // Manque 1 (stock 5, coût 6) — le strict nécessaire serait "5 Énergie +
+  // 1 Crédit", mais le joueur choisit de N'UTILISER QUE 3 Énergie (en
+  // garder 2 en réserve) et de payer les 3 restants en Crédit.
+  var action = { action: 'Jouer', effet: {}, cout: { energie: 6 }, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.stockRessource, 5);
+    assert.strictEqual(contexte.stockCredit, 3);
+    return { utiliseRessource: 3 };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 2); // 5 - 3, 2 préservés
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, 0); // 3 - 3
+  });
+});
+
+test('coût Énergie : ni la ressource ni le Crédit combinés ne suffisent -> Annuler bloque le Coût (effet déjà réussi conservé)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { science: 1 }, cout: { energie: 20 }, texte: '' }; // stock 5 + crédit 3 = 8, très insuffisant
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    return { annule: true };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true); // règle métier : coût annulé après effet réussi -> effet conservé
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, 3); // effet appliqué
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, PLATEAU_BASE.ressourceEnergie); // coût jamais débité
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('coût annulé') !== -1; }));
+  });
+});
+
+test('coût Énergie : substitution jamais déclenchée pour un GAIN (Effet, signe > 0)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { energie: 4 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 9);
+  });
+});
+
+test('coût Science : jamais substituable (aucune popup, clampé comme avant)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: {}, cout: { science: 10 }, texte: '' }; // stock 2, très insuffisant
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, 0); // clampé, comme avant, pas de substitution
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit); // jamais touché
+  });
+});
+
 test('effet annulé (choix refusé) : aucune mutation, coût jamais débité', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -233,6 +331,43 @@ test('rappeler_cube (Coût) : annulé (popup "Annuler") — coût non débité, 
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Installer', effet: { materiel: 1 }, cout: { rappeler_cube: 1 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true); // règle métier : coût annulé après effet réussi -> effet conservé
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, PLATEAU_BASE.ressourceMateriel + 1);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('coût annulé') !== -1; }));
+  });
+});
+
+// todo.md (retour utilisateur) : "defausser_gloire" comme Coût (ex. Focus
+// Progrès Héroïque "Restaurer") délègue à demanderChoix
+// ({type:'defausser_gloire'}) — AUCUN choix utilisateur côté focusEngine
+// (la popup détermine elle-même le jeton Gloire de plus petite valeur,
+// voir strategieService.js).
+test('defausser_gloire (Coût) : succès — délègue à demanderChoix({type:"defausser_gloire"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Restaurer', effet: { regrouper: 1 }, cout: { defausser_gloire: 1 }, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'regrouper') return { deplacements: 1, detail: '1× Corvette 1→2' };
+    assert.strictEqual(contexte.type, 'defausser_gloire');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'jeton Gloire 2 défaussé.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('jeton Gloire 2 défaussé') !== -1; }));
+  });
+});
+
+test('defausser_gloire (Coût) : annulé (popup "Annuler", ex. aucun jeton posé) — coût non débité, effet déjà réussi conservé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Restaurer', effet: { materiel: 1 }, cout: { defausser_gloire: 1 }, texte: '' };
 
   var demanderChoix = function () { return { annule: true }; };
 
@@ -712,6 +847,49 @@ test('avancer_civilisation_moins_avancee : succès — délègue à demanderChoi
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('niveau 0') !== -1; }));
+  });
+});
+
+// EVOLUTION todo.md (retour utilisateur, Focus Héroïque Renfort
+// "Accélérer", focus.json id 106) : quand "avancer_civilisation_moins_
+// avancee" est nichée dans un objet {tie_break:"au_choix",
+// avancer_civilisation_moins_avancee:1} (clé SŒUR, même objet), la popup
+// doit être informée (contexte.tieBreakAuChoix:true) pour proposer un
+// choix parmi les pistes à égalité plutôt que l'ordre fixe silencieux.
+test('avancer_civilisation_moins_avancee avec clé sœur tie_break:"au_choix" -> contexte.tieBreakAuChoix:true', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Renfort' };
+  var action = {
+    action: 'Accélérer',
+    cout: {},
+    effet: { tie_break: 'au_choix', avancer_civilisation_moins_avancee: 1 },
+    texte: ''
+  };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'avancer_civilisation');
+    assert.strictEqual(contexte.moinsAvancee, true);
+    assert.strictEqual(contexte.tieBreakAuChoix, true);
+    return { detail: 'Piste Économie : niveau 0 -> 1.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+  });
+});
+
+test('avancer_civilisation_moins_avancee SANS tie_break -> contexte.tieBreakAuChoix:false (comportement par défaut inchangé)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { avancer_civilisation_moins_avancee: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.tieBreakAuChoix, false);
+    return { detail: 'Piste Économie : niveau 0 -> 1.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
   });
 });
 

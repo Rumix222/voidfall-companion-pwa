@@ -1,9 +1,186 @@
 /**
  * version.js
- * Version 78 — 2026-08-24
+ * Version 83 — 2026-08-24
  * Source de vérité unique pour la version de l'application.
  *
- * 24/08/2026, dernière fois (EVOLUTION 18 — Refonte du moteur d'annulation,
+ * 24/08/2026, dernière fois (Substitution Crédit pour un coût en
+ * Nourriture/Énergie/Matériel — retour utilisateur,
+ * docs-rules-Influence-et-ressources.md §2, marqué 🔍 "à vérifier") :
+ * Règle jusqu'ici non implémentée : "les crédits peuvent être utilisés
+ * comme substitut pour une dépense de Nourriture, Énergie, ou Matériel à
+ * raison de 1 pour 1" (jamais Science, jamais l'Entretien — déjà
+ * correctement respecté par construction, la popup 'phase_evaluation' ne
+ * proposant que ces 3 ressources). `focusEngine.js` ne bloquait par
+ * ailleurs JAMAIS un Coût faute de ressources (clampé à 0 silencieusement)
+ * — la règle du livret dit pourtant qu'une action sans réserve suffisante
+ * est impossible.
+ * - `focusEngine.js` : nouveau cas dédié, AVANT le repli CLES_SIMPLES
+ *   générique, pour un Coût (signe < 0) en Nourriture/Énergie/Matériel
+ *   (`RESSOURCES_SUBSTITUABLES_CREDIT_`) — déclenché UNIQUEMENT quand la
+ *   réserve seule ne suffit pas (`etat[champ] < valeur`) : le cas courant
+ *   où la réserve suffit reste géré silencieusement par CLES_SIMPLES,
+ *   comportement inchangé, aucune popup superflue sur la quasi-totalité
+ *   des actions Focus. En cas de manque, ouvre une popup dédiée (contexte
+ *   'paiement_ressource', strategieService.js) qui laisse le joueur
+ *   répartir librement le montant entre le reste de la ressource et le
+ *   Crédit — SANS obligation d'épuiser d'abord la ressource jusqu'à son
+ *   dernier point (retour utilisateur explicite : le joueur peut préférer
+ *   la préserver et payer davantage en Crédit). "Annuler" bloque le Coût
+ *   (RÈGLE MÉTIER déjà tolérée : "coût annulé après effet déjà réussi")
+ *   — notamment quand ni la ressource ni le Crédit, même combinés, ne
+ *   suffisent.
+ * - `strategieService.js` : nouvelle popup 'paiement_ressource' (résumé
+ *   "X Nourriture/Énergie/Matériel + Y Crédit (substitution)" mis à jour
+ *   en direct, Valider désactivé si la répartition choisie dépasse le
+ *   Crédit disponible, message dédié + Valider caché si même la
+ *   combinaison complète ne suffit pas) ; `coutSuffisant_` (grisage des
+ *   boutons Focus) considère désormais le Crédit disponible comme un pool
+ *   PARTAGÉ pouvant couvrir le manque de Nourriture/Énergie/Matériel — un
+ *   bouton n'est plus grisé à tort juste parce qu'UNE ressource manque si
+ *   le Crédit peut couvrir l'écart.
+ * 7 tests ajoutés dans `focusEngine.test.js` (réserve suffisante seule
+ * -> aucune popup ; réserve insuffisante -> popup + substitution
+ * partielle ; choix de préserver une partie de la réserve ; combinaison
+ * totalement insuffisante -> Annuler, effet déjà réussi conservé ;
+ * jamais déclenché pour un GAIN ; Science jamais substituable). Vérifié
+ * aussi manuellement dans un vrai navigateur (Playwright, scripts
+ * ad-hoc) : rendu/calcul en direct de la popup, bouton Focus non grisé
+ * grâce au Crédit, flux complet clic → popup → validation → journal
+ * ("−3 materiel (dont 3 substitués par Crédit)") → réserves déduites
+ * correctement, aucune erreur JS.
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js,
+ * strategieService.js, docs/docs-rules-Influence-et-ressources.md,
+ * version.js.
+ *
+ * 24/08/2026, avant (Coût "defausser_gloire" — retour utilisateur,
+ * Focus Progrès Héroïque "Restaurer") :
+ * Nouvelle clé Coût "defausser_gloire" (focus.json — Progrès Héroïque
+ * "Restaurer" id 102, et Commandement Héroïque "Utiliser" id 92, tous
+ * deux cout:{defausser_gloire:1}) — jusqu'ici sans cas dédié, retombait
+ * sur le repli générique "effet non chiffré — à appliquer manuellement".
+ * - `focusEngine.js` (`resoudreCle_`) : nouveau cas dédié (Coût
+ *   uniquement, signe < 0), miroir de "ameliorer_gloire" déjà existant —
+ *   délègue à une popup dédiée (contexte 'defausser_gloire',
+ *   strategieService.js) qui fait le calcul ET la persistance (le jeton
+ *   Gloire, array, n'est pas suivi par CHAMPS_DIFF_SUIVIS).
+ * - `strategieService.js` : nouvelle popup 'defausser_gloire' — AUCUN
+ *   choix utilisateur, cible TOUJOURS le jeton Gloire de plus PETITE
+ *   valeur posé sur la fiche Maison (retour utilisateur explicite),
+ *   remis à `null` (retiré) ; contrairement à "ameliorer_gloire", aucun
+ *   plafond à 5 (un jeton déjà au maximum reste éligible à la défausse).
+ *   Si aucun jeton Gloire n'est posé, annule l'action entière (comme tout
+ *   autre coût bloquant faute de cible).
+ * 2 tests ajoutés dans `focusEngine.test.js` (succès — délègue bien à la
+ * popup dédiée ; annulé — coût non débité, effet déjà réussi conservé).
+ * Vérifié aussi manuellement dans un vrai navigateur (Playwright, script
+ * ad-hoc) : 2 jetons Gloire posés (valeurs 2 et 4), le jeton 2 (le plus
+ * petit) est bien celui défaussé, le jeton 4 reste ; aucune erreur JS.
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js,
+ * strategieService.js, version.js.
+ *
+ * 24/08/2026, avant (Popup "Déployer un cube" — Secteur-Mère non
+ * proposé sans Puissance Navale, retour utilisateur) :
+ * Même bug que Regrouper avant EVOLUTION 15 (todo.md) : la popup
+ * 'deployer_cube' (strategieService.js, modes 'libre' et 'par_chantier' —
+ * 'secteur_mere' n'était pas concerné, il cible déjà directement le
+ * Secteur-Mère sans filtre d'appartenance) excluait le Secteur-Mère dès
+ * qu'il n'avait plus de Puissance Navale dessus, alors qu'il appartient
+ * TOUJOURS au joueur (jamais repris par le Néant, docs-rules-flottes.md/
+ * docs-rules-secteurs.md).
+ * - `vousAppartientDeploiement_` accepte désormais un `numeroSecteurMere`
+ *   optionnel — un secteur est éligible s'il appartient au joueur (PN > 0)
+ *   OU s'il s'agit du Secteur-Mère, quel que soit son niveau de Puissance
+ *   Navale.
+ * - Les modes 'libre' et 'par_chantier' résolvent désormais aussi
+ *   `SecteurService.obtenirSecteurMere(scenarioId)` (en parallèle de
+ *   `obtenirSecteurs`, `Promise.all`) pour l'y passer.
+ * Vérifié manuellement dans un vrai navigateur (Playwright, script
+ * ad-hoc) : Secteur-Mère vidé de sa Puissance Navale, proposé comme
+ * cible valide dans les 2 modes concernés, aucune erreur JS.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 24/08/2026, avant (Focus Héroïque Renfort "Accélérer" — retour
+ * utilisateur, plusieurs points de clarté/correction) :
+ * - Bug corrigé : "avancer sur votre piste la moins avancée" (focus.json
+ *   id 106, et l'action de Programme Force — EFFET_PROGRAMME_PAR_TYPE_,
+ *   gameService.js) ne proposait QUE la piste la mieux placée dans l'ordre
+ *   fixe Société > Gouvernement > Économie, même quand une AUTRE piste
+ *   était à égalité (ex. Gouvernement ET Économie à 0 : seul Gouvernement
+ *   apparaissait). Le catalogue portait pourtant déjà le signal
+ *   `tie_break:"au_choix"` (clé sœur de `avancer_civilisation_moins_avancee`
+ *   dans le même objet JSON), jusqu'ici totalement ignoré (traité comme un
+ *   modificateur silencieux, `CLES_MODIFICATEURS_SILENCIEUSES`).
+ *   - `focusEngine.js` : `resoudreJsonInterne_` passe désormais le JSON
+ *     parent en dernier paramètre de `resoudreCle_` (nouveau `jsonParent`,
+ *     paramètre optionnel, rétrocompatible) — le cas
+ *     "avancer_civilisation_moins_avancee" y lit `jsonParent.tie_break`
+ *     et transmet `contexte.tieBreakAuChoix` à la popup.
+ *   - `gameService.js` : `EFFET_PROGRAMME_PAR_TYPE_.Force` porte
+ *     désormais lui aussi `tie_break:"au_choix"` (son texte imprimé le dit
+ *     explicitement : "au choix si égalité").
+ *   - `strategieService.js` (popup 'avancer_civilisation', branche
+ *     `moinsAvancee`) : calcule maintenant TOUTES les pistes à égalité au
+ *     niveau le plus bas ; si `tieBreakAuChoix` et plusieurs candidates,
+ *     affiche un choix restreint à celles-ci (même gabarit que le choix
+ *     libre entre les 3 pistes) plutôt que de retomber silencieusement sur
+ *     l'ordre fixe (comportement inchangé quand `tieBreakAuChoix` est
+ *     absent/faux — cas non concernés par ce correctif).
+ * - Libellés plus clairs (`strategieService.js`) :
+ *   - `libelleOption_` (labels des popups 'option_exclusive'/
+ *     'options_inclusives') : la clé `tie_break` est désormais filtrée
+ *     (jamais un choix affichable — elle produisait un label du genre
+ *     "tie_break + Avancer sur votre piste la moins avancée (1)",
+ *     source de confusion) ; `ressource_choix` a désormais un label dédié
+ *     "+N ressource(s) au choix" au lieu du gabarit générique "clé (N)".
+ *   - Popup 'ressource_choix' : titre "Gagner N ressource(s) au choix"
+ *     côté gain (au lieu de "Choisissez N...", qui ne précisait pas le
+ *     sens gain/coût — "Dépensez N..." déjà correct côté coût, inchangé) ;
+ *     chaque bouton de ressource affiche désormais un compteur "+N" (ex.
+ *     "Crédit +2") dès qu'il a déjà été cliqué dans la sélection en cours
+ *     — indication visuelle demandée en plus du texte "Il reste N à
+ *     choisir" déjà existant.
+ * - `css/style.css` : nouvelle classe `.choix-ressource-compteur` (badge
+ *   "+N" sur les boutons de la popup 'ressource_choix').
+ * 2 tests ajoutés dans `focusEngine.test.js` (tie_break présent/absent ->
+ * `contexte.tieBreakAuChoix` correct). Vérifié aussi manuellement dans un
+ * vrai navigateur (Playwright, scripts ad-hoc) : libellés de la popup
+ * inclusive de Renfort id 106 (regroupé/"+4 ressources au choix"/piste),
+ * titre + compteur de la popup ressource_choix, et le scénario exact du
+ * bug rapporté (Gouvernement/Économie à égalité 0/7, partie fraîche) —
+ * les 2 pistes sont bien proposées, le choix "Économie" persiste
+ * correctement en base.
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js, gameService.js,
+ * strategieService.js, css/style.css, version.js.
+ *
+ * 24/08/2026, avant (Garder l'écran allumé — Screen Wake Lock API,
+ * retour utilisateur : "la PWA peut-elle empêcher l'iPhone de passer en
+ * veille ?") :
+ * Nouveau toggle discret `#btn-veille-ecran` (icône ☕) dans la barre de
+ * titre (`.topbar`), toujours visible (header commun à tous les écrans).
+ * - `index.html` (markup + script de câblage en bas de page) : utilise
+ *   `navigator.wakeLock.request('screen')` — supporté par Safari iOS
+ *   depuis la 16.4 (y compris une PWA installée en standalone). Bouton
+ *   `hidden` par défaut dans le markup, révélé par JS UNIQUEMENT si
+ *   `'wakeLock' in navigator` — pas de bouton sans effet sur un navigateur/
+ *   iOS plus ancien. Préférence persistée dans IndexedDB (store `meta`,
+ *   clé `veilleEcranActive` — même mécanisme que `catalogueVersion`,
+ *   js/catalogueSync.js), jamais en `localStorage` (seule persistance du
+ *   projet = IndexedDB, voir CLAUDE.md).
+ *   Le verrou est automatiquement relâché par le navigateur dès que l'app
+ *   quitte le premier plan (comportement standard de l'API, pas une
+ *   limite du code) — redemandé à chaque retour au premier plan
+ *   (`visibilitychange`) tant que le toggle est actif ; un refus (ex.
+ *   batterie faible) reste silencieux, sans interrompre l'utilisateur pour
+ *   ce confort optionnel.
+ * - `css/style.css` : `.topbar` passe en `position: relative` ; nouvelles
+ *   classes `.btn-veille-ecran`/`.btn-veille-ecran.active` — bouton
+ *   épinglé au coin droit de la barre de titre, atténué/grisé au repos,
+ *   coloré une fois activé.
+ * Pas de nouveau test (feature purement DOM/API navigateur, hors périmètre
+ * de la suite `*.test.js`/`*_test.js` — vérifié manuellement).
+ * Fichiers touchés : index.html, css/style.css, version.js.
+ *
+ * 24/08/2026, avant (EVOLUTION 18 — Refonte du moteur d'annulation,
  * todo.md, retour utilisateur : "annuler la dernière action" (Conquête
  * "Planifier") ne redéplaçait pas la Corruption ni ne retirait le
  * Programme gagné ; le bouton restait bloqué sur "Passage en cours") :
@@ -2425,4 +2602,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260824.12';
+var APP_VERSION = '20260824.17';

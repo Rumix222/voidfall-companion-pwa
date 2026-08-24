@@ -90,10 +90,17 @@ var GameService = (function () {
   // simplement sur le repli générique de resoudreCle_ ("à appliquer
   // manuellement", ne bloque jamais) — le Programme part bien en jeu,
   // avec un rappel manuel pour cette moitié de l'action.
+  // `tie_break: "au_choix"` sur l'option Force (todo.md, retour
+  // utilisateur) : le texte imprimé ("au choix si égalité") le dit
+  // explicitement, comme le Focus Héroïque Renfort "Accélérer" — voir
+  // focusEngine.js resoudreCle_, cas "avancer_civilisation_moins_avancee",
+  // qui lit cette clé sœur pour laisser le joueur choisir parmi les
+  // pistes à égalité plutôt que l'ordre fixe Société > Gouvernement >
+  // Économie.
   var EFFET_PROGRAMME_PAR_TYPE_ = {
     Domination: { envahir: 1 },
     Soutien: { choice: ['activer_cube', 'construire_installation'] },
-    Force: { choice: ['avancer_civilisation_moins_avancee', 'gagner_commerce'] },
+    Force: { choice: [{ tie_break: 'au_choix', avancer_civilisation_moins_avancee: 1 }, 'gagner_commerce'] },
     Richesse: { choice: ['etablir_guilde', { produire_ressource: 1 }] }
   };
   // Ordre d'affichage fixe de l'offre de Programme (Plat. Galactique) —

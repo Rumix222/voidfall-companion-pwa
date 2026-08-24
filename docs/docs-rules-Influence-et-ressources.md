@@ -14,9 +14,9 @@ Il est rare de perdre de l’Influence (voir Entretien) ; si toutefois vous devi
 # 2. RÉSERVE DE RESSOURCES
 La plupart des coûts doivent être réglés en ressources : Nourriture, Énergie, Matériel, Crédits, ou Science. ✅
 Certains coûts vous permettent de combiner Nourriture/Énergie/Matériel voire de combiner les 5 ressources existantes. ✅
-Les crédits peuvent être utilisés comme substitut pour une dépense de Nourriture, Énergie, ou Matériel à raison de 1 pour 1. 🔍
+Les crédits peuvent être utilisés comme substitut pour une dépense de Nourriture, Énergie, ou Matériel à raison de 1 pour 1. ✅ 💬 focusEngine.js (RESSOURCES_SUBSTITUABLES_CREDIT_, resoudreCle_) + popup 'paiement_ressource' (strategieService.js) — uniquement quand la réserve seule ne suffit pas (todo.md, retour utilisateur), jamais pour Science.
 Vous ne pouvez pas utiliser des crédits comme substitut de Science ni pour tout autre coût qui ne se paie pas en ressources. ✅
-De plus, vous ne pouvez pas utiliser cette mécanique de substitution pour satisfaire l’Entretien (qui est une dépense obligatoire de la phase Évaluation de chaque Cycle). 🔍
+De plus, vous ne pouvez pas utiliser cette mécanique de substitution pour satisfaire l’Entretien (qui est une dépense obligatoire de la phase Évaluation de chaque Cycle). ✅ 💬 la popup 'phase_evaluation' (strategieService.js) ne propose que Nourriture/Énergie/Matériel, jamais le Crédit comme option de paiement.
 Les cadrans de la partie droite de votre plateau Ressources vous permettent de tenir le compte de vos réserves. Lorsque vous gagnez ou dépensez des ressources, réduisez ou augmentez la valeur de votre cadran en fonction. ✅
 Vos réserves ne peuvent pas passer en dessous de zéro. Vous ne pouvez pas faire une action si vos réserves ne suffisent pas à payer le coût requis. ✅
 Toutes les réserves ont une limite maximum de 15. Tout excédent est perdu. ❌

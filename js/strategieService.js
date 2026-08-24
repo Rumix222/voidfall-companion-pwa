@@ -958,13 +958,38 @@ var StrategieService = (function () {
     }).join('') + '</div>';
   }
 
+  // todo.md (retour utilisateur) — docs-rules-Influence-et-ressources.md
+  // §2 : mêmes 3 ressources substituables par du Crédit que
+  // focusEngine.js/RESSOURCES_SUBSTITUABLES_CREDIT_ (copie locale
+  // volontaire, fichiers indépendants — voir la même convention pour
+  // RESSOURCES_PRODUCTION, dupliquée entre focusEngine.js/gameService.js).
+  var RESSOURCES_SUBSTITUABLES_CREDIT_ = ['nourriture', 'energie', 'materiel'];
+
+  /**
+   * Un coût est "suffisant" si chaque ressource requise est couverte par
+   * la réserve elle-même OU, pour Nourriture/Énergie/Matériel
+   * (RESSOURCES_SUBSTITUABLES_CREDIT_ ci-dessus), par le Crédit disponible
+   * en complément (todo.md, retour utilisateur — la carte Focus ne doit
+   * plus être grisée à tort juste parce qu'UNE ressource manque si le
+   * Crédit peut couvrir l'écart, voir focusEngine.js pour la popup de
+   * paiement réelle). Le Crédit disponible est un pool PARTAGÉ entre
+   * plusieurs clés substituables d'un même coût : `creditRestant` est
+   * décrémenté au fil du parcours (ordre des clés de `cout`) pour ne pas
+   * compter deux fois le même Crédit sur 2 manques différents.
+   */
   function coutSuffisant_(cout, ressources) {
     if (!cout || typeof cout !== 'object' || cout.brut) return true;
     var suffisant = true;
+    var creditRestant = ressources.credit || 0;
     Object.keys(cout).forEach(function (cle) {
-      if (CHAMP_RESSOURCE[cle] && typeof cout[cle] === 'number' && (ressources[cle] || 0) < cout[cle]) {
-        suffisant = false;
+      if (!CHAMP_RESSOURCE[cle] || typeof cout[cle] !== 'number') return;
+      var manque = cout[cle] - (ressources[cle] || 0);
+      if (manque <= 0) return;
+      if (RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && creditRestant >= manque) {
+        creditRestant -= manque;
+        return;
       }
+      suffisant = false;
     });
     return suffisant;
   }
@@ -1346,10 +1371,28 @@ var StrategieService = (function () {
 
   function libelleOption_(opt) {
     if (typeof opt === 'string') return LIBELLES_OPTIONS[opt] || opt;
-    return Object.keys(opt).map(function (k) {
-      var v = opt[k];
-      return (LIBELLES_OPTIONS[k] || k) + (typeof v === 'number' ? ' (' + v + ')' : '');
-    }).join(' + ');
+    return Object.keys(opt)
+      // "tie_break" (ex. focus.json id 106, Renfort "Accélérer") est un
+      // MODIFICATEUR silencieux pour FocusEngine (voir
+      // CLES_MODIFICATEURS_SILENCIEUSES), jamais un choix affichable —
+      // sans ce filtre, une option comme {tie_break:"au_choix",
+      // avancer_civilisation_moins_avancee:1} affichait littéralement
+      // "tie_break + Avancer sur votre piste la moins avancée (1)"
+      // (todo.md, retour utilisateur : "libellé tie_break j'ai pas compris
+      // ce que ça signifie").
+      .filter(function (k) { return k !== 'tie_break'; })
+      .map(function (k) {
+        var v = opt[k];
+        // "ressource_choix" (todo.md, retour utilisateur) : label dédié
+        // "+N ressource(s) au choix" plutôt que le gabarit générique
+        // "clé (N)" — bien plus clair dans une liste d'options ("Regrouper",
+        // "+4 ressources au choix", "Avancer sur votre piste la moins
+        // avancée (1)"...).
+        if (k === 'ressource_choix' && typeof v === 'number') {
+          return '+' + v + ' ressource' + (v > 1 ? 's' : '') + ' au choix';
+        }
+        return (LIBELLES_OPTIONS[k] || k) + (typeof v === 'number' ? ' (' + v + ')' : '');
+      }).join(' + ');
   }
 
   function fermerModale_() {
@@ -1393,6 +1436,59 @@ var StrategieService = (function () {
         });
         btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
 
+      } else if (contexte.type === 'paiement_ressource') {
+        // Coût en Nourriture/Énergie/Matériel dont la réserve seule ne
+        // suffit pas (todo.md, retour utilisateur — voir focusEngine.js,
+        // resoudreCle_, cas dédié : cette popup n'ouvre QUE face à un
+        // manque, jamais quand la réserve suffit seule). Laisse le joueur
+        // répartir librement le montant entre la ressource restante et le
+        // Crédit (docs-rules-Influence-et-ressources.md §2, 1 Crédit pour
+        // 1 unité manquante) — SANS obligation d'utiliser tout le stock
+        // encore disponible (le joueur peut préférer le préserver et
+        // payer davantage en Crédit). resolve({utiliseRessource}) — le
+        // reste (montant - utiliseRessource) est en Crédit, calculé par
+        // focusEngine.js ; resolve({annule:true}) si le joueur renonce ou
+        // si même la combinaison complète ne suffit pas (bouton Valider
+        // alors désactivé/cette dernière possibilité affichée en clair).
+        var labelRessourcePaiement = CHAMP_RESSOURCE[contexte.ressource].label;
+        var montantPaiement = contexte.montant;
+        var stockRessourcePaiement = contexte.stockRessource || 0;
+        var stockCreditPaiement = contexte.stockCredit || 0;
+        var combinaisonImpossible = stockRessourcePaiement + stockCreditPaiement < montantPaiement;
+
+        titre.textContent = 'Payer ' + montantPaiement + ' ' + labelRessourcePaiement;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        if (combinaisonImpossible) {
+          contenu.innerHTML = '<p class="hint">Stock : ' + stockRessourcePaiement + ' ' + labelRessourcePaiement + ', ' + stockCreditPaiement + ' Crédit.</p>' +
+            '<p class="hint" style="color:var(--color-coral);">Insuffisant même en substituant tout le Crédit disponible (1 Crédit = 1 ' + labelRessourcePaiement + ') — Annuler.</p>';
+          btnValider.hidden = true;
+        } else {
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+
+          var render = function () {
+            var input = document.getElementById('paiement-ressource-input');
+            var utiliseRessourcePaiement = Math.max(0, Math.min(montantPaiement, Math.floor(Number(input.value)) || 0));
+            var utiliseCreditPaiement = montantPaiement - utiliseRessourcePaiement;
+            var possible = utiliseCreditPaiement <= stockCreditPaiement;
+            document.getElementById('paiement-ressource-resume').textContent =
+              utiliseRessourcePaiement + ' ' + labelRessourcePaiement + (utiliseCreditPaiement > 0 ? ' + ' + utiliseCreditPaiement + ' Crédit (substitution)' : '');
+            btnValider.disabled = !possible;
+            btnValider.onclick = possible ? function () { fermerModale_(); resolve({ utiliseRessource: utiliseRessourcePaiement }); } : null;
+          };
+
+          contenu.innerHTML =
+            '<p class="hint" id="paiement-ressource-resume"></p>' +
+            '<p class="hint">Stock : ' + stockRessourcePaiement + ' ' + labelRessourcePaiement + ', ' + stockCreditPaiement + ' Crédit (1 Crédit = 1 ' + labelRessourcePaiement + ' manquant).</p>' +
+            '<label class="hint" for="paiement-ressource-input">Payer en ' + labelRessourcePaiement + ' (le reste en Crédit)</label>' +
+            '<input type="number" min="0" max="' + montantPaiement + '" step="1" value="' + Math.min(montantPaiement, stockRessourcePaiement) + '" id="paiement-ressource-input" class="modal-choix-select">';
+
+          document.getElementById('paiement-ressource-input').addEventListener('input', render);
+          render();
+        }
+
       } else if (contexte.type === 'options_inclusives') {
         titre.textContent = 'Choisissez une ou plusieurs options (et/ou)';
         btnAnnuler.hidden = true;
@@ -1412,16 +1508,30 @@ var StrategieService = (function () {
       } else if (contexte.type === 'ressource_choix') {
         var restant = contexte.nombre;
         var choisies = [];
-        titre.textContent = (contexte.signe > 0 ? 'Choisissez ' : 'Dépensez ') + contexte.nombre + ' ressource(s) au choix';
+        // "Gagner"/"Dépensez" plutôt que "Choisissez" des deux côtés
+        // (todo.md, retour utilisateur — Focus Héroïque Renfort
+        // "Accélérer") : plus clair sur le SENS de l'effet (gain vs coût),
+        // "Choisissez" ne le précisait pas.
+        titre.textContent = (contexte.signe > 0 ? 'Gagner ' : 'Dépensez ') + contexte.nombre + ' ressource(s) au choix';
         btnAnnuler.hidden = true;
         btnValider.hidden = false;
         btnValider.textContent = 'Valider (arrêter ici)';
         btnValider.onclick = function () { fermerModale_(); resolve(choisies); };
 
+        // Nombre de fois où CETTE ressource a déjà été cliquée dans cette
+        // ouverture de popup — affiché directement sur son bouton (todo.md,
+        // retour utilisateur : "à chaque clic indiquer combien de
+        // ressources on a choisi, ex +x afficher sur le bouton").
+        function compteurChoisi_(cle) {
+          return choisies.filter(function (c) { return c === cle; }).length;
+        }
+
         function render() {
           contenu.innerHTML = '<p class="hint">Il reste ' + restant + ' à choisir (ou "Valider" pour arrêter avant).</p>' +
             '<div class="modal-choix-boutons">' + RESSOURCES_PRODUCTION.map(function (cle) {
-              return '<button class="btn btn-secondary btn-choix-ressource" data-ressource="' + cle + '">' + CHAMP_RESSOURCE[cle].label + '</button>';
+              var n = compteurChoisi_(cle);
+              return '<button class="btn btn-secondary btn-choix-ressource" data-ressource="' + cle + '">' + CHAMP_RESSOURCE[cle].label +
+                (n > 0 ? ' <span class="choix-ressource-compteur">+' + n + '</span>' : '') + '</button>';
             }).join('') + '</div>';
           Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-ressource'), function (btn) {
             btn.addEventListener('click', function () {
@@ -1645,9 +1755,16 @@ var StrategieService = (function () {
           nourriture: contexte.ressourceNourriture
         };
 
-        function vousAppartientDeploiement_(secteurs) {
+        // EVOLUTION todo.md (retour utilisateur) : le Secteur-Mère vous
+        // appartient TOUJOURS, même à 0 Puissance Navale (jamais repris
+        // par le Néant — même règle déjà appliquée à Regrouper,
+        // EVOLUTION 15) — `numeroSecteurMere` (optionnel, résolu par les
+        // modes 'par_chantier'/'libre' ci-dessous ; 'secteur_mere' cible
+        // déjà directement le Secteur-Mère sans passer par cette fonction)
+        // le rend éligible comme cible de déploiement même vide.
+        function vousAppartientDeploiement_(secteurs, numeroSecteurMere) {
           var parNumero = creerSecteurParNumero_(secteurs);
-          return function (numero) { return secteurEstPossede_(parNumero(numero)); };
+          return function (numero) { return secteurEstPossede_(parNumero(numero)) || numero === numeroSecteurMere; };
         }
 
         function demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale) {
@@ -1784,8 +1901,12 @@ var StrategieService = (function () {
         }
 
         if (contexte.mode === 'par_chantier') {
-          SecteurService.obtenirSecteurs(partieDeploiement.id).then(function (secteurs) {
-            var vousAppartient = vousAppartientDeploiement_(secteurs);
+          Promise.all([
+            SecteurService.obtenirSecteurs(partieDeploiement.id),
+            SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId)
+          ]).then(function (resultats) {
+            var secteurs = resultats[0];
+            var vousAppartient = vousAppartientDeploiement_(secteurs, resultats[1]);
             var cibles = secteurs
               .filter(function (s) { return vousAppartient(s.numero) && (s.installationChantierNaval || 0) > 0; })
               .map(function (s) { return { numero: s.numero, maxCubes: (s.installationChantierNaval || 0) * contexte.quantiteDemandee }; });
@@ -1814,8 +1935,12 @@ var StrategieService = (function () {
           });
 
         } else { // 'libre'
-          SecteurService.obtenirSecteurs(partieDeploiement.id).then(function (secteurs) {
-            var vousAppartient = vousAppartientDeploiement_(secteurs);
+          Promise.all([
+            SecteurService.obtenirSecteurs(partieDeploiement.id),
+            SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId)
+          ]).then(function (resultats) {
+            var secteurs = resultats[0];
+            var vousAppartient = vousAppartientDeploiement_(secteurs, resultats[1]);
             var cibles = secteurs
               .filter(function (s) { return vousAppartient(s.numero); })
               .map(function (s) { return { numero: s.numero, maxCubes: Infinity }; });
@@ -3430,6 +3555,51 @@ var StrategieService = (function () {
             });
         }
 
+      } else if (contexte.type === 'defausser_gloire') {
+        // Coût "defausser_gloire" (todo.md, retour utilisateur — ex. Focus
+        // Progrès Héroïque "Restaurer", focus.json id 102) — miroir de
+        // 'ameliorer_gloire' ci-dessus (même détermination automatique du
+        // jeton Gloire de plus petite valeur, mêmes précautions sur
+        // `etatGloire` — voir son commentaire "IMPORTANT" ci-dessus), mais
+        // RETIRE le jeton (case remise à null) plutôt que d'incrémenter sa
+        // valeur. Aucun plafond à 5 ici : un jeton déjà au maximum reste
+        // éligible à la défausse.
+        titre.textContent = 'Défausser un jeton Gloire';
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieGloireDefausse = partieAffichee;
+        var gloireAvantDefausse = etatGloire.slice(0, 5);
+        while (gloireAvantDefausse.length < 5) gloireAvantDefausse.push(null);
+
+        var indexGloireMinDefausse = -1, valeurGloireMinDefausse = null;
+        gloireAvantDefausse.forEach(function (v, i) {
+          if (v === null || v === undefined) return;
+          if (valeurGloireMinDefausse === null || v < valeurGloireMinDefausse) { valeurGloireMinDefausse = v; indexGloireMinDefausse = i; }
+        });
+
+        if (indexGloireMinDefausse === -1) {
+          fermerModale_();
+          window.alert('Aucun jeton Gloire à défausser (aucun jeton posé sur la fiche Maison).');
+          resolve({ annule: true });
+        } else {
+          var gloireApresDefausse = gloireAvantDefausse.slice();
+          gloireApresDefausse[indexGloireMinDefausse] = null;
+          GameService.majPlateauMaison(partieGloireDefausse.id, { gloire: gloireApresDefausse })
+            .then(function () {
+              partieGloireDefausse.plateauMaison.gloire = gloireApresDefausse;
+              etatGloire = gloireApresDefausse;
+              renderGloireDOM_(partieGloireDefausse);
+              fermerModale_();
+              resolve({ detail: 'jeton Gloire ' + valeurGloireMinDefausse + ' défaussé.' });
+            })
+            .catch(function (erreur) {
+              window.alert('Échec de la défausse du jeton Gloire : ' + erreur.message);
+            });
+        }
+
       } else if (contexte.type === 'avancer_civilisation') {
         // Popup pour les clés focusEngine.js "avancer_civilisation"
         // (piste au choix, contexte.piste === null) / "avancer_
@@ -3514,20 +3684,46 @@ var StrategieService = (function () {
 
         obtenirDetailPistesCache_(nomMaisonCivilisation).then(function (detail) {
           if (contexte.moinsAvancee) {
-            // Même tri que CivilisationService.avancerPisteMoinsAvancee
-            // (js/civilisationService.js) : la moins avancée, égalité
-            // départagée par l'ordre fixe Société > Gouvernement >
-            // Économie — calculé ICI plutôt que d'appeler cette fonction
-            // séparément, pour réutiliser TEL QUEL le rendu/la validation
-            // du mode "piste imposée" ci-dessous (résultat identique).
-            var pisteMoinsAvancee = CivilisationService.PISTES.slice().sort(function (a, b) {
-              return (civActuelle[a] || 0) - (civActuelle[b] || 0);
-            })[0];
-            var niveauMoinsAvancee = civActuelle[pisteMoinsAvancee] || 0;
+            var niveauMin = Math.min.apply(null, CivilisationService.PISTES.map(function (p) { return civActuelle[p] || 0; }));
+            var pistesAEgalite = CivilisationService.PISTES.filter(function (p) { return (civActuelle[p] || 0) === niveauMin; });
+
+            // todo.md (retour utilisateur, Focus Héroïque Renfort
+            // "Accélérer") : plusieurs pistes à égalité pour la moins
+            // avancée — si l'appelant l'a signalé (`tieBreakAuChoix`, voir
+            // focusEngine.js resoudreCle_ cas "avancer_civilisation_moins_
+            // avancee", clé sœur "tie_break":"au_choix" du catalogue),
+            // laisser le joueur choisir PARMI CELLES-LÀ SEULEMENT, plutôt
+            // que de retomber silencieusement sur l'ordre fixe Société >
+            // Gouvernement > Économie ci-dessous. Bug rapporté : seule la
+            // piste la mieux placée dans cet ordre était proposée, même
+            // quand une autre piste (ex. Économie) était aussi au niveau
+            // le plus bas.
+            if (contexte.tieBreakAuChoix && pistesAEgalite.length > 1) {
+              contenu.innerHTML = '<p class="hint">' + pistesAEgalite.length + ' pistes sont à égalité pour la moins avancée (niveau ' +
+                niveauMin + '/' + CivilisationService.NIVEAU_MAX + ') — choisissez laquelle avancer.</p>' +
+                '<div class="modal-choix-boutons">' +
+                pistesAEgalite.map(function (piste) {
+                  return '<button type="button" class="btn btn-secondary btn-choix-liste" data-piste="' + piste + '">' +
+                    CivilisationService.NOM_PISTE[piste] + ' — niveau ' + niveauMin + '/' + CivilisationService.NIVEAU_MAX +
+                    '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, piste) + '</span>' +
+                    '</button>';
+                }).join('') + '</div>';
+              btnValider.hidden = true;
+              Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+                btn.addEventListener('click', function () { validerAvancementPiste_(btn.dataset.piste, btn); });
+              });
+              return;
+            }
+
+            // Sans égalité (ou sans tie_break "au_choix" côté appelant) :
+            // même tri que CivilisationService.avancerPisteMoinsAvancee
+            // (js/civilisationService.js) — l'ordre fixe PISTES départage
+            // silencieusement, comportement inchangé.
+            var pisteMoinsAvancee = pistesAEgalite[0];
             contenu.innerHTML = '<p class="hint">Piste la moins avancée : ' + CivilisationService.NOM_PISTE[pisteMoinsAvancee] +
-              ' (niveau ' + niveauMoinsAvancee + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
+              ' (niveau ' + niveauMin + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
               '<p class="hint">' + apercuProchaineCase_(detail, pisteMoinsAvancee) + '</p>';
-            btnValider.hidden = niveauMoinsAvancee >= CivilisationService.NIVEAU_MAX;
+            btnValider.hidden = niveauMin >= CivilisationService.NIVEAU_MAX;
             btnValider.textContent = 'Avancer';
             btnValider.onclick = function () { validerAvancementPiste_(pisteMoinsAvancee, null); };
             return;

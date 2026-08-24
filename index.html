@@ -21,6 +21,11 @@
 
   <header class="topbar">
     <h1 id="topbar-titre" class="topbar-titre" title="Retour à l'accueil">Voidfall<span class="topbar-accent">Companion</span></h1>
+    <!-- Toggle "garder l'écran allumé" (Screen Wake Lock API) — discret,
+         toujours visible (header commun à tous les écrans), masqué si
+         l'API n'est pas supportée (ex. iOS < 16.4) plutôt que proposé sans
+         effet. Voir le script de câblage en bas de page. -->
+    <button id="btn-veille-ecran" class="btn-veille-ecran" type="button" aria-pressed="false" hidden>☕</button>
   </header>
 
   <!-- Barre visible uniquement pendant une partie ouverte. -->
@@ -2645,6 +2650,73 @@
     });
 
     SetupService.init();
+  })();
+
+  // ------------------------------------------------------------
+  // Toggle "garder l'écran allumé" (Screen Wake Lock API) — bouton
+  // #btn-veille-ecran, barre de titre (topbar), visible sur tous les
+  // écrans. Supporté par Safari iOS depuis la 16.4 (y compris une PWA
+  // installée en standalone) ; masqué (voir markup, `hidden` par défaut)
+  // sur tout navigateur/version ne l'exposant pas plutôt que proposé sans
+  // effet. Préférence persistée en IndexedDB (`meta`, même mécanisme que
+  // `catalogueVersion` — js/catalogueSync.js), pas en localStorage (seule
+  // persistance du projet, voir CLAUDE.md).
+  //
+  // Le verrou est automatiquement relâché par le navigateur dès que l'app
+  // quitte le premier plan (changement d'app, verrouillage manuel de
+  // l'écran) — c'est le comportement standard de l'API, pas une limite du
+  // code ici. Il est donc redemandé à chaque retour au premier plan
+  // (`visibilitychange`) tant que l'utilisateur a activé le toggle,
+  // silencieusement (un refus, ex. batterie faible, ne doit pas interrompre
+  // l'utilisateur pour un confort optionnel).
+  (function () {
+    var btnVeille = document.getElementById('btn-veille-ecran');
+    if (!btnVeille || !('wakeLock' in navigator)) return;
+
+    var CLE_META_VEILLE = 'veilleEcranActive';
+    var wakeLockSentinel = null;
+    var veilleSouhaitee = false;
+
+    btnVeille.hidden = false;
+
+    function majBoutonVeille_() {
+      btnVeille.classList.toggle('active', veilleSouhaitee);
+      btnVeille.setAttribute('aria-pressed', String(veilleSouhaitee));
+      btnVeille.title = veilleSouhaitee
+        ? 'Écran maintenu allumé — cliquer pour désactiver'
+        : 'Garder l\'écran allumé pendant l\'utilisation';
+    }
+
+    function demanderVerrou_() {
+      if (!veilleSouhaitee || document.visibilityState !== 'visible' || wakeLockSentinel) return;
+      navigator.wakeLock.request('screen').then(function (sentinel) {
+        wakeLockSentinel = sentinel;
+        wakeLockSentinel.addEventListener('release', function () { wakeLockSentinel = null; });
+      }).catch(function () { /* refus silencieux, voir commentaire ci-dessus */ });
+    }
+
+    function relacherVerrou_() {
+      if (!wakeLockSentinel) return;
+      wakeLockSentinel.release().catch(function () {});
+      wakeLockSentinel = null;
+    }
+
+    DB.get('meta', CLE_META_VEILLE).then(function (ligne) {
+      veilleSouhaitee = !!(ligne && ligne.valeur);
+      majBoutonVeille_();
+      demanderVerrou_();
+    });
+
+    btnVeille.addEventListener('click', function () {
+      veilleSouhaitee = !veilleSouhaitee;
+      majBoutonVeille_();
+      DB.put('meta', { cle: CLE_META_VEILLE, valeur: veilleSouhaitee });
+      if (veilleSouhaitee) { demanderVerrou_(); } else { relacherVerrou_(); }
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') demanderVerrou_();
+    });
   })();
 </script>
 </body>
