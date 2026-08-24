@@ -821,6 +821,40 @@ input:disabled {
   border-color: var(--color-coral-dim);
 }
 
+/* EVOLUTION 18 (todo.md) : "un cadre unique pour une action et des sous
+   cadres pour les effets déclenché par cette action" — .journal-action
+   est un <li> de .journal-liste (hérite donc du style carte ci-dessus),
+   .journal-action-effets est la liste imbriquée de ses lignes (une par
+   Effet/Coût/rappel manuel résolu), stylée distinctement (indentée, fond
+   plus sombre) pour ne pas ressembler à une 2e carte empilée. */
+.journal-action-titre {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+.journal-action-effets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.journal-action-effets li {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: none;
+  border-left: 2px solid var(--color-border);
+}
+.journal-action-effets li.journal-avertissement {
+  color: var(--color-coral);
+  border-left-color: var(--color-coral-dim);
+}
+
 .bloc-annulation {
   display: flex;
   align-items: center;

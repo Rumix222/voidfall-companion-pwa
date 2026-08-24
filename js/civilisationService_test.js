@@ -385,3 +385,32 @@ test('avancerPiste sur une piste Corrompue déjà au maximum : no-op, dejaMaximu
     assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 7);
   });
 });
+
+// EVOLUTION 18 (todo.md) : quand avancerPiste est appelée DANS une action
+// Focus/Programme déjà suivie (DB.enregistrementActif() === true, posé
+// par FocusEngine.jouerActionEtPersister/GameService.utiliserProgramme —
+// voir db.js), elle ne doit PAS empiler sa propre entrée séparée : ses
+// mutations remontent naturellement dans l'enregistrement ambiant de
+// l'orchestrateur englobant. Comportement inchangé (self-empile) quand
+// aucun enregistrement n'est actif (bouton "Avancer" manuel, ou un Cadre
+// d'Événement galactique — voir les autres tests de ce fichier).
+test('avancerPiste : enregistrement db.js déjà actif -> ne s’empile PAS elle-même (évite une 2e entrée de pile pour la même action)', function () {
+  var ctx = creerContexte_([
+    { type: 'Standard', piste: 'Société', caseNumero: 1, texte: 'Gagnez 20 Influence.', effet: JSON.stringify({ influence: 20 }) }
+  ]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_();
+  ctx.sandbox.DB.enregistrementActif = function () { return true; };
+
+  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'societe', function () {
+    throw new Error('demanderChoix ne devrait pas être appelé pour cet effet automatisé.');
+  }).then(function (resultat) {
+    assert.strictEqual(resultat.effetSucces, true);
+    assert.strictEqual(resultat.nouveauNiveau, 1);
+    // La mutation a bien été appliquée (majCivilisation/majPlateauMaison,
+    // capturées par l'enregistrement ambiant simulé ici) ...
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civSociete, 1);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].influence, 20);
+    // ... mais AUCUN appel à AnnulationService.empiler.
+    assert.strictEqual(ctx.appelsAnnulation.length, 0);
+  });
+});

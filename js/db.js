@@ -166,13 +166,14 @@ var DB = (function () {
   }
 
   /**
-   * Écriture (création ou mise à jour) d'un seul enregistrement.
+   * Écriture BRUTE (création ou mise à jour) d'un seul enregistrement —
+   * jamais appelée directement en dehors de put() ci-dessous (qui
+   * l'entoure de la capture d'enregistrement EVOLUTION 18, voir plus bas).
    * ⚠️ Ne touche jamais aux autres enregistrements du store — respecte la
    * règle projet "ne jamais rerender/écraser les autres champs si un seul
    * est modifié localement".
    */
-  function put(nomStore, valeur) {
-    verifierStore_(nomStore);
+  function ecrirePut_(nomStore, valeur) {
     return ouvrir_().then(function (base) {
       return new Promise(function (resoudre, rejeter) {
         var transaction = base.transaction(nomStore, 'readwrite');
@@ -180,6 +181,138 @@ var DB = (function () {
         requete.onsuccess = function () { resoudre(valeur); };
         requete.onerror = function () { rejeter(requete.error); };
       });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // EVOLUTION 18 (todo.md, retour utilisateur — annuler la dernière action
+  // ne rétablit pas les effets déclenchés en dehors de plateauMaison, ex.
+  // Focus Conquête "Planifier" : le Programme gagné et la Corruption
+  // déplacée ne sont pas défaits par "Annuler la dernière action") :
+  //
+  // Journal de bord ("changelog") générique, plutôt qu'un système de
+  // mutations construites à la main par chaque popup/service — TOUTE
+  // écriture DB.put() passée pendant un enregistrement actif est capturée
+  // automatiquement, quel que soit le store ou l'appelant (secteurService.js/
+  // civilisationService.js/gameService.js n'ont RIEN à changer). Un seul
+  // "avant"/"apres" est conservé PAR ENREGISTREMENT (store+clé) : si la
+  // même ligne est réécrite plusieurs fois pendant une même action (ex.
+  // "regrouper" touche 2 secteurs, ou une piste de Civilisation chaîne
+  // plusieurs "avance rapide"), seul le tout premier "avant" et le tout
+  // dernier "apres" sont retenus — annuler restaure bien l'état d'avant
+  // l'action entière, pas un état intermédiaire.
+  //
+  // Portée délibérément limitée à une "action" au sens todo.md (Action
+  // Focus via FocusEngine.jouerActionEtPersister, action de Programme en
+  // main via GameService.utiliserProgramme) : ce sont les 2 SEULS
+  // appelants qui démarrent un enregistrement (voir demarrerEnregistrement/
+  // arreterEnregistrement ci-dessous, appelés depuis focusEngine.js/
+  // gameService.js). Un effet déclenché par un Événement galactique
+  // (Cadre) n'est PAS enregistré (aucun `demarrerEnregistrement` autour de
+  // GameService.appliquerCadre*) — conforme à la règle explicite du
+  // todo.md : "L'effet d'un evenement n'a pas a etre annulé... il ne faut
+  // meme pas le tracer".
+  //
+  // `pileAnnulation`/`parties`/`historique` sont TOUJOURS exclus de la
+  // capture (stores de bookkeeping, jamais du contenu de partie à annuler)
+  // — évite aussi tout risque de capture récursive si un enregistrement
+  // reste actif au moment où AnnulationService.empiler écrit sa propre
+  // entrée (en pratique jamais le cas : empiler est toujours appelé APRÈS
+  // arreterEnregistrement par les 2 orchestrateurs ci-dessus).
+  // ------------------------------------------------------------
+
+  var STORES_EXCLUS_ENREGISTREMENT_ = { pileAnnulation: true, parties: true, historique: true };
+  var enregistrement_ = null; // null = inactif, sinon {'store|JSON(cle)': {store, cle, avant, apres}}
+
+  function clonerValeur_(valeur) {
+    return valeur == null ? valeur : JSON.parse(JSON.stringify(valeur));
+  }
+
+  /**
+   * Extrait la clé (simple ou composée) d'un enregistrement à partir du
+   * keyPath déclaré du store (STORES ci-dessus) — même convention que
+   * IndexedDB lui-même (keyPath tableau = clé composée, dans l'ordre).
+   */
+  function clePourEnregistrement_(nomStore, valeur) {
+    var keyPath = STORES[nomStore].keyPath;
+    if (Array.isArray(keyPath)) return keyPath.map(function (champ) { return valeur[champ]; });
+    return valeur[keyPath];
+  }
+
+  /**
+   * Démarre un nouvel enregistrement (remplace tout enregistrement en
+   * cours — un seul à la fois, JS étant mono-thread et les 2 orchestrateurs
+   * concernés n'imbriquant jamais 2 actions annulables en parallèle).
+   */
+  function demarrerEnregistrement() {
+    enregistrement_ = {};
+  }
+
+  /**
+   * Arrête l'enregistrement en cours et retourne les mutations capturées
+   * (tableau de {store, cle, avant, apres}), prêt à être passé tel quel à
+   * AnnulationService.empiler. Sans effet si aucun enregistrement actif
+   * (retourne []) — sûr à appeler même après une erreur en amont.
+   */
+  function arreterEnregistrement() {
+    var captures = enregistrement_
+      ? Object.keys(enregistrement_).map(function (cleInterne) { return enregistrement_[cleInterne]; })
+      : [];
+    enregistrement_ = null;
+    return captures;
+  }
+
+  /**
+   * Vrai si un enregistrement est actuellement actif — consommé par
+   * civilisationService.js (avancerPiste) pour savoir si CET appel fait
+   * partie d'une action déjà enregistrée par un orchestrateur englobant
+   * (auquel cas il ne doit PAS empiler sa propre entrée séparée dans la
+   * pile d'annulation, ses mutations remontant naturellement dans
+   * l'enregistrement ambiant) ou s'il est déclenché de façon autonome
+   * (bouton dédié écran Plat. maison, hors de toute action Focus/Programme
+   * — comportement inchangé, self-empile comme avant EVOLUTION 18).
+   */
+  function enregistrementActif() {
+    return !!enregistrement_;
+  }
+
+  /**
+   * Écriture (création ou mise à jour) d'un seul enregistrement — capture
+   * transparente pour la pile d'annulation si un enregistrement est actif
+   * (EVOLUTION 18 ci-dessus), délègue à ecrirePut_ pour l'écriture réelle.
+   */
+  function put(nomStore, valeur) {
+    verifierStore_(nomStore);
+
+    if (!enregistrement_ || STORES_EXCLUS_ENREGISTREMENT_[nomStore]) {
+      return ecrirePut_(nomStore, valeur);
+    }
+
+    var cle = clePourEnregistrement_(nomStore, valeur);
+    var cleInterne = nomStore + '|' + JSON.stringify(cle);
+    var enregistrementCourant = enregistrement_;
+
+    function noterApres_(resultat) {
+      // enregistrementCourant (pas enregistrement_) : si un NOUVEL
+      // enregistrement a démarré entre-temps (ne devrait jamais arriver en
+      // pratique, mono-thread + pas d'imbrication), on n'écrit pas dans le
+      // mauvais enregistrement.
+      var entree = enregistrementCourant[cleInterne];
+      if (entree) entree.apres = clonerValeur_(valeur);
+      return resultat;
+    }
+
+    if (enregistrementCourant[cleInterne]) {
+      // Déjà touché plus tôt dans CETTE action : "avant" déjà capturé,
+      // seul "apres" doit avancer.
+      return ecrirePut_(nomStore, valeur).then(noterApres_);
+    }
+
+    // Premier contact avec cette ligne pendant l'action : capture "avant"
+    // via une lecture fraîche AVANT d'écrire.
+    return get(nomStore, cle).then(function (avant) {
+      enregistrementCourant[cleInterne] = { store: nomStore, cle: cle, avant: clonerValeur_(avant), apres: null };
+      return ecrirePut_(nomStore, valeur).then(noterApres_);
     });
   }
 
@@ -224,6 +357,10 @@ var DB = (function () {
     getAll: getAll,
     put: put,
     putTout: putTout,
-    supprimer: supprimer
+    supprimer: supprimer,
+    // EVOLUTION 18 (todo.md) — voir bloc de commentaires ci-dessus.
+    demarrerEnregistrement: demarrerEnregistrement,
+    arreterEnregistrement: arreterEnregistrement,
+    enregistrementActif: enregistrementActif
   };
 })();

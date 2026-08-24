@@ -46,12 +46,12 @@
  * CLÉS HORS PÉRIMÈTRE — signalé explicitement (pas d'invention de logique) :
  * Certaines clés dépendent de systèmes que la PWA ne modélise pas
  * automatiquement (voir secteurService.js/gameService.js, en-têtes) :
- *   - Actions sur les secteurs : rappeler_cube, effet_secteur (les autres
- *     actions secteur — regrouper/regroupe, deployer_cube*, envahir/
- *     envahir_corrompu, retirer_corruption — ont chacune un cas dédié
- *     dans resoudreCle_ ci-dessous ; secteurService.js PWA ne porte que
- *     l'instanciation/lecture pour rappeler_cube/effet_secteur, actions
- *     hors périmètre — cf. son en-tête)
+ *   - Actions sur les secteurs : effet_secteur (les autres actions
+ *     secteur — regrouper/regroupe, deployer_cube*, envahir/
+ *     envahir_corrompu, retirer_corruption, rappeler_cube (Coût, EVOLUTION
+ *     13 todo.md) — ont chacune un cas dédié dans resoudreCle_ ci-dessous ;
+ *     secteurService.js PWA ne porte que l'instanciation/lecture pour
+ *     effet_secteur, action hors périmètre — cf. son en-tête)
  *   - Civilisation : avance_rapide, avancer_piste_corrompue
  *     ("avancer_civilisation" et ses variantes "_societe"/"_gouvernement"/
  *     "_economie"/"_moins_avancee" ont chacune un cas dédié ci-dessous qui
@@ -112,24 +112,26 @@ var FocusEngine = (function () {
 
   var CLES_MODIFICATEURS_SILENCIEUSES = ['sans_benefice_case', 'exclude', 'restriction', 'same_sector', 'meme_secteur', 'tie_break'];
 
-  // "rappeler_cube"/"effet_secteur" restent hors périmètre (déjà branchés
-  // en formulaires dédiés côté écran Secteurs, pas de popup Focus/Cadre
-  // dédiée pour eux) — les clés de construction/établissement générique
-  // (voir CLES_CONSTRUIRE/CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous) et
-  // "retirer_corruption" (cas dédié, comme construire/augmenter_
-  // population_pure, qui ouvre une popup de choix parmi les 4 cibles
-  // possibles — Secteur, Piste de Civilisation, Programme, Technologie
-  // Chambres de décontamination — voir strategieService.js, contexte
-  // 'retirer_corruption') en sont exclues. Les VARIANTES du catalogue
-  // (etablir_guilde_meme_secteur/_up_to/_scientifique,
-  // construire_installation_meme_secteur/_autre_secteur/_up_to —
-  // contrainte de secteur croisée avec une autre clé du même JSON,
-  // répétition "jusqu'à N fois", ou type figé) restent hors périmètre :
-  // elles retombent sur le repli générique en bas de resoudreCle_ ("effet
-  // non chiffré — à appliquer manuellement"), portée volontairement
-  // limitée au pattern décrit (secteur libre + type au choix, quantité 1).
+  // "effet_secteur" reste hors périmètre (déjà branché en formulaire dédié
+  // côté écran Secteurs, pas de popup Focus/Cadre dédiée pour lui) — les
+  // clés de construction/établissement générique (voir CLES_CONSTRUIRE/
+  // CATEGORIE_PAR_CLE_CONSTRUIRE_ ci-dessous), "retirer_corruption" (cas
+  // dédié, comme construire/augmenter_population_pure, qui ouvre une popup
+  // de choix parmi les 4 cibles possibles — Secteur, Piste de Civilisation,
+  // Programme, Technologie Chambres de décontamination — voir
+  // strategieService.js, contexte 'retirer_corruption') et "rappeler_cube"
+  // (EVOLUTION 13, todo.md — cas dédié Coût uniquement, voir plus bas dans
+  // resoudreCle_, testé avant le repli générique "cube") en sont exclues.
+  // Les VARIANTES du catalogue (etablir_guilde_meme_secteur/_up_to/
+  // _scientifique, construire_installation_meme_secteur/_autre_secteur/
+  // _up_to — contrainte de secteur croisée avec une autre clé du même
+  // JSON, répétition "jusqu'à N fois", ou type figé) restent hors
+  // périmètre : elles retombent sur le repli générique en bas de
+  // resoudreCle_ ("effet non chiffré — à appliquer manuellement"), portée
+  // volontairement limitée au pattern décrit (secteur libre + type au
+  // choix, quantité 1).
   var CLES_SECTEUR_HORS_PERIMETRE = [
-    'rappeler_cube', 'effet_secteur'
+    'effet_secteur'
   ];
   var CATEGORIE_PAR_CLE_CONSTRUIRE_ = {
     construire_installation: 'installation', installation: 'installation',
@@ -410,6 +412,33 @@ var FocusEngine = (function () {
             : '') + '.');
         return true;
       });
+    }
+
+    // --- Rappeler un cube (EVOLUTION 13, todo.md) : Coût UNIQUEMENT
+    // (signe < 0 — ex. Focus Développement "Installer" Standard,
+    // cout: {rappeler_cube:1}, 7 autres cartes du catalogue partagent ce
+    // même coût). Doit être testée AVANT le repli générique "toute clé
+    // contenant cube" plus bas (qui déciderait sinon, à tort, de décrémenter
+    // cubeActif — un rappel de cube AJOUTE à la zone active depuis un
+    // secteur, il ne consomme pas un cube déjà actif). Ouvre une popup
+    // dédiée (contexte 'rappeler_cube_cout', strategieService.js)
+    // DISTINCTE de la popup 'rappeler_cube' déjà existante (option "recall"
+    // d'un Cadre d'Événement, un EFFET, sans cette restriction) : ne
+    // propose QUE les secteurs qui ne seraient PAS abandonnés par ce rappel
+    // (Secteur-Mère à part, toujours éligible) — voir docs-rules-flottes.md
+    // §1.5/§4 : rappeler le dernier cube d'un secteur hors Secteur-Mère
+    // l'abandonne et coûte un jeton Gloire, mécanique délibérément non
+    // modélisée ici (choix du TODO). La popup fait le choix ET la
+    // persistance (comme construire/regrouper/envahir ci-dessous —
+    // focusEngine reste pur, aucun accès DB ici) ; resoudreCle_ relaie
+    // juste le résumé dans le journal. "Annuler" bloque toute l'action
+    // (même règle que les autres popups de coût/effet). ---
+    if (cle === 'rappeler_cube' && signe < 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'rappeler_cube_cout',
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
     }
 
     // --- Construire une Installation / Établir une Guilde : Effet
@@ -765,21 +794,32 @@ var FocusEngine = (function () {
     // SecteurService.envahirResoudre — tout cela dans la popup (DOM, voir
     // strategieService.js), pas ici (focusEngine reste pur). "Annuler"
     // bloque toute l'action. Conséquences SCALAIRES (jetonPrime/
-    // jetonLiberation/influence en victoire, cubeActif en défaite,
-    // clampé à NB_CUBES_TOTAL) appliquées ICI sur l'état pur — le jeton
-    // Gloire (array, non diffable par ce moteur au clone JSON) est en
-    // revanche persisté DIRECTEMENT par la popup (même pattern que le
-    // clic manuel sur un emplacement Gloire côté écran Stratégie),
-    // l'Influence gagnée depuis son total étant calculée là-bas et
-    // simplement relayée ici en scalaire. HORS PÉRIMÈTRE (journalisé en
-    // avertissement le cas échéant, à traiter manuellement) : défausse
-    // d'un jeton Gloire pour un secteur source
+    // jetonLiberation/influence en victoire, cubeActif TOUJOURS — voir
+    // EVOLUTION 16 ci-dessous, clampé à NB_CUBES_TOTAL) appliquées ICI sur
+    // l'état pur — le jeton Gloire (array, non diffable par ce moteur au
+    // clone JSON) est en revanche persisté DIRECTEMENT par la popup (même
+    // pattern que le clic manuel sur un emplacement Gloire côté écran
+    // Stratégie), l'Influence gagnée depuis son total étant calculée
+    // là-bas et simplement relayée ici en scalaire. HORS PÉRIMÈTRE
+    // (journalisé en avertissement le cas échéant, à traiter
+    // manuellement) : défausse d'un jeton Gloire pour un secteur source
     // abandonné (repris par le Néant). PAS hors périmètre en revanche :
     // les jetons Prime/Libération gagnés restent de simples compteurs
     // (jetonPrime/jetonLiberation), cohérent avec le reste du moteur où
     // ce sont déjà des clés simples (CLES_SIMPLES) — leur résolution
     // immédiate (dépense) n'est pas automatisée, comme n'importe quelle
-    // autre carte à jouer plus tard. ---
+    // autre carte à jouer plus tard.
+    //
+    // EVOLUTION 16 (todo.md, docs-rules-flottes.md §1.5 : "subir des
+    // Dégâts au Combat" = rappeler 1 cube vers la zone active) :
+    // `reponse.cubesPerdus` (calculé par la popup — totalEngage moins les
+    // survivants exacts de CombatService.resoudreInvasion) revient
+    // TOUJOURS en Cube actif, victoire ou défaite — pas seulement en
+    // défaite comme avant cette évolution (les cubes perdus au cours d'un
+    // combat gagné disparaissaient jusqu'ici du suivi sans jamais revenir
+    // en Cube actif). En défaite/égalité, survivants = 0 côté popup, donc
+    // `cubesPerdus` vaut `totalEngage` — comportement inchangé pour ce
+    // cas. ---
     if (cle === 'envahir' || cle === 'envahir_corrompu') {
       return Promise.resolve(demanderChoix({
         type: 'envahir',
@@ -792,9 +832,9 @@ var FocusEngine = (function () {
           etat.jetonPrime = (etat.jetonPrime || 0) + (reponse.jetonPrime || 0);
           etat.jetonLiberation = (etat.jetonLiberation || 0) + (reponse.jetonLiberation || 0);
           etat.influence = (etat.influence || 0) + (reponse.influenceGagnee || 0);
-        } else {
-          etat.cubeActif = Math.min(NB_CUBES_TOTAL, etat.cubeActif + (reponse.totalEngage || 0));
         }
+        var cubesPerdus = reponse.victoire ? (reponse.cubesPerdus || 0) : (reponse.totalEngage || 0);
+        etat.cubeActif = Math.min(NB_CUBES_TOTAL, etat.cubeActif + cubesPerdus);
         journal.push(source + ' : ' + reponse.detail);
         if (reponse.avertissement) journal.push(source + ' : ⚠️ ' + reponse.avertissement);
         return true;
@@ -996,27 +1036,68 @@ var FocusEngine = (function () {
    * appelle pour jouer une action Focus (voir strategieService.js).
    * Dépend de DB, GameService, AnnulationService (à charger avant ce
    * fichier si cette fonction est utilisée).
+   *
+   * EVOLUTION 18 (todo.md, retour utilisateur — annuler la dernière action
+   * ne rétablit pas les effets déclenchés par des popups déléguées qui
+   * persistent DIRECTEMENT en base, ex. secteurs/Programmes/pistes de
+   * Civilisation via SecteurService/GameService/CivilisationService, hors
+   * du diff plateauMaison de resoudreAction ci-dessus) : toute la
+   * résolution — Effet ET Coût, y compris les popups déléguées qu'elle
+   * ouvre via demanderChoix — se déroule maintenant sous
+   * `DB.demarrerEnregistrement()` (db.js), qui capture AUTOMATIQUEMENT
+   * TOUTE écriture DB.put() faite pendant cette fenêtre, quel que soit le
+   * store — pas seulement les 9 champs plateauMaison suivis par
+   * diffChamps_. `DB.arreterEnregistrement()` est TOUJOURS appelé (succès,
+   * échec, ou exception) avant de quitter cette fonction, pour ne jamais
+   * laisser un enregistrement actif fuiter vers d'autres écritures DB sans
+   * rapport.
+   * - Si l'Effet échoue (resultat.succes === false) : la RÈGLE MÉTIER de
+   *   ce fichier veut qu'un Effet en échec ne laisse AUCUNE trace — or une
+   *   popup déléguée peut avoir déjà écrit en base AVANT que l'échec ne
+   *   soit connu (ex. "et/ou" : une option réussit, l'autre est annulée).
+   *   Ces écritures captées sont donc immédiatement défaites via
+   *   AnnulationService.restaurerMutations, sans jamais transiter par la
+   *   pile (rien n'est empilé pour une action qui échoue).
+   * - Si l'Effet réussit : les mutations capturées (englobant la propre
+   *   écriture GameService.majPlateauMaison ci-dessous PLUS toute écriture
+   *   d'une popup déléguée) remplacent — pas s'ajoutent à —
+   *   `resultat.mutations` (diffChamps_) pour l'appel à
+   *   AnnulationService.empiler : c'est un sur-ensemble strictement plus
+   *   complet du même événement, construire les deux séparément ne ferait
+   *   que dupliquer la mutation plateauMaison.
    */
   function jouerActionEtPersister(partieId, carte, action, demanderChoix) {
     return DB.get('plateauMaison', partieId).then(function (plateauMaison) {
       if (!plateauMaison) throw new Error('Plateau maison introuvable (partie ' + partieId + ').');
 
+      DB.demarrerEnregistrement();
+
       return resoudreAction(plateauMaison, carte, action, demanderChoix).then(function (resultat) {
-        if (!resultat.succes || !resultat.mutations.length) {
-          return resultat;
+        if (!resultat.succes) {
+          var mutationsARestaurer = DB.arreterEnregistrement();
+          return AnnulationService.restaurerMutations(partieId, mutationsARestaurer).then(function () { return resultat; });
         }
 
         var champs = {};
         resultat.mutations.forEach(function (m) { champs[m.champ] = resultat.plateauMaisonApres[m.champ]; });
+        var ecriturePlateauMaison = Object.keys(champs).length
+          ? GameService.majPlateauMaison(partieId, champs)
+          : Promise.resolve();
 
-        return GameService.majPlateauMaison(partieId, champs).then(function () {
+        return ecriturePlateauMaison.then(function () {
+          var mutationsCapturees = DB.arreterEnregistrement();
+          if (!mutationsCapturees.length) return resultat;
+
           return AnnulationService.empiler(partieId, {
             source: carte.focus + ' — ' + (action.action || 'action'),
-            mutations: resultat.mutations
+            mutations: mutationsCapturees
+          }).then(function () {
+            return resultat;
           });
-        }).then(function () {
-          return resultat;
         });
+      }).catch(function (erreur) {
+        DB.arreterEnregistrement(); // filet de sécurité, voir commentaire ci-dessus
+        throw erreur;
       });
     });
   }

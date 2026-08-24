@@ -310,6 +310,12 @@ var StrategieService = (function () {
     guilde: 'Établir une Guilde',
     etablir_guilde: 'Établir une Guilde',
     retirer_corruption: 'Retirer une Corruption',
+    // EVOLUTION 14 (todo.md) : "augmenter_population" (pistesCivilisation.json/
+    // focus.json) et "augmenter_population_pure" (evenements.json) sont la
+    // MÊME mécanique (voir FocusEngine.resoudreCle_) — même libellé pour
+    // les deux, plutôt que d'afficher la clé brute.
+    augmenter_population: 'Augmenter une population',
+    augmenter_population_pure: 'Augmenter une population',
     activer_cube: 'Activer 1 cube',
     deployer_cube: 'Déployer 1 cube',
     deploy_cube: 'Déployer 1 cube',
@@ -331,7 +337,27 @@ var StrategieService = (function () {
   };
 
   var partieAffichee = null;
+  // EVOLUTION 18 (todo.md — "faire un cadre unique pour une action et des
+  // sous cadres pour les effets déclenché par cette action") : chaque
+  // entrée est {action: string|null, lignes: string[]} plutôt qu'une
+  // simple ligne de texte — `action` (le libellé de la Focus/Programme
+  // jouée, ex. "Conquête — Planifier") regroupe visuellement TOUTES les
+  // lignes produites par CETTE résolution (Effet + Coût + éventuels
+  // rappels manuels) sous un même "cadre" (renderJournal_ ci-dessous) ;
+  // `action: null` pour les messages hors action (avancement de piste
+  // manuel écran Plat. maison, confirmation d'annulation...), rendus tels
+  // quels comme avant (une simple ligne).
   var journal = [];
+
+  function pousserJournalLigne_(texte) {
+    journal.push({ action: null, lignes: [texte] });
+  }
+
+  function pousserJournalGroupe_(action, lignes) {
+    lignes = (lignes || []).filter(Boolean);
+    if (!lignes.length) return;
+    journal.push({ action: action, lignes: lignes });
+  }
 
   // Total fixe de cubes de Puissance Navale (inactif + actif + déployé),
   // identique pour toutes les maisons.
@@ -721,6 +747,21 @@ var StrategieService = (function () {
     });
   }
 
+  // Repéré par ligne (avant/après EVOLUTION 18, même critère) : passage en
+  // rouge/avertissement pour les lignes de rappel/échec/annulation.
+  function journalLigneEstAvertissement_(ligne) {
+    return ligne.indexOf('⚠️') !== -1 || ligne.indexOf('annulée') !== -1 || ligne.indexOf('↩️') !== -1;
+  }
+
+  /**
+   * EVOLUTION 18 (todo.md) : une entrée `{action, lignes}` avec `action`
+   * renseigné devient un "cadre" — titre (le libellé Focus/Programme) +
+   * sous-cadre listant chaque ligne produite par CETTE résolution (Effet/
+   * Coût/rappels manuels) — plutôt que de les noyer individuellement dans
+   * la liste plate, comme demandé ("faire un cadre unique pour une action
+   * et des sous cadres pour les effets déclenché par cette action").
+   * `action: null` reste une simple ligne, comportement inchangé.
+   */
   function renderJournal_() {
     var container = document.getElementById('ressources-journal');
     if (!journal.length) {
@@ -728,9 +769,21 @@ var StrategieService = (function () {
       return;
     }
     container.innerHTML = '<ul class="journal-liste">' +
-      journal.slice().reverse().map(function (ligne) {
-        var estAvertissement = ligne.indexOf('⚠️') !== -1 || ligne.indexOf('annulée') !== -1 || ligne.indexOf('↩️') !== -1;
-        return '<li' + (estAvertissement ? ' class="journal-avertissement"' : '') + '>' + ligne + '</li>';
+      journal.slice().reverse().map(function (entree) {
+        if (!entree.action) {
+          var ligneUnique = entree.lignes[0];
+          var estAvertissementLigne = journalLigneEstAvertissement_(ligneUnique);
+          return '<li' + (estAvertissementLigne ? ' class="journal-avertissement"' : '') + '>' + ligneUnique + '</li>';
+        }
+        return '<li class="journal-action">' +
+          '<div class="journal-action-titre">' + entree.action + '</div>' +
+          '<ul class="journal-action-effets">' +
+          entree.lignes.map(function (ligne) {
+            var estAvertissement = journalLigneEstAvertissement_(ligne);
+            return '<li' + (estAvertissement ? ' class="journal-avertissement"' : '') + '>' + ligne + '</li>';
+          }).join('') +
+          '</ul>' +
+          '</li>';
       }).join('') +
       '</ul>';
   }
@@ -829,11 +882,11 @@ var StrategieService = (function () {
     CivilisationService.avancerPiste(partie.id, nomMaison, piste, demanderChoix)
       .then(function (resultat) {
         if (resultat.dejaMaximum) {
-          journal.push('Piste ' + LABEL_PISTE[piste] + ' : déjà au maximum.');
+          pousserJournalLigne_('Piste ' + LABEL_PISTE[piste] + ' : déjà au maximum.');
         } else {
-          journal.push('Piste ' + LABEL_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
-            ' — ' + (resultat.texte || 'aucun effet de case.'));
-          journal = journal.concat(resultat.effetJournal || []);
+          var ligneNiveau = 'Piste ' + LABEL_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
+            ' — ' + (resultat.texte || 'aucun effet de case.');
+          pousserJournalGroupe_('Piste ' + LABEL_PISTE[piste], [ligneNiveau].concat(resultat.effetJournal || []));
         }
         return App.rafraichirPartieCourante();
       })
@@ -857,7 +910,7 @@ var StrategieService = (function () {
     CivilisationService.definirCorruption(partieAffichee.id, piste, valeur, options)
       .then(function (resultat) {
         if (resultat && resultat.corruptionMaisonConservee) {
-          journal.push('Piste ' + LABEL_PISTE[piste] + ' : Corruption retirée, mais le compteur de Corruption (plateau maison) n’est pas décrémenté — Événement « Le visage du mal » actif ce cycle (la Corruption reste dans votre zone personnelle jusqu’à l’Évaluation).');
+          pousserJournalLigne_('Piste ' + LABEL_PISTE[piste] + ' : Corruption retirée, mais le compteur de Corruption (plateau maison) n’est pas décrémenté — Événement « Le visage du mal » actif ce cycle (la Corruption reste dans votre zone personnelle jusqu’à l’Évaluation).');
         }
         return App.rafraichirPartieCourante();
       })
@@ -1219,7 +1272,10 @@ var StrategieService = (function () {
 
     FocusEngine.jouerActionEtPersister(partie.id, carte, action, demanderChoix)
       .then(function (resultat) {
-        journal = journal.concat(resultat.journal);
+        // Même libellé que AnnulationService (source de la pile, voir
+        // FocusEngine.jouerActionEtPersister) — un seul "cadre" pour toute
+        // la résolution (Effet + Coût + rappels manuels éventuels).
+        pousserJournalGroupe_(carte.focus + ' — ' + (action.action || 'action'), resultat.journal);
         return App.rafraichirPartieCourante();
       })
       .then(function (partieFraiche) {
@@ -1261,14 +1317,20 @@ var StrategieService = (function () {
     if (btn.disabled) return;
     var texteOriginal = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Passage en cours…';
+    btn.textContent = 'Annulation en cours…';
 
     AnnulationService.annulerDerniere(partie.id)
       .then(function (resultat) {
-        journal.push(resultat.succes ? ('↩️ Action annulée : ' + resultat.source + '.') : 'Aucune action à annuler.');
+        pousserJournalLigne_(resultat.succes ? ('↩️ Action annulée : ' + resultat.source + '.') : 'Aucune action à annuler.');
         return App.rafraichirPartieCourante();
       })
       .then(function (partieFraiche) {
+        // majBoutonAnnuler_ (appelée par afficher() ci-dessous) ne remet
+        // à jour QUE .disabled (selon la nouvelle taille de la pile),
+        // jamais .textContent — sans cette ligne, le bouton restait bloqué
+        // sur "Annulation en cours…" après une annulation réussie (todo.md,
+        // EVOLUTION 18, retour utilisateur).
+        btn.textContent = texteOriginal;
         afficher(partieFraiche);
       })
       .catch(function (erreur) {
@@ -1411,10 +1473,12 @@ var StrategieService = (function () {
         var partie = partieAffichee;
         Promise.all([
           SecteurService.obtenirSecteurs(partie.id),
-          SecteurService.obtenirAdjacences(partie.scenarioId)
+          SecteurService.obtenirAdjacences(partie.scenarioId),
+          SecteurService.obtenirSecteurMere(partie.scenarioId)
         ]).then(function (resultats) {
           var secteurs = resultats[0] || [];
           var adjacenceMap = construireAdjacenceMap_(resultats[1]);
+          var numeroSecteurMere = resultats[2];
 
           var mouvements = []; // état local à cette ouverture de popup
 
@@ -1430,8 +1494,28 @@ var StrategieService = (function () {
             return stockInitial - dejaPris;
           }
 
+          // EVOLUTION 15 (todo.md) : le Secteur-Mère vous appartient
+          // TOUJOURS, même à 0 Puissance Navale (jamais repris par le
+          // Néant) — proposé comme destination/secteur "à vous" même vide,
+          // ce que secteurEstPossede_ (PN > 0 requis) ne capture pas seul.
           function vousAppartient_(numero) {
-            return secteurEstPossede_(secteurParNumero_(numero));
+            return secteurEstPossede_(secteurParNumero_(numero)) || numero === numeroSecteurMere;
+          }
+
+          // Total de Puissance Navale (tous types confondus) encore présent
+          // sur un secteur de départ après les mouvements déjà ajoutés à
+          // cette popup — pour interdire de le vider hors Secteur-Mère
+          // (EVOLUTION 15, même règle que SecteurService.regrouper qui
+          // revalidera de toute façon à la persistance).
+          function totalStockRestantDepart_(numero) {
+            var secteur = secteurParNumero_(numero);
+            var totalInitial = secteur
+              ? ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0) + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0))
+              : 0;
+            var dejaContribue = mouvements
+              .filter(function (m) { return m.depart === numero; })
+              .reduce(function (somme, m) { return somme + m.quantite; }, 0);
+            return totalInitial - dejaContribue;
           }
 
           function render() {
@@ -1507,6 +1591,11 @@ var StrategieService = (function () {
               var dispo = stockRestant_(depart, type);
               if (quantite > dispo) { window.alert('Seulement ' + dispo + ' disponible(s) sur ce secteur pour ce type.'); return; }
               if (total + quantite > 5) { window.alert('Il ne reste que ' + (5 - total) + ' déplacement(s) sur les 5 autorisés.'); return; }
+              // EVOLUTION 15 : jamais vider un secteur de départ hors Secteur-Mère.
+              if (depart !== numeroSecteurMere && totalStockRestantDepart_(depart) - quantite < 1) {
+                window.alert('Impossible : le secteur ' + depart + ' se retrouverait sans Puissance Navale (interdit hors Secteur-Mère lors d\'un regroupement) — laisse-en au moins 1.');
+                return;
+              }
 
               mouvements.push({ type: type, depart: depart, arrivee: arrivee, quantite: quantite });
               render();
@@ -1905,6 +1994,17 @@ var StrategieService = (function () {
               var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible);
               var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
 
+              // EVOLUTION 16 (todo.md, docs-rules-flottes.md §1.5 : "subir
+              // des Dégâts au Combat" = rappeler 1 cube vers la zone
+              // active) : les cubes engagés qui ne survivent PAS au combat
+              // (totalEngage - survivants, quel que soit le camp vainqueur
+              // — en défaite/égalité, survivants = 0, donc TOUT revient,
+              // comportement déjà en place avant cette évolution) sont
+              // reversés en Cube actif plutôt que de disparaître du suivi.
+              var totalSurvivantsAttaquant = Object.keys(resultatCombat.survivantsAttaquant || {})
+                .reduce(function (s, k) { return s + (resultatCombat.survivantsAttaquant[k] || 0); }, 0);
+              var cubesPerdus = Math.max(0, totalEngage - totalSurvivantsAttaquant);
+
               var detailContributions = contributions.map(function (c) {
                 var labelType = labelVaisseau_(c.type);
                 return c.quantite + '× ' + labelType + ' (secteur ' + c.secteur + ')';
@@ -1966,7 +2066,8 @@ var StrategieService = (function () {
                     ' avec ' + totalEngage + ' unité(s) [' + detailContributions + '] — ' +
                     (victoire
                       ? 'VICTOIRE (' + resultatCombat.cubesRestants + ' cube(s) déposé(s) sur le secteur' +
-                        (maisonCible ? ', bonus de Maison déchue « ' + maisonCible + ' » non appliqué pour l\u2019instant' : '') + ').'
+                        (maisonCible ? ', bonus de Maison déchue « ' + maisonCible + ' » non appliqué pour l\u2019instant' : '') +
+                        (cubesPerdus > 0 ? ', ' + cubesPerdus + ' cube(s) perdu(s) au combat reversé(s) en Cube actif' : '') + ').'
                       : 'ÉCHEC — flotte anéantie, unités reversées en Cube actif ; secteur(s) source vidé(s) éventuellement repris par le Néant.');
 
                   var avertissement = null;
@@ -1984,6 +2085,7 @@ var StrategieService = (function () {
                     jetonLiberation: victoire ? (jetonsRetires.jetonLiberation || 0) : 0,
                     influenceGagnee: influenceGagnee,
                     totalEngage: totalEngage,
+                    cubesPerdus: cubesPerdus,
                     detail: detail,
                     avertissement: avertissement
                   });
@@ -2305,6 +2407,77 @@ var StrategieService = (function () {
             btnValider.disabled = true;
 
             SecteurService.rappelerCube(partieRappel.id, numero, type)
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Cube de ' + labelVaisseau_(type) + ' rappelé depuis le Secteur ' + numero + '.', numero: numero, type: type });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec du rappel : ' + erreur.message);
+              });
+          };
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
+
+      } else if (contexte.type === 'rappeler_cube_cout') {
+        // Coût "rappeler_cube" d'une action Focus (EVOLUTION 13, todo.md
+        // — ex. Focus Développement "Installer" Standard, voir
+        // FocusEngine.resoudreCle_, cas dédié). POPUP DISTINCTE de
+        // 'rappeler_cube' ci-dessus (option "recall" d'un Cadre
+        // d'Événement, un EFFET) : la règle d'éligibilité diffère — un
+        // simple Coût d'action Focus ne doit jamais abandonner un secteur
+        // (docs-rules-flottes.md §1.5/§4 : rappeler le dernier cube d'un
+        // secteur hors Secteur-Mère l'abandonne et coûte un jeton Gloire,
+        // mécanique délibérément non modélisée ici) — ne propose que les
+        // secteurs possédés avec STRICTEMENT PLUS d'1 cube de Puissance
+        // Navale au total, SAUF le Secteur-Mère qui reste éligible même à
+        // son dernier cube (il ne peut jamais être abandonné). Persiste
+        // directement via SecteurService.rappelerCube au clic sur Valider
+        // (même pattern que 'rappeler_cube'/'construire' ci-dessus).
+        titre.textContent = 'Rappeler un cube';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieRappelCout = partieAffichee;
+
+        Promise.all([
+          SecteurService.obtenirSecteurs(partieRappelCout.id),
+          SecteurService.obtenirSecteurMere(partieRappelCout.scenarioId)
+        ]).then(function (resultats) {
+          var secteurs = resultats[0];
+          var numeroSecteurMere = resultats[1];
+          var eligibles = secteurs.filter(function (s) {
+            if (!secteurEstPossede_(s)) return false;
+            if (s.numero === numeroSecteurMere) return true;
+            var total = (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
+            return total > 1;
+          });
+          if (!eligibles.length) {
+            contenu.innerHTML = '<p class="hint">Aucun secteur ne permet de rappeler un cube sans l\'abandonner.</p>';
+            return;
+          }
+
+          contenu.innerHTML = '' +
+            '<select id="rappel-cout-select-secteur" class="modal-choix-select">' +
+            eligibles.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('') +
+            '</select>' +
+            '<select id="rappel-cout-select-type" class="modal-choix-select" style="margin-top:8px;">' +
+            TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') +
+            '</select>';
+
+          btnValider.hidden = false;
+          btnValider.textContent = 'Rappeler';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('rappel-cout-select-secteur').value);
+            var type = document.getElementById('rappel-cout-select-type').value;
+            btnValider.disabled = true;
+
+            SecteurService.rappelerCube(partieRappelCout.id, numero, type)
               .then(function () {
                 fermerModale_();
                 btnValider.disabled = false;

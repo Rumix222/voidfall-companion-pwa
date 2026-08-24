@@ -337,6 +337,55 @@ test('regrouper : stock insuffisant -> rejette sans rien modifier', function () 
   });
 });
 
+// EVOLUTION 15 (todo.md) : le Secteur-Mère vous appartient TOUJOURS, même
+// à 0 Puissance Navale (jamais repris par le Néant) — reste une
+// destination valide même vide.
+test('regrouper : le Secteur-Mère est une destination valide même à 0 Puissance Navale', function () {
+  var db = dbBaseRegroupement_();
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'secteur_mere' };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 0 }); // Secteur-Mère, vide
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 3 }); // laisse 2 derrière (pas de Secteur-Mère)
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.regrouper('p1', [{ type: 'corvette', depart: 2, arrivee: 1, quantite: 1 }]).then(function (resultat) {
+    assert.strictEqual(resultat.ok, true);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].pnCorvette, 1);
+    assert.strictEqual(db._stores.secteursPartie['p1|2'].pnCorvette, 2);
+  });
+});
+
+// EVOLUTION 15 : interdit de retirer la DERNIÈRE Puissance Navale d'un
+// secteur de départ qui N'EST PAS le Secteur-Mère (docs-rules-flottes.md
+// §1.5 : "vous ne pouvez pas déplacer le dernier cube d'un secteur si cela
+// conduit à son abandon, sauf Secteur-Mère").
+test('regrouper : interdit de vider un secteur hors Secteur-Mère (dernière Puissance Navale)', function () {
+  var db = dbBaseRegroupement_(); // secteur 1 : pnCorvette 3, PAS Secteur-Mère (aucune scenarioSecteurs configurée)
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.regrouper('p1', [{ type: 'corvette', depart: 1, arrivee: 2, quantite: 3 }]).then(function () {
+    assert.fail('aurait dû rejeter (secteur 1 se retrouverait sans Puissance Navale)');
+  }, function (erreur) {
+    assert.match(erreur.message, /sans puissance navale/i);
+    // Rien n'a été modifié malgré le rejet.
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].pnCorvette, 3);
+    assert.strictEqual(db._stores.secteursPartie['p1|2'].pnCorvette, 1);
+  });
+});
+
+// EVOLUTION 15 : à l'inverse, le Secteur-Mère PEUT être entièrement vidé
+// (aucune règle du "dernier cube" ne s'applique à lui).
+test('regrouper : le Secteur-Mère peut être entièrement vidé', function () {
+  var db = dbBaseRegroupement_();
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'secteur_mere' };
+  var ctx = creerContexte_(db); // secteur 1 (Secteur-Mère) : pnCorvette 3
+
+  return ctx.SecteurService.regrouper('p1', [{ type: 'corvette', depart: 1, arrivee: 2, quantite: 3 }]).then(function (resultat) {
+    assert.strictEqual(resultat.ok, true);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].pnCorvette, 0);
+    assert.strictEqual(db._stores.secteursPartie['p1|2'].pnCorvette, 4);
+  });
+});
+
 // ---------------------------------------------------------------
 // envahirResoudre
 // ---------------------------------------------------------------

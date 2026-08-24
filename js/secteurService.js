@@ -456,6 +456,17 @@ var SecteurService = (function () {
    * appartiennent tous deux au joueur, 5 déplacements maximum au total.
    * Deux passes de validation AVANT toute écriture (adjacence/
    * appartenance, puis stock disponible agrégé par secteur de départ+type).
+   *
+   * EVOLUTION 15 (todo.md, docs-rules-flottes.md §1.5/§4,
+   * docs-rules-secteurs.md) : le Secteur-Mère vous appartient TOUJOURS,
+   * même à 0 Puissance Navale (jamais repris par le Néant) — il reste donc
+   * une destination/un secteur "à vous" valide pour `appartientAuJoueur_`
+   * même vide, ce que cette dernière (PN > 0 requis) ne capture pas seule.
+   * À l'inverse, retirer la DERNIÈRE Puissance Navale d'un secteur qui
+   * N'EST PAS le Secteur-Mère est interdit lors d'un regroupement (à la
+   * différence d'Envahir, qui l'autorise et reprend alors le secteur par
+   * le Néant — voir envahirResoudre ci-dessus) : validé ici en agrégeant
+   * le retrait total (tous types confondus) par secteur de départ.
    */
   function regrouper(partieId, mouvements) {
     if (!Array.isArray(mouvements) || !mouvements.length) {
@@ -489,18 +500,26 @@ var SecteurService = (function () {
         });
 
         var numeros = Object.keys(numerosVus).map(Number);
-        return Promise.all(numeros.map(function (n) { return DB.get('secteursPartie', [partieId, n]); }))
-          .then(function (secteursCharges) {
+        return Promise.all([
+          obtenirSecteurMere(ligneP.scenarioId),
+          Promise.all(numeros.map(function (n) { return DB.get('secteursPartie', [partieId, n]); }))
+        ]).then(function (r2) {
+            var numeroSecteurMere = r2[0];
+            var secteursCharges = r2[1];
             var secteursParNumero = {};
             numeros.forEach(function (n, i) { secteursParNumero[n] = secteursCharges[i]; });
+
+            function appartientOuMere_(secteur, numero) {
+              return appartientAuJoueur_(secteur) || numero === numeroSecteurMere;
+            }
 
             mouvements.forEach(function (m) {
               var sDepart = secteursParNumero[m.depart];
               var sArrivee = secteursParNumero[m.arrivee];
               if (!sDepart) throw new Error('Secteur ' + m.depart + ' introuvable pour cette partie.');
               if (!sArrivee) throw new Error('Secteur ' + m.arrivee + ' introuvable pour cette partie.');
-              if (!appartientAuJoueur_(sDepart)) throw new Error('Le secteur ' + m.depart + ' ne vous appartient pas.');
-              if (!appartientAuJoueur_(sArrivee)) throw new Error('Le secteur ' + m.arrivee + ' ne vous appartient pas.');
+              if (!appartientOuMere_(sDepart, m.depart)) throw new Error('Le secteur ' + m.depart + ' ne vous appartient pas.');
+              if (!appartientOuMere_(sArrivee, m.arrivee)) throw new Error('Le secteur ' + m.arrivee + ' ne vous appartient pas.');
             });
 
             // Objet imbriqué {depart: {type: quantite}} — agrège la
@@ -520,6 +539,19 @@ var SecteurService = (function () {
                   throw new Error('Stock insuffisant : secteur ' + depart + ' n\'a pas ' + demande + ' ' + type + ' (dispo ' + dispo + ').');
                 }
               });
+
+              // EVOLUTION 15 : jamais retirer la DERNIÈRE Puissance Navale
+              // d'un secteur de départ hors Secteur-Mère (tous types
+              // confondus — un secteur avec 1 Corvette + 1 Destroyer ne
+              // doit pas non plus se retrouver à 0 en cumulant 2 mouvements
+              // de types différents dans la même validation).
+              var numeroDepart = Number(depart);
+              if (numeroDepart === numeroSecteurMere) return;
+              var totalRetireDepart = Object.keys(retireParDepart[depart])
+                .reduce(function (s, type) { return s + retireParDepart[depart][type]; }, 0);
+              if (totalPn_(secteursParNumero[depart]) - totalRetireDepart <= 0) {
+                throw new Error('Le secteur ' + depart + ' se retrouverait sans Puissance Navale (interdit hors Secteur-Mère lors d\'un regroupement) — laissez-en au moins 1.');
+              }
             });
 
             mouvements.forEach(function (m) {

@@ -2154,6 +2154,16 @@ var GameService = (function () {
      * redémarre à `false` pour la carte entrante.
      */
     utiliserProgramme: function (partieId, nomProgramme, demanderChoix) {
+      // EVOLUTION 18 (todo.md) : "action de Programme en main" est, avec
+      // l'action Focus (voir FocusEngine.jouerActionEtPersister), le seul
+      // autre type d'action annulable au sens du todo.md — enveloppe donc
+      // toute la résolution (y compris les popups déléguées ouvertes par
+      // FocusEngine.resoudreEffet, qui peuvent écrire directement en base,
+      // ex. secteurs/pistes de Civilisation) sous un enregistrement db.js,
+      // exactement comme jouerActionEtPersister (voir son en-tête pour le
+      // détail du mécanisme). `DB.arreterEnregistrement()` est TOUJOURS
+      // appelé (succès, refus, ou exception).
+      DB.demarrerEnregistrement();
       return Promise.all([DB.get('plateauMaison', partieId), DB.getAll('programmes')]).then(function (resultats) {
         var ligneDepart = resultats[0];
         var catalogue = resultats[1];
@@ -2236,6 +2246,22 @@ var GameService = (function () {
             });
           });
         });
+      }).then(function (resultatFinal) {
+        var mutationsCapturees = DB.arreterEnregistrement();
+        if (resultatFinal && resultatFinal.annule) {
+          // L'Effet a finalement échoué (RÈGLE MÉTIER : aucune trace) —
+          // défait immédiatement tout ce qu'une popup déléguée aurait déjà
+          // écrit en base, sans jamais transiter par la pile.
+          return AnnulationService.restaurerMutations(partieId, mutationsCapturees).then(function () { return resultatFinal; });
+        }
+        if (!mutationsCapturees.length) return resultatFinal;
+        return AnnulationService.empiler(partieId, {
+          source: 'Programme — ' + nomProgramme,
+          mutations: mutationsCapturees
+        }).then(function () { return resultatFinal; });
+      }).catch(function (erreur) {
+        DB.arreterEnregistrement(); // filet de sécurité, voir commentaire ci-dessus
+        throw erreur;
       });
     },
 

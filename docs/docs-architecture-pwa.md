@@ -137,6 +137,9 @@ avant d'être utilisable.
 | `supprimer` | `(nomStore, cle)` | Suppression d'un enregistrement (idempotent) |
 | `vider` | `(nomStore)` | Vide entièrement un store |
 | `NOMS_STORES` | (constante) | `Object.keys(STORES)` |
+| `demarrerEnregistrement` | — | **EVOLUTION 18** (todo.md). Démarre un enregistrement générique : toute écriture `put()` suivante (quel que soit le store, sauf `pileAnnulation`/`parties`/`historique`) est capturée automatiquement `{store, cle, avant, apres}` — un seul couple avant/après par ligne touchée (1er avant, dernier après), même si elle est réécrite plusieurs fois. Appelé UNIQUEMENT par `FocusEngine.jouerActionEtPersister`/`GameService.utiliserProgramme` — jamais par la résolution d'un Cadre d'Événement galactique (effet d'Événement volontairement non traçable) |
+| `arreterEnregistrement` | — | Arrête l'enregistrement en cours et retourne les mutations capturées (`[]` si aucun enregistrement actif) — prêt à passer tel quel à `AnnulationService.empiler`/`restaurerMutations` |
+| `enregistrementActif` | — | Vrai si un enregistrement est en cours — consommé par `CivilisationService.avancerPiste` pour savoir si elle doit empiler sa propre entrée (usage autonome) ou laisser ses mutations remonter dans l'enregistrement ambiant (appelée depuis une action Focus/Programme déjà suivie) |
 
 ### 2.3 Data shapes clés
 
@@ -320,7 +323,7 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
 | `choisirTechnologieAvancee` | `(partieId, slot, nomTechnologie)` | Une des 4 Technologies avancées (slot 0-3), cycle 1 uniquement, rejette les doublons |
 | `obtenirTechnologiesAvanceesGroupes` | `(partie)` | **Pure.** `{toutes, groupeA, groupeB, actif}` — `actif` = noms améliorables au cycle en cours |
 | `gagnerProgramme` | `(partieId, nomProgramme)` | Ajoute `nomProgramme` à `programmesEnMain` (non borné, rejette si déjà en main ou déjà dans `programmesUtilises`) ; réinitialise l'entrée `offresProgramme` correspondante si `nomProgramme` en faisait partie. Appelée directement par la popup `'gagner_programme'` (strategieService.js), même principe que `SecteurService.placerCorruption` — aucun historique/rechargement ici |
-| `utiliserProgramme` | `(partieId, nomProgramme, demanderChoix)` | Résout l'action gratuite du Programme (`EFFET_PROGRAMME_PAR_TYPE_`, table fixe par type) via `FocusEngine.resoudreEffet` (`cout` toujours vide) puis, si l'action va au bout, déplace la carte de `programmesEnMain` vers `programmesUtilises` (emplacements 1-3 uniquement) — conflit de type → confirmation, 3 emplacements pleins → popup dédiée, refus → reste en main. Décrémente `corruptionMaison` si l'emplacement remplacé était Corrompu. Appelée par la popup `'utiliser_programme'` (strategieService.js) |
+| `utiliserProgramme` | `(partieId, nomProgramme, demanderChoix)` | Résout l'action gratuite du Programme (`EFFET_PROGRAMME_PAR_TYPE_`, table fixe par type) via `FocusEngine.resoudreEffet` (`cout` toujours vide) puis, si l'action va au bout, déplace la carte de `programmesEnMain` vers `programmesUtilises` (emplacements 1-3 uniquement) — conflit de type → confirmation, 3 emplacements pleins → popup dédiée, refus → reste en main. Décrémente `corruptionMaison` si l'emplacement remplacé était Corrompu. Appelée par la popup `'utiliser_programme'` (strategieService.js). **EVOLUTION 18** (todo.md) : 2e (et dernier) orchestrateur, avec `FocusEngine.jouerActionEtPersister`, à envelopper sa résolution sous `DB.demarrerEnregistrement()`/empiler via `AnnulationService.empiler` — même mécanisme, voir `annulationService.js` §4.6 |
 
 **Constantes clés** :
 - `RESSOURCES_SIMPLES_CADRE` : `['nourriture','energie','materiel','credit','science']`
@@ -413,7 +416,7 @@ calcule l'état résultant sous forme de diff. Entièrement pur SAUF
 |---|---|---|
 | `resoudreAction` | `(plateauMaison, carte, action, demanderChoix)` | **Pure.** Résout Effet puis Coût (coût débité seulement si l'Effet réussit) ; retourne `{succes, journal, mutations, plateauMaisonApres}` |
 | `resoudreEffet` | `(plateauMaison, effetJson, source, texteAction, demanderChoix)` | **Pure.** Réutilisée par `civilisationService.js` (effet de case, signe toujours +1) ; retourne `{succes, journal, mutations, etatResultat}` |
-| `jouerActionEtPersister` | `(partieId, carte, action, demanderChoix)` | **Non pure** — lit `plateauMaison`, appelle `resoudreAction`, écrit via `GameService.majPlateauMaison`, empile via `AnnulationService.empiler` |
+| `jouerActionEtPersister` | `(partieId, carte, action, demanderChoix)` | **Non pure** — lit `plateauMaison`, appelle `resoudreAction`, écrit via `GameService.majPlateauMaison`, empile via `AnnulationService.empiler`. **EVOLUTION 18** (todo.md) : toute la résolution se déroule sous `DB.demarrerEnregistrement()` — si l'Effet échoue, restaure immédiatement (`AnnulationService.restaurerMutations`) ce qu'une popup déléguée aurait déjà écrit ; sinon empile les mutations CAPTURÉES (superset de `resultat.mutations`, couvre aussi les écritures hors plateauMaison) |
 | `BONUS_COMMERCE` | (const, test) | Les 6 bonus fixes du livret Commerce |
 | `CLES_SECTEUR_HORS_PERIMETRE` | (const, test) | Voir liste ci-dessous |
 | `CLES_CIVILISATION_HORS_PERIMETRE` | (const, test) | Voir liste ci-dessous |
@@ -426,7 +429,10 @@ persistance via `SecteurService.deployerCube`), `ressource_choix`,
 `choice`/`choix` (exclusif ou inclusif si "et/ou"), `choice_repeat`,
 `gagner_commerce`, `regrouper`/`regroupe` (popup → `SecteurService.regrouper`),
 `envahir`/`envahir_corrompu` (popup → `CombatService.resoudreInvasion` +
-`SecteurService.envahirResoudre`), `influence_secteur` (popup sans choix
+`SecteurService.envahirResoudre`), `rappeler_cube` en Coût (EVOLUTION 13,
+todo.md — popup `rappeler_cube_cout`, secteurs possédés avec >1 Puissance
+Navale, Secteur-Mère excepté, → `SecteurService.rappelerCube`),
+`influence_secteur` (popup sans choix
 utilisateur, calcul pur depuis `SecteurService.
 obtenirAgregatsInfluenceSecteursPurs` — voir §6), `produire_<ressource>`
 (ressource imposée par la clé — popup sans choix utilisateur, calcul pur
@@ -438,11 +444,11 @@ jamais bloquante).
 
 **Hors périmètre explicite** (journalisé `"⚠️ non automatisé"`, ne bloque
 jamais) :
-- `CLES_SECTEUR_HORS_PERIMETRE` : `construire_installation`,
-  `installation`, `etablir_guilde`, `guilde`, `rappeler_cube`,
-  `retirer_corruption`, `effet_secteur`. Déjà couvertes par des boutons
-  dédiés écran Secteurs (Construire/Rappeler un cube) plutôt que par le pont
-  Focus.
+- `CLES_SECTEUR_HORS_PERIMETRE` : `effet_secteur` uniquement (les autres
+  clés listées ici historiquement — `construire_installation`,
+  `installation`, `etablir_guilde`, `guilde`, `retirer_corruption`,
+  `rappeler_cube` — ont chacune un cas dédié dans `resoudreCle_`, voir
+  ci-dessus).
 - `CLES_CIVILISATION_HORS_PERIMETRE` : `avancer_civilisation_
   societe/gouvernement/economie`, `avancer_civilisation`, `avance_rapide`,
   `avancer_civilisation_moins_avancee`, `avancer_piste_corrompue`. Bien
@@ -461,14 +467,34 @@ jamais) :
 
 ### 4.6 `js/annulationService.js` — pile d'annulation
 
-**Rôle** : pile LIFO des actions Focus jouées, persistée (`pileAnnulation`,
-survit à une fermeture accidentelle). Annuler = réécrire les valeurs `avant`
-de chaque mutation, aucune logique métier "inverse" recalculée.
+**Rôle** : pile LIFO des actions Focus/Programme en main jouées, persistée
+(`pileAnnulation`, survit à une fermeture accidentelle). Annuler = réécrire
+les valeurs `avant` de chaque mutation, aucune logique métier "inverse"
+recalculée.
+
+**EVOLUTION 18** (todo.md, retour utilisateur — annuler "Conquête Planifier"
+ne redéplaçait pas la Corruption ni ne retirait le Programme gagné) : une
+entrée de pile mélange désormais 2 formats de mutation, gérés tous deux par
+`restaurerMutations`/`annulerDerniere` :
+- Legacy `{champ, avant, apres}` (implicitement `plateauMaison[partieId]`,
+  produit par `focusEngine.js`/`diffChamps_`) — toujours produit par
+  `CivilisationService.avancerPiste` en usage AUTONOME (bouton "Avancer"
+  manuel, ou Cadre d'Événement galactique).
+- Générique `{store, cle, avant, apres}` (ligne COMPLÈTE d'un store
+  quelconque, avant/après) — capturé AUTOMATIQUEMENT par
+  `DB.demarrerEnregistrement`/`put` (voir `js/db.js` §4.2bis ci-dessous)
+  pendant toute la résolution d'une action Focus
+  (`FocusEngine.jouerActionEtPersister`) ou Programme en main
+  (`GameService.utiliserProgramme`) — couvre donc AUSSI les popups
+  déléguées qui persistent directement (secteurs via `SecteurService`,
+  pistes de Civilisation, Programmes, Gloire...), jusqu'ici hors de portée
+  de la pile.
 
 | Fonction | Paramètres | Description |
 |---|---|---|
 | `empiler` | `(partieId, {source, mutations})` | Empile une action réussie ; purge la plus ancienne au-delà de la limite ; no-op si aucune mutation |
-| `annulerDerniere` | `(partieId)` | Dépile + annule la dernière action, ré-appelable en chaîne |
+| `annulerDerniere` | `(partieId)` | Dépile + annule la dernière action (`restaurerMutations` ci-dessous), ré-appelable en chaîne |
+| `restaurerMutations` | `(partieId, mutations)` | **EVOLUTION 18.** Réécrit les valeurs `avant` d'un tableau de mutations SANS toucher à la pile — réutilisée par `jouerActionEtPersister`/`utiliserProgramme` pour annuler immédiatement les écritures d'une action dont l'Effet a finalement échoué (RÈGLE MÉTIER : aucune trace) |
 | `viderPile` | `(partieId)` | Vide la pile d'une partie — exposée mais pas encore appelée automatiquement en fin de cycle |
 | `obtenirPile` | `(partieId)` | Pile triée du plus ancien au plus récent |
 | `compter` | `(partieId)` | Longueur de la pile |

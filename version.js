@@ -1,9 +1,200 @@
 /**
  * version.js
- * Version 73 — 2026-08-24
+ * Version 78 — 2026-08-24
  * Source de vérité unique pour la version de l'application.
  *
- * 24/08/2026, dernière fois (EVOLUTION 12 — Limite d'utilisation d'une
+ * 24/08/2026, dernière fois (EVOLUTION 18 — Refonte du moteur d'annulation,
+ * todo.md, retour utilisateur : "annuler la dernière action" (Conquête
+ * "Planifier") ne redéplaçait pas la Corruption ni ne retirait le
+ * Programme gagné ; le bouton restait bloqué sur "Passage en cours") :
+ * - Bouton bloqué : `strategieService.js` (`annulerDerniereAction_`)
+ *   renomme le texte transitoire en "Annulation en cours…" et le restaure
+ *   désormais aussi après une annulation RÉUSSIE (`majBoutonAnnuler_`,
+ *   appelée par `afficher()`, ne remet à jour que `.disabled`, jamais
+ *   `.textContent` — le texte n'était restauré qu'en cas d'échec avant ce
+ *   correctif).
+ * - Cause racine du bug de fond : ~12 popups déléguées (construire,
+ *   regrouper, envahir, retirer/gagner/déplacer Corruption, augmenter
+ *   Population, améliorer Gloire, gagner un Programme, rappeler un cube,
+ *   avancer une piste de Civilisation) écrivent DIRECTEMENT en base
+ *   (secteurs, plateau maison hors des 9 champs `diffChamps_`, pistes de
+ *   Civilisation), jamais capturées par la pile d'annulation.
+ * - `db.js` : nouveau mécanisme générique de "changelog" —
+ *   `demarrerEnregistrement`/`arreterEnregistrement`/`enregistrementActif`.
+ *   Pendant un enregistrement actif, TOUTE écriture `put()` (n'importe
+ *   quel store, sauf `pileAnnulation`/`parties`/`historique`) est capturée
+ *   automatiquement `{store, cle, avant, apres}` — un seul couple
+ *   avant/après par ligne touchée (1er avant, dernier après), quel que
+ *   soit le nombre d'écritures pendant l'action. Choix délibéré plutôt
+ *   qu'un threading manuel de mutations popup par popup (proposé par
+ *   l'utilisateur en session) : capture tout automatiquement, aucun risque
+ *   d'oubli sur une popup future, zéro changement requis dans
+ *   secteurService.js/civilisationService.js/gameService.js.
+ * - `annulationService.js` : `restaurerMutations` (nouvelle, exportée)
+ *   généralise la restauration aux 2 formats de mutation cohabitants
+ *   (legacy `{champ, avant, apres}` plateauMaison, générique `{store,
+ *   cle, avant, apres}` ligne complète — `DB.put`/`DB.supprimer` si
+ *   `avant` est `null`) ; `annulerDerniere` en interne l'utilise
+ *   désormais aussi.
+ * - `focusEngine.js` (`jouerActionEtPersister`) et `gameService.js`
+ *   (`utiliserProgramme`) — les 2 SEULS orchestrateurs "action annulable"
+ *   au sens du todo.md — enveloppent désormais toute leur résolution
+ *   (Effet + Coût + popups déléguées imbriquées) sous un enregistrement :
+ *   Effet en échec -> `AnnulationService.restaurerMutations` immédiat
+ *   (RÈGLE MÉTIER : un Effet en échec ne laisse AUCUNE trace — une popup
+ *   déléguée ayant déjà écrit avant l'échec, ex. "et/ou" partiel, était
+ *   jusqu'ici une fuite silencieuse) ; succès -> empile les mutations
+ *   CAPTURÉES (superset de `diffChamps_`, couvre aussi le hors-plateauMaison)
+ *   comme UNE SEULE entrée. Un Cadre d'Événement galactique n'enveloppe
+ *   toujours rien (aucun `demarrerEnregistrement`) : conforme à la règle
+ *   explicite du todo.md ("l'effet d'un evenement... il ne faut meme pas
+ *   le tracer").
+ * - `civilisationService.js` (`avancerPiste`/`avancerPisteCorrompue`) :
+ *   `empilerSiAutonome_` saute le self-empile historique quand
+ *   `DB.enregistrementActif()` est vrai (appel imbriqué dans une action
+ *   déjà suivie, ex. popup 'avancer_civilisation') — évite une 2e entrée
+ *   de pile séparée pour ce qui doit rester UNE seule action annulable.
+ *   Comportement autonome inchangé (bouton "Avancer" manuel, Cadre
+ *   d'Événement).
+ * - `strategieService.js` : le journal de l'écran Focus
+ *   (`ressources-journal`) groupe désormais chaque action jouée sous un
+ *   "cadre" (titre + sous-liste indentée de ses lignes Effet/Coût/rappels)
+ *   au lieu d'une liste plate — "faire un cadre unique pour une action et
+ *   des sous cadres pour les effets déclenché par cette action" (todo.md).
+ *   `journal` passe de `string[]` à `{action, lignes}[]` (nouveaux helpers
+ *   `pousserJournalLigne_`/`pousserJournalGroupe_`, tous les points
+ *   d'écriture mis à jour). `css/style.css` : classes `.journal-action*`.
+ * 15 tests ajoutés (`db_enregistrement_test.js` : 7, mécanisme générique
+ * contre un faux IndexedDB minimal ; `gameService_evolution18_undo_test.js` :
+ * 5, intégration bout-en-bout via les 2 orchestrateurs — reproduit
+ * exactement "Conquête Planifier" du retour utilisateur ; 3 dans
+ * `focusEngine.test.js`/`secteurService_actions.test.js`/
+ * `civilisationService_test.js`). Vérifié aussi manuellement dans un vrai
+ * navigateur (Playwright, script ad-hoc) : bouton non bloqué, groupement
+ * visuel du journal, aucune erreur JS. 208 tests `*.test.js`/`*_test.js`
+ * au vert après ces changements (tous fichiers de test du projet).
+ * Fichiers touchés : db.js, annulationService.js, focusEngine.js,
+ * gameService.js, civilisationService.js, strategieService.js,
+ * css/style.css, db_enregistrement_test.js (nouveau),
+ * gameService_evolution18_undo_test.js (nouveau), focusEngine.test.js,
+ * secteurService_actions.test.js, civilisationService_test.js,
+ * gameService_utiliser_programme_test.js, docs/docs-architecture-pwa.md,
+ * docs/TODO.md, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache —
+ * les 2 fichiers de test *_test.js ne sont jamais servis à l'app, voir
+ * FICHIERS_A_METTRE_EN_CACHE).
+ *
+ * 24/08/2026, avant (EVOLUTION 16 — Perte de Puissance Navale,
+ * todo.md, docs-rules-flottes.md §1.5) :
+ * Sur une invasion GAGNÉE avec des pertes en cours de combat (unités
+ * engagées mais non survivantes), ces cubes disparaissaient purement et
+ * simplement du suivi — ni déposés sur le secteur (seuls les survivants le
+ * sont), ni reversés en Cube actif. Seule la DÉFAITE totale créditait tout
+ * `totalEngage` en Cube actif ("les Dégâts au Combat" = rappeler 1 cube
+ * vers la zone active, docs-rules-flottes.md §1.5 — une règle qui
+ * s'applique aussi en cas de victoire avec pertes partielles).
+ * - `strategieService.js` (popup 'envahir') : calcule désormais
+ *   `cubesPerdus` = `totalEngage` moins la somme des survivants exacts
+ *   (`resultatCombat.survivantsAttaquant`, déjà calculés par
+ *   `CombatService.resoudreInvasion`) — inclus dans l'objet résolu et
+ *   mentionné dans le journal ("X cube(s) perdu(s) au combat reversé(s)
+ *   en Cube actif") quand > 0.
+ * - `focusEngine.js` (`resoudreCle_`, cas 'envahir'/'envahir_corrompu') :
+ *   crédite `cubeActif` avec `reponse.cubesPerdus` en victoire (nouveau)
+ *   ou `reponse.totalEngage` en défaite/égalité (inchangé — en défaite,
+ *   les survivants attaquant sont toujours 0, donc les deux formules
+ *   coïncident).
+ * 1 test ajouté dans `focusEngine.test.js` (victoire avec pertes partielles
+ * — cubeActif crédité et clampé à 14). 130 tests `*.test.js` au vert après
+ * ce changement.
+ * Fichiers touchés : strategieService.js, focusEngine.js,
+ * focusEngine.test.js, docs/TODO.md, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 15 — Le Secteur-Mère vous
+ * appartient toujours, todo.md, docs-rules-flottes.md §1.5/§4) :
+ * L'action Regrouper ne traitait pas le Secteur-Mère différemment des
+ * autres secteurs : il n'était ni proposable comme destination à 0
+ * Puissance Navale (secteurEstPossede_/appartientAuJoueur_ exigent PN > 0),
+ * ni protégé par la règle "on ne vide jamais un secteur hors Secteur-Mère"
+ * (absente jusqu'ici de `SecteurService.regrouper`, qui ne validait que
+ * l'adjacence/l'appartenance/le stock disponible).
+ * - `secteurService.js` (`regrouper`) : charge désormais aussi
+ *   `obtenirSecteurMere(scenarioId)` ; un secteur de départ/arrivée est
+ *   valide s'il appartient au joueur OU s'il s'agit du Secteur-Mère
+ *   (`appartientOuMere_`) ; après la validation de stock existante, rejette
+ *   tout mouvement qui viderait ENTIÈREMENT (tous types confondus) un
+ *   secteur de départ AUTRE que le Secteur-Mère. La reprise par le Néant
+ *   d'un secteur vidé restait déjà correctement scopée à `envahirResoudre`
+ *   (jamais implémentée côté `regrouper`, qui interdit désormais ce cas en
+ *   amont plutôt que de le laisser survenir).
+ * - `strategieService.js` (popup 'regrouper') : charge
+ *   `SecteurService.obtenirSecteurMere` en plus des secteurs/adjacences ;
+ *   `vousAppartient_` inclut désormais le Secteur-Mère (destination
+ *   possible même vide) ; le clic "Ajouter ce déplacement" applique la
+ *   même règle de "dernière Puissance Navale" que le serveur AVANT
+ *   d'ajouter le mouvement (message immédiat plutôt qu'un rejet différé à
+ *   la validation).
+ * 3 tests ajoutés dans `secteurService_actions.test.js` (Secteur-Mère
+ * destination valide à 0 PN, secteur normal jamais vidable, Secteur-Mère
+ * lui-même librement vidable). 129 tests `*.test.js` au vert après ces
+ * changements (secteurService_actions.test.js + focusEngine.test.js
+ * confondus).
+ * Fichiers touchés : secteurService.js, strategieService.js,
+ * secteurService_actions.test.js, docs/TODO.md, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 14 — affichage augmenter_population +
+ * vérification popups Regrouper/Envahir, todo.md) :
+ * - `strategieService.js` : "augmenter_population"/"augmenter_population_pure"
+ *   ajoutées à `LIBELLES_OPTIONS` ("Augmenter une population" pour les
+ *   deux) — ces clés retombaient sur le repli "clé brute" dans les popups
+ *   de choix (ex. Focus Développement "Harmoniser", `choice:
+ *   ["augmenter_population", "retirer_corruption"]`), affichant
+ *   littéralement "augmenter_population" au lieu d'un libellé lisible.
+ * - Second point du todo.md (espacement des boutons "Ajouter ce
+ *   déplacement"/"Engager cette unité", boutons Valider renommés) :
+ *   vérifié, déjà en place dans le code actuel (aucun changement
+ *   nécessaire) — probablement couvert par un chantier de texte antérieur
+ *   (commit "Programmes : gain de place et textes raccourcis").
+ * Fichiers touchés : strategieService.js, docs/TODO.md, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 13 — Focus Développement "Installer"
+ * : Coût "rappeler_cube", todo.md) :
+ * La clé Coût "rappeler_cube" (focus.json — Focus Développement "Installer"
+ * Standard et 7 autres cartes, toujours `{rappeler_cube:1}`) retombait à
+ * tort sur le repli générique "toute clé contenant cube" de
+ * `FocusEngine.resoudreCle_` : celui-ci DÉCRÉMENTAIT `cubeActif` de 1,
+ * l'exact inverse de la règle du jeu (rappeler un cube AJOUTE 1 cube depuis
+ * un secteur vers la zone active, ça ne consomme pas un cube déjà actif) —
+ * ce coût n'était donc jamais réellement débité.
+ * - `focusEngine.js` : nouveau cas dédié pour `rappeler_cube` en Coût
+ *   (signe < 0), testé AVANT le repli générique "cube" (comme
+ *   `CLES_DEPLOYER_CUBE` déjà) — délègue à une popup dédiée (contexte
+ *   'rappeler_cube_cout', strategieService.js) qui fait le choix ET la
+ *   persistance (`SecteurService.rappelerCube`), comme construire/
+ *   regrouper/envahir. Retiré de `CLES_SECTEUR_HORS_PERIMETRE` (ne
+ *   contient plus que `effet_secteur`).
+ * - `strategieService.js` : nouvelle popup 'rappeler_cube_cout', DISTINCTE
+ *   de la popup 'rappeler_cube' existante (option "recall" d'un Cadre
+ *   d'Événement, un EFFET sans cette contrainte) — ne propose que les
+ *   secteurs possédés qui ne seraient PAS abandonnés par ce rappel :
+ *   Secteur-Mère toujours éligible (jamais abandonné), les autres
+ *   uniquement s'ils portent STRICTEMENT PLUS d'1 cube de Puissance Navale
+ *   au total (docs-rules-flottes.md §1.5/§4 — rappeler le dernier cube
+ *   d'un secteur hors Secteur-Mère l'abandonne et coûte un jeton Gloire,
+ *   mécanique délibérément non modélisée ici, choix du TODO).
+ * 2 tests ajoutés dans `focusEngine.test.js` (succès — cubeActif inchangé,
+ * annulation — coût non débité). 58 tests `*.test.js`/`*_test.js` au vert
+ * après ce changement (focusEngine.test.js seul, non re-décompté
+ * globalement).
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js,
+ * strategieService.js, docs/docs-architecture-pwa.md, docs/TODO.md,
+ * version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 12 — Limite d'utilisation d'une
  * action Focus par cycle, todo.md, retour utilisateur) :
  * Nouveau champ `plateauMaison.actionsFocusUtilisees` (tableau de clés
  * "Focus — Action", ex. "Politique — Contrôler") accumulant les actions
@@ -2234,4 +2425,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260824.7';
+var APP_VERSION = '20260824.12';

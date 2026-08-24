@@ -20,6 +20,15 @@
  * comme UNE SEULE entrée dans la pile d'annulation (annulationService.js),
  * pour qu'"Annuler la dernière action" revienne bien sur les deux à la
  * fois — cohérent avec la sémantique "une action jouée = une entrée".
+ * EVOLUTION 18 (todo.md) : ce self-empile est SAUTÉ (voir
+ * empilerSiAutonome_ plus bas) quand un enregistrement db.js est déjà
+ * actif (`DB.enregistrementActif`) — c'est-à-dire quand avancerPiste est
+ * appelée DEPUIS une action Focus/Programme déjà suivie par
+ * FocusEngine.jouerActionEtPersister/GameService.utiliserProgramme (popup
+ * 'avancer_civilisation') : ses écritures sont alors DÉJÀ capturées par
+ * l'enregistrement ambiant de cet orchestrateur englobant, empiler ici en
+ * plus créerait une 2e entrée séparée pour ce qui doit rester UNE seule
+ * action annulable en un clic.
  *
  * Règle : en cas d'égalité pour "la piste la moins avancée", ordre fixe
  * Société > Gouvernement > Économie (pas de choix proposé au joueur).
@@ -302,6 +311,28 @@ var CivilisationService = (function () {
   }
 
   /**
+   * EVOLUTION 18 (todo.md) : empile normalement (comportement historique,
+   * inchangé — bouton "Avancer" manuel écran Plat. maison, ou Cadre
+   * d'Événement galactique qui n'enveloppe jamais sa résolution d'un
+   * enregistrement db.js, cf. règle du todo.md "l'effet d'un evenement...
+   * il ne faut meme pas le tracer") SAUF si un enregistrement db.js est
+   * DÉJÀ actif (`DB.enregistrementActif`) : dans ce cas, cet appel a lieu
+   * DANS la résolution d'une action Focus/Programme déjà suivie par
+   * l'orchestrateur englobant (FocusEngine.jouerActionEtPersister/
+   * GameService.utiliserProgramme, via la popup 'avancer_civilisation') —
+   * ses écritures DB.put (majCivilisation/majPlateauMaison) sont alors
+   * DÉJÀ capturées par cet enregistrement ambiant, empiler ICI créerait
+   * une 2e entrée de pile séparée pour ce qui doit rester UNE seule
+   * action annulable en un clic.
+   */
+  function empilerSiAutonome_(partieId, entree) {
+    if (typeof DB.enregistrementActif === 'function' && DB.enregistrementActif()) {
+      return Promise.resolve(null);
+    }
+    return AnnulationService.empiler(partieId, entree);
+  }
+
+  /**
    * Trouve la ligne de pistesCivilisation pour une maison/piste/case
    * donnée (fallback Type -> "Standard", comme FocusService.obtenirMiseEnPlace).
    */
@@ -367,7 +398,7 @@ var CivilisationService = (function () {
         champsCorrompue[champNiveau] = nouveau;
         return GameService.majCivilisation(partieId, champsCorrompue).then(function () {
           var mutationsCorrompue = [{ champ: champNiveau, avant: ancien, apres: nouveau }];
-          return AnnulationService.empiler(partieId, { source: source, mutations: mutationsCorrompue });
+          return empilerSiAutonome_(partieId, { source: source, mutations: mutationsCorrompue });
         }).then(function () {
           return {
             piste: piste,
@@ -396,7 +427,7 @@ var CivilisationService = (function () {
         // s'écraseraient l'une l'autre).
         var mutations = [{ champ: champNiveau, avant: ancien, apres: resultatChaine.niveauFinal }].concat(mutationsRessources);
 
-        return AnnulationService.empiler(partieId, { source: source, mutations: mutations }).then(function () {
+        return empilerSiAutonome_(partieId, { source: source, mutations: mutations }).then(function () {
           return {
             piste: piste,
             ancienNiveau: ancien,
@@ -506,7 +537,7 @@ var CivilisationService = (function () {
           { champ: champNiveau, avant: ancien, apres: nouveau },
           { champ: champCorrompue, avant: true, apres: false }
         ];
-        return AnnulationService.empiler(partieId, { source: 'Piste Corrompue — ' + NOM_PISTE[piste], mutations: mutations });
+        return empilerSiAutonome_(partieId, { source: 'Piste Corrompue — ' + NOM_PISTE[piste], mutations: mutations });
       }).then(function () {
         return { piste: piste, ancienNiveau: ancien, nouveauNiveau: nouveau };
       });

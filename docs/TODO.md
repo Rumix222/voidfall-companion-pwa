@@ -77,18 +77,22 @@ En fait pour la condition pour mettre le picto sur le focus c'est : au moins une
 Test : faire deux actions d'un focus, annuler la derniere action, le focus a toujours le picto
 
 #Evolution 13 : Focus développement action installer
+✅ Traité (24/08/2026) — focusEngine.js/strategieService.js : Coût "rappeler_cube" (8 cartes du catalogue, dont Développement "Installer") : nouveau cas dédié + popup 'rappeler_cube_cout', ne proposant que les secteurs qui ne seraient pas abandonnés (Secteur-Mère à part). Corrige au passage un bug latent (le repli générique "cube" décrémentait cubeActif au lieu de laisser le coût hors périmètre).
 Pour le cout : popup qui affiche les secteurs ou l'on possede de la puissance naval (+ de 1 pour les secteur hors secteur mere, car on ne peut pas abandonner un secteur)
 
 #Evolution 14 : affichage augmenter_population (action harmoniser)
+✅ Traité (24/08/2026) — strategieService.js : "augmenter_population"/"augmenter_population_pure" ajoutées à LIBELLES_OPTIONS ("Augmenter une population"), affichées dans les popups de choix (ex. Focus Développement "Harmoniser") au lieu de la clé brute.
 Afficher "Augmenter une population"
 
 #Evolution 14 : popup action regrouper et envahir
+✅ Déjà en place (vérifié 24/08/2026, aucun changement nécessaire) — les 4 points étaient déjà appliqués dans le code actuel (regrouper-btn-ajouter/envahir-btn-ajouter ont déjà margin-top/margin-bottom:10px, et les 2 boutons Valider affichent déjà juste "Valider").
 Ajouter un espace apres le bouton "Ajouter ce déplacement"
 Renommer le bouton valider en juste "Valider"
 Ajouter un espace apres le bouton "Engager cette unité"
 Renommer le bouton Lancer l'invasion... en juste "Valider"
 
 #Evolution 15 : Le secteur mere nous appartient
+✅ Traité (24/08/2026) — secteurService.js/strategieService.js : `regrouper` traite désormais le Secteur-Mère comme toujours "à vous" (destination valide même à 0 Puissance Navale) et interdit de vider un AUTRE secteur de sa dernière Puissance Navale (règle "hors Secteur-Mère" du livret) — validé côté SecteurService (revalidation avant écriture) ET côté popup (message immédiat). La reprise par le Néant d'un secteur vidé restait déjà correctement scopée à `envahirResoudre` (pas `regrouper`, qui interdit désormais ce cas en amont).
 Lors de l'action regrouper il faut proposer le secteur mere meme s'il n'y a pas de puissance naval dessus
 Attention a ces regles (cf docs-rules-flottes.md et docs-rules-secteurs.md) :
 - Le secteur mere nous appartient meme s'il n'y a plus de pissance naval dessus
@@ -97,12 +101,21 @@ Attention a ces regles (cf docs-rules-flottes.md et docs-rules-secteurs.md) :
 - On n'a pas le droit de retirer la derniere puissance naval d'un secteur (hors secteur mere) lors d'un regroupement
 
 #Evolution 16 : Perte de puissance naval
+✅ Traité (24/08/2026) — strategieService.js/focusEngine.js : popup 'envahir' calcule désormais `cubesPerdus` (unités engagées non survivantes) et le crédite TOUJOURS en Cube actif, pas seulement en défaite comme avant — les pertes lors d'un combat GAGNÉ disparaissaient jusqu'ici du suivi sans jamais revenir en Cube actif (docs-rules-flottes.md §1.5 : subir des Dégâts au Combat = rappeler 1 cube vers la zone active).
 Lorsqu'on perd des cubes de puissance naval ces cube revienne dans les cube actif
 
 #Evolution 17 : Action gratuite
+✅ Investigué (24/08/2026, aucun changement de code, décision utilisateur) — le catalogue indique bien un coût de 1 Science pour Focus Développement "Harmoniser" (Standard ET Héroïque, focus.json id 6/87) : pas de carte "gratuite" en jeu ici. Reproduit le flux complet (FocusEngine.resoudreAction avec l'Effet "choice" ["augmenter_population","retirer_corruption"]) : dans le cas nominal (option choisie avec une cible éligible), l'action réussit normalement, le coût est bien débité, aucune trace "annulée". Le message "action annulée" n'apparaît QUE si l'option choisie dans le "choice" exclusif ne peut aboutir (ex. aucun secteur Pur éligible pour Augmenter une Population Pure) : la popup correspondante ne propose alors que "Annuler", ce qui bloque toute l'action — comportement voulu de la RÈGLE MÉTIER (le Coût n'est jamais débité si l'Effet échoue), pas un bug. Piste d'amélioration UX identifiée mais non retenue pour l'instant : proposer automatiquement l'autre option d'un choix exclusif quand la première n'a aucune cible éligible (changement plus large, touchant le moteur de choix partagé par de nombreuses cartes Focus) — à reconsidérer si le problème se reproduit avec un scénario précis.
 Developpement - Harmoniser n'a aucun cout, dans l'historique des actions elle est noté comme annulée a cause de ça je crois
 
 #Evolution 18 : Annuler la derniere action en semble pas bien fonctionner
+✅ Traité (24/08/2026) — refonte complète du moteur d'annulation (voir version.js pour le détail complet) :
+- Bouton bloqué sur "Passage en cours" : corrigé (renommé "Annulation en cours…", texte restauré après une annulation réussie — il n'était restauré qu'en cas d'échec avant ce correctif).
+- Cause racine du bug (Corruption non redéplacée/Programme non retiré) : de nombreuses popups déléguées (construire, regrouper, envahir, retirer/gagner/déplacer Corruption, augmenter Population, Gloire, gagner un Programme, rappeler un cube, avancer une piste de Civilisation) écrivent DIRECTEMENT en base, hors du diff plateauMaison suivi par la pile — jamais capturées, donc jamais annulées. Corrigé via un mécanisme générique db.js (`demarrerEnregistrement`/`arreterEnregistrement`/`enregistrementActif`) : capture AUTOMATIQUEMENT toute écriture `DB.put()` (n'importe quel store) pendant la résolution d'une action Focus (`FocusEngine.jouerActionEtPersister`) ou Programme en main (`GameService.utiliserProgramme`) — plus besoin de modifier chaque popup individuellement. `AnnulationService` généralise la restauration à ces mutations "ligne complète" en plus du format historique (champ plateauMaison).
+- Terminologie du todo respectée : Action = Focus (jouerActionEtPersister) ou Programme en main (utiliserProgramme), seuls les 2 orchestrateurs qui démarrent un enregistrement. Effet d'un Événement galactique : jamais enregistré (aucun `demarrerEnregistrement` autour d'un Cadre), donc jamais tracé ni annulable — conforme à la demande. Un Effet qui échoue APRÈS qu'une popup déléguée ait déjà écrit (ex. "et/ou" partiel) restaure désormais IMMÉDIATEMENT ces écritures (RÈGLE MÉTIER : aucune trace), sans même transiter par la pile.
+- `CivilisationService.avancerPiste`/`avancerPisteCorrompue` n'empilent plus leur propre entrée quand elles sont appelées DANS une action déjà enregistrée (évite une 2e entrée de pile pour ce qui doit rester une seule action annulable en un clic).
+- Historique visuel ("cadre unique + sous-cadres") : le journal de l'écran Focus groupe désormais chaque action jouée sous un titre, avec ses lignes (Effet/Coût/rappels) en sous-liste indentée.
+- Couverture tests : `db_enregistrement_test.js` (mécanisme générique, faux IndexedDB), `gameService_evolution18_undo_test.js` (intégration bout-en-bout via les 2 orchestrateurs, reproduit exactement le scénario "Conquête Planifier" rapporté), tests ajoutés dans `focusEngine.test.js`/`civilisationService_test.js`. Vérifié aussi manuellement dans un vrai navigateur (Playwright) : bouton, groupement du journal, aucune erreur JS.
 Exemple :J'ai tenté d'annuler la derniere action COnquete - planifier, la corruption n'a pas été redéplacée. 
 Et le bouton affiche toujours "Passage en cours" (renommer en annulation en cours pendant qu'on y est)
 Bien architecturer le moteur d'action, enregistrer tous les éléments modifier par l'action pour pouvoir l'annuler.

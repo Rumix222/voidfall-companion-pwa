@@ -19,18 +19,26 @@ function chargerDansContexte_(chemin, contexte) {
 }
 
 function creerDbFactice_() {
-  var stores = { plateauMaison: {}, pileAnnulation: {} };
+  // EVOLUTION 18 (todo.md) : 'secteursPartie' (clé composée [partieId,
+  // numero], convention join('|') identique à secteurService_actions.test.js)
+  // ajouté pour tester restaurerMutations_/AnnulationService avec des
+  // mutations génériques {store, cle, avant, apres} (pas seulement
+  // plateauMaison legacy {champ, avant, apres}).
+  var stores = { plateauMaison: {}, pileAnnulation: {}, secteursPartie: {} };
   var prochainId = 1;
+  function cleStr_(nom, cle) { return Array.isArray(cle) ? cle.join('|') : cle; }
   return {
-    get: function (nom, cle) { return Promise.resolve(stores[nom][cle] || null); },
+    get: function (nom, cle) { return Promise.resolve(stores[nom][cleStr_(nom, cle)] || null); },
     getAll: function (nom) { return Promise.resolve(Object.keys(stores[nom]).map(function (k) { return stores[nom][k]; })); },
     put: function (nom, valeur) {
       if (nom === 'pileAnnulation' && valeur.id === undefined) valeur.id = prochainId++;
-      var cle = nom === 'pileAnnulation' ? valeur.id : valeur.partieId;
-      stores[nom][cle] = valeur;
+      var cle = nom === 'pileAnnulation' ? valeur.id
+        : nom === 'secteursPartie' ? [valeur.partieId, valeur.numero]
+        : valeur.partieId;
+      stores[nom][cleStr_(nom, cle)] = valeur;
       return Promise.resolve(valeur);
     },
-    supprimer: function (nom, cle) { delete stores[nom][cle]; return Promise.resolve(); },
+    supprimer: function (nom, cle) { delete stores[nom][cleStr_(nom, cle)]; return Promise.resolve(); },
     _stores: stores
   };
 }
@@ -183,9 +191,9 @@ test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jeto
 // "effet_secteur" sert de témoin pour les clés secteur non automatisées
 // (repli générique "effet non chiffré") — "retirer_corruption" ne peut
 // pas servir de témoin car elle est portée (voir tests dédiés plus bas) ;
-// "rappeler_cube" est écarté aussi : son nom contient "cube" et tombe
-// dans le repli générique dédié aux clés Cube, pas dans celui des clés
-// secteur.
+// "rappeler_cube" est écarté aussi : depuis EVOLUTION 13 (todo.md), c'est
+// un cas dédié (Coût uniquement, popup 'rappeler_cube_cout' — voir tests
+// dédiés plus bas).
 test('clé secteur hors périmètre (effet_secteur) : ne bloque pas, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
@@ -195,6 +203,43 @@ test('clé secteur hors périmètre (effet_secteur) : ne bloque pas, journalisé
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('effet_secteur') !== -1 && l.indexOf('non automatisé') !== -1; }));
+  });
+});
+
+// EVOLUTION 13 (todo.md) : "rappeler_cube" comme Coût (ex. Focus
+// Développement "Installer" Standard) délègue à demanderChoix
+// ({type:'rappeler_cube_cout'}) — PAS au repli générique "cube" (qui
+// déciderait à tort de décrémenter cubeActif : un rappel de cube AJOUTE à
+// la zone active, il ne consomme pas un cube déjà actif).
+test('rappeler_cube (Coût) : succès — délègue à demanderChoix({type:"rappeler_cube_cout"}), journalisé, cubeActif inchangé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Installer', effet: {}, cout: { rappeler_cube: 1 }, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'rappeler_cube_cout');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Cube de Corvette rappelé depuis le Secteur 3.', numero: 3, type: 'corvette' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, PLATEAU_BASE.cubeActif);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Cube de Corvette rappelé depuis le Secteur 3') !== -1; }));
+  });
+});
+
+test('rappeler_cube (Coût) : annulé (popup "Annuler") — coût non débité, effet déjà réussi conservé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Installer', effet: { materiel: 1 }, cout: { rappeler_cube: 1 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true); // règle métier : coût annulé après effet réussi -> effet conservé
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, PLATEAU_BASE.ressourceMateriel + 1);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('coût annulé') !== -1; }));
   });
 });
 
@@ -220,6 +265,29 @@ test('envahir : victoire — jetonPrime/jetonLiberation/influence crédités, jo
     assert.strictEqual(resultat.plateauMaisonApres.influence, 13); // 10 + 3
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('VICTOIRE') !== -1; }));
+  });
+});
+
+// EVOLUTION 16 (todo.md) : les cubes perdus au cours d'un combat GAGNÉ
+// (engagés mais non survivants) reviennent aussi en Cube actif, pas
+// seulement en défaite.
+test('envahir : victoire avec pertes — cubesPerdus revient en Cube actif (clampé à 14)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var plateau = Object.assign({}, PLATEAU_BASE, { cubeActif: 2 });
+  var action = { action: 'Envahir', effet: { envahir: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function () {
+    return {
+      victoire: true, jetonPrime: 0, jetonLiberation: 0, influenceGagnee: 0,
+      totalEngage: 3, cubesPerdus: 2,
+      detail: 'Invasion du secteur 4 (Néant) — VICTOIRE, 2 cube(s) perdu(s) au combat reversé(s) en Cube actif.'
+    };
+  };
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, 4); // 2 + 2 perdus revenus
   });
 });
 
@@ -1167,5 +1235,85 @@ test('pile limitée à 10 entrées par partie', function () {
   }).then(function (pile) {
     assert.strictEqual(pile[0].source, 'Action 3'); // les 3 plus anciennes (0,1,2) purgées
     assert.strictEqual(pile[9].source, 'Action 12');
+  });
+});
+
+// EVOLUTION 18 (todo.md, retour utilisateur) : format générique {store,
+// cle, avant, apres} (db.js, DB.demarrerEnregistrement/put) — restaure la
+// ligne COMPLÈTE d'un store autre que plateauMaison (ex. secteursPartie),
+// pas juste un champ. Vérifie aussi la cohabitation avec le format legacy
+// {champ, avant, apres} dans une MÊME entrée de pile.
+test('annulerDerniere : mutation générique {store, cle, avant, apres} restaure la ligne complète (secteursPartie)', function () {
+  var ctx = creerContexte_();
+  var dbFactice = creerDbFactice_();
+  ctx.DB = dbFactice;
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
+
+  return dbFactice.put('secteursPartie', { partieId: 'partie-test', numero: 3, pnCorvette: 5, corrompu: false }).then(function () {
+    return dbFactice.put('secteursPartie', { partieId: 'partie-test', numero: 3, pnCorvette: 2, corrompu: true });
+  }).then(function () {
+    return ctx.AnnulationService.empiler('partie-test', {
+      source: 'Conquête — Planifier',
+      mutations: [{ store: 'secteursPartie', cle: ['partie-test', 3], avant: { partieId: 'partie-test', numero: 3, pnCorvette: 5, corrompu: false }, apres: { partieId: 'partie-test', numero: 3, pnCorvette: 2, corrompu: true } }]
+    });
+  }).then(function () {
+    return ctx.AnnulationService.annulerDerniere('partie-test');
+  }).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    return dbFactice.get('secteursPartie', ['partie-test', 3]);
+  }).then(function (secteur) {
+    assert.strictEqual(secteur.pnCorvette, 5);
+    assert.strictEqual(secteur.corrompu, false);
+  });
+});
+
+test('annulerDerniere : mutations mixtes (plateauMaison legacy + secteursPartie générique) dans la même entrée', function () {
+  var ctx = creerContexte_();
+  var dbFactice = creerDbFactice_();
+  ctx.DB = dbFactice;
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
+
+  return dbFactice.put('plateauMaison', Object.assign({}, PLATEAU_BASE, { programmesEnMain: [] })).then(function () {
+    return dbFactice.put('secteursPartie', { partieId: 'partie-test', numero: 4, corrompu: false });
+  }).then(function () {
+    return dbFactice.put('plateauMaison', Object.assign({}, PLATEAU_BASE, { programmesEnMain: ['Rebellion'] }));
+  }).then(function () {
+    return dbFactice.put('secteursPartie', { partieId: 'partie-test', numero: 4, corrompu: true });
+  }).then(function () {
+    return ctx.AnnulationService.empiler('partie-test', {
+      source: 'Conquête — Planifier',
+      mutations: [
+        { champ: 'programmesEnMain', avant: [], apres: ['Rebellion'] },
+        { store: 'secteursPartie', cle: ['partie-test', 4], avant: { partieId: 'partie-test', numero: 4, corrompu: false }, apres: { partieId: 'partie-test', numero: 4, corrompu: true } }
+      ]
+    });
+  }).then(function () {
+    return ctx.AnnulationService.annulerDerniere('partie-test');
+  }).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    return Promise.all([
+      dbFactice.get('plateauMaison', 'partie-test'),
+      dbFactice.get('secteursPartie', ['partie-test', 4])
+    ]);
+  }).then(function (resultats) {
+    assert.strictEqual(JSON.stringify(resultats[0].programmesEnMain), JSON.stringify([]));
+    assert.strictEqual(resultats[1].corrompu, false);
+  });
+});
+
+test('AnnulationService.restaurerMutations : ligne inexistante avant l’action (avant=null) -> supprimée par l’annulation', function () {
+  var ctx = creerContexte_();
+  var dbFactice = creerDbFactice_();
+  ctx.DB = dbFactice;
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
+
+  return dbFactice.put('secteursPartie', { partieId: 'partie-test', numero: 7, corrompu: true }).then(function () {
+    return ctx.AnnulationService.restaurerMutations('partie-test', [
+      { store: 'secteursPartie', cle: ['partie-test', 7], avant: null, apres: { partieId: 'partie-test', numero: 7, corrompu: true } }
+    ]);
+  }).then(function () {
+    return dbFactice.get('secteursPartie', ['partie-test', 7]);
+  }).then(function (secteur) {
+    assert.strictEqual(secteur, null);
   });
 });

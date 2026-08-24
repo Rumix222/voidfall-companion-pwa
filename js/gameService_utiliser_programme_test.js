@@ -56,7 +56,16 @@ function creerSandbox_(lignePlateauMaison, resultatEffetMock) {
     getAll: function (table) {
       if (table === 'programmes') return Promise.resolve(CATALOGUE_PROGRAMMES);
       return Promise.resolve([]);
-    }
+    },
+    // EVOLUTION 18 (todo.md) : GameService.utiliserProgramme enveloppe
+    // désormais sa résolution sous DB.demarrerEnregistrement/
+    // arreterEnregistrement (voir db.js) — stubs no-op ici, ce fichier
+    // couvre l'ORCHESTRATION (placement/conflit/plein/annulation), pas le
+    // mécanisme d'enregistrement lui-même (voir
+    // gameService_evolution18_undo_test.js pour une intégration complète
+    // avec le vrai db.js).
+    demarrerEnregistrement: function () {},
+    arreterEnregistrement: function () { return []; }
   };
 
   var FocusEngine = {
@@ -66,8 +75,19 @@ function creerSandbox_(lignePlateauMaison, resultatEffetMock) {
     }
   };
 
+  // Stub minimal : mutationsCapturees est toujours [] (voir
+  // arreterEnregistrement ci-dessus), donc jamais réellement invoqué dans
+  // ce fichier — présent uniquement pour que la référence globale
+  // AnnulationService résolve (utiliserProgramme y accède toujours dans
+  // la branche `resultatFinal.annule`, mutations vides ou non).
+  var AnnulationService = {
+    empiler: function () { return Promise.resolve(); },
+    restaurerMutations: function () { return Promise.resolve(); }
+  };
+
   var sandbox = {
-    DB: DB, FocusEngine: FocusEngine, console: console, Promise: Promise, Object: Object, Number: Number,
+    DB: DB, FocusEngine: FocusEngine, AnnulationService: AnnulationService,
+    console: console, Promise: Promise, Object: Object, Number: Number,
     Date: Date, Error: Error, Array: Array, JSON: JSON, String: String, Math: Math
   };
   vm.createContext(sandbox);
