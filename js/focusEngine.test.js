@@ -99,7 +99,7 @@ test('effet annulé (choix refusé) : aucune mutation, coût jamais débité', f
   });
 });
 
-test('choix imbriqué (et/ou) : deux options appliquées, tolérant', function () {
+test('choix imbriqué (et/ou) : seules les options sélectionnées sont appliquées', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = {
@@ -422,6 +422,130 @@ test('gain_corruption : annulé (popup "Annuler") — bloque toute l’action, c
   });
 });
 
+// EVOLUTION 10 — "deplacer_corruption" délègue à
+// demanderChoix({type:'deplacer_corruption'}) — même contrat que
+// retirer_corruption/gain_corruption ci-dessus (la popup, strategieService.js,
+// fait le choix ET la persistance des 2 étapes — source ET destination —
+// resoudreCle_ ne fait que relayer reponse.detail).
+test('deplacer_corruption : succès — délègue à demanderChoix({type:"deplacer_corruption"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { deplacer_corruption: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'deplacer_corruption');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Corruption déplacée de Secteur 4 vers Secteur 7.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Corruption déplacée de Secteur 4 vers Secteur 7') !== -1; }));
+  });
+});
+
+test('deplacer_corruption : annulé (popup "Annuler") — bloque toute l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { deplacer_corruption: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+test('deplacer_corruption et/ou augmenter_population (choice inclusif) : les 2 clés ouvrent chacune leur popup', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  // Reproduit focus.json id 81 (Zenor — "Répliquer") : { choice: [
+  // "deplacer_corruption", "augmenter_population" ] }, texte "et/ou" ->
+  // choice inclusif (options_inclusives), les 2 clés résolues à tour de rôle.
+  var action = {
+    action: 'Jouer',
+    effet: { choice: ['deplacer_corruption', 'augmenter_population'] },
+    cout: {},
+    texte: 'Déplacez une Corruption et/ou augmentez une Population Pure.'
+  };
+
+  var appelsPopup = 0;
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'options_inclusives') return [0, 1]; // les 2 options
+    appelsPopup++;
+    if (contexte.type === 'deplacer_corruption') return { detail: 'Corruption déplacée de Secteur 4 vers Secteur 7.' };
+    assert.strictEqual(contexte.type, 'augmenter_population_pure');
+    return { detail: 'Population du Secteur 2 augmentée de 1.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(appelsPopup, 2, 'les 2 clés (deplacer_corruption/augmenter_population) doivent chacune ouvrir la popup');
+  });
+});
+
+// EVOLUTION 11 (todo.md, retour utilisateur — bug reproduit avec Focus
+// Conquête "Planifier" — focus.json id 2 : { choice: ["gagner_programme",
+// "deplacer_corruption"] }, texte "et/ou") : sélectionner les 2 options
+// via options_inclusives PUIS Annuler la popup nichée de l'UNE d'elles
+// (ici gagner_programme, la 1re résolue) doit bloquer TOUTE l'action —
+// le Coût ne doit JAMAIS être débité. Avant correctif, la branche
+// inclusive de resoudreCle_ ignorait délibérément ("tolérant") le
+// résultat `false` d'une option nichée annulée et retournait toujours
+// `true`, donc l'Effet était considéré réussi et le Coût débité malgré
+// l'annulation — bug corrigé (voir focusEngine.js, commentaire EVOLUTION 11).
+test('choice et/ou : Annuler UNE option nichée parmi 2 sélectionnées bloque TOUTE l\u2019action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Conquête' };
+  var action = {
+    action: 'Planifier',
+    effet: { choice: ['gagner_programme', 'deplacer_corruption'] },
+    cout: { credit: 1, energie: 1 },
+    texte: 'Gagnez un Programme et/ou déplacez une Corruption.'
+  };
+
+  var appelDeplacerCorruption = false;
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'options_inclusives') return [0, 1]; // les 2 options
+    if (contexte.type === 'gagner_programme') return { annule: true }; // 1re option annulée
+    if (contexte.type === 'deplacer_corruption') appelDeplacerCorruption = true;
+    return { detail: 'ne devrait jamais être atteint' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false, 'toute l\u2019action doit être bloquée, pas seulement la 1re option');
+    assert.strictEqual(resultat.mutations.length, 0, 'aucune mutation, y compris le Coût (credit/energie)');
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE, 'état renvoyé inchangé (référence identique)');
+    assert.strictEqual(appelDeplacerCorruption, false, '2e option (deplacer_corruption) jamais résolue après l\u2019annulation de la 1re');
+  });
+});
+
+test('choice et/ou : Annuler la 2e option nichée (après succès de la 1re) bloque aussi TOUTE l\u2019action', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Conquête' };
+  var action = {
+    action: 'Planifier',
+    effet: { choice: ['gagner_programme', 'deplacer_corruption'] },
+    cout: { credit: 1, energie: 1 },
+    texte: 'Gagnez un Programme et/ou déplacez une Corruption.'
+  };
+
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'options_inclusives') return [0, 1];
+    if (contexte.type === 'gagner_programme') return { detail: 'Programme Domination obtenu.' };
+    if (contexte.type === 'deplacer_corruption') return { annule: true }; // 2e option annulée
+    return { detail: 'ne devrait jamais être atteint' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0, 'le succès de la 1re option seule ne doit rien persister si la 2e est annulée');
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 // "gagner_programme" délègue à demanderChoix({type:'gagner_programme'}) —
 // même contrat que gain_corruption/retirer_corruption ci-dessus (la popup,
 // strategieService.js, fait le choix ET la persistance via
@@ -711,7 +835,13 @@ test('produire_ressource (choix du joueur) : reste hors périmètre, ne bloque p
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('non automatisé') !== -1; }));
-    assert.strictEqual(resultat.mutations.length, 0);
+    // EVOLUTION 12 : l'action a réussi (succes:true) malgré l'effet hors
+    // périmètre — elle est donc marquée utilisée (actionsFocusUtilisees),
+    // seule mutation produite ici (aucune ressource n'est réellement
+    // modifiée par cet effet non automatisé).
+    assert.strictEqual(resultat.mutations.length, 1);
+    assert.strictEqual(resultat.mutations[0].champ, 'actionsFocusUtilisees');
+    assert.strictEqual(JSON.stringify(resultat.plateauMaisonApres.actionsFocusUtilisees), JSON.stringify(['Test — Jouer']));
   });
 });
 
@@ -871,6 +1001,103 @@ test('cube : activation clampée à 14, consommation clampée à 0', function ()
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.cubeActif, 0);
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('restant') !== -1; }));
+  });
+});
+
+// ------------------------------------------------------------
+// EVOLUTION 12 — Limite d'utilisation d'une action Focus par cycle
+// (todo.md, retour utilisateur) : plateauMaison.actionsFocusUtilisees
+// (voir focusEngine.js — CHAMPS_DIFF_SUIVIS/resoudreAction) accumule la
+// clé "Focus — Action" de chaque action Focus jouée avec succès CE
+// cycle ; strategieService.js s'en sert pour griser le bouton et
+// signaler le Focus concerné (au moins 1 action utilisée). Réinitialisé
+// à chaque changement de cycle par GameService.avancerCycle. Passe par
+// le même mécanisme diff/undo que le reste du plateau : annuler la
+// dernière action retire AUTOMATIQUEMENT sa clé, sans code dédié côté
+// AnnulationService — vérifié ci-dessous par une intégration complète
+// resoudreAction + AnnulationService.
+// ------------------------------------------------------------
+
+test('EVOLUTION 12 — une action réussie est ajoutée à actionsFocusUtilisees (clé "Focus — Action")', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Politique' };
+  var action = { action: 'Contrôler', effet: { credit: 1 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(JSON.stringify(resultat.plateauMaisonApres.actionsFocusUtilisees), JSON.stringify(['Politique — Contrôler']));
+    assert.ok(resultat.mutations.some(function (m) { return m.champ === 'actionsFocusUtilisees'; }));
+  });
+});
+
+test('EVOLUTION 12 — une action annulée (Effet refusé) n\u2019est PAS marquée utilisée', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Politique' };
+  var action = { action: 'Contrôler', effet: { retirer_corruption: 1 }, cout: {}, texte: '' };
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+    assert.strictEqual(resultat.plateauMaisonApres.actionsFocusUtilisees, undefined);
+  });
+});
+
+test('EVOLUTION 12 — rejouer la MÊME action (déjà marquée) ne duplique pas la clé, aucune mutation superflue', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Politique' };
+  var action = { action: 'Contrôler', effet: { credit: 1 }, cout: {}, texte: '' };
+  var plateauAvecActionDejaUtilisee = Object.assign({}, PLATEAU_BASE, { actionsFocusUtilisees: ['Politique — Contrôler'] });
+
+  return ctx.FocusEngine.resoudreAction(plateauAvecActionDejaUtilisee, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(JSON.stringify(resultat.plateauMaisonApres.actionsFocusUtilisees), JSON.stringify(['Politique — Contrôler']));
+    // Contenu inchangé (même référence de clé) -> diffChamps_ (comparaison
+    // par CONTENU, pas par référence) ne doit PAS remonter de mutation.
+    assert.strictEqual(resultat.mutations.some(function (m) { return m.champ === 'actionsFocusUtilisees'; }), false);
+  });
+});
+
+test('EVOLUTION 12 — undo de la DERNIÈRE action rétablit SEULEMENT l\u2019utilisabilité de celle-ci, pas des autres', function () {
+  var ctx = creerContexte_();
+  var dbFactice = creerDbFactice_();
+  ctx.DB = dbFactice;
+  chargerDansContexte_(__dirname + '/annulationService.js', ctx);
+
+  var carte = { focus: 'Politique' };
+  var actionControler = { action: 'Contrôler', effet: { credit: 1 }, cout: {}, texte: '' };
+  var actionImposer = { action: 'S\u2019imposer', effet: { credit: 1 }, cout: {}, texte: '' };
+
+  return dbFactice.put('plateauMaison', Object.assign({}, PLATEAU_BASE)).then(function () {
+    return ctx.FocusEngine.resoudreAction(dbFactice._stores.plateauMaison['partie-test'], carte, actionControler, demanderChoixSansPopup_);
+  }).then(function (resultat1) {
+    assert.strictEqual(resultat1.succes, true);
+    return dbFactice.put('plateauMaison', resultat1.plateauMaisonApres).then(function () {
+      return ctx.AnnulationService.empiler('partie-test', { source: 'Politique — Contrôler', mutations: resultat1.mutations });
+    });
+  }).then(function () {
+    return ctx.FocusEngine.resoudreAction(dbFactice._stores.plateauMaison['partie-test'], carte, actionImposer, demanderChoixSansPopup_);
+  }).then(function (resultat2) {
+    assert.strictEqual(resultat2.succes, true);
+    // Les 2 actions accumulées après la 2e.
+    assert.strictEqual(
+      JSON.stringify(resultat2.plateauMaisonApres.actionsFocusUtilisees),
+      JSON.stringify(['Politique — Contrôler', 'Politique — S\u2019imposer'])
+    );
+    return dbFactice.put('plateauMaison', resultat2.plateauMaisonApres).then(function () {
+      return ctx.AnnulationService.empiler('partie-test', { source: 'Politique — S\u2019imposer', mutations: resultat2.mutations });
+    });
+  }).then(function () {
+    return ctx.AnnulationService.annulerDerniere('partie-test');
+  }).then(function (resultatAnnulation) {
+    assert.strictEqual(resultatAnnulation.succes, true);
+    assert.strictEqual(resultatAnnulation.source, 'Politique — S\u2019imposer');
+    return dbFactice.get('plateauMaison', 'partie-test');
+  }).then(function (ligne) {
+    // "Contrôler" reste marqué utilisé (le Focus garde son picto),
+    // "S'imposer" a retrouvé son utilisabilité (bouton non grisé) —
+    // reproduit exactement le test demandé (todo.md EVOLUTION 12).
+    assert.strictEqual(JSON.stringify(ligne.actionsFocusUtilisees), JSON.stringify(['Politique — Contrôler']));
   });
 });
 

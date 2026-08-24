@@ -160,7 +160,16 @@ var GameService = (function () {
     // AUTORISES ci-dessous) ; whitelisté ICI en plus pour permettre la
     // saisie manuelle directe (Programmes/Chambres de décontamination,
     // non automatisées — champ éditable, strategieService.js).
-    'corruptionMaison'
+    'corruptionMaison',
+    // EVOLUTION 12 (todo.md, retour utilisateur) — tableau des clés
+    // "Focus — Action" jouées avec succès CE cycle (voir focusEngine.js,
+    // resoudreAction/CHAMPS_DIFF_SUIVIS — la mutation de ce champ passe
+    // par le même mécanisme diff/undo que le reste du plateau, empilée
+    // par AnnulationService comme n'importe quelle autre). Utilisé par
+    // strategieService.js pour griser le bouton d'une action déjà jouée
+    // et signaler le Focus concerné. Réinitialisé à [] à chaque
+    // changement de cycle par GameService.avancerCycle ci-dessous.
+    'actionsFocusUtilisees'
   ];
 
   // ------------------------------------------------------------
@@ -473,6 +482,11 @@ var GameService = (function () {
     // nativement 'retirer_corruption', identité comme les autres clés
     // ci-dessus.
     if (option.cle === 'retirer_corruption') return option.cle;
+    // EVOLUTION 10 — même mécanisme générique, FocusEngine.resoudreCle_
+    // reconnaît nativement 'deplacer_corruption' (ex. Événement A Cycle 1
+    // Cadre "exploit" : "retirez une Corruption et déplacez une
+    // Corruption", evenements.json).
+    if (option.cle === 'deplacer_corruption') return option.cle;
     // Même mécanisme générique — FocusEngine.resoudreCle_ reconnaît
     // nativement 'avancer_civilisation' (piste au choix) et
     // 'avancer_civilisation_societe'/'_gouvernement'/'_economie' (piste
@@ -746,7 +760,11 @@ var GameService = (function () {
       // CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
       corruptionChambreDecontamination: pm.corruptionChambreDecontamination || 0,
       // Compteur de Corruption sur la fiche Maison.
-      corruptionMaison: pm.corruptionMaison || 0
+      corruptionMaison: pm.corruptionMaison || 0,
+      // EVOLUTION 12 — voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
+      // Repli sur tableau vide pour toute partie créée avant l'ajout de
+      // ce champ (même principe que programmesEnMain/offresProgramme).
+      actionsFocusUtilisees: Array.isArray(pm.actionsFocusUtilisees) ? pm.actionsFocusUtilisees : []
     };
 
     return partie;
@@ -1905,7 +1923,11 @@ var GameService = (function () {
      * cycleActuel n'est jamais stocké tel quel (calculé à la lecture, voir
      * assemblerPartie_) : incrémente cycleNum/cycleTermine et amorce
      * focusHeroiques/focusHeroiquesPioches pour le nouveau cycle si
-     * absents.
+     * absents. EVOLUTION 12 : réinitialise aussi
+     * plateauMaison.actionsFocusUtilisees ([]) — écrit SÉPARÉMENT via
+     * majPlateauMaison, jamais porté par sauvegarderPartie/etatJson
+     * (pourEtatJson_ exclut toujours `plateauMaison`, colonnes dédiées de
+     * la table `plateauMaison`, pas de `parties`).
      */
     avancerCycle: function (partieId) {
       return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
@@ -1928,7 +1950,19 @@ var GameService = (function () {
           if (!partie.focusHeroiquesPioches) partie.focusHeroiquesPioches = [];
         }
 
-        return GameService.sauvegarderPartie(partie, 'avancer_cycle', 'cycle suivant');
+        // Reflète aussi la réinitialisation sur l'objet `partie` EN
+        // MÉMOIRE, en plus de l'écriture DB ci-dessous : sauvegarderPartie
+        // renvoie CET objet tel quel (pas de relecture DB), et l'appelant
+        // (index.html, bouton "Fin du cycle") l'utilise directement pour
+        // re-rendre l'écran Focus sans passer par un rechargement complet
+        // — sans cette ligne, l'écran afficherait encore les actions de
+        // l'ancien cycle comme "utilisées" jusqu'au prochain rafraîchissement.
+        partie.plateauMaison = partie.plateauMaison || {};
+        partie.plateauMaison.actionsFocusUtilisees = [];
+
+        return GameService.majPlateauMaison(partieId, { actionsFocusUtilisees: [] }).then(function () {
+          return GameService.sauvegarderPartie(partie, 'avancer_cycle', 'cycle suivant');
+        });
       });
     },
 

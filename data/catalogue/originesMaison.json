@@ -40,7 +40,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Zenor",
@@ -83,7 +84,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Thegwyn",
@@ -126,7 +128,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Astoran",
@@ -169,7 +172,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Fenrax",
@@ -212,7 +216,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Kradmor",
@@ -255,7 +260,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 1,
     "secteurMereGuildeScientifiques": 1,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Kradmor",
@@ -298,7 +304,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Nervo",
@@ -341,7 +348,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Novaris",
@@ -384,7 +392,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Belitan",
@@ -427,7 +436,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "nourriture"
+    "bonusProd": "nourriture",
+    "bonusProdSecondaire": "credit"
   },
   {
     "maison": "Belitan",
@@ -470,7 +480,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "energie"
+    "bonusProd": "energie",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Valnis",
@@ -513,7 +524,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "nourriture"
+    "bonusProd": "nourriture",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Valnis",
@@ -556,7 +568,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "energie"
+    "bonusProd": "energie",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Yarvek",
@@ -599,7 +612,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Nervo",
@@ -642,7 +656,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Thegwyn",
@@ -685,7 +700,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 1,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "energie"
+    "bonusProd": "energie",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Shiveus",
@@ -728,7 +744,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 1,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Novaris",
@@ -771,7 +788,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Cortozaar",
@@ -814,7 +832,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "energie"
+    "bonusProd": "energie",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Zenor",
@@ -857,7 +876,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 1,
-    "bonusProd": "nourriture"
+    "bonusProd": "nourriture",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Dunlork",
@@ -900,7 +920,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "nourriture"
+    "bonusProd": "nourriture",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Shiveus",
@@ -943,7 +964,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 1,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Dunlork",
@@ -986,7 +1008,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "materiel"
+    "bonusProd": "materiel",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Yarvek",
@@ -1029,7 +1052,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": null
+    "bonusProd": null,
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Astoran",
@@ -1072,7 +1096,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "materiel"
+    "bonusProd": "materiel",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Fenrax",
@@ -1115,7 +1140,8 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "credit"
+    "bonusProd": "credit",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Marqualos",
@@ -1158,7 +1184,8 @@
     "secteurMereGuildeMineurs": 0,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "materiel"
+    "bonusProd": "materiel",
+    "bonusProdSecondaire": null
   },
   {
     "maison": "Marqualos",
@@ -1201,6 +1228,7 @@
     "secteurMereGuildeMineurs": 1,
     "secteurMereGuildeBanquiers": 0,
     "secteurMereGuildeScientifiques": 0,
-    "bonusProd": "nourriture"
+    "bonusProd": "nourriture",
+    "bonusProdSecondaire": null
   }
 ]

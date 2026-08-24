@@ -1,9 +1,193 @@
 /**
  * version.js
- * Version 69 — 2026-08-24
+ * Version 73 — 2026-08-24
  * Source de vérité unique pour la version de l'application.
  *
- * 24/08/2026, dernière fois (Plat. maison — renomme la section "Corruption
+ * 24/08/2026, dernière fois (EVOLUTION 12 — Limite d'utilisation d'une
+ * action Focus par cycle, todo.md, retour utilisateur) :
+ * Nouveau champ `plateauMaison.actionsFocusUtilisees` (tableau de clés
+ * "Focus — Action", ex. "Politique — Contrôler") accumulant les actions
+ * Focus jouées avec succès CE cycle (Focus joueur ET Focus héroïques,
+ * même chemin de code) :
+ * - `FocusEngine.resoudreAction` (focusEngine.js) ajoute la clé de
+ *   l'action dès que l'Effet a réussi (idempotent — rejouer une action
+ *   déjà marquée ne duplique pas sa clé), en réutilisant `libelleSource`
+ *   (déjà utilisé pour le journal/la pile d'annulation). Cette mutation
+ *   passe par le MÊME mécanisme diff/undo que le reste du plateau
+ *   (`CHAMPS_DIFF_SUIVIS`) : annuler la DERNIÈRE action retire
+ *   automatiquement sa clé, sans code dédié côté AnnulationService — le
+ *   Focus concerné regagne son picto/bouton utilisable dès que ce n'est
+ *   plus la seule action utilisée, exactement comme demandé (todo.md :
+ *   "faire deux actions d'un focus, annuler la dernière, le focus a
+ *   toujours le picto"). `diffChamps_` (même fichier) compare désormais
+ *   par CONTENU (JSON.stringify) plutôt que par référence — nécessaire
+ *   pour ce nouveau champ TABLEAU (un clone JSON a toujours une
+ *   référence différente même à contenu identique), sans changer le
+ *   comportement des champs scalaires déjà suivis.
+ * - `GameService` (gameService.js) : `actionsFocusUtilisees` ajouté à
+ *   `CHAMPS_PLATEAU_MAISON_AUTORISES` (écriture autorisée via
+ *   majPlateauMaison) et exposé dans `assemblerPartie_`
+ *   (partie.plateauMaison.actionsFocusUtilisees, repli sur [] pour les
+ *   parties créées avant ce champ). `avancerCycle` réinitialise ce
+ *   champ à [] à chaque changement de cycle — à la fois dans l'objet
+ *   `partie` renvoyé EN MÉMOIRE (index.html re-rend l'écran Focus
+ *   directement avec cet objet, sans rechargement complet) ET dans la
+ *   table `plateauMaison` (écriture séparée via majPlateauMaison,
+ *   jamais portée par sauvegarderPartie/etatJson — pourEtatJson_ exclut
+ *   toujours `plateauMaison`).
+ * - `strategieService.js` (`carteFocusJoueurHTML_`, réutilisée pour les
+ *   Focus joueur ET héroïques) : chaque bouton d'action déjà jouée ce
+ *   cycle devient réellement `disabled` (icône ✓ au lieu de ▶, classe
+ *   `.focus-action-deja-utilisee`) — visuellement DISTINCTE de
+ *   `.focus-action-insuffisant` (ressources manquantes, rouge) pour ne
+ *   pas confondre les 2 raisons d'indisponibilité. Le titre de la carte
+ *   affiche un badge "✓ Utilisé" (`.badge-focus-utilise`, vert) dès
+ *   qu'au moins une action de ce Focus a été jouée ce cycle.
+ * - `style.css` : 2 nouvelles classes — `.focus-action-deja-utilisee`
+ *   (gris neutre, bouton non cliquable) et `.badge-focus-utilise`
+ *   (badge vert sur le titre, distinct des badge-type-* existants qui
+ *   servent au TYPE de carte, pas à son état d'utilisation).
+ * 6 tests ajoutés (`focusEngine_test.js` : marquage, non-marquage sur
+ * annulation, idempotence, intégration annulation ↔ 2 actions du même
+ * Focus reproduisant exactement le scénario todo.md ;
+ * `gameService_cycle_focus_technologie_test.js` : réinitialisation
+ * mémoire + DB au changement de cycle) — 1 test existant
+ * (`produire_ressource`) mis à jour (une action "réussie mais hors
+ * périmètre" produit désormais 1 mutation : actionsFocusUtilisees).
+ * 198 tests `*_test.js` au vert après ces changements.
+ * Fichiers touchés : focusEngine.js, gameService.js, strategieService.js,
+ * style.css, focusEngine_test.js,
+ * gameService_cycle_focus_technologie_test.js, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 11 — Bug annulation coût débité
+ * malgré une option nichée annulée, todo.md, retour utilisateur) :
+ * Reproduit avec Focus Conquête "Planifier" (focus.json id 2 : { choice:
+ * ["gagner_programme", "deplacer_corruption"] }, texte "et/ou") —
+ * sélectionner les 2 options via la popup 'options_inclusives' PUIS
+ * Annuler la popup nichée de l'UNE d'elles (ex. gagner_programme)
+ * débitait quand même le Coût de l'action (credit/energie).
+ * `FocusEngine.resoudreCle_`, branche "choice"/"choix" INCLUSIVE
+ * (texte contenant "et/ou", focusEngine.js) : la boucle `reduce` sur les
+ * options sélectionnées ignorait délibérément ("tolérant", commentaire
+ * d'origine) le résultat `false` d'une option nichée annulée et
+ * retournait TOUJOURS `true` — l'Effet était donc considéré réussi même
+ * si l'une des options choisies avait été annulée en cours de route, et
+ * `FocusEngine.resoudreAction` débitait le Coût en conséquence. Ce
+ * comportement enfreignait la RÈGLE MÉTIER documentée en tête de
+ * focusEngine.js ("un blocage à N'IMPORTE quelle clé annule bien la
+ * totalité du JSON en cours, pas seulement les clés restantes").
+ * Correctif : la boucle `reduce` propage désormais normalement le
+ * résultat de chaque option nichée (même mécanisme que
+ * `resoudreJsonInterne_`/`choice_repeat`, déjà corrects) — un "Annuler"
+ * sur N'IMPORTE laquelle des options sélectionnées (la 1re ou la 2e)
+ * bloque désormais TOUTE l'action : aucune mutation, Coût jamais débité,
+ * comme pour une option "choice" exclusive. Ce changement s'applique à
+ * TOUTE clé "choice"/"choix" inclusive du catalogue (focus.json/
+ * evenements.json/pistesCivilisation.json), pas seulement à "Planifier".
+ * 2 tests de non-régression ajoutés dans `focusEngine_test.js`
+ * (annulation de la 1re option des 2 sélectionnées, puis de la 2e après
+ * succès de la 1re — dans les 2 cas : succes=false, mutations=[], état
+ * renvoyé inchangé) ; le test existant "choix imbriqué (et/ou)" renommé
+ * pour clarifier qu'il porte sur les options NON sélectionnées (ignorées
+ * sans erreur), pas sur la tolérance à l'annulation (ce dont il ne
+ * s'agissait jamais) — comportement inchangé pour ce cas. 193 tests
+ * `*_test.js` au vert après ces changements.
+ * Fichiers touchés : focusEngine.js, focusEngine_test.js, version.js.
+ * `service-worker.js` inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTION 10 — Déplacer une Corruption,
+ * todo.md, retour utilisateur) :
+ * Nouvelle clé Effet "deplacer_corruption" (focus.json — ex. Focus
+ * Politique "Contrôler", Focus Conquête "Planifier", Focus Zenor
+ * "Répliquer" — et evenements.json, Cadres "choix"/"exploit" d'Événement
+ * galactique) — jusqu'ici sans cas dédié, retombait sur le repli
+ * générique "effet non chiffré — à appliquer manuellement" :
+ * - `FocusEngine.resoudreCle_` (focusEngine.js) reconnaît désormais
+ *   "deplacer_corruption" (Effet uniquement, signe > 0) au même titre que
+ *   "retirer_corruption"/"gain_corruption" — délègue à une popup dédiée
+ *   (contexte 'deplacer_corruption', strategieService.js) qui fait le
+ *   choix ET la persistance.
+ * - `GameService.cleFocusEnginePourOptionCadre_` (gameService.js)
+ *   reconnaît aussi "deplacer_corruption" pour un usage en option de
+ *   Cadre "choix" d'Événement galactique (ex. evenements.json, Événement
+ *   A Cycle 1 : "retirez une Corruption et déplacez une Corruption").
+ * - Nouvelle popup `strategieService.js` (contexte 'deplacer_corruption')
+ *   à 2 ÉTAPES : 1) SOURCE — même menu que 'retirer_corruption' (Secteur
+ *   possédé Corrompu / Piste Corrompue / Programme manuel / Chambres de
+ *   décontamination si stockage > 0) ; 2) DESTINATION — même menu que
+ *   'gagner_corruption' (Secteur possédé Pur non immunisé / Piste non
+ *   Corrompue / Programme manuel / Chambres de décontamination si
+ *   emplacement libre), calculé et affiché AVANT toute écriture en base,
+ *   donc excluant naturellement la source (toujours Corrompue à ce
+ *   stade) — sauf exception explicite : Chambres de décontamination
+ *   n'est jamais proposée comme destination si la source EST elle-même
+ *   la Technologie (emplacements non suivis individuellement, seul le
+ *   compte agrégé plateauMaison.corruptionChambreDecontamination l'est).
+ *   Écriture : PLACE d'abord sur la destination, RETIRE ensuite de la
+ *   source (échec DB en cours de route -> au pire une Corruption en trop,
+ *   jamais une Corruption perdue).
+ * - `index.html` : libellé `LABEL_OPTION_FOCUSENGINE_.deplacer_corruption`
+ *   ("Déplacer une Corruption") pour l'usage en option de Cadre.
+ * - 3 tests ajoutés dans `focusEngine_test.js` (succès, annulation à
+ *   n'importe laquelle des 2 étapes bloque toute l'action — coût jamais
+ *   débité, combinaison "et/ou" avec augmenter_population comme
+ *   focus.json id 81 Zenor "Répliquer") — 191 tests `*_test.js` au vert
+ *   après ces changements.
+ * Fichiers touchés : focusEngine.js, strategieService.js, gameService.js,
+ * index.html, focusEngine_test.js, version.js. `service-worker.js`
+ * inchangé (aucun nouveau fichier à mettre en cache).
+ *
+ * 24/08/2026, avant (EVOLUTIONS 8, 9, 14 — todo.md, retour
+ * utilisateur) :
+ * - EVOLUTION 8 (origine Belitan/Collecte de données) : `originesMaison.json`
+ *   gagne un champ `bonusProdSecondaire` (null par défaut sur toutes les
+ *   entrées) ; fixé à "credit" pour l'entrée Belitan dont `bonusProd` vaut
+ *   déjà "nourriture" — Belitan produit désormais +1 Nourriture ET +1
+ *   Crédit. `StrategieService.calculerNiveauxProduction_` (strategieService.js)
+ *   applique ce second bonus au même titre que `bonusProd`.
+ * - EVOLUTION 9 (niveau de production — secteurs non possédés) :
+ *   `calculerNiveauxProduction_` ne comptait, à tort, la contribution
+ *   Population × Guildes de TOUS les secteurs de la partie, y compris ceux
+ *   ne nous appartenant plus (repris par le Néant). Le calcul ne prend
+ *   désormais en compte que les secteurs possédés (au moins 1 PN joueur et
+ *   aucune PN Néant dessus), sauf le Secteur-Mère qui nous appartient
+ *   toujours même sans PN dessus. `SecteurService.appartientAuJoueur`
+ *   (secteurService.js) est exposée publiquement (seule source de vérité,
+ *   déjà utilisée en interne par `appartientAuJoueur_`) pour que
+ *   strategieService.js s'appuie dessus sans dupliquer la règle. Le total
+ *   de Puissance Navale déployée (`totalDeploye`, affiché en Cube déployé)
+ *   n'est PAS concerné : les champs pnCorvette/etc. représentent déjà la PN
+ *   du joueur, par opposition à pnNeant.
+ * - EVOLUTION 14 (libellé "Augmenter une population") : le bouton d'option
+ *   de Cadre `augmenter_population_pure` (index.html,
+ *   LABEL_OPTION_FOCUSENGINE_) affichait "Augmenter une Population Pure" —
+ *   renommé "Augmenter une population" pour matcher le texte déjà utilisé
+ *   ailleurs (popups de résolution, journal).
+ * - EVOLUTION 14/15 (doublon de numérotation dans todo.md — popups
+ *   Regrouper/Envahir, retour utilisateur) : dans strategieService.js,
+ *   les boutons "Ajouter ce déplacement" (Regrouper) et "Engager cette
+ *   unité" (Envahir) ont désormais un espace (margin-bottom) après eux,
+ *   avant le bouton Valider global. Les boutons Valider de ces deux popups
+ *   affichaient le décompte dans leur libellé ("Valider (N
+ *   déplacement(s))", "Lancer l'invasion (N unité(s))") — simplifiés en
+ *   "Valider" tout court (4 occurrences : normal + message d'erreur), le
+ *   décompte restant visible juste au-dessus ("Déplacements utilisés :
+ *   N / 5", "N unité(s) de Puissance Navale engagée(s)").
+ * Fichiers touchés : originesMaison.json, secteurService.js,
+ * strategieService.js, index.html, version.js. `service-worker.js` inchangé
+ * (aucun nouveau fichier à mettre en cache, CACHE_NOM dérive déjà de
+ * APP_VERSION). 188 tests `*_test.js`/`*.test.js` au vert après ces
+ * changements (secteurService_actions_test.js re-vérifié en particulier
+ * pour l'export `appartientAuJoueur`).
+ * EVOLUTIONS 10 (déplacer corruption), 11 (annulation multi-effets), 12
+ * (limite d'utilisation Focus par cycle), 13 (coût action Installer) et 15/
+ * 16 (règles Secteur-Mère lors de Regrouper, perte de PN) du todo.md restent
+ * HORS PÉRIMÈTRE de cette livraison — scope à clarifier avec l'utilisateur
+ * avant implémentation (chacune est une fonctionnalité distincte,
+ * potentiellement ambiguë architecturalement).
+ *
+ * 24/08/2026, avant (Plat. maison — renomme la section "Corruption
  * et Influence" en "Corruption maison et influence", retour utilisateur) :
  * clarifie que ce compteur (`plateauMaison.corruptionMaison`) ne porte QUE
  * sur les Corruptions de la fiche Maison elle-même (pistes de
@@ -2050,4 +2234,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260824.3';
+var APP_VERSION = '20260824.7';

@@ -1095,6 +1095,22 @@ input:disabled {
   outline: 2px solid #e0364f;
   outline-offset: 1px;
 }
+/* EVOLUTION 12 (todo.md, retour utilisateur) — action Focus déjà jouée
+   ce cycle : DISTINCTE de .focus-action-insuffisant ci-dessus (rouge =
+   ressources manquantes, indisponibilité TEMPORAIRE) — ici gris/neutre
+   avec un bouton ✓ (voir carteFocusJoueurHTML_, strategieService.js),
+   plus sombre (opacity plus basse) pour bien la différencier au premier
+   coup d'œil. Le bouton est en plus réellement `disabled` (HTML), ce
+   style n'est donc jamais cliquable contrairement à -insuffisant qui
+   reste actionnable si le joueur trouve la ressource manquante. */
+.focus-action-deja-utilisee { opacity: 0.4; }
+.focus-action-deja-utilisee .btn-jouer-action {
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: default;
+}
+.focus-action-deja-utilisee .pastille-cout { filter: grayscale(1); }
 /* .badge est PARTAGÉE par le type de carte Focus (badge-type-*, écran
    Stratégie) et par les badges technologie (badge-sans-point, écrans
    Partie/Historique) — une seule classe de base pour les deux usages,
@@ -1113,6 +1129,22 @@ input:disabled {
 .badge-type-standard { background: var(--color-surface-2); }
 .badge-type-heroique { background: rgba(255, 107, 82, 0.14); border: 1px solid var(--color-coral); color: var(--color-coral); }
 .badge-type-maison { background: rgba(76, 29, 149, 0.25); border: 1px solid var(--color-nebula-1); }
+/* EVOLUTION 12 — badge sur le TITRE de la carte Focus (h3, voir
+   carteFocusJoueurHTML_), signalant qu'au moins une action de ce Focus
+   a été jouée ce cycle. Vert (pas coral/violet comme les badges-type
+   ci-dessus, déjà utilisés ailleurs pour le TYPE de carte) pour se lire
+   comme une confirmation plutôt qu'une catégorie. font-size réduit +
+   vertical-align pour rester sur la même ligne que le nom du Focus sans
+   agrandir le titre. */
+.badge-focus-utilise {
+  background: rgba(46, 160, 90, 0.16);
+  border: 1px solid #2ea05a;
+  color: #4ecb84;
+  font-size: 0.62rem;
+  padding: 2px 8px;
+  vertical-align: middle;
+  margin: 0 0 0 6px;
+}
 
 /* --- Modale de choix générique (demanderChoix, coûts/effets Focus) --- */
 .modal-overlay {

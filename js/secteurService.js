@@ -989,6 +989,12 @@ var SecteurService = (function () {
     obtenirSecteurs: obtenirSecteurs,
     obtenirAdjacences: obtenirAdjacences,
     obtenirSecteurMere: obtenirSecteurMere,
+    // Exposée publiquement (EVOLUTION 9) : seule source de vérité sur la
+    // possession d'un secteur (PN joueur > 0 et pas de PN Néant), utilisée
+    // par strategieService.js pour calculerNiveauxProduction_ sans dupliquer
+    // la règle. Le Secteur-Mère est TOUJOURS possédé même sans PN dessus
+    // (cas géré séparément par l'appelant via obtenirSecteurMere).
+    appartientAuJoueur: appartientAuJoueur_,
     construire: construire,
     deployerCube: deployerCube,
     rappelerCube: rappelerCube,

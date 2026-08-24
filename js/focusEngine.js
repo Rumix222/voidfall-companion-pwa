@@ -217,7 +217,12 @@ var FocusEngine = (function () {
   var CHAMPS_DIFF_SUIVIS = [
     'ressourceNourriture', 'ressourceEnergie', 'ressourceMateriel',
     'ressourceCredit', 'ressourceScience', 'influence', 'cubeActif',
-    'jetonPrime', 'jetonLiberation'
+    'jetonPrime', 'jetonLiberation',
+    // EVOLUTION 12 : liste des actions Focus déjà jouées CE cycle (voir
+    // resoudreAction ci-dessous) — seul champ TABLEAU de cette liste,
+    // d'où le passage de diffChamps_ à une comparaison par CONTENU
+    // (JSON.stringify) plutôt que par référence, voir plus bas.
+    'actionsFocusUtilisees'
   ];
 
   // ------------------------------------------------------------
@@ -228,12 +233,19 @@ var FocusEngine = (function () {
     return JSON.parse(JSON.stringify(objet));
   }
 
+  // Comparaison par CONTENU (pas par référence) : `etat` est TOUJOURS un
+  // clone JSON de l'état de départ (cloner_ ci-dessus), donc un champ
+  // tableau jamais modifié (ex. actionsFocusUtilisees inchangé) a de
+  // toute façon une référence différente de l'original — une comparaison
+  // `!==` naïve le signalerait à tort comme "modifié" à chaque action.
+  // Fonctionne aussi pour les champs scalaires déjà suivis ci-dessus
+  // (JSON.stringify(5) !== JSON.stringify(5) est faux, comme 5!==5).
   function diffChamps_(avant, apres) {
     var mutations = [];
     CHAMPS_DIFF_SUIVIS.forEach(function (champ) {
       var valAvant = avant[champ];
       var valApres = apres[champ];
-      if (valAvant !== valApres) {
+      if (JSON.stringify(valAvant) !== JSON.stringify(valApres)) {
         mutations.push({ champ: champ, avant: valAvant, apres: valApres });
       }
     });
@@ -504,6 +516,27 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Déplacer une Corruption (EVOLUTION 10) : Effet UNIQUEMENT (signe
+    // > 0). Ouvre une popup dédiée à 2 étapes (contexte
+    // 'deplacer_corruption', strategieService.js) : la SOURCE (menu
+    // identique à 'retirer_corruption' ci-dessus — Secteur/Piste/
+    // Programme/Technologie Chambres de décontamination Corrompus), puis
+    // la DESTINATION (menu identique à 'gagner_corruption' — calculé
+    // AVANT toute écriture, donc excluant naturellement la source, qui
+    // reste Corrompue tant qu'on n'a pas validé). Même contrat
+    // d'annulation que retirer_corruption/gagner_corruption : la popup
+    // fait le choix ET la persistance (focusEngine reste pur, aucun
+    // accès DB ici), et l'annulation à n'importe quelle étape bloque
+    // TOUTE l'action (coût jamais débité) — cf. reponseAnnulee_.
+    // resoudreCle_ relaie juste le résumé dans le journal. ---
+    if (cle === 'deplacer_corruption' && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'deplacer_corruption',
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
     // --- Avancer sur une piste de Civilisation : Effet UNIQUEMENT (signe
     // > 0). Ouvre une popup dédiée (contexte 'avancer_civilisation',
     // strategieService.js) qui affiche, pour la ou les piste(s) candidate(s)
@@ -644,9 +677,22 @@ var FocusEngine = (function () {
     }
 
     // --- choice / choix : liste d'options (chaînes ou fragments JSON).
-    // Exclusif (un seul choix, peut bloquer si annulé) sauf si le Texte de
-    // l'action contient "et/ou" (inclusif, sélection multiple, tolérant —
-    // un refus sur une option nichée n'annule pas le reste). ---
+    // Exclusif (un seul choix, peut bloquer si annulé) OU, si le Texte de
+    // l'action contient "et/ou", inclusif (sélection multiple des
+    // options à résoudre — laquelle "options_inclusives" détermine, PAS
+    // le contenu de cette réponse). Dans LES DEUX CAS, un "Annuler" sur
+    // N'IMPORTE quelle option nichée bloque TOUTE l'action — EVOLUTION 11
+    // (todo.md, retour utilisateur : Focus Conquête "Planifier", et/ou
+    // "gagner_programme"/"deplacer_corruption" — sélectionner les 2 puis
+    // Annuler la popup de programme débitait quand même le Coût). Ce
+    // comportement est celui documenté en RÈGLE MÉTIER en tête de
+    // fichier ("un blocage à N'IMPORTE quelle clé annule bien la
+    // totalité du JSON en cours") — la version précédente de cette
+    // branche inclusive l'enfreignait délibérément ("tolérant"), ce qui
+    // était le bug : `resoudreJsonInterne_` (qui appelle `resoudreCle_`
+    // ci-dessous) et `resoudreJson_` n'ont AUCUN moyen de savoir qu'une
+    // option nichée a échoué si cette fonction retourne toujours `true`
+    // — le Coût de l'action entière est alors débité à tort. ---
     if ((cle === 'choice' || cle === 'choix') && Array.isArray(valeur)) {
       var inclusif = String(texteAction || '').indexOf('et/ou') !== -1;
 
@@ -661,10 +707,11 @@ var FocusEngine = (function () {
       return Promise.resolve(demanderChoix({ type: 'options_inclusives', options: valeur, source: source })).then(function (reponse) {
         var indices = Array.isArray(reponse) ? reponse : [];
         return indices.reduce(function (promesse, indexOption) {
-          return promesse.then(function () {
+          return promesse.then(function (succesPrecedent) {
+            if (succesPrecedent === false) return false;
             return resoudreOption_(valeur[indexOption], signe, source, etat, journal, demanderChoix);
           });
-        }, Promise.resolve()).then(function () { return true; }); // tolérant : un refus sur une option nichée n'annule pas le reste
+        }, Promise.resolve(true));
       });
     }
 
@@ -880,6 +927,25 @@ var FocusEngine = (function () {
    * une Promise résolue avec la réponse du joueur (voir les différents
    * `contexte.type` dans resoudreCle_ ci-dessus).
    *
+   * EVOLUTION 12 (todo.md, retour utilisateur — limite d'utilisation
+   * d'une action Focus par cycle) : dès que l'Effet a réussi (même
+   * condition que le reste de cette fonction — un Coût qui échoue APRÈS
+   * un Effet réussi ne bloque pas l'action, voir le bloc ci-dessous),
+   * `libelleSource` (déjà utilisé comme identifiant de journal/pile
+   * d'annulation) est ajouté à `plateauMaison.actionsFocusUtilisees` si
+   * absent. Cette mutation passe par le MÊME mécanisme diff/undo que le
+   * reste du plateau (CHAMPS_DIFF_SUIVIS/diffChamps_ ci-dessus) : annuler
+   * cette action (AnnulationService, pile d'annulation) retire
+   * AUTOMATIQUEMENT sa clé de la liste, sans code dédié côté annulation —
+   * strategieService.js n'a qu'à lire ce champ pour griser le bouton
+   * correspondant et signaler le Focus concerné (au moins 1 action
+   * utilisée). Réinitialisé à chaque changement de cycle par
+   * GameService.avancerCycle (gameService.js). Limite connue : la clé
+   * est `carte.focus + ' — ' + action.action`, PAS un identifiant par
+   * carte — une collision (2 cartes différentes partageant exactement le
+   * même nom de Focus ET d'action) marquerait à tort les deux comme
+   * utilisées ; le catalogue actuel ne présente pas ce cas.
+   *
    * Retourne une Promise<{succes, journal, mutations, plateauMaisonApres}>.
    * N'écrit RIEN en base — voir jouerActionEtPersister ci-dessous pour
    * l'orchestrateur qui écrit + empile l'annulation.
@@ -907,6 +973,12 @@ var FocusEngine = (function () {
         } else {
           journalFinal.push(sourceCout + ' : ⚠️ coût annulé après application de l\u2019effet — vérifiez le suivi de ressources manuellement.');
         }
+
+        var actionsUtilisees = Array.isArray(etatFinal.actionsFocusUtilisees) ? etatFinal.actionsFocusUtilisees : [];
+        if (actionsUtilisees.indexOf(libelleSource) === -1) {
+          etatFinal.actionsFocusUtilisees = actionsUtilisees.concat([libelleSource]);
+        }
+
         return {
           succes: true,
           journal: journalFinal,

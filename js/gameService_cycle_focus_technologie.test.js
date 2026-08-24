@@ -106,6 +106,26 @@ test('avancerCycle : 1 -> 2, amorce focusHeroiques.cycle2 et focusHeroiquesPioch
   });
 });
 
+// EVOLUTION 12 (todo.md, retour utilisateur) — les actions Focus
+// utilisées se réinitialisent à chaque changement de cycle : à la fois
+// dans l'objet `partie` renvoyé EN MÉMOIRE (utilisé directement par
+// index.html pour re-rendre l'écran Focus sans rechargement complet) ET
+// dans la table `plateauMaison` (relecture ultérieure, ex. prochaine
+// action jouée).
+test('avancerCycle : réinitialise plateauMaison.actionsFocusUtilisees (mémoire ET DB)', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = ligneParties_('p1');
+  db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', { actionsFocusUtilisees: ['Politique — Contrôler', 'Conquête — Planifier'] });
+  var ctx = creerContexte_(db);
+
+  return ctx.GameService.avancerCycle('p1').then(function (partie) {
+    assert.strictEqual(JSON.stringify(partie.plateauMaison.actionsFocusUtilisees), JSON.stringify([]));
+    return db.get('plateauMaison', 'p1');
+  }).then(function (ligne) {
+    assert.strictEqual(JSON.stringify(ligne.actionsFocusUtilisees), JSON.stringify([]));
+  });
+});
+
 test('avancerCycle : 3 -> termine (ne dépasse jamais 3)', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = ligneParties_('p1', { cycleNum: 3, cycleTermine: false });

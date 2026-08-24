@@ -549,9 +549,14 @@ var StrategieService = (function () {
   /**
    * Calcule les NIVEAUX de production Nourriture/Énergie/Matériel/Crédit/
    * Science (population du secteur × nombre de Guildes de ce type, sommé
-   * sur tous les secteurs de la partie, + 1 sur la ressource nommée par
-   * originesMaison.bonusProd le cas échéant) ainsi que le total de
-   * Puissance Navale déployée. Factorisé pour être réutilisé par
+   * sur les seuls secteurs qui APPARTIENNENT au joueur — cf EVOLUTION 9,
+   * SecteurService.appartientAuJoueur, exception Secteur-Mère toujours
+   * possédé même sans PN dessus — + 1 sur la ressource nommée par
+   * originesMaison.bonusProd, + 1 supplémentaire sur bonusProdSecondaire
+   * le cas échéant — EVOLUTION 8, ex. Belitan/Collecte de données) ainsi
+   * que le total de Puissance Navale déployée (non filtré par possession :
+   * les champs pnCorvette/etc. représentent déjà la PN du joueur, par
+   * opposition à pnNeant). Factorisé pour être réutilisé par
    * renderCubes_ (affichage, ci-dessous) ET par le contexte
    * 'produire_revenu' (résolution de l'effet "produire_<ressource>" d'une
    * carte Focus, ex. Production — Ravitailler, voir demanderChoix
@@ -566,10 +571,12 @@ var StrategieService = (function () {
 
     return Promise.all([
       SecteurService.obtenirSecteurs(partie.id),
-      DB.getAll('originesMaison')
+      DB.getAll('originesMaison'),
+      SecteurService.obtenirSecteurMere(partie.scenarioId)
     ]).then(function (resultats) {
       var secteurs = resultats[0] || [];
       var origines = resultats[1] || [];
+      var numeroSecteurMere = resultats[2];
       var origine = origines.filter(function (o) {
         return o.maison === nomMaison && o.technologie === nomTechDepart;
       })[0] || null;
@@ -577,16 +584,28 @@ var StrategieService = (function () {
       var totaux = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
       var totalDeploye = 0;
       secteurs.forEach(function (s) {
+        totalDeploye += (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
+          (Number(s.pnDestroyer) || 0) + (Number(s.pnCuirasse) || 0) + (Number(s.pnPorteVaisseau) || 0);
+
+        // EVOLUTION 9 : un secteur non possédé (pas de PN joueur dessus,
+        // ou repris par le Néant) ne contribue pas au niveau de
+        // production, sauf le Secteur-Mère qui nous appartient toujours.
+        var estSecteurMere = numeroSecteurMere !== null && s.numero === numeroSecteurMere;
+        if (!estSecteurMere && !SecteurService.appartientAuJoueur(s)) return;
+
         var population = Number(s.population) || 0;
         Object.keys(GUILDE_VERS_RESSOURCE).forEach(function (cleGuilde) {
           totaux[GUILDE_VERS_RESSOURCE[cleGuilde]] += population * (Number(s[cleGuilde]) || 0);
         });
-        totalDeploye += (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
-          (Number(s.pnDestroyer) || 0) + (Number(s.pnCuirasse) || 0) + (Number(s.pnPorteVaisseau) || 0);
       });
 
       if (origine && origine.bonusProd && totaux.hasOwnProperty(origine.bonusProd)) {
         totaux[origine.bonusProd] += 1;
+      }
+      // EVOLUTION 8 : bonus secondaire (ex. Belitan/Collecte de données :
+      // +1 Crédit en plus du +1 Nourriture de bonusProd).
+      if (origine && origine.bonusProdSecondaire && totaux.hasOwnProperty(origine.bonusProdSecondaire)) {
+        totaux[origine.bonusProdSecondaire] += 1;
       }
 
       return { niveaux: totaux, totalDeploye: totalDeploye };
@@ -909,25 +928,57 @@ var StrategieService = (function () {
    * la carte (partie.focusJoueur ou partie.focusHeroiques[cycle]) : voir
    * renderFocusHeroiquesJoueur_ ci-dessous, qui réutilise cette même
    * fonction pour les Focus héroïques du cycle en cours.
+   *
+   * EVOLUTION 12 (todo.md, retour utilisateur — limite d'utilisation
+   * d'une action Focus par cycle) : `partie.plateauMaison.
+   * actionsFocusUtilisees` (tableau de clés "Focus — Action", voir
+   * FocusEngine.resoudreAction/GameService.avancerCycle) détermine, pour
+   * chaque action, si elle a déjà été jouée avec succès CE cycle — le
+   * bouton est alors DÉSACTIVÉ (attribut HTML `disabled`, pas seulement
+   * visuel) et affiche ✓ au lieu de ▶, la ligne entière prend la classe
+   * `.focus-action-deja-utilisee` (css/style.css) — visuellement
+   * distincte de `.focus-action-insuffisant` (ressources manquantes,
+   * bordure/texte rouges) pour ne pas confondre les 2 raisons
+   * d'indisponibilité. Le titre de la carte affiche un badge "✓ Utilisé"
+   * dès qu'AU MOINS une action de cette carte a été jouée ce cycle.
+   * Annuler la DERNIÈRE action (bouton "Annuler", écran Stratégie)
+   * retire automatiquement sa clé de actionsFocusUtilisees (mécanisme
+   * diff/undo générique de focusEngine.js, aucun code dédié ici) : au
+   * prochain rendu (afficher() rappelé après l'annulation), le bouton
+   * redevient utilisable et le badge disparaît si c'était la dernière
+   * action de ce Focus.
    */
   function carteFocusJoueurHTML_(carte, carteIndex, source) {
     var ressources = (partieAffichee.plateauMaison || {}).ressources || {};
+    var actionsUtilisees = (partieAffichee.plateauMaison || {}).actionsFocusUtilisees || [];
+    var auMoinsUneUtilisee = false;
     var actionsHtml = carte.actions.map(function (action, actionIndex) {
       var jouable = coutSuffisant_(action.cout, ressources);
-      return '<div class="focus-action' + (jouable ? '' : ' focus-action-insuffisant') + '">' +
+      var libelleAction = carte.focus + ' — ' + (action.action || 'action');
+      var dejaUtilisee = actionsUtilisees.indexOf(libelleAction) !== -1;
+      if (dejaUtilisee) auMoinsUneUtilisee = true;
+      var classe = dejaUtilisee ? ' focus-action-deja-utilisee' : (jouable ? '' : ' focus-action-insuffisant');
+      return '<div class="focus-action' + classe + '">' +
         '<div class="focus-action-corps">' +
         '<p class="focus-action-nom">' + (action.action || '(action)') + '</p>' +
         (action.texte ? '<p>' + action.texte + '</p>' : '') +
         '</div>' +
         '<div class="focus-action-side">' +
         pastillesCoutHTML_(action.cout) +
-        '<button class="btn-jouer-action" data-source="' + (source || 'joueur') + '" data-carte="' + carteIndex + '" data-action="' + actionIndex + '" title="Jouer cette action" aria-label="Jouer cette action">▶</button>' +
+        '<button class="btn-jouer-action" data-source="' + (source || 'joueur') + '" data-carte="' + carteIndex + '" data-action="' + actionIndex + '"' +
+        (dejaUtilisee ? ' disabled title="Déjà jouée ce cycle" aria-label="Déjà jouée ce cycle"' : ' title="Jouer cette action" aria-label="Jouer cette action"') + '>' +
+        (dejaUtilisee ? '✓' : '▶') +
+        '</button>' +
         '</div>' +
         '</div>';
     }).join('');
 
+    var badgeUtilise = auMoinsUneUtilisee
+      ? ' <span class="badge badge-focus-utilise" title="Au moins une action de ce Focus a été jouée ce cycle">✓ Utilisé</span>'
+      : '';
+
     return '<div class="card focus-card">' +
-      '<h3>' + carte.focus + '</h3>' +
+      '<h3>' + carte.focus + badgeUtilise + '</h3>' +
       actionsHtml +
       '</div>';
   }
@@ -1406,7 +1457,7 @@ var StrategieService = (function () {
               '<select id="regrouper-arrivee"></select>' +
               '<label class="hint" for="regrouper-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
               '<input type="number" min="1" step="1" value="1" id="regrouper-quantite">' +
-              '<button type="button" class="btn btn-secondary" id="regrouper-btn-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+              '<button type="button" class="btn btn-secondary" id="regrouper-btn-ajouter" style="width:100%;margin-top:10px;margin-bottom:10px;">Ajouter ce déplacement</button>' +
               '</div>';
 
             Array.prototype.forEach.call(contenu.querySelectorAll('.regrouper-retirer'), function (btn) {
@@ -1462,7 +1513,7 @@ var StrategieService = (function () {
             });
 
             btnValider.hidden = mouvements.length === 0;
-            btnValider.textContent = 'Valider (' + total + ' déplacement(s))';
+            btnValider.textContent = 'Valider';
             btnValider.onclick = function () {
               btnValider.disabled = true;
               btnValider.textContent = 'Passage en cours…';
@@ -1478,7 +1529,7 @@ var StrategieService = (function () {
                 })
                 .catch(function (erreur) {
                   btnValider.disabled = false;
-                  btnValider.textContent = 'Valider (' + total + ' déplacement(s))';
+                  btnValider.textContent = 'Valider';
                   window.alert('Échec du regroupement : ' + erreur.message);
                 });
             };
@@ -1785,7 +1836,7 @@ var StrategieService = (function () {
               '<select id="envahir-secteur-source"></select>' +
               '<label class="hint" for="envahir-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
               '<input type="number" min="1" step="1" value="1" id="envahir-quantite">' +
-              '<button type="button" class="btn btn-secondary" id="envahir-btn-ajouter" style="width:100%;margin-top:10px;">Engager cette unité</button>' +
+              '<button type="button" class="btn btn-secondary" id="envahir-btn-ajouter" style="width:100%;margin-top:10px;margin-bottom:10px;">Engager cette unité</button>' +
               '</div>';
 
             Array.prototype.forEach.call(contenu.querySelectorAll('.envahir-retirer'), function (btn) {
@@ -1839,7 +1890,7 @@ var StrategieService = (function () {
             });
 
             btnValider.hidden = contributions.length === 0;
-            btnValider.textContent = 'Lancer l\u2019invasion (' + totalEngage + ' unité(s))';
+            btnValider.textContent = 'Valider';
             btnValider.onclick = function () {
               var cibleFinale = Number(selectCible.value);
               var secteurCible = secteurParNumero_(cibleFinale);
@@ -1939,7 +1990,7 @@ var StrategieService = (function () {
                 })
                 .catch(function (erreur) {
                   btnValider.disabled = false;
-                  btnValider.textContent = 'Lancer l\u2019invasion (' + totalEngage + ' unité(s))';
+                  btnValider.textContent = 'Valider';
                   window.alert('Échec de la résolution : ' + erreur.message);
                 });
             };
@@ -2785,6 +2836,249 @@ var StrategieService = (function () {
 
         SecteurService.obtenirSecteursEligiblesGainCorruption(partieCorruptionGain.id)
           .then(function (eligiblesSecteurs) { afficherMenuCibles_(eligiblesSecteurs); })
+          .catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des secteurs : ' + erreur.message);
+          });
+
+      } else if (contexte.type === 'deplacer_corruption') {
+        // EVOLUTION 10 — Effet "Déplacer une Corruption" (docs-rules-
+        // corruption-gardiens-refuges-technoConsume.md §1 : "Déplacer une
+        // Corruption revient à déplacer un marqueur placé selon l'une des
+        // options [Secteur/Piste/Programme/Techno] sur un autre
+        // emplacement éligible.") Popup à 2 ÉTAPES :
+        // 1) SOURCE — même menu que 'retirer_corruption' ci-dessus
+        //    (Secteur possédé Corrompu / Piste Corrompue / Programme
+        //    manuel / Chambres de décontamination si stockage > 0).
+        // 2) DESTINATION — même menu que 'gagner_corruption' ci-dessus
+        //    (Secteur possédé Pur non immunisé / Piste non Corrompue /
+        //    Programme manuel / Chambres de décontamination si
+        //    emplacement libre), calculé et affiché AVANT toute écriture
+        //    en base : la source (toujours Corrompue à ce stade) est donc
+        //    naturellement absente de son propre menu de destination pour
+        //    Secteur/Piste (un secteur/une piste ne peut pas être à la
+        //    fois Corrompu ET éligible à une NOUVELLE Corruption). Seule
+        //    exception explicite : "Chambres de décontamination" n'est
+        //    JAMAIS proposée comme destination si la source EST elle-même
+        //    la Technologie — les emplacements de la carte ne sont pas
+        //    suivis individuellement en base (seul le compte agrégé
+        //    plateauMaison.corruptionChambreDecontamination l'est), donc
+        //    "déplacer" d'un jeton chambre à lui-même n'a pas de sens.
+        //    "Programme" reste TOUJOURS proposé aux 2 étapes (manuel, non
+        //    suivi en base — même limitation que retirer_corruption/
+        //    gagner_corruption).
+        // Écriture : PLACE d'abord sur la destination, RETIRE ensuite de
+        // la source — ordre choisi pour qu'un échec DB en cours de route
+        // laisse au pire une Corruption EN TROP (facile à corriger
+        // manuellement) plutôt qu'une Corruption perdue.
+        titre.textContent = 'Déplacer une Corruption';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieDeplacer = partieAffichee;
+        var pistesCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
+          return !!(partieDeplacer.civilisation && partieDeplacer.civilisation.corrompues && partieDeplacer.civilisation.corrompues[p]);
+        });
+        var possedeChambreDep = nomsTechnologiesJoueur_(partieDeplacer).indexOf('chambres de décontamination') !== -1;
+        var techChambreDep = technologieChambreDecontamination_(partieDeplacer);
+        var maxChambreDep = techChambreDep ? (techChambreDep.amelioree ? 3 : 2) : 0;
+        var corruptionStockeeDep = (partieDeplacer.plateauMaison && partieDeplacer.plateauMaison.corruptionChambreDecontamination) || 0;
+        var optionsRetraitPisteDep_ = { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieDeplacer) };
+
+        function libelleCibleDep_(c) {
+          if (c.cle === 'secteur') return 'Secteur ' + c.numero;
+          if (c.cle === 'piste') return 'la piste ' + CivilisationService.NOM_PISTE[c.piste];
+          if (c.cle === 'techno') return 'Chambres de décontamination';
+          return 'un Programme (manuellement)';
+        }
+
+        function executerRetraitDep_(source) {
+          if (source.cle === 'secteur') return SecteurService.retirerCorruption(partieDeplacer.id, source.numero);
+          if (source.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, source.piste, false, optionsRetraitPisteDep_);
+          if (source.cle === 'techno') {
+            var champs = { corruptionChambreDecontamination: corruptionStockeeDep - 1 };
+            return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
+              partieDeplacer.plateauMaison.corruptionChambreDecontamination = corruptionStockeeDep - 1;
+            });
+          }
+          return Promise.resolve(); // 'programme' : manuel, rien à écrire.
+        }
+
+        function executerPlacementDep_(destination) {
+          if (destination.cle === 'secteur') return SecteurService.placerCorruption(partieDeplacer.id, destination.numero);
+          if (destination.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, destination.piste, true);
+          if (destination.cle === 'techno') {
+            var champs = { corruptionChambreDecontamination: corruptionStockeeDep + 1 };
+            return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
+              partieDeplacer.plateauMaison.corruptionChambreDecontamination = corruptionStockeeDep + 1;
+            });
+          }
+          return Promise.resolve(); // 'programme'
+        }
+
+        function terminerDeplacement_(source, destination) {
+          btnValider.disabled = true;
+          executerPlacementDep_(destination)
+            .then(function () { return executerRetraitDep_(source); })
+            .then(function () {
+              fermerModale_();
+              btnValider.disabled = false;
+              resolve({ detail: 'Corruption déplacée de ' + libelleCibleDep_(source) + ' vers ' + libelleCibleDep_(destination) + '.' });
+            })
+            .catch(function (erreur) {
+              btnValider.disabled = false;
+              window.alert('Échec du déplacement : ' + erreur.message);
+            });
+        }
+
+        // --- Étape 2 : menu DESTINATION (calculé APRÈS le choix de la
+        // source, mais AVANT toute écriture — voir chargerEtAfficherDestination_
+        // ci-dessous, qui recharge les listes d'éligibilité juste avant).
+        function afficherEtapeDestinationDep_(source, eligiblesSecteursGain, pistesNonCorrompuesDep, chambreDisponibleDep) {
+          var options = [];
+          if (eligiblesSecteursGain.length) options.push({ cle: 'secteur', label: 'Secteur' });
+          if (pistesNonCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+          options.push({ cle: 'programme', label: 'Programme', sousTexte: 'à placer manuellement' });
+          if (source.cle !== 'techno' && chambreDisponibleDep) {
+            options.push({ cle: 'techno', label: 'Chambres de décontamination', sousTexte: (maxChambreDep - corruptionStockeeDep) + ' emplacement(s) libre(s)' });
+          }
+
+          titre.textContent = 'Déplacer une Corruption — Destination';
+          btnValider.hidden = true;
+          contenu.innerHTML = '<p class="hint">Source : ' + libelleCibleDep_(source) + '.</p>' +
+            '<div class="modal-choix-boutons">' +
+            options.map(function (o) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-cle="' + o.cle + '">' +
+                o.label + (o.sousTexte ? '<br><span class="cadre-action-sous-texte">' + o.sousTexte + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var cle = btn.dataset.cle;
+              if (cle === 'secteur') return afficherSousSelectSecteurDestinationDep_(source, eligiblesSecteursGain);
+              if (cle === 'piste') return afficherSousSelectPisteDestinationDep_(source, pistesNonCorrompuesDep);
+              if (cle === 'programme') return terminerDeplacement_(source, { cle: 'programme' });
+              if (cle === 'techno') return terminerDeplacement_(source, { cle: 'techno' });
+            });
+          });
+        }
+
+        function afficherSousSelectSecteurDestinationDep_(source, eligibles) {
+          titre.textContent = 'Déplacer une Corruption — Destination Secteur';
+          contenu.innerHTML = '<p class="hint">Source : ' + libelleCibleDep_(source) + '.</p>' +
+            '<select id="corruption-deplacer-select-secteur-dest" class="modal-choix-select">' +
+            eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('corruption-deplacer-select-secteur-dest').value);
+            terminerDeplacement_(source, { cle: 'secteur', numero: numero });
+          };
+        }
+
+        function afficherSousSelectPisteDestinationDep_(source, pistesEligibles) {
+          if (pistesEligibles.length === 1) {
+            terminerDeplacement_(source, { cle: 'piste', piste: pistesEligibles[0] });
+            return;
+          }
+          titre.textContent = 'Déplacer une Corruption — Destination Piste de Civilisation';
+          contenu.innerHTML = '<p class="hint">Source : ' + libelleCibleDep_(source) + '.</p>' +
+            '<select id="corruption-deplacer-select-piste-dest" class="modal-choix-select">' +
+            pistesEligibles.map(function (p) { return '<option value="' + p + '">' + CivilisationService.NOM_PISTE[p] + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var pisteChoisie = document.getElementById('corruption-deplacer-select-piste-dest').value;
+            terminerDeplacement_(source, { cle: 'piste', piste: pisteChoisie });
+          };
+        }
+
+        // Recharge les listes d'éligibilité DESTINATION juste avant
+        // affichage (état courant, rien encore écrit à ce stade).
+        function chargerEtAfficherDestinationDep_(source) {
+          contenu.innerHTML = '<p class="hint">Chargement…</p>';
+          var pistesNonCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
+            return !(partieDeplacer.civilisation && partieDeplacer.civilisation.corrompues && partieDeplacer.civilisation.corrompues[p]);
+          });
+          var chambreDisponibleDep = possedeChambreDep && corruptionStockeeDep < maxChambreDep;
+          SecteurService.obtenirSecteursEligiblesGainCorruption(partieDeplacer.id)
+            .then(function (eligiblesSecteursGain) {
+              afficherEtapeDestinationDep_(source, eligiblesSecteursGain, pistesNonCorrompuesDep, chambreDisponibleDep);
+            })
+            .catch(function (erreur) {
+              contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+              window.alert('Échec du chargement des secteurs : ' + erreur.message);
+            });
+        }
+
+        // --- Étape 1 : menu SOURCE (identique à 'retirer_corruption').
+        function afficherEtapeSourceDep_(eligiblesSecteursRetrait) {
+          var options = [];
+          if (eligiblesSecteursRetrait.length) options.push({ cle: 'secteur', label: 'Secteur' });
+          if (pistesCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+          options.push({ cle: 'programme', label: 'Programme', sousTexte: 'à retirer manuellement' });
+          if (possedeChambreDep && corruptionStockeeDep > 0) {
+            options.push({ cle: 'techno', label: 'Chambres de décontamination', sousTexte: corruptionStockeeDep + ' Corruption(s) stockée(s)' });
+          }
+
+          btnValider.hidden = true;
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            options.map(function (o) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-cle="' + o.cle + '">' +
+                o.label + (o.sousTexte ? '<br><span class="cadre-action-sous-texte">' + o.sousTexte + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var cle = btn.dataset.cle;
+              if (cle === 'secteur') return afficherSousSelectSecteurSourceDep_(eligiblesSecteursRetrait);
+              if (cle === 'piste') return afficherSousSelectPisteSourceDep_();
+              if (cle === 'programme') return chargerEtAfficherDestinationDep_({ cle: 'programme' });
+              if (cle === 'techno') return chargerEtAfficherDestinationDep_({ cle: 'techno' });
+            });
+          });
+        }
+
+        function afficherSousSelectSecteurSourceDep_(eligibles) {
+          titre.textContent = 'Déplacer une Corruption — Source Secteur';
+          contenu.innerHTML = '' +
+            '<select id="corruption-deplacer-select-secteur-src" class="modal-choix-select">' +
+            eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('corruption-deplacer-select-secteur-src').value);
+            chargerEtAfficherDestinationDep_({ cle: 'secteur', numero: numero });
+          };
+        }
+
+        function afficherSousSelectPisteSourceDep_() {
+          if (pistesCorrompuesDep.length === 1) {
+            chargerEtAfficherDestinationDep_({ cle: 'piste', piste: pistesCorrompuesDep[0] });
+            return;
+          }
+          titre.textContent = 'Déplacer une Corruption — Source Piste de Civilisation';
+          contenu.innerHTML = '' +
+            '<select id="corruption-deplacer-select-piste-src" class="modal-choix-select">' +
+            pistesCorrompuesDep.map(function (p) { return '<option value="' + p + '">' + CivilisationService.NOM_PISTE[p] + '</option>'; }).join('') +
+            '</select>';
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var pisteChoisie = document.getElementById('corruption-deplacer-select-piste-src').value;
+            chargerEtAfficherDestinationDep_({ cle: 'piste', piste: pisteChoisie });
+          };
+        }
+
+        SecteurService.obtenirSecteursEligiblesRetraitCorruption(partieDeplacer.id)
+          .then(function (eligiblesSecteursRetrait) { afficherEtapeSourceDep_(eligiblesSecteursRetrait); })
           .catch(function (erreur) {
             contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
