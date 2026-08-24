@@ -313,7 +313,7 @@
     "code": "H2-A",
     "maison": "Belitan",
     "origine": "A",
-    "technologieDepart": "Collecte de données",
+    "technologieDepart": "Ciblage",
     "supplementaire": false,
     "objectifs": [
       "Gagnez 3 Influence pour chacun de vos secteurs Purs.",
@@ -327,7 +327,7 @@
     "code": "H2-B",
     "maison": "Belitan",
     "origine": "B",
-    "technologieDepart": "Ciblage",
+    "technologieDepart": "Collecte de données",
     "supplementaire": false,
     "objectifs": [
       "Gagnez 3 Influence pour chacun de vos secteurs Purs avec 5 Population.",
