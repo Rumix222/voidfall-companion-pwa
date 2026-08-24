@@ -48,3 +48,48 @@ simplement incrémenter le niveau de la piste civilisation concerné
 Si piste non préciséer afficher une popup pour choisir la piste, rappeler ou en est cahque piste x/x et le prochain effet qui sera résolu, et annuler / valider
 Si piste précisé : par exemple "Avancer sur la piste Gouvernement", afficher une popup avec le niveau de la piste et l'effet qui sera résolu, et annuler / valider
 Lors de la validation appliqué l'effet, attention avancer sur une piste peut entrainer de nouveau un choix pour l'utilisateur, bien gérer l'enchainement des popup et des actions en cascade
+
+#EVOLUTION 8 : Correction données origine maison Belitan
+pour "bonusProd": "nourriture" ajouter aussi un bonus de crédit +1
+
+#EVOLUTION 9 : Correction niveau de production
+pour le calcul du niveau de production il ne faut pas prendre en compte les secteur qui nous appartiennent pas.
+Prendre en compte uniquement ou il y a au moins une puissance naval du joueur (donc pas du néant), exception pour le secteur mere qui nous appartient toujours (seul secteur ou on peu avoir 0 puissance sans le perdre).
+
+#Evolution 10 : Implementer effet Déplacer corruption
+Exemple Focus conquête action planifier.
+Dans popup permettre de choisir la corruption a déplacer et la destination, rappel des possibilité dans docs-rules-corruption-gardiens-refuges-technoConsume.md
+
+#Evolution 11 : Annulation effet lorsque 2 effets
+A vérifier, avant implémentation de evolution 10, j'ai fait l'action planifier, choisi les deux effets, puis sur la popup de choix de programme j'ai fait annuler, le cout de l'action a quand même été débité. SI plusieurs effet il faudrait valider ou annuler tous les effets d'un coup pour éviter ça ?
+
+#Evolution 12 : limite d'utilisation action focus
+A gere par cycle, réinitialiser lorsqu'on change de cycle :
+- Lorsqu'on fait une action d'un focus, signaler au niveau du titre du focus, que ce focus a été utilisé (trouver un picto qui va bien)
+- Si l'action s'est correctement terminée, griser l'action pour qu'elle ne soit pas réutilisable ce cycle. (trouver un design pour différencier action inutilisable car déjà utilisé de inutilisable car pas assez de ressource)
+L'annulation de la derniere action rétabli l'utilisabilité de l'action
+En fait pour la condition pour mettre le picto sur le focus c'est : au moins une action a été utilisé
+Test : faire deux actions d'un focus, annuler la derniere action, le focus a toujours le picto
+
+#Evolution 13 : Focus développement action installer
+Pour le cout : popup qui affiche les secteurs ou l'on possede de la puissance naval (+ de 1 pour les secteur hors secteur mere, car on ne peut pas abandonner un secteur)
+
+#Evolution 14 : affichage augmenter_population (action harmoniser)
+Afficher "Augmenter une population"
+
+#Evolution 14 : popup action regrouper et envahir
+Ajouter un espace apres le bouton "Ajouter ce déplacement"
+Renommer le bouton valider en juste "Valider"
+Ajouter un espace apres le bouton "Engager cette unité"
+Renommer le bouton Lancer l'invasion... en juste "Valider"
+
+#Evolution 15 : Le secteur mere nous appartient
+Lors de l'action regrouper il faut proposer le secteur mere meme s'il n'y a pas de puissance naval dessus
+Attention a ces regles (cf docs-rules-flottes.md et docs-rules-secteurs.md) :
+- Le secteur mere nous appartient meme s'il n'y a plus de pissance naval dessus
+- Le secteur mere n'est pas repris par le néant s'il n'y a plus de puissance naval dessus
+- Un autre secteur qui nous appartient est automatiquement repris par le neant si on n'a pas de puissance naval dessus (peut arriver lors de l'action envahir)
+- On n'a pas le droit de retirer la derniere puissance naval d'un secteur (hors secteur mere) lors d'un regroupement
+
+#Evolution 16 : Perte de puissance naval
+Lorsqu'on perd des cubes de puissance naval ces cube revienne dans les cube actif
