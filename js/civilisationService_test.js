@@ -271,8 +271,8 @@ test('choice inclusif "et/ou" où seule une option automatisée est choisie : au
 });
 
 // ---------------------------------------------------------------
-// definirCorruption / avancerPisteSansEffet — utilisés par l'Événement
-// galactique G, Cycle 1, Cadres 1 et 2 ("Le visage du mal").
+// definirCorruption — utilisée par l'Événement galactique G, Cycle 1,
+// Cadres 1 et 2 ("Le visage du mal").
 // ---------------------------------------------------------------
 
 test('definirCorruption : place une Corruption -> +1 sur corruptionMaison', function () {
@@ -328,27 +328,58 @@ test('definirCorruption : idempotent (même état demandé deux fois) -> corrupt
   });
 });
 
-test('avancerPisteSansEffet : avance d’une case, ne résout AUCUN effet de case, ne touche pas au marqueur Corrompue', function () {
+// ---------------------------------------------------------------
+// avancerPiste sur une piste Corrompue — règle générique (docs-rules-
+// corruption-gardiens-refuges-technoConsume.md §1 : "une piste de
+// Civilisation Corrompue ne vous rapporte aucun bénéfice"), appliquée par
+// avancerPiste elle-même pour TOUT appelant. Remplace les anciens tests
+// de avancerPisteSansEffet (fonction dédiée supprimée — sa sémantique vit
+// désormais directement ici) ; utilisée aussi par l'Événement galactique
+// G, Cycle 1, Cadre 1, qui corrompt une piste PUIS l'avance
+// (strategieService.js, placerCorruptionSurPiste_, qui appelle cette
+// même avancerPiste generique sans plus rien de spécifique).
+// ---------------------------------------------------------------
+
+test('avancerPiste sur une piste Corrompue : avance d’une case, ne résout AUCUN effet de case, ne touche pas au marqueur Corrompue', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Gouvernement', caseNumero: 2, texte: 'Gagnez 20 Influence.', effet: JSON.stringify({ influence: 20 }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 1, civCorrompueGouvernement: true });
 
-  return ctx.sandbox.CivilisationService.avancerPisteSansEffet(PARTIE_ID, 'gouvernement').then(function (resultat) {
+  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé pour une piste Corrompue (aucun effet résolu).'); };
+
+  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'gouvernement', demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.ancienNiveau, 1);
     assert.strictEqual(resultat.nouveauNiveau, 2);
-    assert.strictEqual(resultat.dejaMaximum, false);
+    assert.strictEqual(resultat.effetSucces, true);
+    assert.ok(!resultat.dejaMaximum);
     assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civGouvernement, 2);
     assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].influence, 0, 'le bénéfice de la case 2 (+20 Influence) ne doit PAS être appliqué');
-    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civCorrompueGouvernement, true, 'le marqueur Corrompue doit rester tel quel (contrairement à avancerPisteCorrompue)');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civCorrompueGouvernement, true, 'le marqueur Corrompue reste tel quel (avancerPiste ne le décoche jamais, contrairement à avancerPisteCorrompue)');
   });
 });
 
-test('avancerPisteSansEffet : piste déjà au maximum -> no-op, dejaMaximum=true', function () {
-  var ctx = creerContexte_([]);
-  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 7 });
+test('avancerPiste sur une piste Corrompue : n’enchaîne pas un "avance_rapide" (qui est lui-même un bénéfice de case)', function () {
+  var ctx = creerContexte_([
+    { type: 'Standard', piste: 'Économie', caseNumero: 1, texte: 'Avance rapide.', effet: JSON.stringify({ avance_rapide: 1 }) },
+    { type: 'Standard', piste: 'Économie', caseNumero: 2, texte: 'Gagnez 3 Crédits.', effet: JSON.stringify({ credit: 3 }) }
+  ]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 0, civCorrompueEconomie: true });
 
-  return ctx.sandbox.CivilisationService.avancerPisteSansEffet(PARTIE_ID, 'economie').then(function (resultat) {
+  var demanderChoix = function () { throw new Error('demanderChoix ne devrait pas être appelé pour une piste Corrompue.'); };
+
+  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'economie', demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.nouveauNiveau, 1, 'une seule case franchie, pas de chaîne avance_rapide sur une piste Corrompue');
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 1);
+    assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].ressourceCredit, 0);
+  });
+});
+
+test('avancerPiste sur une piste Corrompue déjà au maximum : no-op, dejaMaximum=true (comme n’importe quelle piste)', function () {
+  var ctx = creerContexte_([]);
+  ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 7, civCorrompueEconomie: true });
+
+  return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'economie', function () {}).then(function (resultat) {
     assert.strictEqual(resultat.dejaMaximum, true);
     assert.strictEqual(resultat.nouveauNiveau, 7);
     assert.strictEqual(ctx.stores.plateauMaison[PARTIE_ID].civEconomie, 7);

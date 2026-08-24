@@ -59,9 +59,14 @@
  *     CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js exclut toujours
  *     civSociete/civGouvernement/civEconomie — ces champs restent sous la
  *     seule responsabilité de CivilisationService)
- *   - Production : produire_ressource, produire_deux_ressources,
- *     produire_<ressource> (niveauxProduction dépend d'un calcul agrégé
- *     sur secteursPartie — population × guildes — non porté côté PWA)
+ *   - Production : produire_ressource, produire_deux_ressources — CHOIX du
+ *     joueur parmi les 5 ressources, popup de sélection pas encore
+ *     construite (produire_<ressource>, où la ressource est imposée par
+ *     le nom de la clé — ex. Focus Production "Ravitailler" — A un cas
+ *     dédié ci-dessous qui délègue le calcul du revenu à une popup
+ *     'produire_revenu', strategieService.js, seul niveauxProduction
+ *     — calcul agrégé sur secteursPartie, population × guildes — dépend
+ *     d'un accès secteurs hors de portée de ce moteur pur)
  * Pour ces clés, resoudreCle_ NE BLOQUE PAS l'action : elle journalise un
  * avertissement explicite ("effet non chiffré — à appliquer manuellement")
  * et continue. Aucune ressource n'est débitée/créditée à tort pour ces
@@ -762,10 +767,44 @@ var FocusEngine = (function () {
       return Promise.resolve(true);
     }
 
-    // --- Production non portée côté PWA (niveaux dérivés des secteurs,
-    // calcul pas encore porté) ---
+    // --- Produire une ressource précise (produire_nourriture/energie/
+    // materiel/credit/science — ex. Focus Production "Ravitailler") :
+    // Effet UNIQUEMENT (signe > 0), AUCUN choix utilisateur — la
+    // ressource visée est imposée par le nom même de la clé (contrairement
+    // à produire_ressource/produire_deux_ressources ci-dessous, où le
+    // joueur choisit parmi les 5). Le gain est le revenu de production
+    // ACTUEL de cette ressource (Niveau Population × Guildes + bonus
+    // d'origine, table PRODUCTION_NEMS/PRODUCTION_CREDIT), hors de portée
+    // de focusEngine (pur, aucun accès aux secteurs) : ouvre une popup
+    // dédiée (contexte 'produire_revenu', strategieService.js) qui
+    // calcule le montant ET l'affiche brièvement, même principe que
+    // influence_secteur ci-dessus (aucune interaction utilisateur, juste
+    // un calcul déterministe). ---
+    if (cle.indexOf('produire_') === 0 && cle !== 'produire_ressource' && cle !== 'produire_deux_ressources' && signe > 0) {
+      var cleRessourceProduite = cle.slice('produire_'.length);
+      if (RESSOURCES_PRODUCTION.indexOf(cleRessourceProduite) !== -1) {
+        return Promise.resolve(demanderChoix({
+          type: 'produire_revenu',
+          ressource: cleRessourceProduite,
+          source: source,
+          partieId: etat.partieId
+        })).then(function (reponse) {
+          if (reponseAnnulee_(reponse)) return false;
+          var champProduit = CHAMP_PAR_CLE[cleRessourceProduite];
+          etat[champProduit] = Math.max(0, etat[champProduit] + (Number(reponse.montant) || 0));
+          journal.push(source + ' : ' + reponse.detail);
+          return true;
+        });
+      }
+    }
+
+    // --- Production non portée côté PWA (produire_ressource/
+    // produire_deux_ressources — CHOIX du joueur parmi les 5 ressources,
+    // popup de sélection pas encore construite ; et tout produire_<clé>
+    // qui ne correspond à aucune des 5 ressources ci-dessus, cas non
+    // rencontré dans le catalogue à ce jour) ---
     if (cle === 'produire_ressource' || cle === 'produire_deux_ressources' || cle.indexOf('produire_') === 0) {
-      journal.push(source + ' : ⚠️ "' + cle + '" non automatisé (niveaux de production pas encore calculés côté PWA) — à appliquer manuellement.');
+      journal.push(source + ' : ⚠️ "' + cle + '" non automatisé (sélection de ressource au choix du joueur pas encore construite côté PWA) — à appliquer manuellement.');
       return Promise.resolve(true);
     }
 

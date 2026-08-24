@@ -2,12 +2,20 @@
  * civilisationService.js
  * Pistes de Civilisation — Voidfall Companion PWA
  *
- * Avancer une piste fait deux choses successivement :
+ * Avancer une piste (avancerPiste) fait deux choses successivement :
  *   1. Incrémente le niveau de la piste (persisté via
  *      GameService.majCivilisation).
  *   2. Résout l'Effet de la case atteinte, en réutilisant le moteur
  *      focusEngine.js (FocusEngine.resoudreEffet), sans duplication de
- *      logique coût/effet.
+ *      logique coût/effet — SAUF si la piste est marquée Corrompue à ce
+ *      moment-là (docs-rules-corruption-gardiens-refuges-technoConsume.md
+ *      §1 : "une piste de Civilisation Corrompue ne vous rapporte aucun
+ *      bénéfice") : le niveau avance quand même, mais aucun effet n'est
+ *      résolu (ni un éventuel enchaînement "avance_rapide", qui EST
+ *      lui-même un bénéfice de case). Règle appliquée une seule fois ICI,
+ *      pour TOUT appelant (bouton "Avancer" manuel, Focus/Programme via la
+ *      popup 'avancer_civilisation', et l'Événement galactique G Cycle 1
+ *      Cadre 1 qui corrompt une piste puis la fait avancer).
  * Les deux mutations (niveau de piste + effet de la case) sont empilées
  * comme UNE SEULE entrée dans la pile d'annulation (annulationService.js),
  * pour qu'"Annuler la dernière action" revienne bien sur les deux à la
@@ -317,11 +325,28 @@ var CivilisationService = (function () {
   }
 
   /**
-   * Avance une piste précise d'une case (aucun effet, pas d'écriture, ne
-   * fait rien si déjà au maximum) : {piste, ancienNiveau, nouveauNiveau,
-   * texte, effetJournal, effetSucces, dejaMaximum}. "texte" peut résumer
-   * PLUSIEURS cases si un "avance_rapide" a chaîné sur une case suivante
-   * (jointes par un espace).
+   * Avance une piste précise d'une case (résout l'Effet de la case
+   * atteinte, sauf piste Corrompue — voir plus bas ; ne fait rien si déjà
+   * au maximum) : {piste, ancienNiveau, nouveauNiveau, texte, effetJournal,
+   * effetSucces, dejaMaximum}. "texte" peut résumer PLUSIEURS cases si un
+   * "avance_rapide" a chaîné sur une case suivante (jointes par un espace).
+   *
+   * Règle de Corruption générique (docs-rules-corruption-gardiens-refuges-
+   * technoConsume.md §1 : "une piste de Civilisation Corrompue ne vous
+   * rapporte aucun bénéfice") : si la piste est marquée Corrompue
+   * (`pm[CHAMP_CORROMPUE[piste]]`) au moment de l'appel, le NIVEAU avance
+   * quand même d'une case mais AUCUN effet n'est résolu — ni la case
+   * atteinte, ni un éventuel enchaînement "avance_rapide" (qui EST lui-même
+   * un bénéfice de case). Centralisé ICI plutôt que chez chaque appelant :
+   * TOUT appelant (bouton "Avancer" manuel, Focus/Programme
+   * "avancer_civilisation" et variantes, dont "_moins_avancee", via la
+   * popup dédiée strategieService.js, et l'Événement galactique G Cycle 1
+   * Cadre 1 qui corrompt une piste PUIS la fait avancer — voir
+   * strategieService.js, placerCorruptionSurPiste_) bénéficie donc
+   * automatiquement de la règle sans avoir à connaître lui-même l'état
+   * Corrompue de la piste. Remplace l'ancienne avancerPisteSansEffet
+   * (fonction dédiée, un seul appelant — voir version.js pour l'historique
+   * du refactor).
    */
   function avancerPiste(partieId, nomMaison, piste, demanderChoix) {
     if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
@@ -336,6 +361,24 @@ var CivilisationService = (function () {
       }
       var nouveau = ancien + 1;
       var source = 'Case ' + nouveau + ' — ' + NOM_PISTE[piste];
+
+      if (pm[CHAMP_CORROMPUE[piste]]) {
+        var champsCorrompue = {};
+        champsCorrompue[champNiveau] = nouveau;
+        return GameService.majCivilisation(partieId, champsCorrompue).then(function () {
+          var mutationsCorrompue = [{ champ: champNiveau, avant: ancien, apres: nouveau }];
+          return AnnulationService.empiler(partieId, { source: source, mutations: mutationsCorrompue });
+        }).then(function () {
+          return {
+            piste: piste,
+            ancienNiveau: ancien,
+            nouveauNiveau: nouveau,
+            texte: 'Piste Corrompue — aucun bénéfice de case.',
+            effetJournal: [],
+            effetSucces: true
+          };
+        });
+      }
 
       var journalAccumule = [];
       var mutationsRessources = [];
@@ -471,41 +514,6 @@ var CivilisationService = (function () {
   }
 
   /**
-   * Avance une piste précise d'une case SANS résoudre l'effet de la case
-   * (contrairement à avancerPiste ci-dessus) et SANS toucher au marqueur
-   * "Corrompue" (contrairement à avancerPisteCorrompue ci-dessus, qui
-   * décoche — ici la Corruption qui vient d'être placée doit rester).
-   * Utilisée pour l'effet de Cadre d'Événement galactique qui force à
-   * avancer sur une piste tout en ignorant le bénéfice de la case
-   * atteinte. Ne fait rien si la piste est déjà au niveau maximum ("la
-   * case la plus à droite" — rien à avancer). Empile une entrée
-   * d'annulation comme les fonctions sœurs.
-   */
-  function avancerPisteSansEffet(partieId, piste) {
-    if (PISTES.indexOf(piste) === -1) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
-
-    return DB.get('plateauMaison', partieId).then(function (pm) {
-      if (!pm) throw new Error('Plateau maison introuvable (partie ' + partieId + ').');
-      var champNiveau = CHAMP_NIVEAU[piste];
-      var ancien = pm[champNiveau] || 0;
-      if (ancien >= NIVEAU_MAX) {
-        return { piste: piste, ancienNiveau: ancien, nouveauNiveau: ancien, dejaMaximum: true };
-      }
-      var nouveau = ancien + 1;
-
-      var champs = {};
-      champs[champNiveau] = nouveau;
-
-      return GameService.majCivilisation(partieId, champs).then(function () {
-        var mutations = [{ champ: champNiveau, avant: ancien, apres: nouveau }];
-        return AnnulationService.empiler(partieId, { source: 'Piste avancée sans bénéfice — ' + NOM_PISTE[piste], mutations: mutations });
-      }).then(function () {
-        return { piste: piste, ancienNiveau: ancien, nouveauNiveau: nouveau, dejaMaximum: false };
-      });
-    });
-  }
-
-  /**
    * Détail complet (texte des 7 cases) des 3 pistes pour une maison —
    * donnée de référence statique, une seule lecture du store catalogue
    * pour les 21 cases.
@@ -538,7 +546,6 @@ var CivilisationService = (function () {
     avancerPisteMoinsAvancee: avancerPisteMoinsAvancee,
     definirCorruption: definirCorruption,
     avancerPisteCorrompue: avancerPisteCorrompue,
-    avancerPisteSansEffet: avancerPisteSansEffet,
     obtenirDetailPistes: obtenirDetailPistes
   };
 })();

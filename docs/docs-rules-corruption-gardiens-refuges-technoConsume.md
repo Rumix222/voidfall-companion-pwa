@@ -9,7 +9,7 @@
 # 1. CORRUPTION
 La Corruption vous inflige des effets négatifs.
 Une Population Corrompue ne peut pas évoluer,
-une piste de Civilisation Corrompue ne vous rapporte aucun bénéfice,
+une piste de Civilisation Corrompue ne vous rapporte aucun bénéfice, ✅ 💬 CivilisationService.avancerPiste (js/civilisationService.js) : la piste avance quand même, mais aucun effet de case (ni chaînage "avance rapide") n'est résolu si elle est marquée Corrompue au moment de l'avancement — appliqué pour tout appelant (bouton "Avancer" manuel, Focus/Programme, Événement G Cycle 1 Cadre 1).
 vous ne pouvez pas évaluer les objectifs d’un Programme Corrompu,
 et la plupart des objectifs des Programmes nécessitent des éléments Purs.
 Certaines actions se payent en gagnant de la Corruption ;

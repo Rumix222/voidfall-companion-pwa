@@ -546,14 +546,25 @@ var StrategieService = (function () {
    * compacte (.ligne-cubes, voir css/style.css), le mot "Cube" n'apparaît
    * qu'une fois.
    */
-  function renderCubes_(partie) {
-    var pm = partie.plateauMaison || {};
-    var cubeActif = pm.cubeActif || 0;
-    var container = document.getElementById('ressources-cubes');
+  /**
+   * Calcule les NIVEAUX de production Nourriture/Énergie/Matériel/Crédit/
+   * Science (population du secteur × nombre de Guildes de ce type, sommé
+   * sur tous les secteurs de la partie, + 1 sur la ressource nommée par
+   * originesMaison.bonusProd le cas échéant) ainsi que le total de
+   * Puissance Navale déployée. Factorisé pour être réutilisé par
+   * renderCubes_ (affichage, ci-dessous) ET par le contexte
+   * 'produire_revenu' (résolution de l'effet "produire_<ressource>" d'une
+   * carte Focus, ex. Production — Ravitailler, voir demanderChoix
+   * plus bas) : focusEngine.js reste pur (aucun accès aux secteurs), donc
+   * lui délègue ce calcul via demanderChoix plutôt que de le dupliquer.
+   * Retourne { niveaux: {nourriture,energie,materiel,credit,science},
+   * totalDeploye }.
+   */
+  function calculerNiveauxProduction_(partie) {
     var nomMaison = partie.joueur ? partie.joueur.nom : null;
     var nomTechDepart = (partie.joueur && partie.joueur.technologieDepart) ? partie.joueur.technologieDepart.nom : null;
 
-    Promise.all([
+    return Promise.all([
       SecteurService.obtenirSecteurs(partie.id),
       DB.getAll('originesMaison')
     ]).then(function (resultats) {
@@ -578,11 +589,21 @@ var StrategieService = (function () {
         totaux[origine.bonusProd] += 1;
       }
 
-      RESSOURCES_PRODUCTION.forEach(function (cle) { niveauxProduction[cle] = totaux[cle]; });
+      return { niveaux: totaux, totalDeploye: totalDeploye };
+    });
+  }
+
+  function renderCubes_(partie) {
+    var pm = partie.plateauMaison || {};
+    var cubeActif = pm.cubeActif || 0;
+    var container = document.getElementById('ressources-cubes');
+
+    calculerNiveauxProduction_(partie).then(function (resultat) {
+      RESSOURCES_PRODUCTION.forEach(function (cle) { niveauxProduction[cle] = resultat.niveaux[cle]; });
       majNiveauxAffiches_();
 
-      dernierTotalDeployeCubes_ = totalDeploye;
-      var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - totalDeploye);
+      dernierTotalDeployeCubes_ = resultat.totalDeploye;
+      var cubeInactif = Math.max(0, NB_CUBES_TOTAL - cubeActif - resultat.totalDeploye);
 
       container.innerHTML =
         '<div class="ligne-cubes">' +
@@ -591,7 +612,7 @@ var StrategieService = (function () {
         '<span class="ligne-cubes-item">Actif ' +
         '<input type="number" step="1" min="0" class="cube-actif-input" id="cube-actif-input" value="' + cubeActif + '">' +
         '</span>' +
-        '<span class="ligne-cubes-item">Déployé <strong>' + totalDeploye + '</strong></span>' +
+        '<span class="ligne-cubes-item">Déployé <strong>' + resultat.totalDeploye + '</strong></span>' +
         '</div>';
 
       document.getElementById('cube-actif-input').addEventListener('input', function () {
@@ -2706,17 +2727,22 @@ var StrategieService = (function () {
         // `contexte.avancerPisteApresPlacement` est vrai (transmis par
         // GameService.appliquerCadreGainCorruption pour un Cadre précis —
         // jamais pour un gain_corruption Focus générique), enchaîne
-        // CivilisationService.avancerPisteSansEffet sur cette même piste
-        // (le joueur avance sur cette piste en ignorant le bénéfice de la
-        // case atteinte, sauf déjà au maximum). Résout le texte de détail
-        // combiné, pour les 2 branches (piste unique/select) ci-dessous.
+        // CivilisationService.avancerPiste sur cette même piste — la piste
+        // vient d'être marquée Corrompue par definirCorruption ci-dessus,
+        // donc la règle générique de avancerPiste ("aucun bénéfice de case
+        // pour une piste Corrompue", voir civilisationService.js) s'y
+        // applique déjà telle quelle : pas besoin d'un chemin dédié
+        // "sans effet" (ex-avancerPisteSansEffet, fusionné dans
+        // avancerPiste). Résout le texte de détail combiné, pour les 2
+        // branches (piste unique/select) ci-dessous.
         function placerCorruptionSurPiste_(piste) {
           return CivilisationService.definirCorruption(partieCorruptionGain.id, piste, true).then(function () {
             var base = 'Corruption placée sur la piste ' + CivilisationService.NOM_PISTE[piste] + '.';
             if (!contexte.avancerPisteApresPlacement) return base;
-            return CivilisationService.avancerPisteSansEffet(partieCorruptionGain.id, piste).then(function (resultatAvance) {
+            var nomMaisonGain = partieCorruptionGain.joueur ? partieCorruptionGain.joueur.nom : null;
+            return CivilisationService.avancerPiste(partieCorruptionGain.id, nomMaisonGain, piste, demanderChoix).then(function (resultatAvance) {
               if (resultatAvance.dejaMaximum) return base + ' Piste déjà au niveau maximum, pas d’avancement.';
-              return base + ' Piste avancée d’une case (niveau ' + resultatAvance.ancienNiveau + ' → ' + resultatAvance.nouveauNiveau + ', sans bénéfice de case).';
+              return base + ' Piste avancée d’une case (niveau ' + resultatAvance.ancienNiveau + ' → ' + resultatAvance.nouveauNiveau + ', sans bénéfice de case — piste Corrompue).';
             });
           });
         }
@@ -2845,6 +2871,37 @@ var StrategieService = (function () {
           window.alert('Échec du calcul d’Influence : ' + erreur.message);
         });
 
+      } else if (contexte.type === 'produire_revenu') {
+        // Effet "Produire une ressource précise" (produire_nourriture/
+        // energie/materiel/credit/science — voir focusEngine.js, ex. Focus
+        // Production "Ravitailler") : AUCUN choix utilisateur — le gain est
+        // le revenu de production ACTUEL de `contexte.ressource` (Niveau
+        // Population × Guildes + bonus d'origine, calculerNiveauxProduction_
+        // ci-dessus, puis table PRODUCTION_NEMS/PRODUCTION_CREDIT via
+        // calculerProduction_ — même calcul que la grille affichée sur
+        // l'écran Plat. maison). Résolution directe, même principe que
+        // 'influence_secteur' juste au-dessus (popup affichée brièvement,
+        // "Calcul en cours…", Annuler disponible en cas d'erreur).
+        var labelRessourceProduite = CHAMP_RESSOURCE[contexte.ressource] ? CHAMP_RESSOURCE[contexte.ressource].label : contexte.ressource;
+        titre.textContent = 'Produire — ' + labelRessourceProduite;
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
+          var niveauProduit = resultat.niveaux[contexte.ressource] || 0;
+          var montantProduit = calculerProduction_(contexte.ressource, niveauProduit);
+          fermerModale_();
+          resolve({
+            montant: montantProduit,
+            detail: '+' + montantProduit + ' ' + labelRessourceProduite + ' (Production, Niveau ' + niveauProduit + ').'
+          });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du calcul de production : ' + erreur.message);
+        });
+
       } else if (contexte.type === 'ameliorer_gloire') {
         // focusEngine.js reconnaît la clé "ameliorer_gloire" mais ne peut
         // pas écrire lui-même le résultat — le jeton Gloire (array) n'est
@@ -2943,9 +3000,15 @@ var StrategieService = (function () {
         var nomMaisonCivilisation = partieCivilisation.joueur ? partieCivilisation.joueur.nom : null;
         var civActuelle = partieCivilisation.civilisation || {};
 
+        // Piste Corrompue (partieCivilisation.civilisation.corrompues,
+        // voir gameService.js/assemblerPartie_) : avancerPiste n'y résout
+        // aucun effet (règle générique, civilisationService.js) — l'aperçu
+        // le signale au lieu du texte de la case, pour ne pas laisser
+        // croire au joueur qu'il va gagner le bénéfice affiché.
         function apercuProchaineCase_(detail, piste) {
           var niveau = civActuelle[piste] || 0;
           if (niveau >= CivilisationService.NIVEAU_MAX) return 'Piste déjà au niveau maximum.';
+          if (civActuelle.corrompues && civActuelle.corrompues[piste]) return 'Piste Corrompue — avancera sans bénéfice de case.';
           var cases = (detail && detail[piste]) || [];
           var entree = cases[niveau]; // case niveau+1 (index niveau, 0-based)
           return entree ? ('Case ' + entree.case + ' — ' + (entree.texte || '(aucun texte)')) : '';

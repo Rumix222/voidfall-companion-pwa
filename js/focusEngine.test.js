@@ -633,6 +633,88 @@ test('influence_par_secteur_pur : annulé (popup "Annuler") — bloque toute l�
   });
 });
 
+// "produire_<ressource>" (ressource imposée par le nom de la clé, ex.
+// Focus Production "Ravitailler" — produire_energie/materiel/nourriture)
+// délègue à demanderChoix({type:'produire_revenu'}) — calcul déterministe
+// (revenu de production actuel), aucun choix utilisateur, la popup
+// (strategieService.js) fait le calcul ET résout {montant, detail}. Même
+// contrat que influence_secteur ci-dessus.
+test('produire_energie : délègue à demanderChoix({type:"produire_revenu", ressource:"energie"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = { action: 'Ravitailler', effet: { produire_energie: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'produire_revenu');
+    assert.strictEqual(contexte.ressource, 'energie');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { montant: 4, detail: '+4 Énergie (Production, Niveau 6).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 9); // 5 + 4
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('+4 Énergie') !== -1; }));
+  });
+});
+
+// Ravitailler combine 3 clés produire_* dans la même option "choice" —
+// chacune est résolue indépendamment (son propre appel à demanderChoix),
+// toutes les 3 doivent créditer la bonne ressource.
+test('Ravitailler (produire_energie + produire_materiel + produire_nourriture ensemble) : crédite les 3 ressources', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = {
+    action: 'Ravitailler',
+    effet: { produire_energie: 1, produire_materiel: 1, produire_nourriture: 1 },
+    cout: {}, texte: ''
+  };
+
+  var montantParRessource = { energie: 4, materiel: 3, nourriture: 2 };
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'produire_revenu');
+    var montant = montantParRessource[contexte.ressource];
+    return { montant: montant, detail: '+' + montant + ' ' + contexte.ressource + ' (Production).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 9); // 5 + 4
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 8); // 5 + 3
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceNourriture, 7); // 5 + 2
+  });
+});
+
+test('produire_credit : annulé (popup "Annuler") — bloque toute l’action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { produire_credit: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+// "produire_ressource"/"produire_deux_ressources" (CHOIX du joueur parmi
+// les 5 ressources) restent hors périmètre — pas de popup de sélection
+// construite, contrairement à produire_<ressource> (ressource imposée)
+// ci-dessus.
+test('produire_ressource (choix du joueur) : reste hors périmètre, ne bloque pas, journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { produire_ressource: 1 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('non automatisé') !== -1; }));
+    assert.strictEqual(resultat.mutations.length, 0);
+  });
+});
+
 // "avancer_civilisation" (piste au choix) et les 3 variantes
 // "avancer_civilisation_<piste>" (piste imposée) délèguent à
 // demanderChoix({type:'avancer_civilisation', piste}) — la popup

@@ -506,10 +506,15 @@ var GameService = (function () {
   //   ci-dessous (Événement G Cycle 1 Cadre 1 — "si la Corruption est
   //   placée sur une piste... le joueur doit avancer sur cette piste [en
   //   ignorant le bénéfice de la case atteinte]" — SEUL effet_conditionnel
-  //   automatisé à ce jour, via CivilisationService.avancerPisteSansEffet,
-  //   civilisationService.js v5 — qui n'a PAS la sémantique de
-  //   avancerPisteCorrompue, laquelle décoche la piste en avançant ; tout
-  //   AUTRE effet_conditionnel reste hors périmètre, laissé manuel) ;
+  //   automatisé à ce jour : appliqué en enchaînant simplement la
+  //   Corruption (CivilisationService.definirCorruption) PUIS l'avancement
+  //   GÉNÉRIQUE (CivilisationService.avancerPiste, strategieService.js/
+  //   placerCorruptionSurPiste_) — "aucun bénéfice de case pour une piste
+  //   Corrompue" est désormais une règle appliquée par avancerPiste
+  //   elle-même pour TOUT appelant, plus un chemin dédié ; ne décoche PAS
+  //   la piste (contrairement à avancerPisteCorrompue, qui reste un pont
+  //   Focus -> Civilisation non câblé, hors périmètre ici) ; tout AUTRE
+  //   effet_conditionnel reste hors périmètre, laissé manuel) ;
   // - une cible (primaire OU de repli) ne correspond à aucune entrée
   //   connue — notamment "offre_programme" (case précise du plateau des
   //   Programmes, jamais suivie en base — reste manuel, comme demandé) et

@@ -428,7 +428,10 @@ persistance via `SecteurService.deployerCube`), `ressource_choix`,
 `envahir`/`envahir_corrompu` (popup → `CombatService.resoudreInvasion` +
 `SecteurService.envahirResoudre`), `influence_secteur` (popup sans choix
 utilisateur, calcul pur depuis `SecteurService.
-obtenirAgregatsInfluenceSecteursPurs` — voir §6), et les no-op silencieux
+obtenirAgregatsInfluenceSecteursPurs` — voir §6), `produire_<ressource>`
+(ressource imposée par la clé — popup sans choix utilisateur, calcul pur
+via `calculerNiveauxProduction_`, ex. Focus Production "Ravitailler" —
+voir §6), et les no-op silencieux
 `sans_benefice_case`/`exclude`/`restriction`/`same_sector`/`meme_secteur`/
 `tie_break`. Toute clé inconnue tombe dans un repli générique (journalisée,
 jamais bloquante).
@@ -446,10 +449,15 @@ jamais) :
   implémenté dans `civilisationService.js`, mais uniquement via les boutons
   dédiés de l'écran Plat. maison — pas de pont automatique depuis une carte
   Focus.
-- `produire_ressource`, `produire_deux_ressources`, tout préfixe `produire_*`
-  : niveaux de production (Population × Guildes par secteur) non calculés
-  automatiquement côté résolution Focus (ils LE sont côté affichage, voir
-  `renderCubes_` §5.2).
+- `produire_ressource`, `produire_deux_ressources` : CHOIX du joueur parmi
+  les 5 ressources, popup de sélection pas encore construite.
+  `produire_<ressource>` (ressource imposée par le nom de la clé, ex. Focus
+  Production "Ravitailler" — `produire_energie`/`produire_materiel`/
+  `produire_nourriture`) N'est PLUS hors périmètre : délègue à une popup
+  dédiée (`produire_revenu`, `strategieService.js`) qui calcule le revenu
+  de production actuel via `calculerNiveauxProduction_` (même calcul que
+  `renderCubes_` §5.2, désormais factorisé en commun) et crédite la
+  ressource.
 
 ### 4.6 `js/annulationService.js` — pile d'annulation
 
@@ -469,18 +477,21 @@ de chaque mutation, aucune logique métier "inverse" recalculée.
 
 **Rôle** : avancement des 3 pistes (Société/Gouvernement/Économie) + effet de
 la case atteinte (réutilise `FocusEngine.resoudreEffet`), marqueurs
-"Corrompue", chaînage des cases "Avance rapide".
+"Corrompue", chaînage des cases "Avance rapide". Règle générique Corruption
+(docs-rules-corruption-gardiens-refuges-technoConsume.md §1) : `avancerPiste`
+n'applique JAMAIS l'effet d'une case atteinte sur une piste marquée
+Corrompue au moment de l'appel (le niveau avance quand même) — appliqué une
+seule fois, pour tout appelant.
 
 | Export | Paramètres | Description |
 |---|---|---|
 | `PISTES` | (constante) | `['societe','gouvernement','economie']` |
 | `NOM_PISTE` | (constante) | Map clé → libellé affiché |
 | `NIVEAU_MAX` | (constante) | `7` |
-| `avancerPiste` | `(partieId, nomMaison, piste, demanderChoix, options)` | Avance d'une case, résout l'effet (chaîne les cases "Avance rapide" consécutives), empile UNE entrée pour toutes les mutations ; no-op si déjà au niveau max |
+| `avancerPiste` | `(partieId, nomMaison, piste, demanderChoix)` | Avance d'une case ; résout l'effet (chaîne les cases "Avance rapide" consécutives) SAUF piste Corrompue (aucun effet, aucun chaînage) ; empile UNE entrée pour toutes les mutations ; no-op si déjà au niveau max |
 | `avancerPisteMoinsAvancee` | `(partieId, nomMaison, demanderChoix)` | Avance la piste au niveau le plus bas (égalité : Société > Gouvernement > Économie) |
 | `definirCorruption` | `(partieId, piste, valeur, options)` | Coche/décoche "Corrompue" ; `options.conserverCorruptionRetiree` conserve le compteur au retrait (Événement G) |
-| `avancerPisteCorrompue` | `(partieId)` | Avance la piste Corrompue SANS résoudre l'effet, puis décoche |
-| `avancerPisteSansEffet` | `(partieId, nomMaison, piste)` | Avance d'une case sans résoudre l'effet ni toucher au marqueur Corrompue |
+| `avancerPisteCorrompue` | `(partieId)` | Avance la piste Corrompue SANS résoudre l'effet, puis décoche — pont Focus → Civilisation pas encore câblé à un bouton, testée seulement |
 | `obtenirDetailPistes` | `(nomMaison)` | Détail complet (texte des 7 cases × 3 pistes) |
 
 ### 4.8 `js/combatService.js` — moteur de combat PUR
@@ -668,9 +679,12 @@ callback) et par `index.html` (cadres d'Événement galactique).
 **Rendus clés** : `champRessourceHTML_`/`renderRessources_` (grille 6
 colonnes : pastille/Niveau/→/Revenu/Stock éditable/Delta),
 `renderRappelRessources_` (bandeau fixe), `renderJetons_` (Commerce/
-Prime/Libération), `renderCubes_` (recalcule les niveaux de production
-Population×Guildes+bonus origine depuis `SecteurService.obtenirSecteurs`),
-`renderGloire_`/`renderGloireDOM_` (5 emplacements cliquables),
+Prime/Libération), `renderCubes_` (affichage — délègue le calcul des
+niveaux de production Population×Guildes+bonus origine à
+`calculerNiveauxProduction_`, aussi réutilisée par le contexte
+`produire_revenu`, §6, pour créditer l'effet "produire_&lt;ressource&gt;"
+d'une carte Focus, ex. Ravitailler), `renderGloire_`/`renderGloireDOM_`
+(5 emplacements cliquables),
 `carteFocusJoueurHTML_` (gabarit carte Focus), `renderFocusJoueur_`,
 `renderFocusHeroiquesJoueur_`, `renderFocusHeroiques_` (sélection cycle),
 `jouerAction_` (joue une action via `FocusEngine.jouerActionEtPersister`).
@@ -751,6 +765,7 @@ des `contexte.type` (22 branches, `if/else if`) :
 | `utiliser_programme` | Affiche l'action gratuite du Programme (`INFO_PROGRAMME_PAR_TYPE`), bouton "Résoudre" → `GameService.utiliserProgramme` (relaie la même `demanderChoix` pour toute sous-popup imbriquée — envahir/options_inclusives/avancer_civilisation/confirmation/etc.) | `{detail, place, nom, type}` ou `{annule:true}` | **Oui** — `GameService.utiliserProgramme` |
 | `choisir_emplacement_programme` | Plateau Programme plein (3 emplacements occupés, aucun conflit de type) : choisir lequel remplacer | `{numero}` ou `{annule:true}` | Non — sélection seule, `GameService.utiliserProgramme` persiste |
 | `influence_secteur` | Aucun choix utilisateur : calcule un gain d'Influence variable depuis `SecteurService.obtenirAgregatsInfluenceSecteursPurs` (9 formules), ferme immédiatement | `{montant, detail}` | Non — calcul pur, la persistance du gain reste côté appelant |
+| `produire_revenu` | Aucun choix utilisateur : calcule le revenu de production actuel de `contexte.ressource` via `calculerNiveauxProduction_` (Population × Guildes + bonus d'origine, puis table PRODUCTION_NEMS/PRODUCTION_CREDIT), ferme immédiatement | `{montant, detail}` | Non — calcul pur, la persistance du gain reste côté appelant |
 | `ameliorer_gloire` | Choisir un jeton Gloire posé à améliorer (+1 valeur) | `{detail}` ou `{annule:true}` | **Oui** — écrit directement `plateauMaison.gloire`, hors flux d'annulation |
 | `avancer_civilisation` | Choisir une piste de Civilisation à avancer — `contexte.moinsAvancee:true` calcule la piste la moins avancée localement (action de Programme Force) plutôt qu'une `piste` imposée/au choix | (résolution interne, pas de `resolve` direct) | **Oui** — délègue à `CivilisationService.avancerPiste` |
 | `resoudre_cadre_evenement` | Liste les options d'un cadre "choix" d'Événement galactique (delta simple / proportionnel / Technologie) | dépend de l'option choisie | Variable selon l'option |
@@ -891,9 +906,11 @@ Récapitulatif transverse (détail par module en §4.5) :
 - **Avancement de Civilisation depuis une carte Focus** : implémenté
   ailleurs (`civilisationService.js`, boutons Plat. maison), pas de pont
   Focus automatique.
-- **Niveaux de production** (`produire_ressource`/`produire_*`) non calculés
-  automatiquement lors de la résolution d'une action Focus (ils le sont côté
-  affichage uniquement, `renderCubes_`).
+- **Production, choix de la ressource** (`produire_ressource`/
+  `produire_deux_ressources`) : le joueur choisit parmi les 5 ressources,
+  popup de sélection pas encore construite. `produire_<ressource>`
+  (ressource imposée par la clé, ex. Focus Production "Ravitailler") EST
+  automatisé (popup `produire_revenu`, `strategieService.js`, §4.5).
 - **Défausse de Gloire pour secteur source abandonné** lors d'une invasion,
   et **résolution immédiate des jetons Prime/Libération** : simples
   compteurs journalisés/crédités, pas de popup dédiée.

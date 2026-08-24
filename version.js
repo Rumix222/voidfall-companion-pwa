@@ -1,9 +1,78 @@
 /**
  * version.js
- * Version 66 — 2026-08-23
+ * Version 69 — 2026-08-24
  * Source de vérité unique pour la version de l'application.
  *
- * 23/08/2026, dernière fois (Fin de cycle — popup "Phase Évaluation",
+ * 24/08/2026, dernière fois (Plat. maison — renomme la section "Corruption
+ * et Influence" en "Corruption maison et influence", retour utilisateur) :
+ * clarifie que ce compteur (`plateauMaison.corruptionMaison`) ne porte QUE
+ * sur les Corruptions de la fiche Maison elle-même (pistes de
+ * Civilisation, emplacements de Programme, Technologie Chambres de
+ * décontamination — voir CivilisationService.definirCorruption/
+ * gameService.js CHAMPS_PLATEAU_MAISON_AUTORISES) et jamais sur les
+ * secteurs Corrompus possédés (compteur distinct, non suivi). Pur
+ * changement de libellé (`index.html`, `<h2 class="section-title">` +
+ * commentaire associé) — aucune logique modifiée.
+ *
+ * 24/08/2026, avant (Focus Production — automatise l'effet
+ * "Ravitailler", retour utilisateur) :
+ * `FocusEngine.resoudreCle_` (js/focusEngine.js) automatise désormais les
+ * clés Effet "produire_<ressource>" où la ressource est imposée par le
+ * nom même de la clé (produire_nourriture/energie/materiel/credit/
+ * science — ex. Focus Production "Ravitailler", catalogue focus.json id
+ * 14/98) : Effet uniquement (signe > 0), aucun choix utilisateur — le
+ * gain est le revenu de production ACTUEL de cette ressource (Niveau
+ * Population × Guildes + bonus d'origine, table PRODUCTION_NEMS/
+ * PRODUCTION_CREDIT), calculé via une nouvelle popup dédiée
+ * (`produire_revenu`, strategieService.js), même principe que
+ * `influence_secteur` (aucune interaction, juste un calcul déterministe
+ * qui ferme la popup immédiatement). Reste HORS PÉRIMÈTRE, inchangé :
+ * `produire_ressource`/`produire_deux_ressources` (CHOIX du joueur parmi
+ * les 5 ressources — popup de sélection pas encore construite).
+ * `strategieService.js` : le calcul des niveaux de production
+ * (Population × Guildes + bonus d'origine, jusqu'ici inline dans
+ * `renderCubes_`) est factorisé dans une nouvelle fonction
+ * `calculerNiveauxProduction_(partie)`, réutilisée par `renderCubes_`
+ * (affichage, inchangé) ET par le contexte `produire_revenu` — même
+ * calcul, une seule source de vérité.
+ * 4 tests ajoutés dans `js/focusEngine.test.js` (delegation demanderChoix,
+ * Ravitailler combine 3 clés produire_* résolues indépendamment, Annuler
+ * bloque l'action, produire_ressource/produire_deux_ressources restent
+ * hors périmètre) — 114 tests `*.test.js` + 18 `*_test.js` au vert.
+ *
+ * 24/08/2026, avant (Civilisation — règle générique "piste
+ * Corrompue = aucun bénéfice de case", retour utilisateur) :
+ * `CivilisationService.avancerPiste` (js/civilisationService.js)
+ * applique désormais elle-même la règle docs-rules-corruption-gardiens-
+ * refuges-technoConsume.md §1 ("une piste de Civilisation Corrompue ne
+ * vous rapporte aucun bénéfice") : si la piste visée est marquée
+ * Corrompue au moment de l'appel, le NIVEAU avance quand même d'une case
+ * mais AUCUN effet n'est résolu (ni un éventuel enchaînement "avance
+ * rapide", qui EST lui-même un bénéfice de case). Avant ce correctif,
+ * SEUL le chemin dédié de l'Événement galactique G Cycle 1 Cadre 1
+ * (corrompre une piste puis la faire avancer) ignorait le bénéfice ; le
+ * bouton "Avancer" manuel (écran Focus) et les clés Focus/Programme
+ * "avancer_civilisation" et variantes (dont "_moins_avancee"),
+ * résolues via la popup 'avancer_civilisation' (strategieService.js),
+ * appliquaient à tort l'effet de case même sur une piste Corrompue — bug
+ * corrigé en centralisant la règle dans avancerPiste elle-même, pour
+ * tout appelant.
+ * Supprime `CivilisationService.avancerPisteSansEffet` (fonction dédiée
+ * à un seul appelant, devenue redondante) : `strategieService.js`
+ * (placerCorruptionSurPiste_, Événement G Cycle 1 Cadre 1) appelle
+ * désormais la avancerPiste GÉNÉRIQUE — la piste vient d'être marquée
+ * Corrompue par definirCorruption juste avant, donc la règle ci-dessus
+ * s'y applique déjà telle quelle, sans code spécifique. La popup
+ * 'avancer_civilisation' affiche en prime un aperçu "Piste Corrompue —
+ * avancera sans bénéfice de case" au lieu du texte de la prochaine case,
+ * pour ne pas laisser croire à un gain qui n'aura pas lieu.
+ * `avancerPisteCorrompue` (mécanique différente — avance ET décoche,
+ * jamais câblée à un bouton) reste inchangée, hors périmètre ici.
+ * 3 tests remplacent les 2 tests avancerPisteSansEffet dans
+ * `js/civilisationService_test.js` (110 + 18 tests `*.test.js`/`*_test.js`
+ * toujours au vert).
+ *
+ * 23/08/2026, avant (Fin de cycle — popup "Phase Évaluation",
  * retour utilisateur, voir docs-rules-cycle-de-jeu.md §3) :
  * Le bouton "Fin du cycle"/"Terminer la partie" (index.html) ouvre
  * désormais StrategieService.demanderChoix({type:'phase_evaluation'})
@@ -1981,4 +2050,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260823.15';
+var APP_VERSION = '20260824.3';
