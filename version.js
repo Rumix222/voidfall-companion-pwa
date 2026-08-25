@@ -1,9 +1,48 @@
 /**
  * version.js
- * Version 91 — 2026-08-25
+ * Version 92 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — corrige un vrai bug
+ * 25/08/2026, dernière fois (Feuille d'action — Regrouper/Envahir
+ * portés DANS la feuille + 2 ajustements visuels, retour utilisateur :
+ * "quand on passe à l'action regrouper ou envahir il faudrait rester
+ * dans la même popup comme dans le POC") :
+ * - Écart de scope corrigé : `feuilleFlowRegrouper_`/`feuilleFlowEnvahir_`
+ *   (nouvelles) portent DIRECTEMENT dans la feuille les formulaires
+ *   auparavant volontairement laissés sur #modal-choix (engagement
+ *   multi-unités, calculateur de combat) — portage FIDÈLE des branches
+ *   #modal-choix 'regrouper'/'envahir' plus bas dans ce fichier : mêmes
+ *   appels métier (SecteurService.obtenirSecteurs/obtenirAdjacences/
+ *   obtenirSecteurMere/regrouper/envahirResoudre, CombatService.
+ *   resoudreInvasion, GameService.majPlateauMaison pour la Gloire), même
+ *   validation (règle "jamais vider un secteur hors Secteur-Mère", etc.),
+ *   seul le CHROME change — étape unique ré-affichée en place (même
+ *   pattern que la maquette/l'écran Test : `<select>`/`<input>` dans
+ *   `.regrouper-form`, déjà stylée pour le thème sombre, réutilisée telle
+ *   quelle). `FEUILLE_TYPES_SUPPORTES_` inclut désormais 'regrouper' ET
+ *   'envahir' — Focus Conquête Standard "Engager" ne quitte donc plus
+ *   jamais la feuille, du choix initial jusqu'au paiement (déjà
+ *   pré-capturé sur le premier écran, entrée précédente) en passant par
+ *   le combat/regroupement.
+ * - Barre du stepper de paiement teintée selon la couleur de la ressource
+ *   (`CHAMP_RESSOURCE[cle].couleur`, ex. Énergie -> jaune) au lieu d'une
+ *   couleur neutre fixe — `feuilleStepperCoutHTML_` accepte désormais un
+ *   paramètre `couleur` optionnel (segment Crédit inchangé, toujours
+ *   corail).
+ * - `.feuille-separateur` (ligne courte avant "Effet") centrée
+ *   (`margin: 20px auto` au lieu de `20px 0`).
+ * 145 tests au vert (aucune logique métier touchée — SecteurService.js/
+ * CombatService.js/GameService.js inchangés, seule la fonction qui les
+ * appelle change). Vérifié manuellement dans un vrai navigateur
+ * (Playwright, ressources forcées via IndexedDB) : Regrouper complet
+ * (ajout d'un déplacement réel, validé, coût débité) SANS jamais afficher
+ * #modal-choix ; Envahir complet (combat réel résolu, log affiché,
+ * défaite gérée correctement) SANS jamais afficher #modal-choix ;
+ * couleur de barre vérifiée par calcul (rgb exact) ; séparateur vérifié
+ * centré (marges gauche/droite égales) — aucune erreur JS.
+ * Fichiers touchés : css/style.css, strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — corrige un vrai bug
  * "insuffisant" à tort + 4 ajustements visuels, retour utilisateur après
  * test sur iPhone en production, écran combiné Coût+Effet de l'entrée
  * précédente) :
@@ -2990,4 +3029,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.7';
+var APP_VERSION = '20260825.8';

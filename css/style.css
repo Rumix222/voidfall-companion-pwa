@@ -1722,7 +1722,7 @@ input[type="number"]:focus-visible {
 .feuille-separateur {
   width: 48px;
   height: 1px;
-  margin: 20px 0;
+  margin: 20px auto;
   border: none;
   background: var(--color-border);
 }

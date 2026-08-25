@@ -1434,19 +1434,21 @@ var StrategieService = (function () {
   // des clés Effet non couvertes ici : nourriture_par_secteur_pur,
   // gagner_technologie, etc.), et toutes les autres cartes du catalogue
   // continuent d'utiliser #modal-choix, INCHANGÉ. `FEUILLE_TYPES_
-  // SUPPORTES_` ne couvre QUE les contexte.type déclenchés par cette carte
-  // (option_exclusive/options_inclusives/paiement_ressource/
-  // gagner_programme/deplacer_corruption) — "regrouper"/"envahir" (choix
-  // possibles d'Engager) retombent volontairement sur #modal-choix
-  // INCHANGÉ même en mode Feuille : leurs formulaires (engagement
-  // multi-unités, calculateur de combat) sont hors périmètre de ce
-  // portage — la feuille se referme, la modale classique prend le relais
-  // pour CETTE étape, puis la feuille reprend si d'autres étapes suivent.
+  // SUPPORTES_` couvre les contexte.type déclenchés par cette carte,
+  // désormais TOUS (option_exclusive/options_inclusives/
+  // paiement_ressource/gagner_programme/deplacer_corruption/regrouper/
+  // envahir) — retour utilisateur : "il faudrait rester dans la même
+  // popup [pour Regrouper/Envahir] comme dans le POC" (auparavant repli
+  // volontaire sur #modal-choix, formulaires jugés hors périmètre du
+  // premier portage — feuilleFlowRegrouper_/feuilleFlowEnvahir_, plus
+  // bas, les portent maintenant directement DANS la feuille, réutilisant
+  // la logique métier des branches #modal-choix équivalentes SANS aucun
+  // changement).
   function carteEligibleFeuille_(carte) {
     return !!carte && carte.focus === 'Conquête' && carte.type === 'Standard';
   }
   var carteEnFeuille_ = false;
-  var FEUILLE_TYPES_SUPPORTES_ = ['option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption'];
+  var FEUILLE_TYPES_SUPPORTES_ = ['option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption', 'regrouper', 'envahir'];
 
   var feuillePile_ = [];
   var feuilleRejetCourant_ = null;
@@ -1535,7 +1537,7 @@ var StrategieService = (function () {
     }
     return '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' +
       (infos.texteFixe ? '<p class="hint">' + infos.texteFixe + ' (fixe).</p>' : '') +
-      feuilleStepperCoutHTML_(idStepper, infos.label, infos.montant, infos.stockRessource, infos.stockCredit) + '</div>';
+      feuilleStepperCoutHTML_(idStepper, infos.label, infos.montant, infos.stockRessource, infos.stockCredit, CHAMP_RESSOURCE[infos.cle] && CHAMP_RESSOURCE[infos.cle].couleur) + '</div>';
   }
 
   function feuilleConsommerEtiquetteSequence_() {
@@ -1728,10 +1730,14 @@ var StrategieService = (function () {
       r.addEventListener('click', function () { onChoisi(i); });
     });
   }
-  function feuilleStepperCoutHTML_(id, label, montant, stock, credit) {
+  // `couleur` (retour utilisateur) : segment "ressource" de la barre
+  // teinté selon CHAMP_RESSOURCE[cle].couleur (ex. Énergie -> jaune),
+  // plutôt qu'une couleur neutre fixe — le segment "Crédit" reste corail,
+  // inchangé.
+  function feuilleStepperCoutHTML_(id, label, montant, stock, credit, couleur) {
     return '<div class="cout-stepper" id="stepper-' + id + '">' +
       '<button type="button" class="cout-stepper-bouton" data-role="moins">−</button>' +
-      '<div class="cout-stepper-barre"><div class="cout-stepper-seg-ressource" id="seg-res-' + id + '"></div><div class="cout-stepper-seg-credit" id="seg-cred-' + id + '"></div></div>' +
+      '<div class="cout-stepper-barre"><div class="cout-stepper-seg-ressource" id="seg-res-' + id + '"' + (couleur ? ' style="background:' + couleur + '"' : '') + '></div><div class="cout-stepper-seg-credit" id="seg-cred-' + id + '"></div></div>' +
       '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
       '</div>' +
       '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
@@ -1879,7 +1885,7 @@ var StrategieService = (function () {
       html: combinaisonImpossible
         ? '<p class="hint">Stock : ' + stockRessource + ' ' + label + ', ' + stockCredit + ' Crédit.</p>' +
           '<p class="hint" style="color:var(--color-coral);">Insuffisant même en substituant tout le Crédit disponible (1 Crédit = 1 ' + label + ') — Annuler.</p>'
-        : '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>' +
+        : '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit, CHAMP_RESSOURCE[contexte.ressource] && CHAMP_RESSOURCE[contexte.ressource].couleur) + '</div>' +
           (sectionEffet ? '<hr class="feuille-separateur">' : '') + sectionEffet,
       brancher: combinaisonImpossible ? null : function (el) {
         feuilleBrancherStepperCout_(el, 'pay', label, montant, stockRessource, stockCredit, estado, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
@@ -2105,33 +2111,444 @@ var StrategieService = (function () {
     return promise;
   }
 
+  /**
+   * Regrouper, DANS la feuille (retour utilisateur : "il faudrait rester
+   * dans la même popup comme dans le POC" — auparavant repli volontaire
+   * sur #modal-choix, voir CLES_TYPES_SUPPORTES_ ci-dessus, entrées
+   * précédentes). Portage DIRECT de la branche #modal-choix 'regrouper'
+   * équivalente plus bas (même logique, mêmes appels SecteurService) —
+   * seul le CHROME change : une étape unique ré-affichée en place
+   * (`rerender_`, comme `feuilleFlowRegrouper_`/`feuilleFlowEnvahir_`
+   * partagent le même besoin de formulaire dynamique que
+   * feuilleFlowDeplacerCorruption_ n'a pas), pas de `contexte.type`
+   * distinct de son homologue #modal-choix (identique).
+   */
+  function feuilleFlowRegrouper_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partie = partieAffichee;
+
+    var etape = { titre: etiquette + 'Regrouper', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    Promise.all([
+      SecteurService.obtenirSecteurs(partie.id),
+      SecteurService.obtenirAdjacences(partie.scenarioId),
+      SecteurService.obtenirSecteurMere(partie.scenarioId)
+    ]).then(function (resultats) {
+      var secteurs = resultats[0] || [];
+      var adjacenceMap = construireAdjacenceMap_(resultats[1]);
+      var numeroSecteurMere = resultats[2];
+      var mouvements = [];
+      var secteurParNumero_ = creerSecteurParNumero_(secteurs);
+
+      function stockRestant_(numero, type) {
+        var secteur = secteurParNumero_(numero);
+        var champ = SecteurService.CHAMP_PN_PAR_TYPE[type];
+        var stockInitial = secteur ? (secteur[champ] || 0) : 0;
+        var dejaPris = mouvements.filter(function (m) { return m.depart === numero && m.type === type; })
+          .reduce(function (s, m) { return s + m.quantite; }, 0);
+        return stockInitial - dejaPris;
+      }
+      function vousAppartient_(numero) {
+        return secteurEstPossede_(secteurParNumero_(numero)) || numero === numeroSecteurMere;
+      }
+      function totalStockRestantDepart_(numero) {
+        var secteur = secteurParNumero_(numero);
+        var totalInitial = secteur
+          ? ((secteur.pnCorvette || 0) + (secteur.pnSentinelle || 0) + (secteur.pnDestroyer || 0) + (secteur.pnCuirasse || 0) + (secteur.pnPorteVaisseau || 0))
+          : 0;
+        var dejaContribue = mouvements.filter(function (m) { return m.depart === numero; }).reduce(function (s, m) { return s + m.quantite; }, 0);
+        return totalInitial - dejaContribue;
+      }
+
+      function html() {
+        var total = mouvements.reduce(function (s, m) { return s + m.quantite; }, 0);
+        var listeHTML = mouvements.length
+          ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+              return '<li>' + m.quantite + '× ' + labelVaisseau_(m.type) + ' : Secteur ' + m.depart + ' → Secteur ' + m.arrivee +
+                ' <button type="button" class="btn-lien regrouper-retirer" data-index="' + i + '">retirer</button></li>';
+            }).join('') + '</ul>'
+          : '<p class="hint">Aucun déplacement ajouté.</p>';
+
+        return '<p class="hint">Déplacements utilisés : <strong>' + total + ' / 5</strong></p>' +
+          listeHTML +
+          '<div class="regrouper-form">' +
+          '<label class="hint" for="feuille-regrouper-type">Type</label>' +
+          '<select id="feuille-regrouper-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+          '<label class="hint" for="feuille-regrouper-depart" style="margin-top:8px;display:block;">Départ</label>' +
+          '<select id="feuille-regrouper-depart"></select>' +
+          '<label class="hint" for="feuille-regrouper-arrivee" style="margin-top:8px;display:block;">Arrivée (secteur adjacent)</label>' +
+          '<select id="feuille-regrouper-arrivee"></select>' +
+          '<label class="hint" for="feuille-regrouper-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
+          '<input type="number" min="1" step="1" value="1" id="feuille-regrouper-quantite">' +
+          '<button type="button" class="btn btn-secondary" id="feuille-regrouper-btn-ajouter" style="width:100%;margin-top:10px;margin-bottom:10px;">Ajouter ce déplacement</button>' +
+          '</div>';
+      }
+
+      function brancher(el) {
+        Array.prototype.forEach.call(el.querySelectorAll('.regrouper-retirer'), function (btn) {
+          btn.addEventListener('click', function () { mouvements.splice(Number(btn.dataset.index), 1); rerender_(); });
+        });
+
+        var selectType = document.getElementById('feuille-regrouper-type');
+        var selectDepart = document.getElementById('feuille-regrouper-depart');
+        var selectArrivee = document.getElementById('feuille-regrouper-arrivee');
+        var champQuantite = document.getElementById('feuille-regrouper-quantite');
+        var btnAjouter = document.getElementById('feuille-regrouper-btn-ajouter');
+
+        function majDepart() {
+          var type = selectType.value;
+          var options = secteurs
+            .filter(function (s) { return vousAppartient_(s.numero); })
+            .map(function (s) { return { numero: s.numero, stock: stockRestant_(s.numero, type) }; })
+            .filter(function (o) { return o.stock > 0; });
+          selectDepart.innerHTML = options.length
+            ? options.map(function (o) { return '<option value="' + o.numero + '">Secteur ' + o.numero + ' (' + o.stock + ' disponible(s))</option>'; }).join('')
+            : '<option value="">Aucun secteur disponible</option>';
+          majArrivee();
+        }
+        function majArrivee() {
+          var depart = Number(selectDepart.value);
+          var voisins = (adjacenceMap[depart] || []).filter(vousAppartient_);
+          selectArrivee.innerHTML = voisins.length
+            ? voisins.map(function (n) { return '<option value="' + n + '">Secteur ' + n + '</option>'; }).join('')
+            : '<option value="">Aucun secteur adjacent vous appartenant</option>';
+        }
+        selectType.addEventListener('change', majDepart);
+        selectDepart.addEventListener('change', majArrivee);
+        majDepart();
+
+        btnAjouter.addEventListener('click', function () {
+          var type = selectType.value;
+          var depart = Number(selectDepart.value);
+          var arrivee = Number(selectArrivee.value);
+          var quantite = Math.max(1, Math.floor(Number(champQuantite.value) || 1));
+          var total = mouvements.reduce(function (s, m) { return s + m.quantite; }, 0);
+
+          if (!depart || !arrivee) { window.alert('Choisis un secteur de départ et d\'arrivée.'); return; }
+          var dispo = stockRestant_(depart, type);
+          if (quantite > dispo) { window.alert('Seulement ' + dispo + ' disponible(s) sur ce secteur pour ce type.'); return; }
+          if (total + quantite > 5) { window.alert('Il ne reste que ' + (5 - total) + ' déplacement(s) sur les 5 autorisés.'); return; }
+          if (depart !== numeroSecteurMere && totalStockRestantDepart_(depart) - quantite < 1) {
+            window.alert('Impossible : le secteur ' + depart + ' se retrouverait sans Puissance Navale (interdit hors Secteur-Mère lors d\'un regroupement) — laisse-en au moins 1.');
+            return;
+          }
+
+          mouvements.push({ type: type, depart: depart, arrivee: arrivee, quantite: quantite });
+          rerender_();
+        });
+
+        feuilleEls_.btnValider.hidden = mouvements.length === 0;
+        feuilleEls_.btnValider.onclick = mouvements.length === 0 ? null : function () {
+          feuilleEls_.btnValider.disabled = true;
+          SecteurService.regrouper(partie.id, mouvements)
+            .then(function () {
+              var total2 = mouvements.reduce(function (s, m) { return s + m.quantite; }, 0);
+              var detail = mouvements.map(function (m) { return m.quantite + '× ' + labelVaisseau_(m.type) + ' ' + m.depart + '→' + m.arrivee; }).join(', ');
+              feuilleRejetCourant_ = null;
+              feuilleEls_.btnValider.disabled = false;
+              resolve({ deplacements: total2, detail: detail, mouvements: mouvements });
+            })
+            .catch(function (erreur) {
+              feuilleEls_.btnValider.disabled = false;
+              window.alert('Échec du regroupement : ' + erreur.message);
+            });
+        };
+      }
+
+      function rerender_() {
+        feuilleEls_.corpsInner.innerHTML = html();
+        brancher(feuilleEls_.corpsInner);
+        feuilleAjusterHauteur_();
+      }
+
+      etape.html = html();
+      etape.brancher = brancher;
+      rerender_();
+    }).catch(function (erreur) {
+      feuilleEls_.corpsInner.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Envahir, DANS la feuille — même principe que feuilleFlowRegrouper_ ci-
+   * dessus (portage direct de la branche #modal-choix 'envahir' plus bas,
+   * même logique/appels CombatService/SecteurService, seul le chrome
+   * change).
+   */
+  function feuilleFlowEnvahir_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var corrompu = !!contexte.corrompu;
+    var partieEnvahir = partieAffichee;
+
+    function maisonDechue_(s) { return (s && s.maisonAssociee) || null; }
+
+    var etape = { titre: etiquette + (corrompu ? 'Envahir un secteur Corrompu' : 'Envahir un secteur'), nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    Promise.all([
+      SecteurService.obtenirSecteurs(partieEnvahir.id),
+      SecteurService.obtenirAdjacences(partieEnvahir.scenarioId)
+    ]).then(function (resultats) {
+      var secteurs = resultats[0] || [];
+      var adjacenceMap = construireAdjacenceMap_(resultats[1]);
+      var secteurParNumero_ = creerSecteurParNumero_(secteurs);
+
+      function vousAppartientEnvahir_(numero) { return secteurEstPossede_(secteurParNumero_(numero)); }
+
+      var ciblesEligibles = secteurs.filter(function (s) {
+        var eligible = corrompu ? !!s.corrompu : ((s.pnNeant || 0) > 0 || !!maisonDechue_(s));
+        return !vousAppartientEnvahir_(s.numero) && eligible && (adjacenceMap[s.numero] || []).some(vousAppartientEnvahir_);
+      });
+
+      if (!ciblesEligibles.length) {
+        etape.html = '<p class="hint">Aucun secteur ' + (corrompu ? 'Corrompu' : 'du Néant ou de Maison déchue') + ' adjacent à l’un de vos secteurs actuellement.</p>';
+        etape.onValider = null;
+        feuilleRendreEtape_(etape, null);
+        return;
+      }
+
+      function totalStockSecteur_(numero) {
+        var s = secteurParNumero_(numero);
+        if (!s) return 0;
+        return (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
+      }
+      var contributions = [];
+      function stockRestantType_(numero, type) {
+        var s = secteurParNumero_(numero);
+        var champ = SecteurService.CHAMP_PN_PAR_TYPE[type];
+        var initial = s ? (s[champ] || 0) : 0;
+        var pris = contributions.filter(function (c) { return c.secteur === numero && c.type === type; }).reduce(function (som, c) { return som + c.quantite; }, 0);
+        return initial - pris;
+      }
+      function totalContribueSecteur_(numero) {
+        return contributions.filter(function (c) { return c.secteur === numero; }).reduce(function (som, c) { return som + c.quantite; }, 0);
+      }
+
+      function html() {
+        var selectCibleExistant = document.getElementById('feuille-envahir-select-cible');
+        var cible = Number((selectCibleExistant && selectCibleExistant.value) || ciblesEligibles[0].numero);
+        var totalEngage = contributions.reduce(function (s, c) { return s + c.quantite; }, 0);
+
+        var listeHTML = contributions.length
+          ? '<ul class="regrouper-liste">' + contributions.map(function (c, i) {
+              return '<li>' + c.quantite + '× ' + labelVaisseau_(c.type) + ' : Secteur ' + c.secteur + ' → Secteur ' + cible +
+                ' <button type="button" class="btn-lien envahir-retirer" data-index="' + i + '">retirer</button></li>';
+            }).join('') + '</ul>'
+          : '<p class="hint">Aucune unité engagée.</p>';
+
+        return '<label class="hint" for="feuille-envahir-select-cible">Secteur ' + (corrompu ? 'Corrompu' : 'du Néant') + ' à envahir</label>' +
+          '<select id="feuille-envahir-select-cible">' +
+          ciblesEligibles.map(function (s) {
+            var maison = maisonDechue_(s);
+            var etiquette2 = maison ? ('Maison déchue : ' + maison) : ('Néant : ' + (s.pnNeant || 0));
+            return '<option value="' + s.numero + '"' + (s.numero === cible ? ' selected' : '') + '>Secteur ' + s.numero + ' (' + etiquette2 + ')</option>';
+          }).join('') +
+          '</select>' +
+          '<p class="hint" style="margin-top:10px;"><strong>' + totalEngage + '</strong> unité(s) de Puissance Navale engagée(s).</p>' +
+          listeHTML +
+          '<div class="regrouper-form">' +
+          '<label class="hint" for="feuille-envahir-type">Type</label>' +
+          '<select id="feuille-envahir-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+          '<label class="hint" for="feuille-envahir-secteur-source" style="margin-top:8px;display:block;">Secteur source (adjacent à la cible, à vous)</label>' +
+          '<select id="feuille-envahir-secteur-source"></select>' +
+          '<label class="hint" for="feuille-envahir-quantite" style="margin-top:8px;display:block;">Quantité</label>' +
+          '<input type="number" min="1" step="1" value="1" id="feuille-envahir-quantite">' +
+          '<button type="button" class="btn btn-secondary" id="feuille-envahir-btn-ajouter" style="width:100%;margin-top:10px;margin-bottom:10px;">Engager cette unité</button>' +
+          '</div>';
+      }
+
+      function brancher(el) {
+        Array.prototype.forEach.call(el.querySelectorAll('.envahir-retirer'), function (btn) {
+          btn.addEventListener('click', function () { contributions.splice(Number(btn.dataset.index), 1); rerender_(); });
+        });
+
+        var selectCible = document.getElementById('feuille-envahir-select-cible');
+        var selectType = document.getElementById('feuille-envahir-type');
+        var selectSource = document.getElementById('feuille-envahir-secteur-source');
+        var champQuantite = document.getElementById('feuille-envahir-quantite');
+        var btnAjouter = document.getElementById('feuille-envahir-btn-ajouter');
+
+        function majSources() {
+          var cibleActuelle = Number(selectCible.value);
+          var type = selectType.value;
+          var options = (adjacenceMap[cibleActuelle] || [])
+            .filter(vousAppartientEnvahir_)
+            .map(function (numero) { return { numero: numero, stockType: stockRestantType_(numero, type), totalRestant: totalStockSecteur_(numero) - totalContribueSecteur_(numero) }; })
+            .filter(function (o) { return o.stockType > 0 && o.totalRestant > 1; });
+          selectSource.innerHTML = options.length
+            ? options.map(function (o) { return '<option value="' + o.numero + '">Secteur ' + o.numero + ' (' + o.stockType + ' disponible(s), ' + o.totalRestant + ' au total)</option>'; }).join('')
+            : '<option value="">Aucun secteur disponible</option>';
+        }
+
+        selectCible.addEventListener('change', function () { contributions.length = 0; rerender_(); });
+        selectType.addEventListener('change', majSources);
+        majSources();
+
+        btnAjouter.addEventListener('click', function () {
+          var type = selectType.value;
+          var numeroSource = Number(selectSource.value);
+          var quantite = Math.max(1, Math.floor(Number(champQuantite.value) || 1));
+
+          if (!numeroSource) { window.alert('Choisis un secteur source.'); return; }
+          var dispoType = stockRestantType_(numeroSource, type);
+          if (quantite > dispoType) { window.alert('Seulement ' + dispoType + ' disponible(s) sur ce secteur pour ce type.'); return; }
+          var totalRestantApres = totalStockSecteur_(numeroSource) - totalContribueSecteur_(numeroSource) - quantite;
+          if (totalRestantApres < 1) { window.alert('Impossible : le secteur ' + numeroSource + ' se retrouverait sans Puissance Navale — laisse-en au moins 1.'); return; }
+
+          contributions.push({ type: type, secteur: numeroSource, quantite: quantite });
+          rerender_();
+        });
+
+        feuilleEls_.btnValider.hidden = contributions.length === 0;
+        feuilleEls_.btnValider.onclick = contributions.length === 0 ? null : function () {
+          var cibleFinale = Number(selectCible.value);
+          var secteurCible = secteurParNumero_(cibleFinale);
+          if (!secteurCible) { window.alert('Secteur cible introuvable.'); return; }
+
+          var totalEngage = contributions.reduce(function (s, c) { return s + c.quantite; }, 0);
+          var unitesAttaquant = {};
+          contributions.forEach(function (c) {
+            var champ = VAISSEAU_VERS_CHAMP_COMBAT[c.type];
+            unitesAttaquant[champ] = (unitesAttaquant[champ] || 0) + c.quantite;
+          });
+
+          var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible);
+          var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
+
+          var totalSurvivantsAttaquant = Object.keys(resultatCombat.survivantsAttaquant || {})
+            .reduce(function (s, k) { return s + (resultatCombat.survivantsAttaquant[k] || 0); }, 0);
+          var cubesPerdus = Math.max(0, totalEngage - totalSurvivantsAttaquant);
+
+          var detailContributions = contributions.map(function (c) { return c.quantite + '× ' + labelVaisseau_(c.type) + ' (secteur ' + c.secteur + ')'; }).join(', ');
+          var maisonCible = maisonDechue_(secteurCible);
+
+          feuilleEls_.btnValider.disabled = true;
+
+          var sourcesPayload = contributions.map(function (c) { return { type: c.type, secteur: c.secteur, quantite: c.quantite }; });
+          var survivantsPayload = {};
+          if (victoire && resultatCombat.survivantsAttaquant) {
+            Object.keys(resultatCombat.survivantsAttaquant).forEach(function (champCombat) {
+              var cleColonne = champCombat === 'portevaisseau' ? 'porte_vaisseau' : champCombat;
+              survivantsPayload[cleColonne] = resultatCombat.survivantsAttaquant[champCombat];
+            });
+          }
+
+          SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload)
+            .then(function (jetonsRetires) {
+              jetonsRetires = jetonsRetires || {};
+              var influenceGagnee = 0;
+              if (victoire) {
+                var jetonsGloireGagnes = Array.isArray(jetonsRetires.jetonGloire)
+                  ? jetonsRetires.jetonGloire
+                  : (jetonsRetires.jetonGloire ? [jetonsRetires.jetonGloire] : []);
+                var auMoinsUnGloirePlace = false;
+                jetonsGloireGagnes.forEach(function (valeurGloire) {
+                  if (!(valeurGloire > 0)) return;
+                  var indexLibre = etatGloire.indexOf(null);
+                  if (indexLibre === -1) indexLibre = etatGloire.indexOf(undefined);
+                  if (indexLibre !== -1) { etatGloire[indexLibre] = valeurGloire; auMoinsUnGloirePlace = true; }
+                });
+                if (auMoinsUnGloirePlace) {
+                  GameService.majPlateauMaison(partieEnvahir.id, { gloire: etatGloire }).catch(function (e) { window.alert('Échec de l’enregistrement de la Gloire : ' + e.message); });
+                  renderGloireDOM_(partieEnvahir);
+                }
+                influenceGagnee = etatGloire.reduce(function (s, v) { return s + (v || 0); }, 0);
+              }
+
+              var detail = 'Invasion du secteur ' + cibleFinale +
+                (corrompu ? ' (Corrompu)' : (maisonCible ? ' (Maison déchue : ' + maisonCible + ')' : ' (Néant)')) +
+                ' avec ' + totalEngage + ' unité(s) [' + detailContributions + '] — ' +
+                (victoire
+                  ? 'VICTOIRE (' + resultatCombat.cubesRestants + ' cube(s) déposé(s) sur le secteur' +
+                    (maisonCible ? ', bonus de Maison déchue « ' + maisonCible + ' » non appliqué pour l’instant' : '') +
+                    (cubesPerdus > 0 ? ', ' + cubesPerdus + ' cube(s) perdu(s) au combat reversé(s) en Cube actif' : '') + ').'
+                  : 'ÉCHEC — flotte anéantie, unités reversées en Cube actif ; secteur(s) source vidé(s) éventuellement repris par le Néant.');
+
+              var avertissement = null;
+              var abandonnes = jetonsRetires.secteursAbandonnes || [];
+              if (abandonnes.length) {
+                avertissement = 'Secteur(s) ' + abandonnes.join(', ') + ' repris par le Néant (vidé(s) de Puissance Navale) — défaussez un jeton Gloire de votre choix par secteur, si vous en avez (à faire manuellement, hors périmètre cette session).';
+              }
+
+              feuilleRejetCourant_ = null;
+              feuilleEls_.btnValider.disabled = false;
+              window.alert(resultatCombat.log.join('\n'));
+              resolve({
+                victoire: victoire,
+                jetonPrime: victoire ? (jetonsRetires.jetonPrime || 0) : 0,
+                jetonLiberation: victoire ? (jetonsRetires.jetonLiberation || 0) : 0,
+                influenceGagnee: influenceGagnee,
+                totalEngage: totalEngage,
+                cubesPerdus: cubesPerdus,
+                detail: detail,
+                avertissement: avertissement
+              });
+            })
+            .catch(function (erreur) {
+              feuilleEls_.btnValider.disabled = false;
+              window.alert('Échec de la résolution : ' + erreur.message);
+            });
+        };
+      }
+
+      function rerender_() {
+        feuilleEls_.corpsInner.innerHTML = html();
+        brancher(feuilleEls_.corpsInner);
+        feuilleAjusterHauteur_();
+      }
+
+      etape.html = html();
+      etape.brancher = brancher;
+      rerender_();
+    }).catch(function (erreur) {
+      feuilleEls_.corpsInner.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
   function demanderChoixFeuille_(contexte) {
     if (contexte.type === 'option_exclusive') return feuilleFlowOptionExclusive_(contexte);
     if (contexte.type === 'options_inclusives') return feuilleFlowOptionsInclusives_(contexte);
     if (contexte.type === 'paiement_ressource') return feuilleFlowPaiementRessource_(contexte);
     if (contexte.type === 'gagner_programme') return feuilleFlowGagnerProgramme_(contexte);
     if (contexte.type === 'deplacer_corruption') return feuilleFlowDeplacerCorruption_();
+    if (contexte.type === 'regrouper') return feuilleFlowRegrouper_();
+    if (contexte.type === 'envahir') return feuilleFlowEnvahir_(contexte);
     return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
   }
 
   function demanderChoix(contexte) {
     // Feuille d'action (Focus Conquête Standard uniquement, voir
     // carteEligibleFeuille_ ci-dessus) : intercepte les types qu'elle sait
-    // résoudre, court-circuitant TOUT le reste de cette fonction (y
-    // compris `modal.hidden = false` tout en bas) — #modal-choix ne
-    // s'affiche donc jamais pour ces types-là sur cette carte. Tout autre
-    // type (dont 'regrouper'/'envahir', volontairement hors de
-    // FEUILLE_TYPES_SUPPORTES_) et toute autre carte retombent sur le
-    // reste de cette fonction, INCHANGÉ.
+    // résoudre (TOUS ceux déclenchés par cette carte, y compris
+    // 'regrouper'/'envahir' depuis leur portage direct — voir
+    // FEUILLE_TYPES_SUPPORTES_), court-circuitant TOUT le reste de cette
+    // fonction (y compris `modal.hidden = false` tout en bas) —
+    // #modal-choix ne s'affiche donc jamais pour cette carte. Tout autre
+    // type (aucun connu actuellement pour Conquête Standard — filet de
+    // sécurité si le catalogue évoluait) et toute autre carte retombent
+    // sur le reste de cette fonction, INCHANGÉ.
     if (carteEnFeuille_ && FEUILLE_TYPES_SUPPORTES_.indexOf(contexte.type) !== -1) {
       return demanderChoixFeuille_(contexte);
     }
-    // Repli #modal-choix alors qu'on est en mode Feuille (ex. 'regrouper'/
-    // 'envahir' choisis via Engager) : masque la feuille le temps de cette
+    // Repli #modal-choix (filet de sécurité, ne devrait plus se produire
+    // pour Conquête Standard depuis que 'regrouper'/'envahir' sont dans
+    // FEUILLE_TYPES_SUPPORTES_) : masque la feuille le temps de cette
     // étape SANS l'annuler (feuilleFermer_ ne touche jamais feuillePile_/
-    // feuilleSequenceEtOu_) — elle ressurgira automatiquement si un type
-    // Feuille revient ensuite (le paiement du coût, voir
-    // feuillePousserEtape_ qui annule ce masquage).
+    // feuilleSequenceEtOu_) — elle ressurgirait automatiquement si un type
+    // Feuille revenait ensuite (feuillePousserEtape_ annule ce masquage).
     if (carteEnFeuille_) feuilleFermer_();
 
     var modal = document.getElementById('modal-choix');
