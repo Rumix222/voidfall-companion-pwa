@@ -1473,7 +1473,6 @@ var StrategieService = (function () {
     feuilleEls_.teteEtapes = document.getElementById('feuille-etapes');
     feuilleEls_.corpsInner = document.getElementById('feuille-corps-inner');
     feuilleEls_.btnValider = document.getElementById('feuille-valider');
-    feuilleEls_.btnAnnuler = document.getElementById('feuille-annuler');
     if (!feuilleEls_.scrim || !feuilleEls_.feuille) return;
 
     var dragY = null, dragH = null;
@@ -1502,7 +1501,6 @@ var StrategieService = (function () {
     feuilleEls_.grabberZone.addEventListener('pointercancel', finDrag);
 
     feuilleEls_.scrim.addEventListener('click', feuilleFermerEtAnnuler_);
-    feuilleEls_.btnAnnuler.addEventListener('click', feuilleFermerEtAnnuler_);
     feuilleEls_.teteRetour.addEventListener('click', function () {
       var actuelle = feuillePile_[feuillePile_.length - 1];
       if (feuillePile_.length <= 1 || (actuelle && actuelle.racineSequence !== false)) return;
@@ -1514,7 +1512,12 @@ var StrategieService = (function () {
   function feuilleTailleAuContenu_() {
     var chrome = document.querySelector('#feuille .feuille-tete').offsetHeight +
       document.querySelector('#feuille .feuille-pied').offsetHeight + 26;
-    return Math.min(window.innerHeight * 0.92, Math.max(180, feuilleEls_.corpsInner.scrollHeight + chrome));
+    // Retour utilisateur (test iPhone réel) : "la popup n'est pas assez
+    // dépliée de base" — un contenu court (ex. 2 options d'Engager) ne
+    // remplissait qu'une fraction minime de l'écran. Plancher relatif à la
+    // fenêtre (42%, sensation "demi-feuille" façon Plans iOS) plutôt qu'un
+    // plancher absolu (180px) trop petit sur un écran de téléphone actuel.
+    return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.42, feuilleEls_.corpsInner.scrollHeight + chrome));
   }
   function feuilleAjusterHauteur_() {
     feuilleEls_.feuille.classList.add('feuille-animee');
@@ -1591,7 +1594,6 @@ var StrategieService = (function () {
     els.btnValider.hidden = !etape.onValider;
     els.btnValider.disabled = false;
     els.btnValider.onclick = etape.onValider || null;
-    els.btnAnnuler.textContent = feuillePile_.length <= 1 ? 'Annuler' : 'Fermer';
   }
   function feuillePousserEtape_(etape, direction) {
     // Ré-affiche le voile/annule un masquage retardé en attente — voir

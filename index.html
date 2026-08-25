@@ -458,7 +458,6 @@
       </div>
       <div class="feuille-pied" id="test-feuille-pied">
         <button type="button" class="btn btn-primary" id="test-feuille-valider">Valider</button>
-        <button type="button" class="feuille-pied-lien" id="test-feuille-annuler">Annuler</button>
       </div>
     </div>
   </section>
@@ -511,7 +510,6 @@
     </div>
     <div class="feuille-pied" id="feuille-pied">
       <button type="button" class="btn btn-primary" id="feuille-valider">Valider</button>
-      <button type="button" class="feuille-pied-lien" id="feuille-annuler">Annuler</button>
     </div>
   </div>
 
@@ -2890,11 +2888,12 @@
     var teteEtapes = document.getElementById('test-feuille-etapes');
     var corpsInner = document.getElementById('test-feuille-corps-inner');
     var btnValider = document.getElementById('test-feuille-valider');
-    var btnAnnuler = document.getElementById('test-feuille-annuler');
     var pile = [];
     // Callback résolvant la Promise du "demanderChoix" en cours quand
-    // l'utilisateur ferme sans valider (voile/Annuler/glissé vers le bas) —
-    // chaque flow ci-dessous y branche la valeur d'annulation attendue par
+    // l'utilisateur ferme sans valider (voile/glissé vers le bas — le
+    // bouton "Annuler" a été retiré, retour utilisateur : "devenu inutile"
+    // une fois le geste de glissé fiable) — chaque flow ci-dessous y
+    // branche la valeur d'annulation attendue par
     // FocusEngine pour SON contexte.type précis (voir focusEngine.js).
     var rejetCourant = null;
     // Retour utilisateur (test iPhone) : sur un choix "et/ou" à 2 options
@@ -2918,7 +2917,9 @@
     function tailleAuContenu() {
       var chrome = document.querySelector('#test-feuille .feuille-tete').offsetHeight +
         document.querySelector('#test-feuille .feuille-pied').offsetHeight + 26;
-      return Math.min(window.innerHeight * 0.92, Math.max(180, corpsInner.scrollHeight + chrome));
+      // Même correctif que la production (strategieService.js) : plancher
+      // relatif à la fenêtre plutôt qu'un plancher absolu trop petit.
+      return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.42, corpsInner.scrollHeight + chrome));
     }
     function ajusterHauteur() {
       feuille.classList.add('feuille-animee');
@@ -2943,7 +2944,6 @@
       if (r) r();
     }
     scrim.addEventListener('click', fermerEtAnnuler_);
-    btnAnnuler.addEventListener('click', fermerEtAnnuler_);
 
     var dragY = null, dragH = null;
     grabberZone.addEventListener('pointerdown', function (e) {
@@ -3005,7 +3005,6 @@
       btnValider.hidden = !etape.onValider;
       btnValider.disabled = false;
       btnValider.onclick = etape.onValider || null;
-      btnAnnuler.textContent = pile.length <= 1 ? 'Annuler' : 'Fermer';
     }
     function pousserEtape(etape, direction) {
       pile.push(etape);

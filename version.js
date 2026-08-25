@@ -1,9 +1,53 @@
 /**
  * version.js
- * Version 88 — 2026-08-25
+ * Version 89 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action EN PRODUCTION — Focus
+ * 25/08/2026, dernière fois (Feuille d'action — ajustements retour
+ * utilisateur après test sur iPhone en production, Focus Conquête
+ * "Engager") :
+ * - Zone de grab (`.feuille-grabber-zone`, css/style.css) : "j'ai du mal à
+ *   attraper le grab" — la cible tactile réelle (padding autour de la
+ *   barre visuelle 5px) ne faisait qu'environ 21px de haut, sous la norme
+ *   Apple HIG (44px min.). Portée à 45px (`padding: 20px 0; min-height:
+ *   44px;`), `touch-action: none` explicite dessus (déjà sur `.feuille`
+ *   parent, redondance volontaire pour la fiabilité du geste).
+ * - Bouton "Annuler"/"Fermer" en bas de la feuille retiré (`#feuille-
+ *   annuler` en production, `#test-feuille-annuler` sur l'écran Test) —
+ *   "devenu inutile" une fois le geste de glissé fiable (fix ci-dessus) :
+ *   les 2 autres façons de rejeter (glissé vers le bas, tap sur le voile)
+ *   suffisent. `.feuille-pied-lien` (css/style.css) supprimée, plus
+ *   utilisée nulle part.
+ * - `feuilleTailleAuContenu_`/`tailleAuContenu` (strategieService.js/
+ *   index.html) : "la popup n'est pas assez dépliée de base" — un plancher
+ *   absolu de 180px laissait un contenu court (ex. les 2 options
+ *   d'Engager) occuper une fraction minime de l'écran. Plancher relatif à
+ *   la fenêtre (42% — sensation "demi-feuille" façon Plans iOS) à la
+ *   place.
+ * - "Il manque la gestion du coût pour pouvoir payer en crédit" (Engager) :
+ *   INVESTIGUÉ, PAS UN BUG — vérifié manuellement (Playwright, gabarit
+ *   iPhone, Regrouper réel complété jusqu'au bout) que la feuille de
+ *   paiement ("Payer 2 Énergie", stepper Crédit) apparaît bien après un
+ *   Regrouper/Envahir résolu via le repli #modal-choix — le mécanisme de
+ *   "masquage puis résurgence" (feuilleFermer_/feuillePousserEtape_,
+ *   entrée précédente) fonctionne correctement. Cause la plus probable du
+ *   retour utilisateur : les 3 frictions ci-dessus (grab difficile à
+ *   attraper, feuille trop petite) empêchaient probablement d'aller
+ *   jusqu'à cette étape lors du test initial — à reconfirmer après ce
+ *   correctif plutôt qu'un changement de code supplémentaire sans
+ *   diagnostic clair.
+ * 145 tests `*.test.js` + toutes les suites `*_test.js` au vert (aucune
+ * logique métier touchée, uniquement CSS/DOM/JS de présentation).
+ * Vérifié manuellement dans un vrai navigateur (Playwright, gabarit
+ * iPhone 390×844, partie réelle) : zone de grab mesurée à 45px, geste de
+ * glissé vers le bas toujours fonctionnel (feuille se ferme), hauteur
+ * par défaut à 42% de l'écran sur un contenu court, Engager -> Regrouper
+ * réel complété -> "Payer 2 Énergie" affiché correctement -> validé,
+ * aucune erreur JS.
+ * Fichiers touchés : css/style.css, index.html, strategieService.js,
+ * version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action EN PRODUCTION — Focus
  * Conquête Standard, retour utilisateur : "implémente cette version du
  * poc dans la vraie appli sur le même focus") :
  * Après validation sur l'écran Test (état factice), la feuille tactile
@@ -2844,4 +2888,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.4';
+var APP_VERSION = '20260825.5';

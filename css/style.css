@@ -1633,9 +1633,15 @@ input[type="number"]:focus-visible {
 .feuille-grabber-zone {
   display: flex;
   justify-content: center;
-  padding: 10px 0 6px;
+  align-items: center;
+  /* Retour utilisateur (test iPhone réel) : "j'ai du mal à attraper le
+     grab" — la barre visuelle (5px) n'est qu'un indice visuel, la cible
+     tactile réelle est TOUTE cette zone (44px min., norme Apple HIG). */
+  padding: 20px 0;
+  min-height: 44px;
   cursor: grab;
   flex-shrink: 0;
+  touch-action: none;
 }
 .feuille-grabber {
   width: 36px;
@@ -1699,18 +1705,6 @@ input[type="number"]:focus-visible {
   background: var(--color-surface);
 }
 .feuille-pied .btn { width: 100%; min-height: 48px; font-size: 1rem; }
-.feuille-pied-lien {
-  display: block;
-  text-align: center;
-  margin-top: 10px;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  background: none;
-  border: none;
-  padding: 6px;
-  width: 100%;
-  cursor: pointer;
-}
 
 .feuille-section-titre {
   font-family: var(--font-display);
