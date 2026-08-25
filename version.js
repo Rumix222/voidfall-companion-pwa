@@ -1,9 +1,79 @@
 /**
  * version.js
- * Version 97 — 2026-08-25
+ * Version 98 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Focus Développement "Installer" — refonte
+ * 25/08/2026, dernière fois (Historique : le warning périmé
+ * "effet_secteur non automatisé" disparaît quand l'action l'a en fait
+ * traité + Feuille d'action sur Focus Innovation Standard) :
+ * - `filtrerJournalEffetSecteurResolu_` (strategieService.js, NOUVEAU) :
+ *   focusEngine.js pousse TOUJOURS l'avertissement "effet_secteur non
+ *   automatisé" en résolvant l'Effet (avant le Coût, où la construction
+ *   réelle a lieu côté Feuille pour "Installer") — il n'a aucun moyen de
+ *   savoir que l'UI le traitera plus tard. Ce filtre d'AFFICHAGE (pas la
+ *   donnée en base) retire cette ligne du journal quand la MÊME
+ *   résolution contient aussi une ligne "construite/établie sur le
+ *   Secteur", preuve qu'elle a bien été traitée. Vérifié en navigateur
+ *   réel (Focus Développement "Installer") : le journal affiche
+ *   uniquement "Cube de Corvette rappelé... Guilde Fermiers établie...",
+ *   plus aucune trace d'"effet_secteur".
+ * - Focus Innovation Standard (Rechercher/Inventer/Consolider) porté sur
+ *   la Feuille d'action, `CARTES_ELIGIBLES_FEUILLE_` étendue. Nécessitait
+ *   de généraliser le système de paiement combiné Coût+Effet (jusqu'ici
+ *   limité à UNE seule ressource substituable par action) : "Consolider"
+ *   (cout:{energie:1, materiel:1, nourriture:1}) est la première carte
+ *   avec 3 ressources substituables SIMULTANÉMENT.
+ *   `feuilleInfosCoutInitial_`/`feuilleSectionCoutHTML_` renvoient/
+ *   affichent désormais un TABLEAU `substituables` (un stepper par
+ *   ressource) au lieu d'un `cle`/`montant` unique ; `feuillePrepaiement_`
+ *   devient une MAP `{cle: {montant, utiliseRessource}}` au lieu d'un
+ *   objet unique ; nouvelle `feuilleBrancherSectionCout_` recalcule le
+ *   budget Crédit PARTAGÉ (le même compte pour les 3 steppers) à chaque
+ *   changement et désactive Valider si l'engagement total dépasse le
+ *   Crédit réel disponible. `feuilleFlowGagnerProgramme_` affiche
+ *   maintenant elle aussi une section Coût combinée quand elle est le
+ *   premier écran (cas de "Consolider", effet direct sans wrapper
+ *   choice). Deux nouveaux flows auto-résolutifs (aucune interaction —
+ *   ports directs des branches #modal-choix 'influence_secteur'/
+ *   'produire_revenu') : `feuilleFlowInfluenceSecteur_` (Influence
+ *   variable par Guilde/Installation/cube/secteur Pur) et
+ *   `feuilleFlowProduireRevenu_` (production actuelle d'une ressource
+ *   précise) — "Rechercher" (et/ou Science+Crédit / Influence). Labels
+ *   manquants ajoutés à `LIBELLES_OPTIONS` (produire_credit/energie/
+ *   materiel/nourriture/science, influence_par_*) — affichaient sinon la
+ *   clé brute JSON dans la liste et/ou.
+ * - Bug de course DÉCOUVERT en testant ces 2 nouveaux flows auto-
+ *   résolutifs (les premiers assez rapides — quelques ms — pour
+ *   l'exposer ; jamais rencontré avant, toute carte migrée jusqu'ici
+ *   exigeait une vraie interaction utilisateur, largement plus lente que
+ *   l'animation) : `feuilleRendreEtape_` planifie l'échange de contenu
+ *   (nouveau HTML + recalcul de hauteur) dans un `setTimeout` non suivi —
+ *   si l'étape se résout ET que `jouerAction_` ferme toute la feuille
+ *   AVANT que ce timeout ne se déclenche, celui-ci s'exécute quand même
+ *   APRÈS coup, réinjecte du HTML périmé et rouvre visuellement la
+ *   feuille (figée). Un second bug, plus profond, est apparu en corrigeant
+ *   le premier : `feuilleFlowGagnerProgramme_` pousse un écran
+ *   "Chargement…" PUIS rappelle `feuilleRendreEtape_` une 2e fois sur la
+ *   MÊME étape une fois les Programmes chargés (2 appels avant que le 1er
+ *   timeout n'ait eu le temps de se déclencher) — chaque appel ajoutait sa
+ *   propre classe de transition SANS retirer celle du précédent, la
+ *   laissant orpheline pour toujours (opacité 0 figée en permanence) :
+ *   1er cas qui déclenche ce double rendu assez tôt pour l'exposer, sur
+ *   Focus Innovation "Consolider" (corps de la Feuille resté visuellement
+ *   VIDE malgré un contenu bien présent dans le DOM). Les deux corrigés en
+ *   suivant/nettoyant systématiquement les classes de transition
+ *   résiduelles (`feuilleTimeoutEntree_`, nouveau) plutôt qu'au cas par
+ *   cas. 145 tests au vert. Vérifié en navigateur réel (Playwright,
+ *   gabarit iPhone, partie réelle) : Rechercher (et/ou complet, labels
+ *   corrects, feuille se referme proprement), Inventer (0 écran
+ *   interactif — cout science + effet gagner_technologie tous deux hors
+ *   périmètre — flash minime ~6px avant fermeture, acceptable), Consolider
+ *   (3 steppers colorés visibles et fonctionnels, Programme obtenu,
+ *   ressources débitées 1/1/1 correctement) — aucune erreur JS sur tout le
+ *   parcours des 3 actions.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Focus Développement "Installer" — refonte
  * de l'écran, retour utilisateur : "ça ne fonctionne pas" (l'entrée
  * précédente enchaînait Coût puis Effet sur 2 écrans SÉPARÉS, section
  * "Effet" affichée en HAUT sans son propre choix de secteur visible) —
@@ -3214,4 +3284,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.13';
+var APP_VERSION = '20260825.14';

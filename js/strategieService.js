@@ -336,7 +336,25 @@ var StrategieService = (function () {
     avancer_civilisation_moins_avancee: 'Avancer sur votre piste la moins avancée',
     avance_rapide: 'Avancer librement sur une piste de Civilisation',
     nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel',
-    credit: 'Crédit', science: 'Science', influence: 'Influence'
+    credit: 'Crédit', science: 'Science', influence: 'Influence',
+    // Focus Innovation "Rechercher" (retour utilisateur : affichait les
+    // clés brutes "produire_credit (1) + produire_science (1)" /
+    // "influence_par_guilde" dans la liste et/ou) — produire_<ressource>
+    // (focusEngine.js, résolution auto via 'produire_revenu') et
+    // influence_par_* (CLES_INFLUENCE_SECTEUR_, résolution auto via
+    // 'influence_secteur').
+    produire_nourriture: 'Produire de la Nourriture', produire_energie: 'Produire de l’Énergie',
+    produire_materiel: 'Produire du Matériel', produire_credit: 'Produire des Crédits',
+    produire_science: 'Produire de la Science',
+    influence_par_guilde: 'Gagner de l’Influence (par Guilde)',
+    influence_par_guilde_pure: 'Gagner de l’Influence (par Guilde Pure)',
+    influence_par_guilde_scientifique_pure: 'Gagner de l’Influence (par Guilde de Scientifiques Pure)',
+    influence_par_installation_pure: 'Gagner de l’Influence (par Installation Pure)',
+    influence_par_cube_secteur_pur: 'Gagner de l’Influence (par cube sur secteur Pur)',
+    influence_par_cube_secteur_pur_et_fiche: 'Gagner de l’Influence (par cube sur secteur Pur et sur la fiche Maison)',
+    influence_par_secteur_pur: 'Gagner de l’Influence (par secteur Pur)',
+    influence_par_secteur_pur_avec_guilde: 'Gagner de l’Influence (par secteur Pur avec Guilde)',
+    influence_par_secteur_pur_population_6: 'Gagner de l’Influence (par secteur Pur à Population 6)'
   };
 
   var partieAffichee = null;
@@ -774,6 +792,31 @@ var StrategieService = (function () {
       if (ligne.indexOf(prefixes[i]) === 0) return ligne.slice(prefixes[i].length);
     }
     return ligne;
+  }
+
+  /**
+   * Retour utilisateur : "pourquoi j'ai encore l'avertissement
+   * effet_secteur non automatisé alors que l'action est ok ?" —
+   * focusEngine.js résout TOUJOURS l'Effet (`effet_secteur`, hors
+   * périmètre — CLES_SECTEUR_HORS_PERIMETRE) AVANT le Coût
+   * (`rappeler_cube`), donc AVANT que feuilleFlowRappelerCubeCout_
+   * (strategieService.js) n'ait la moindre chance de construire quoi que
+   * ce soit sur le secteur — l'avertissement est poussé dans le journal
+   * inconditionnellement, sans savoir que la Feuille va s'en charger
+   * juste après. Filtre PUREMENT côté affichage (l'écriture en base,
+   * elle, a bien eu lieu) : retire cette ligne UNIQUEMENT si le MÊME
+   * journal contient aussi une ligne confirmant la construction réelle
+   * (Guilde/Installation) — condition qui n'est vraie QUE pour ce
+   * chaînage précis (Focus Développement "Installer" aujourd'hui),
+   * n'affecte donc aucune autre carte portant `effet_secteur` sans cette
+   * construction associée (ex. "Progrès Standard Restaurer", catalogue,
+   * pas encore migrée à la Feuille — son avertissement reste affiché,
+   * à raison, tant que son Effet n'est pas automatisé).
+   */
+  function filtrerJournalEffetSecteurResolu_(lignes) {
+    var aConstruit = lignes.some(function (l) { return l.indexOf('construite sur le Secteur') !== -1 || l.indexOf('établie sur le Secteur') !== -1; });
+    if (!aConstruit) return lignes;
+    return lignes.filter(function (l) { return l.indexOf('"effet_secteur" non automatisé') === -1; });
   }
 
   /**
@@ -1339,7 +1382,7 @@ var StrategieService = (function () {
         // Même libellé que AnnulationService (source de la pile, voir
         // FocusEngine.jouerActionEtPersister) — un seul "cadre" pour toute
         // la résolution (Effet + Coût + rappels manuels éventuels).
-        pousserJournalGroupe_(carte.focus + ' — ' + (action.action || 'action'), resultat.journal);
+        pousserJournalGroupe_(carte.focus + ' — ' + (action.action || 'action'), filtrerJournalEffetSecteurResolu_(resultat.journal));
         return App.rafraichirPartieCourante();
       })
       .then(function (partieFraiche) {
@@ -1467,7 +1510,8 @@ var StrategieService = (function () {
   // demandé pour elle).
   var CARTES_ELIGIBLES_FEUILLE_ = [
     { focus: 'Conquête', type: 'Standard' },
-    { focus: 'Développement', type: 'Standard' }
+    { focus: 'Développement', type: 'Standard' },
+    { focus: 'Innovation', type: 'Standard' }
   ];
   function carteEligibleFeuille_(carte) {
     return !!carte && CARTES_ELIGIBLES_FEUILLE_.some(function (c) { return c.focus === carte.focus && c.type === carte.type; });
@@ -1476,7 +1520,11 @@ var StrategieService = (function () {
   var FEUILLE_TYPES_SUPPORTES_ = [
     'option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption', 'regrouper', 'envahir',
     // Focus Développement Standard (Harmoniser/Croître/Installer) :
-    'retirer_corruption', 'construire', 'augmenter_population_pure', 'rappeler_cube_cout'
+    'retirer_corruption', 'construire', 'augmenter_population_pure', 'rappeler_cube_cout',
+    // Focus Innovation Standard (Rechercher) — résolution automatique, sans
+    // interaction utilisateur (feuilleFlowInfluenceSecteur_/
+    // feuilleFlowProduireRevenu_) :
+    'influence_secteur', 'produire_revenu'
   ];
 
   var feuillePile_ = [];
@@ -1510,10 +1558,15 @@ var StrategieService = (function () {
   // — l'utilisateur ne voit donc qu'UN SEUL écran combiné Coût+Effet,
   // fidèle à la maquette d'origine, même si focusEngine.js continue en
   // interne de résoudre Effet PUIS Coût en 2 appels demanderChoix
-  // séquentiels. Remis à `null` par jouerAction_ à chaque nouvelle action
-  // ET consommé (remis à `null`) dès qu'utilisé, pour ne jamais fuiter
-  // vers un appel demanderChoix qui ne correspond pas (repli normal sur un
-  // écran dédié dans ce cas, comportement inchangé).
+  // séquentiels. Remis à `null` par jouerAction_ à chaque nouvelle action.
+  // Depuis le support multi-ressources (Focus Innovation "Consolider",
+  // cout:{energie,materiel,nourriture} substituables simultanément) :
+  // objet-MAP `{cle: {montant, utiliseRessource}}`, une entrée par
+  // ressource substituable pré-capturée — CHAQUE entrée est consommée
+  // (retirée de la map) dès qu'utilisée par feuilleFlowPaiementRessource_,
+  // pour ne jamais fuiter vers un appel demanderChoix qui ne correspond
+  // pas (repli normal sur un écran dédié dans ce cas, comportement
+  // inchangé).
   var feuillePrepaiement_ = null;
 
   /**
@@ -1525,48 +1578,86 @@ var StrategieService = (function () {
    * autres clés (jamais substituables, ex. Crédit) sont listées en texte
    * fixe. Retourne `null` si l'action n'a aucun coût.
    */
+  /**
+   * Retour utilisateur (Focus Innovation Standard "Consolider",
+   * cout:{energie:1, materiel:1, nourriture:1} — 3 ressources
+   * substituables SIMULTANÉMENT, jamais rencontré jusqu'ici, où chaque
+   * carte migrée n'en avait au plus qu'UNE) : `substituables` est
+   * désormais un TABLEAU (0 à N entrées, une par ressource
+   * Nourriture/Énergie/Matériel présente dans `action.cout`), plus
+   * `texteFixe` pour les clés jamais substituables restantes (ex.
+   * Crédit, Science). Un seul stepper par ressource, mais le Crédit
+   * disponible est un pool PARTAGÉ entre tous — voir
+   * feuilleBrancherSectionCout_ ci-dessous, qui empêche d'engager plus de
+   * Crédit au total (tous steppers confondus) qu'il n'y en a réellement.
+   */
   function feuilleInfosCoutInitial_() {
     var action = feuilleActionCourante_ && feuilleActionCourante_.action;
     if (!action || !action.cout || typeof action.cout !== 'object') return null;
     var cout = action.cout;
-    var cleSubstituable = null;
-    Object.keys(cout).forEach(function (cle) {
-      if (!cleSubstituable && RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && typeof cout[cle] === 'number') {
-        cleSubstituable = cle;
-      }
-    });
-    var texteFixe = Object.keys(cout).filter(function (c) { return c !== cleSubstituable; })
-      .map(function (c) { return (typeof cout[c] === 'number' ? cout[c] + ' ' : '') + (CHAMP_RESSOURCE[c] ? CHAMP_RESSOURCE[c].label : abregeCout_(c)); })
-      .join(', ') || null;
-    if (!cleSubstituable) return { substituable: false, texteFixe: texteFixe };
-
     // partieAffichee.plateauMaison.ressources (clés courtes : energie,
     // credit...) — PAS les champs plats ressourceEnergie/ressourceCredit
-    // (ceux-là n'existent que sur la ligne BRUTE `plateauMaison` en DB,
-    // CHAMP_DB_RESSOURCE_SIMPLE_ ci-dessus sert à la persistance d'une
-    // saisie manuelle, pas à la lecture ici — bug corrigé après retour
-    // utilisateur : "ça me met insuffisant alors que j'ai les ressources",
-    // le stock lu valait donc toujours 0).
+    // (ceux-là n'existent que sur la ligne BRUTE `plateauMaison` en DB —
+    // bug corrigé après retour utilisateur : "ça me met insuffisant alors
+    // que j'ai les ressources", le stock lu valait donc toujours 0).
     var ressources = (partieAffichee && partieAffichee.plateauMaison && partieAffichee.plateauMaison.ressources) || {};
-    return {
-      substituable: true,
-      cle: cleSubstituable,
-      montant: cout[cleSubstituable],
-      label: CHAMP_RESSOURCE[cleSubstituable].label,
-      stockRessource: ressources[cleSubstituable] || 0,
-      stockCredit: ressources.credit || 0,
-      texteFixe: texteFixe
-    };
+    var substituables = [];
+    var texteFixeParts = [];
+    Object.keys(cout).forEach(function (cle) {
+      if (typeof cout[cle] !== 'number') return;
+      if (RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1) {
+        substituables.push({
+          cle: cle,
+          montant: cout[cle],
+          label: CHAMP_RESSOURCE[cle].label,
+          stockRessource: ressources[cle] || 0,
+          stockCredit: ressources.credit || 0
+        });
+      } else {
+        texteFixeParts.push(cout[cle] + ' ' + (CHAMP_RESSOURCE[cle] ? CHAMP_RESSOURCE[cle].label : abregeCout_(cle)));
+      }
+    });
+    return { substituables: substituables, texteFixe: texteFixeParts.join(', ') || null };
   }
 
-  function feuilleSectionCoutHTML_(infos, idStepper) {
+  function feuilleSectionCoutHTML_(infos, idPrefix) {
     if (!infos) return '';
-    if (!infos.substituable) {
+    if (!infos.substituables.length) {
       return infos.texteFixe ? '<div class="feuille-section"><p class="feuille-section-titre">Coût</p><p class="hint">' + infos.texteFixe + '.</p></div>' : '';
     }
+    var corps = infos.substituables.map(function (s, i) {
+      return (i > 0 ? '<div style="margin-top:14px;"></div>' : '') +
+        feuilleStepperCoutHTML_(idPrefix + i, s.label, s.montant, s.stockRessource, s.stockCredit, CHAMP_RESSOURCE[s.cle] && CHAMP_RESSOURCE[s.cle].couleur);
+    }).join('');
     return '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' +
       (infos.texteFixe ? '<p class="hint">' + infos.texteFixe + ' (fixe).</p>' : '') +
-      feuilleStepperCoutHTML_(idStepper, infos.label, infos.montant, infos.stockRessource, infos.stockCredit, CHAMP_RESSOURCE[infos.cle] && CHAMP_RESSOURCE[infos.cle].couleur) + '</div>';
+      corps + '</div>';
+  }
+
+  /**
+   * Branche TOUS les steppers d'une section Coût multi-ressources
+   * (feuilleSectionCoutHTML_ ci-dessus) — `estados` : un objet {v}
+   * PROPRE à chaque ressource (comme un stepper isolé), mais le Crédit
+   * disponible (`infos.substituables[i].stockCredit`, identique pour
+   * toutes puisque c'est le MÊME compte) est vérifié GLOBALEMENT à
+   * chaque changement de N'IMPORTE lequel des steppers : la somme du
+   * Crédit engagé sur toutes les ressources ne doit jamais dépasser le
+   * Crédit réellement disponible, même si chaque stepper pris isolément
+   * semblerait le permettre.
+   */
+  function feuilleBrancherSectionCout_(el, infos, idPrefix, estados) {
+    if (!infos || !infos.substituables.length) return;
+    var stockCredit = infos.substituables[0].stockCredit;
+    function recalculerBudget_() {
+      var total = infos.substituables.reduce(function (s, sub, i) {
+        var v = estados[i].v == null ? Math.min(sub.montant, sub.stockRessource) : estados[i].v;
+        return s + Math.max(0, sub.montant - v);
+      }, 0);
+      feuilleEls_.btnValider.disabled = total > stockCredit;
+    }
+    infos.substituables.forEach(function (s, i) {
+      feuilleBrancherStepperCout_(el, idPrefix + i, s.label, s.montant, s.stockRessource, s.stockCredit, estados[i], recalculerBudget_);
+    });
   }
 
   function feuilleConsommerEtiquetteSequence_() {
@@ -1654,8 +1745,23 @@ var StrategieService = (function () {
   // Regrouper/Envahir, hors périmètre — voir FEUILLE_TYPES_SUPPORTES_ —
   // puis DOIT ressurgir pour le paiement du coût qui suit).
   var feuilleTimeoutFermeture_ = null;
+  // Chrono de l'échange de contenu DIFFÉRÉ de feuilleRendreEtape_ (attend la
+  // fin de l'animation de sortie avant d'injecter le HTML de l'étape
+  // suivante et de recalculer la hauteur). Sans suivi ici : une étape
+  // auto-résolutive (feuilleFlowInfluenceSecteur_/feuilleFlowProduireRevenu_
+  // — Focus Innovation "Rechercher", AUCUNE interaction utilisateur, se
+  // résout en quelques ms) peut se résoudre ET fermer toute la feuille
+  // (feuilleFermer_, hauteur -> 0) AVANT que ce setTimeout ne se déclenche —
+  // il s'exécute alors APRÈS coup, réinjecte le HTML périmé ("Calcul en
+  // cours…") et rappelle feuilleAjusterHauteur_ qui rouvre visuellement la
+  // feuille à sa hauteur de contenu (bug constaté : la feuille restait
+  // affichée, figée sur "Calcul en cours…", après une action pourtant
+  // entièrement résolue — jamais rencontré avant Innovation, aucune étape
+  // migrée jusqu'ici ne se résolvait assez vite pour exposer cette course).
+  var feuilleTimeoutEntree_ = null;
   function feuilleFermer_() {
     if (!feuilleInitialisee_ || !feuilleEls_.feuille) return;
+    if (feuilleTimeoutEntree_) { clearTimeout(feuilleTimeoutEntree_); feuilleTimeoutEntree_ = null; }
     feuilleEls_.feuille.classList.add('feuille-animee');
     feuilleEls_.feuille.style.height = '0px';
     if (feuilleTimeoutFermeture_) clearTimeout(feuilleTimeoutFermeture_);
@@ -1699,11 +1805,27 @@ var StrategieService = (function () {
       els.teteEtapes.hidden = true;
     }
     var classeSortie = direction === 'avant' ? 'transition-sortie-avant' : 'transition-sortie-arriere';
+    // Retire TOUTE classe de transition résiduelle avant d'ajouter la
+    // nouvelle (pas seulement `classeSortie`) : certains flows (ex.
+    // feuilleFlowGagnerProgramme_ — pousse un placeholder "Chargement…"
+    // PUIS rappelle feuilleRendreEtape_ une 2e fois sur la MÊME étape une
+    // fois les données chargées) déclenchent 2 appels successifs à cette
+    // fonction avant que le premier n'ait eu le temps de se dérouler (voir
+    // feuilleTimeoutEntree_ ci-dessous, annulé par le 2e appel) — si le 2e
+    // appel ajoute une AUTRE classe de sortie (ex. la 1re était "avant", la
+    // 2e "arrière"), sa propre callback ne retirait QUE celle qu'IL avait
+    // ajoutée, laissant l'autre orpheline pour toujours (opacité 0 figée —
+    // bug constaté : le corps de la Feuille restait invisible en
+    // permanence sur Focus Innovation "Consolider", 1er cas qui déclenche
+    // ce double rendu assez tôt pour l'exposer).
+    els.corpsInner.classList.remove('transition-sortie-avant', 'transition-sortie-arriere', 'transition-entree');
     els.corpsInner.classList.add(classeSortie);
-    setTimeout(function () {
+    if (feuilleTimeoutEntree_) clearTimeout(feuilleTimeoutEntree_);
+    feuilleTimeoutEntree_ = setTimeout(function () {
+      feuilleTimeoutEntree_ = null;
       els.corpsInner.innerHTML = etape.html;
       if (etape.brancher) etape.brancher(els.corpsInner);
-      els.corpsInner.classList.remove(classeSortie);
+      els.corpsInner.classList.remove('transition-sortie-avant', 'transition-sortie-arriere');
       els.corpsInner.classList.add('transition-entree');
       requestAnimationFrame(function () { els.corpsInner.classList.remove('transition-entree'); feuilleAjusterHauteur_(); });
     }, direction ? 150 : 0);
@@ -1810,7 +1932,7 @@ var StrategieService = (function () {
     // (feuillePile_ encore vide) — voir feuilleActionCourante_/
     // feuillePrepaiement_ ci-dessus.
     var infosCout = feuillePile_.length === 0 ? feuilleInfosCoutInitial_() : null;
-    var estadoCout = (infosCout && infosCout.substituable) ? {} : null;
+    var estadosCout = infosCout ? infosCout.substituables.map(function () { return {}; }) : null;
     var action = feuilleActionCourante_ && feuilleActionCourante_.action;
     var titre = action ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Choisissez une option';
     var sectionCoutOpt = feuilleSectionCoutHTML_(infosCout, 'optCombine');
@@ -1820,15 +1942,16 @@ var StrategieService = (function () {
         '<div class="feuille-section"><p class="feuille-section-titre">Effet</p>' + feuilleRangeeChoixHTML_('opt', options, false) + '</div>',
       brancher: function (el) {
         feuilleBrancherRangeeChoix_(el, 'opt', false);
-        if (infosCout && infosCout.substituable) {
-          feuilleBrancherStepperCout_(el, 'optCombine', infosCout.label, infosCout.montant, infosCout.stockRessource, infosCout.stockCredit, estadoCout, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
-        }
+        if (infosCout) feuilleBrancherSectionCout_(el, infosCout, 'optCombine', estadosCout);
       },
       onValider: function () {
         var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
         feuilleRejetCourant_ = null;
-        if (infosCout && infosCout.substituable) {
-          feuillePrepaiement_ = { cle: infosCout.cle, montant: infosCout.montant, utiliseRessource: estadoCout.v };
+        if (infosCout && infosCout.substituables.length) {
+          feuillePrepaiement_ = {};
+          infosCout.substituables.forEach(function (s, idx) {
+            feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCout[idx].v };
+          });
         }
         resolve({ indexChoisi: i });
       }
@@ -1843,7 +1966,7 @@ var StrategieService = (function () {
     feuilleRejetCourant_ = function () { resolve(selection); };
     var options = contexte.options.map(libelleOption_);
     var infosCout = feuillePile_.length === 0 ? feuilleInfosCoutInitial_() : null;
-    var estadoCout = (infosCout && infosCout.substituable) ? {} : null;
+    var estadosCout = infosCout ? infosCout.substituables.map(function () { return {}; }) : null;
     var action = feuilleActionCourante_ && feuilleActionCourante_.action;
     var titre = action ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Une ou plusieurs options (et/ou)';
     var etape = {
@@ -1851,14 +1974,15 @@ var StrategieService = (function () {
       html: '',
       brancher: function (el) {
         feuilleBrancherRangeeChoix_(el, 'inc', true, function (indices) { selection = indices; etape.html = html(); });
-        if (infosCout && infosCout.substituable) {
-          feuilleBrancherStepperCout_(el, 'incCombine', infosCout.label, infosCout.montant, infosCout.stockRessource, infosCout.stockCredit, estadoCout, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
-        }
+        if (infosCout) feuilleBrancherSectionCout_(el, infosCout, 'incCombine', estadosCout);
       },
       onValider: function () {
         feuilleRejetCourant_ = null;
-        if (infosCout && infosCout.substituable) {
-          feuillePrepaiement_ = { cle: infosCout.cle, montant: infosCout.montant, utiliseRessource: estadoCout.v };
+        if (infosCout && infosCout.substituables.length) {
+          feuillePrepaiement_ = {};
+          infosCout.substituables.forEach(function (s, idx) {
+            feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCout[idx].v };
+          });
         }
         // ≥ 2 options choisies -> focusEngine.js va résoudre chacune, DANS
         // L'ORDRE de contexte.options (resoudreOption_/reduce), via un
@@ -1884,9 +2008,9 @@ var StrategieService = (function () {
     // Déjà réglé sur l'écran combiné Coût+Effet précédent (feuilleFlow
     // OptionExclusive_/OptionsInclusives_) — répond immédiatement, aucun
     // écran supplémentaire (voir feuillePrepaiement_ ci-dessus).
-    if (feuillePrepaiement_ && feuillePrepaiement_.cle === contexte.ressource && feuillePrepaiement_.montant === contexte.montant) {
-      var reponsePrepayee = { utiliseRessource: feuillePrepaiement_.utiliseRessource };
-      feuillePrepaiement_ = null;
+    if (feuillePrepaiement_ && feuillePrepaiement_[contexte.ressource] && feuillePrepaiement_[contexte.ressource].montant === contexte.montant) {
+      var reponsePrepayee = { utiliseRessource: feuillePrepaiement_[contexte.ressource].utiliseRessource };
+      delete feuillePrepaiement_[contexte.ressource];
       return Promise.resolve(reponsePrepayee);
     }
     var resolve;
@@ -1931,9 +2055,19 @@ var StrategieService = (function () {
     var partieProgramme = partieAffichee;
     var TYPES_PROGRAMME_ORDRE_ = ['Domination', 'Force', 'Soutien', 'Richesse'];
     var etiquette = feuilleConsommerEtiquetteSequence_();
+    // Écran combiné Coût+Effet quand ce choix de Programme est le tout
+    // premier écran de l'action (ex. Focus Innovation "Consolider",
+    // effet:{gagner_programme:1} sans wrapper option_exclusive/inclusives
+    // — gagner_programme est alors le PREMIER demanderChoix appelé par
+    // focusEngine, avant même le coût).
+    var estPremierEcran = feuillePile_.length === 0;
+    var infosCout = estPremierEcran ? feuilleInfosCoutInitial_() : null;
+    var estadosCout = infosCout ? infosCout.substituables.map(function () { return {}; }) : null;
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var titre = (estPremierEcran && action) ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : (etiquette + 'Gagner un Programme');
 
     feuillePousserEtape_({
-      titre: etiquette + 'Gagner un Programme', nbEtapes: 1, etapeIndex: 0,
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
       html: '<p class="hint">Chargement…</p>'
     }, feuillePile_.length > 1 ? 'avant' : null);
 
@@ -1956,7 +2090,9 @@ var StrategieService = (function () {
 
       var etapeCourante = feuillePile_[feuillePile_.length - 1];
       if (!disponibles.length) {
-        etapeCourante.html = '<p class="hint">Aucun Programme disponible' + (contexte.typeImpose ? ' de type ' + contexte.typeImpose : '') + ' (déjà tous en main).</p>';
+        var sectionCoutVide = feuilleSectionCoutHTML_(infosCout, 'progCombineVide');
+        etapeCourante.html = sectionCoutVide + (sectionCoutVide ? '<hr class="feuille-separateur">' : '') +
+          '<p class="hint">Aucun Programme disponible' + (contexte.typeImpose ? ' de type ' + contexte.typeImpose : '') + ' (déjà tous en main).</p>';
         feuilleRendreEtape_(etapeCourante, null);
         return;
       }
@@ -1975,11 +2111,13 @@ var StrategieService = (function () {
       var parNom_ = {};
       disponibles.forEach(function (p) { parNom_[p.nom] = p; });
 
-      etapeCourante.html = '<div class="feuille-section">' +
-        '<select id="feuille-programme-select" class="modal-choix-select">' + groupes + '</select>' +
-        '<p class="hint" id="feuille-programme-detail" style="margin-top:8px;"></p>' +
-        '</div>';
+      var sectionCoutProg = feuilleSectionCoutHTML_(infosCout, 'progCombine');
+      var contenuSelect = '<select id="feuille-programme-select" class="modal-choix-select">' + groupes + '</select>' +
+        '<p class="hint" id="feuille-programme-detail" style="margin-top:8px;"></p>';
+      etapeCourante.html = sectionCoutProg + (sectionCoutProg ? '<hr class="feuille-separateur">' : '') +
+        '<div class="feuille-section">' + (sectionCoutProg ? '<p class="feuille-section-titre">Effet</p>' : '') + contenuSelect + '</div>';
       etapeCourante.brancher = function (el) {
+        if (infosCout) feuilleBrancherSectionCout_(el, infosCout, 'progCombine', estadosCout);
         var selectProgramme = el.querySelector('#feuille-programme-select');
         var detailProgramme = el.querySelector('#feuille-programme-detail');
         function majDetail_() {
@@ -1991,6 +2129,12 @@ var StrategieService = (function () {
       };
       etapeCourante.onValider = function () {
         var nomChoisi = feuilleEls_.corpsInner.querySelector('#feuille-programme-select').value;
+        if (infosCout && infosCout.substituables.length) {
+          feuillePrepaiement_ = {};
+          infosCout.substituables.forEach(function (s, idx) {
+            feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCout[idx].v };
+          });
+        }
         feuilleEls_.btnValider.disabled = true;
         GameService.gagnerProgramme(partieProgramme.id, nomChoisi).then(function (resultat) {
           feuilleEls_.btnValider.disabled = false;
@@ -2004,6 +2148,117 @@ var StrategieService = (function () {
       feuilleRendreEtape_(etapeCourante, null);
     }).catch(function (erreur) {
       window.alert('Échec du chargement des Programmes : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Gain d'Influence variable "N par Guilde/Installation/cube/secteur Pur"
+   * (focusEngine.js — CLES_INFLUENCE_SECTEUR_) : AUCUN choix utilisateur,
+   * montant entièrement déterminé par l'état du plateau. Port direct de la
+   * branche #modal-choix 'influence_secteur' (même calcul via SecteurService.
+   * obtenirAgregatsInfluenceSecteursPurs) — la Feuille reste visible
+   * brièvement ("Calcul en cours…") puis se résout automatiquement, sans
+   * action de l'utilisateur.
+   */
+  function feuilleFlowInfluenceSecteur_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    feuillePousserEtape_({
+      titre: etiquette + 'Gagner de l’Influence', nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Calcul en cours…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    var partieInfluence = partieAffichee;
+    SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieInfluence.id).then(function (agregats) {
+      var formule = contexte.formule;
+      var valeur = contexte.valeur;
+      var montant = 0;
+      var detail = '';
+
+      if (formule === 'influence_par_guilde') {
+        var clesGuilde = Array.isArray(valeur) ? valeur : [];
+        var labels = [];
+        clesGuilde.forEach(function (cleGuilde) {
+          var champ = CHAMP_GUILDE_PAR_CLE_INFLUENCE_[cleGuilde];
+          if (!champ) return;
+          montant += agregats.guildesPures[champ] || 0;
+          labels.push(labelGuilde_(champ));
+        });
+        detail = montant + ' Influence (Guildes Pures de ' + labels.join('/') + ' — ' + montant + ' au total).';
+      } else if (formule === 'influence_par_guilde_pure') {
+        montant = valeur * agregats.guildesPures.total;
+        detail = montant + ' Influence (' + agregats.guildesPures.total + ' Guilde(s) Pure(s) × ' + valeur + ').';
+      } else if (formule === 'influence_par_guilde_scientifique_pure') {
+        montant = valeur * agregats.guildesPures.scientifiques;
+        detail = montant + ' Influence (' + agregats.guildesPures.scientifiques + ' Guilde(s) de Scientifiques Pures × ' + valeur + ').';
+      } else if (formule === 'influence_par_installation_pure') {
+        montant = valeur * agregats.installationsPuresTotal;
+        detail = montant + ' Influence (' + agregats.installationsPuresTotal + ' Installation(s) Pure(s) × ' + valeur + ').';
+      } else if (formule === 'influence_par_cube_secteur_pur') {
+        montant = valeur * agregats.cubesSecteurPurTotal;
+        detail = montant + ' Influence (' + agregats.cubesSecteurPurTotal + ' cube(s) sur secteurs Purs × ' + valeur + ').';
+      } else if (formule === 'influence_par_cube_secteur_pur_et_fiche') {
+        var cubeActifFiche = (partieInfluence.plateauMaison && partieInfluence.plateauMaison.cubeActif) || 0;
+        var totalCubes = agregats.cubesSecteurPurTotal + cubeActifFiche;
+        montant = valeur * totalCubes;
+        detail = montant + ' Influence (' + totalCubes + ' cube(s) — ' + agregats.cubesSecteurPurTotal +
+          ' sur secteurs Purs + ' + cubeActifFiche + ' actif(s) sur la fiche Maison — × ' + valeur + ').';
+      } else if (formule === 'influence_par_secteur_pur') {
+        montant = valeur * agregats.nombreSecteurPur;
+        detail = montant + ' Influence (' + agregats.nombreSecteurPur + ' secteur(s) Pur(s) × ' + valeur + ').';
+      } else if (formule === 'influence_par_secteur_pur_avec_guilde') {
+        montant = valeur * agregats.nombreSecteurPurAvecGuilde;
+        detail = montant + ' Influence (' + agregats.nombreSecteurPurAvecGuilde + ' secteur(s) Pur(s) avec Guilde × ' + valeur + ').';
+      } else if (formule === 'influence_par_secteur_pur_population_6') {
+        montant = valeur * agregats.nombreSecteurPurPopulation6;
+        detail = montant + ' Influence (' + agregats.nombreSecteurPurPopulation6 + ' secteur(s) Pur(s) à Population 6 × ' + valeur + ').';
+      } else {
+        detail = '0 Influence (formule "' + formule + '" inconnue).';
+      }
+
+      feuilleRejetCourant_ = null;
+      resolve({ montant: montant, detail: detail });
+    }).catch(function (erreur) {
+      window.alert('Échec du calcul d’Influence : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Effet "Produire une ressource précise" (produire_nourriture/energie/
+   * materiel/credit/science — ex. Focus Innovation "Rechercher") : AUCUN
+   * choix utilisateur, le gain est le revenu de production ACTUEL (même
+   * calcul que la grille Plat. maison, calculerNiveauxProduction_/
+   * calculerProduction_). Port direct de la branche #modal-choix
+   * 'produire_revenu' — même principe que feuilleFlowInfluenceSecteur_
+   * ci-dessus (résolution automatique, pas d'interaction).
+   */
+  function feuilleFlowProduireRevenu_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var labelRessourceProduite = CHAMP_RESSOURCE[contexte.ressource] ? CHAMP_RESSOURCE[contexte.ressource].label : contexte.ressource;
+    feuillePousserEtape_({
+      titre: etiquette + 'Produire — ' + labelRessourceProduite, nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Calcul en cours…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
+      var niveauProduit = resultat.niveaux[contexte.ressource] || 0;
+      var montantProduit = calculerProduction_(contexte.ressource, niveauProduit);
+      feuilleRejetCourant_ = null;
+      resolve({
+        montant: montantProduit,
+        detail: '+' + montantProduit + ' ' + labelRessourceProduite + ' (Production, Niveau ' + niveauProduit + ').'
+      });
+    }).catch(function (erreur) {
+      window.alert('Échec du calcul de production : ' + erreur.message);
     });
 
     return promise;
@@ -3062,20 +3317,20 @@ var StrategieService = (function () {
     if (contexte.type === 'construire') return feuilleFlowConstruire_(contexte);
     if (contexte.type === 'augmenter_population_pure') return feuilleFlowAugmenterPopulationPure_();
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
+    if (contexte.type === 'influence_secteur') return feuilleFlowInfluenceSecteur_(contexte);
+    if (contexte.type === 'produire_revenu') return feuilleFlowProduireRevenu_(contexte);
     return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
   }
 
   function demanderChoix(contexte) {
-    // Feuille d'action (Focus Conquête Standard uniquement, voir
-    // carteEligibleFeuille_ ci-dessus) : intercepte les types qu'elle sait
-    // résoudre (TOUS ceux déclenchés par cette carte, y compris
-    // 'regrouper'/'envahir' depuis leur portage direct — voir
-    // FEUILLE_TYPES_SUPPORTES_), court-circuitant TOUT le reste de cette
-    // fonction (y compris `modal.hidden = false` tout en bas) —
-    // #modal-choix ne s'affiche donc jamais pour cette carte. Tout autre
-    // type (aucun connu actuellement pour Conquête Standard — filet de
-    // sécurité si le catalogue évoluait) et toute autre carte retombent
-    // sur le reste de cette fonction, INCHANGÉ.
+    // Feuille d'action (cartes de CARTES_ELIGIBLES_FEUILLE_ ci-dessus
+    // uniquement) : intercepte les types qu'elle sait résoudre (TOUS ceux
+    // déclenchés par ces cartes — voir FEUILLE_TYPES_SUPPORTES_),
+    // court-circuitant TOUT le reste de cette fonction (y compris
+    // `modal.hidden = false` tout en bas) — #modal-choix ne s'affiche donc
+    // jamais pour ces cartes. Tout autre type (filet de sécurité si le
+    // catalogue évoluait) et toute autre carte (pas encore migrée)
+    // retombent sur le reste de cette fonction, INCHANGÉ.
     if (carteEnFeuille_ && FEUILLE_TYPES_SUPPORTES_.indexOf(contexte.type) !== -1) {
       return demanderChoixFeuille_(contexte);
     }
