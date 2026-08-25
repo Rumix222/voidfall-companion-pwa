@@ -1716,6 +1716,17 @@ input[type="number"]:focus-visible {
 }
 .feuille-section + .feuille-section { margin-top: 20px; }
 
+/* Séparateur entre Coût et Effet sur l'écran combiné — court (pas pleine
+   largeur), pour marquer la coupure sans découper visuellement toute la
+   feuille comme le ferait un <hr> classique. */
+.feuille-separateur {
+  width: 48px;
+  height: 1px;
+  margin: 20px 0;
+  border: none;
+  background: var(--color-border);
+}
+
 /* Rangée de choix (exclusif/inclusif) — cible tactile pleine largeur
    min. 44px (norme Apple HIG), coche/puce à droite plutôt qu'un petit
    input radio/checkbox de 18px difficile à viser au doigt. */

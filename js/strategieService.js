@@ -1509,14 +1509,21 @@ var StrategieService = (function () {
       .join(', ') || null;
     if (!cleSubstituable) return { substituable: false, texteFixe: texteFixe };
 
-    var pm = (partieAffichee && partieAffichee.plateauMaison) || {};
+    // partieAffichee.plateauMaison.ressources (clés courtes : energie,
+    // credit...) — PAS les champs plats ressourceEnergie/ressourceCredit
+    // (ceux-là n'existent que sur la ligne BRUTE `plateauMaison` en DB,
+    // CHAMP_DB_RESSOURCE_SIMPLE_ ci-dessus sert à la persistance d'une
+    // saisie manuelle, pas à la lecture ici — bug corrigé après retour
+    // utilisateur : "ça me met insuffisant alors que j'ai les ressources",
+    // le stock lu valait donc toujours 0).
+    var ressources = (partieAffichee && partieAffichee.plateauMaison && partieAffichee.plateauMaison.ressources) || {};
     return {
       substituable: true,
       cle: cleSubstituable,
       montant: cout[cleSubstituable],
       label: CHAMP_RESSOURCE[cleSubstituable].label,
-      stockRessource: pm[CHAMP_DB_RESSOURCE_SIMPLE_[cleSubstituable]] || 0,
-      stockCredit: pm.ressourceCredit || 0,
+      stockRessource: ressources[cleSubstituable] || 0,
+      stockCredit: ressources.credit || 0,
       texteFixe: texteFixe
     };
   }
@@ -1590,11 +1597,12 @@ var StrategieService = (function () {
     var chrome = document.querySelector('#feuille .feuille-tete').offsetHeight +
       document.querySelector('#feuille .feuille-pied').offsetHeight + 26;
     // Retour utilisateur (test iPhone réel) : "la popup n'est pas assez
-    // dépliée de base" — un contenu court (ex. 2 options d'Engager) ne
-    // remplissait qu'une fraction minime de l'écran. Plancher relatif à la
-    // fenêtre (42%, sensation "demi-feuille" façon Plans iOS) plutôt qu'un
+    // dépliée de base" (42% initialement, encore insuffisant au retour
+    // suivant) — un contenu court (ex. 2 options d'Engager) ne remplissait
+    // qu'une fraction minime de l'écran. Plancher relatif à la fenêtre
+    // (70%) plutôt qu'un
     // plancher absolu (180px) trop petit sur un écran de téléphone actuel.
-    return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.42, feuilleEls_.corpsInner.scrollHeight + chrome));
+    return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.70, feuilleEls_.corpsInner.scrollHeight + chrome));
   }
   function feuilleAjusterHauteur_() {
     feuilleEls_.feuille.classList.add('feuille-animee');
@@ -1727,8 +1735,8 @@ var StrategieService = (function () {
       '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
       '</div>' +
       '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
-      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>' +
-      '<p class="hint" id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant même en combinant Crédit et réserve.</p>';
+      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit.' +
+      ' <span id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant</span></p>';
   }
   function feuilleBrancherStepperCout_(container, id, label, montant, stock, credit, estado, onMaj) {
     if (estado.v == null) estado.v = Math.min(montant, stock);
@@ -1770,9 +1778,10 @@ var StrategieService = (function () {
     var estadoCout = (infosCout && infosCout.substituable) ? {} : null;
     var action = feuilleActionCourante_ && feuilleActionCourante_.action;
     var titre = action ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Choisissez une option';
+    var sectionCoutOpt = feuilleSectionCoutHTML_(infosCout, 'optCombine');
     feuillePousserEtape_({
       titre: titre, nbEtapes: 1, etapeIndex: 0,
-      html: feuilleSectionCoutHTML_(infosCout, 'optCombine') +
+      html: sectionCoutOpt + (sectionCoutOpt ? '<hr class="feuille-separateur">' : '') +
         '<div class="feuille-section"><p class="feuille-section-titre">Effet</p>' + feuilleRangeeChoixHTML_('opt', options, false) + '</div>',
       brancher: function (el) {
         feuilleBrancherRangeeChoix_(el, 'opt', false);
@@ -1827,7 +1836,8 @@ var StrategieService = (function () {
       }
     };
     function html() {
-      return feuilleSectionCoutHTML_(infosCout, 'incCombine') +
+      var sectionCout = feuilleSectionCoutHTML_(infosCout, 'incCombine');
+      return sectionCout + (sectionCout ? '<hr class="feuille-separateur">' : '') +
         '<div class="feuille-section"><p class="feuille-section-titre">Effet — une ou plusieurs options</p>' + feuilleRangeeChoixHTML_('inc', options, true, selection) + '</div>';
     }
     etape.html = html();
@@ -1869,7 +1879,8 @@ var StrategieService = (function () {
       html: combinaisonImpossible
         ? '<p class="hint">Stock : ' + stockRessource + ' ' + label + ', ' + stockCredit + ' Crédit.</p>' +
           '<p class="hint" style="color:var(--color-coral);">Insuffisant même en substituant tout le Crédit disponible (1 Crédit = 1 ' + label + ') — Annuler.</p>'
-        : '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>' + sectionEffet,
+        : '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>' +
+          (sectionEffet ? '<hr class="feuille-separateur">' : '') + sectionEffet,
       brancher: combinaisonImpossible ? null : function (el) {
         feuilleBrancherStepperCout_(el, 'pay', label, montant, stockRessource, stockCredit, estado, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
       },

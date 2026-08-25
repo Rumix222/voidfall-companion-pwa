@@ -1,9 +1,52 @@
 /**
  * version.js
- * Version 90 — 2026-08-25
+ * Version 91 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — écran combiné Coût+Effet
+ * 25/08/2026, dernière fois (Feuille d'action — corrige un vrai bug
+ * "insuffisant" à tort + 4 ajustements visuels, retour utilisateur après
+ * test sur iPhone en production, écran combiné Coût+Effet de l'entrée
+ * précédente) :
+ * - BUG CORRIGÉ (pas un simple ajustement) : "ça me met insuffisant alors
+ *   que j'ai les ressources". `feuilleInfosCoutInitial_` lisait
+ *   `partieAffichee.plateauMaison.ressourceEnergie`/`.ressourceCredit`
+ *   (champs plats) — ces champs n'existent QUE sur la ligne BRUTE
+ *   `plateauMaison` telle que stockée en IndexedDB ; l'objet ASSEMBLÉ que
+ *   `partieAffichee` porte réellement (`GameService.assemblerPartie_`,
+ *   gameService.js) imbrique les ressources sous
+ *   `plateauMaison.ressources.energie`/`.credit` (clés COURTES). Le stock
+ *   lu valait donc TOUJOURS 0, déclenchant le message "insuffisant" dès
+ *   qu'un coût substituable existait, peu importe la réserve réelle —
+ *   n'affectait QUE l'écran combiné (nouveau) ; l'ancien écran
+ *   `paiement_ressource` autonome (`contexte.stockRessource` fourni
+ *   directement par `focusEngine.js`, jamais lu depuis `partieAffichee`)
+ *   n'a jamais été concerné, d'où l'absence de ce bug dans les
+ *   vérifications précédentes portant sur lui. Repéré et reproduit en
+ *   forçant des ressources abondantes via IndexedDB (Playwright) plutôt
+ *   qu'en devinant une origine "chanceuse" — confirmé : `App.
+ *   getPartieCourante().plateauMaison.ressourceEnergie` est bien
+ *   `undefined`, la bonne clé est `.ressources.energie`.
+ * - Hauteur par défaut de la feuille : 42% (entrée précédente) jugé
+ *   encore trop petit — passée à 70% de la fenêtre.
+ * - Rappel de stock : "X Crédit disponible" → "X Crédit." (mot
+ *   "disponible" retiré, redondant).
+ * - Message d'insuffisance : la phrase complète ("Insuffisant même en
+ *   combinant Crédit et réserve") remplacée par le seul mot "Insuffisant"
+ *   (orange), affiché EN LIGNE juste après le rappel de stock plutôt
+ *   qu'en paragraphe séparé.
+ * - Nouveau séparateur `.feuille-separateur` (css/style.css, 48px de
+ *   large, PAS pleine largeur) entre les sections "Coût" et "Effet" des 3
+ *   écrans combinés.
+ * 145 tests au vert (aucun touché par le bug, hors périmètre de la suite
+ * — logique DOM/lecture d'état). Vérifié manuellement dans un vrai
+ * navigateur (Playwright, ressources forcées via IndexedDB pour un test
+ * déterministe) : stock correctement lu (10/10, avertissement masqué),
+ * puis ressources forcées à 0 -> badge "Insuffisant" affiché correctement
+ * ; hauteur mesurée à 70% ; séparateur présent ; aucune erreur JS.
+ * Fichiers touchés : css/style.css, index.html, strategieService.js,
+ * version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — écran combiné Coût+Effet
  * dès le premier écran, retour utilisateur : "je pensais que dans le
  * dernier design choisi le coût s'affichait dès le début en haut de la
  * popup, une partie coût et une partie effet, comme dans la maquette
@@ -2947,4 +2990,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.6';
+var APP_VERSION = '20260825.7';

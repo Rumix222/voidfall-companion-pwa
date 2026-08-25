@@ -2919,7 +2919,7 @@
         document.querySelector('#test-feuille .feuille-pied').offsetHeight + 26;
       // Même correctif que la production (strategieService.js) : plancher
       // relatif à la fenêtre plutôt qu'un plancher absolu trop petit.
-      return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.42, corpsInner.scrollHeight + chrome));
+      return Math.min(window.innerHeight * 0.92, Math.max(window.innerHeight * 0.70, corpsInner.scrollHeight + chrome));
     }
     function ajusterHauteur() {
       feuille.classList.add('feuille-animee');
