@@ -1,9 +1,29 @@
 /**
  * version.js
- * Version 98 — 2026-08-25
+ * Version 99 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Historique : le warning périmé
+ * 25/08/2026, dernière fois (Focus Innovation "Consolider" — retour
+ * utilisateur : "il ne faut pas répéter 3 fois le stock une fois suffit,
+ * comme ça on peut resserrer les slide des ressource") :
+ * `feuilleSectionCoutHTML_` affiche désormais un SEUL rappel de stock
+ * groupé ("Stock : 1 Énergie, 1 Matériel, 1 Nourriture, 10 Crédit.") en
+ * tête de la section Coût dès que 2 steppers ou plus sont affichés côte à
+ * côte (le Crédit étant de toute façon un pool UNIQUE partagé — répéter
+ * "N Crédit" sous chaque stepper n'apportait rien), au lieu d'un rappel
+ * individuel sous CHAQUE stepper — `feuilleStepperCoutHTML_` reçoit un
+ * nouveau paramètre `masquerHint` qui omet ce texte (l'indicateur
+ * "Insuffisant" par ressource, span#avert-{id}, reste inchangé, juste
+ * sans le texte de stock qui l'accompagnait). L'espacement vertical entre
+ * steppers est réduit en conséquence (14px -> 6px) une fois ce texte
+ * disparu. Comportement des cartes à UNE seule ressource substituable
+ * (Conquête/Développement/Rechercher) inchangé (rappel individuel
+ * toujours affiché, seuil à 2 steppers). 145 tests au vert, vérifié en
+ * navigateur réel (Focus Innovation "Consolider") : un seul rappel de
+ * stock visible, 3 barres resserrées, ressources correctement débitées.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Historique : le warning périmé
  * "effet_secteur non automatisé" disparaît quand l'action l'a en fait
  * traité + Feuille d'action sur Focus Innovation Standard) :
  * - `filtrerJournalEffetSecteurResolu_` (strategieService.js, NOUVEAU) :
@@ -3284,4 +3304,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.14';
+var APP_VERSION = '20260825.15';

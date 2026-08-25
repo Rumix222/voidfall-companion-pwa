@@ -1625,13 +1625,25 @@ var StrategieService = (function () {
     if (!infos.substituables.length) {
       return infos.texteFixe ? '<div class="feuille-section"><p class="feuille-section-titre">Coût</p><p class="hint">' + infos.texteFixe + '.</p></div>' : '';
     }
+    // Retour utilisateur (Focus Innovation "Consolider", 3 ressources
+    // substituables à la fois) : le rappel de stock ("Stock : N Crédit")
+    // ne doit pas se répéter sous CHAQUE stepper — le Crédit est un pool
+    // UNIQUE partagé par tous (feuilleBrancherSectionCout_ ci-dessus). À
+    // partir de 2 steppers, un seul rappel groupé ("Stock : 1 Énergie, 1
+    // Matériel, 1 Nourriture, 10 Crédit.") remplace les rappels individuels
+    // — permet aussi de resserrer l'espace vertical entre les barres.
+    var multi = infos.substituables.length > 1;
+    var rappelGroupe = multi
+      ? '<p class="hint">Stock : ' + infos.substituables.map(function (s) { return s.stockRessource + ' ' + s.label; }).join(', ') +
+        ', ' + infos.substituables[0].stockCredit + ' Crédit.</p>'
+      : '';
     var corps = infos.substituables.map(function (s, i) {
-      return (i > 0 ? '<div style="margin-top:14px;"></div>' : '') +
-        feuilleStepperCoutHTML_(idPrefix + i, s.label, s.montant, s.stockRessource, s.stockCredit, CHAMP_RESSOURCE[s.cle] && CHAMP_RESSOURCE[s.cle].couleur);
+      return (i > 0 ? '<div style="margin-top:' + (multi ? '6px' : '14px') + ';"></div>' : '') +
+        feuilleStepperCoutHTML_(idPrefix + i, s.label, s.montant, s.stockRessource, s.stockCredit, CHAMP_RESSOURCE[s.cle] && CHAMP_RESSOURCE[s.cle].couleur, multi);
     }).join('');
     return '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' +
       (infos.texteFixe ? '<p class="hint">' + infos.texteFixe + ' (fixe).</p>' : '') +
-      corps + '</div>';
+      rappelGroupe + corps + '</div>';
   }
 
   /**
@@ -1885,15 +1897,24 @@ var StrategieService = (function () {
   // teinté selon CHAMP_RESSOURCE[cle].couleur (ex. Énergie -> jaune),
   // plutôt qu'une couleur neutre fixe — le segment "Crédit" reste corail,
   // inchangé.
-  function feuilleStepperCoutHTML_(id, label, montant, stock, credit, couleur) {
+  // `masquerHint` (retour utilisateur, Focus Innovation "Consolider") :
+  // le rappel de stock individuel ("Stock : N Ressource, N Crédit") est
+  // omis quand le rappel est déjà affiché groupé une seule fois pour toute
+  // la section (feuilleSectionCoutHTML_ ci-dessus, à partir de 2
+  // steppers) — l'indicateur "Insuffisant" (span#avert-{id}) reste
+  // toujours présent (juste sans le texte de stock), feuilleBrancherStepperCout_
+  // le pilote de la même façon dans les deux cas.
+  function feuilleStepperCoutHTML_(id, label, montant, stock, credit, couleur, masquerHint) {
     return '<div class="cout-stepper" id="stepper-' + id + '">' +
       '<button type="button" class="cout-stepper-bouton" data-role="moins">−</button>' +
       '<div class="cout-stepper-barre"><div class="cout-stepper-seg-ressource" id="seg-res-' + id + '"' + (couleur ? ' style="background:' + couleur + '"' : '') + '></div><div class="cout-stepper-seg-credit" id="seg-cred-' + id + '"></div></div>' +
       '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
       '</div>' +
       '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
-      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit.' +
-      ' <span id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant</span></p>';
+      (masquerHint
+        ? '<p class="hint cout-stepper-hint"><span id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant</span></p>'
+        : '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit.' +
+          ' <span id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant</span></p>');
   }
   function feuilleBrancherStepperCout_(container, id, label, montant, stock, credit, estado, onMaj) {
     if (estado.v == null) estado.v = Math.min(montant, stock);
