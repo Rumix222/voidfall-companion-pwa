@@ -1,9 +1,68 @@
 /**
  * version.js
- * Version 89 — 2026-08-25
+ * Version 90 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — ajustements retour
+ * 25/08/2026, dernière fois (Feuille d'action — écran combiné Coût+Effet
+ * dès le premier écran, retour utilisateur : "je pensais que dans le
+ * dernier design choisi le coût s'affichait dès le début en haut de la
+ * popup, une partie coût et une partie effet, comme dans la maquette
+ * variante-c-feuille.html") :
+ * Écart identifié entre la maquette (qui combinait TOUJOURS Coût+Effet
+ * sur un seul écran) et la production livrée (qui les affichait comme 2
+ * écrans séparés et séquentiels — reflet fidèle de la mécanique RÉELLE de
+ * `focusEngine.js`, Effet résolu PUIS Coût, via 2 appels `demanderChoix`
+ * INDÉPENDANTS). Plutôt que de restructurer `focusEngine.js` (moteur pur,
+ * RÈGLE MÉTIER "Effet puis Coût" invariante, risque élevé pour un gain
+ * cosmétique), la Feuille "pré-répond" désormais elle-même au 2e appel :
+ * - `feuilleFlowOptionExclusive_`/`feuilleFlowOptionsInclusives_` (le
+ *   tout premier écran d'une action, `feuillePile_` encore vide)
+ *   affichent maintenant AUSSI une section "Coût" (stepper Crédit si la
+ *   ressource est substituable, texte fixe sinon — `feuilleInfosCoutInitial_`/
+ *   `feuilleSectionCoutHTML_`, nouvelles) à CÔTÉ de la section "Effet"
+ *   (choix exclusif/inclusif), sur le MÊME écran — fidèle à la maquette.
+ *   La valeur choisie est capturée dans `feuillePrepaiement_` (nouveau)
+ *   au clic sur Valider, PAS encore envoyée à focusEngine.js (qui n'a pas
+ *   encore demandé le Coût à ce stade).
+ * - `feuilleFlowPaiementRessource_` : si le `contexte` reçu correspond
+ *   exactement à `feuillePrepaiement_` (même clé/montant), répond
+ *   IMMÉDIATEMENT avec la valeur déjà capturée — AUCUN écran
+ *   supplémentaire ne s'affiche, l'utilisateur ne voit donc qu'UN écran.
+ *   Repli sur le comportement normal (écran dédié) si `feuillePrepaiement_`
+ *   est absent ou ne correspond pas — cas Focus Conquête "Préparer" (effet
+ *   silencieux `activer_cube`, jamais de choix d'Effet donc jamais de
+ *   pré-paiement) : cet écran affiche désormais lui-même une section
+ *   "Effet" statique (texte de l'action) en plus du Coût, pour la même
+ *   raison — TOUJOURS les 2 sections, même quand l'un des deux volets n'a
+ *   rien d'interactif (principe déjà énoncé par la maquette).
+ * - Titres des écrans : "Choisissez une option"/"Payer N Ressource"
+ *   remplacés par le nom de l'action ("Conquête — Engager", etc.) quand
+ *   c'est le premier écran — cohérent avec le fait qu'il combine
+ *   désormais 2 informations (Coût ET Effet), pas seulement l'une des
+ *   deux.
+ * - `feuilleStepperCoutHTML_`/`feuilleBrancherStepperCout_` : nouvel
+ *   avertissement dédié ("Insuffisant même en combinant Crédit et
+ *   réserve"), affiché/masqué automatiquement selon que le stepper permet
+ *   ou non de couvrir le montant — utile maintenant que ce stepper peut
+ *   apparaître SANS le message "Insuffisant..." dédié de l'ancien écran
+ *   `paiement_ressource` autonome (celui-ci reste inchangé pour son propre
+ *   cas, ce nouvel avertissement couvre le cas combiné).
+ * `feuilleActionCourante_` (nouveau, `{carte, action}`) posé par
+ * jouerAction_ juste avant le premier `demanderChoix`, lu par les
+ * fonctions ci-dessus pour accéder au texte/titre/coût de l'action — remis
+ * à `null` dans tous les cas de sortie (succès/échec/erreur), comme
+ * `carteEnFeuille_`.
+ * 145 tests `*.test.js` + toutes les suites `*_test.js` au vert (aucune
+ * logique de focusEngine.js touchée — seule la PRÉSENTATION du Coût
+ * change de moment, jamais son calcul). Vérifié manuellement dans un vrai
+ * navigateur (Playwright, gabarit iPhone, partie réelle) : Préparer
+ * (Coût+Effet combinés sur 1 écran, substitution fonctionnelle) ; Engager/
+ * Planifier (Coût+Effet combinés sur le 1er écran, avertissement
+ * "insuffisant" correctement masqué/affiché selon les fonds réels de la
+ * partie testée) — aucune erreur JS.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — ajustements retour
  * utilisateur après test sur iPhone en production, Focus Conquête
  * "Engager") :
  * - Zone de grab (`.feuille-grabber-zone`, css/style.css) : "j'ai du mal à
@@ -2888,4 +2947,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.5';
+var APP_VERSION = '20260825.6';

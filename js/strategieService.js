@@ -1303,12 +1303,15 @@ var StrategieService = (function () {
     // échec, erreur), filet de sécurité même si un contexte inattendu
     // laissait la promesse de résolution en suspens.
     carteEnFeuille_ = carteEligibleFeuille_(carte);
+    feuilleActionCourante_ = carteEnFeuille_ ? { carte: carte, action: action } : null;
+    feuillePrepaiement_ = null;
     if (carteEnFeuille_) feuilleOuvrir_();
 
     FocusEngine.jouerActionEtPersister(partie.id, carte, action, demanderChoix)
       .then(function (resultat) {
         feuilleFermer_();
         carteEnFeuille_ = false;
+        feuilleActionCourante_ = null;
         // Même libellé que AnnulationService (source de la pile, voir
         // FocusEngine.jouerActionEtPersister) — un seul "cadre" pour toute
         // la résolution (Effet + Coût + rappels manuels éventuels).
@@ -1330,6 +1333,7 @@ var StrategieService = (function () {
       .catch(function (erreur) {
         feuilleFermer_();
         carteEnFeuille_ = false;
+        feuilleActionCourante_ = null;
         window.alert('Échec de l\'action : ' + erreur.message);
         btn.disabled = false;
         btn.textContent = texteOriginal;
@@ -1454,6 +1458,79 @@ var StrategieService = (function () {
   // susceptibles d'apparaître dedans (gagner_programme/deplacer_corruption)
   // — voir feuilleFlowOptionsInclusives_/feuilleConsommerEtiquetteSequence_.
   var feuilleSequenceEtOu_ = null;
+  // {carte, action} de l'action en cours de résolution — posé par
+  // jouerAction_ AVANT le premier demanderChoix, lu par
+  // feuilleInfosCoutInitial_ (Coût combiné dès le premier écran, voir
+  // ci-dessous) et par feuilleFlowPaiementRessource_ (texte d'Effet quand
+  // le paiement EST le premier et seul écran, ex. Focus Conquête
+  // "Préparer" — effet silencieux, aucune popup dédiée pour lui).
+  var feuilleActionCourante_ = null;
+  // Retour utilisateur (test iPhone) : "je pensais que le coût s'affichait
+  // dès le début, une partie coût et une partie effet, comme dans la
+  // maquette variante-c-feuille.html" — feuilleFlowOptionExclusive_/
+  // feuilleFlowOptionsInclusives_ (le tout premier écran d'une action)
+  // affichent désormais AUSSI le stepper de coût quand l'action porte une
+  // ressource substituable (Nourriture/Énergie/Matériel), et capturent le
+  // montant choisi ici. Quand focusEngine.js redemande ensuite
+  // 'paiement_ressource' pour CETTE MÊME clé/montant (résolution Coût,
+  // toujours APRÈS l'Effet — architecture de focusEngine.js, RÈGLE
+  // MÉTIER non modifiée), feuilleFlowPaiementRessource_ répond
+  // IMMÉDIATEMENT avec la valeur déjà capturée, SANS ré-afficher un écran
+  // — l'utilisateur ne voit donc qu'UN SEUL écran combiné Coût+Effet,
+  // fidèle à la maquette d'origine, même si focusEngine.js continue en
+  // interne de résoudre Effet PUIS Coût en 2 appels demanderChoix
+  // séquentiels. Remis à `null` par jouerAction_ à chaque nouvelle action
+  // ET consommé (remis à `null`) dès qu'utilisé, pour ne jamais fuiter
+  // vers un appel demanderChoix qui ne correspond pas (repli normal sur un
+  // écran dédié dans ce cas, comportement inchangé).
+  var feuillePrepaiement_ = null;
+
+  /**
+   * Calcule les infos d'affichage du Coût de l'action EN COURS
+   * (feuilleActionCourante_), pour l'écran combiné Coût+Effet — au plus
+   * UNE clé substituable par action dans le catalogue actuel (jamais
+   * vérifié au-delà de Focus Conquête Standard, seule carte éligible à la
+   * Feuille pour l'instant) : la 1re trouvée dans `action.cout` gagne, les
+   * autres clés (jamais substituables, ex. Crédit) sont listées en texte
+   * fixe. Retourne `null` si l'action n'a aucun coût.
+   */
+  function feuilleInfosCoutInitial_() {
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    if (!action || !action.cout || typeof action.cout !== 'object') return null;
+    var cout = action.cout;
+    var cleSubstituable = null;
+    Object.keys(cout).forEach(function (cle) {
+      if (!cleSubstituable && RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle) !== -1 && typeof cout[cle] === 'number') {
+        cleSubstituable = cle;
+      }
+    });
+    var texteFixe = Object.keys(cout).filter(function (c) { return c !== cleSubstituable; })
+      .map(function (c) { return (typeof cout[c] === 'number' ? cout[c] + ' ' : '') + (CHAMP_RESSOURCE[c] ? CHAMP_RESSOURCE[c].label : abregeCout_(c)); })
+      .join(', ') || null;
+    if (!cleSubstituable) return { substituable: false, texteFixe: texteFixe };
+
+    var pm = (partieAffichee && partieAffichee.plateauMaison) || {};
+    return {
+      substituable: true,
+      cle: cleSubstituable,
+      montant: cout[cleSubstituable],
+      label: CHAMP_RESSOURCE[cleSubstituable].label,
+      stockRessource: pm[CHAMP_DB_RESSOURCE_SIMPLE_[cleSubstituable]] || 0,
+      stockCredit: pm.ressourceCredit || 0,
+      texteFixe: texteFixe
+    };
+  }
+
+  function feuilleSectionCoutHTML_(infos, idStepper) {
+    if (!infos) return '';
+    if (!infos.substituable) {
+      return infos.texteFixe ? '<div class="feuille-section"><p class="feuille-section-titre">Coût</p><p class="hint">' + infos.texteFixe + '.</p></div>' : '';
+    }
+    return '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' +
+      (infos.texteFixe ? '<p class="hint">' + infos.texteFixe + ' (fixe).</p>' : '') +
+      feuilleStepperCoutHTML_(idStepper, infos.label, infos.montant, infos.stockRessource, infos.stockCredit) + '</div>';
+  }
+
   function feuilleConsommerEtiquetteSequence_() {
     if (!feuilleSequenceEtOu_) return '';
     feuilleSequenceEtOu_.position++;
@@ -1650,7 +1727,8 @@ var StrategieService = (function () {
       '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
       '</div>' +
       '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
-      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>';
+      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>' +
+      '<p class="hint" id="avert-' + id + '" style="color:var(--color-coral);" hidden>Insuffisant même en combinant Crédit et réserve.</p>';
   }
   function feuilleBrancherStepperCout_(container, id, label, montant, stock, credit, estado, onMaj) {
     if (estado.v == null) estado.v = Math.min(montant, stock);
@@ -1658,6 +1736,7 @@ var StrategieService = (function () {
     var segRes = container.querySelector('#seg-res-' + id);
     var segCred = container.querySelector('#seg-cred-' + id);
     var resume = container.querySelector('#resume-' + id);
+    var avertissement = container.querySelector('#avert-' + id);
     function maj() {
       var v = estado.v;
       var pctRes = montant ? (v / montant) * 100 : 0;
@@ -1667,7 +1746,9 @@ var StrategieService = (function () {
         (montant - v > 0 ? ' + <span class="valeur-credit">' + (montant - v) + ' Crédit</span>' : '');
       boutons[0].disabled = v <= 0;
       boutons[1].disabled = v >= Math.min(montant, stock);
-      if (onMaj) onMaj((montant - v) > credit);
+      var impossible = (montant - v) > credit;
+      if (avertissement) avertissement.hidden = !impossible;
+      if (onMaj) onMaj(impossible);
     }
     boutons[0].onclick = function () { estado.v = Math.max(0, estado.v - 1); maj(); };
     boutons[1].onclick = function () { estado.v = Math.min(Math.min(montant, stock), estado.v + 1); maj(); };
@@ -1682,13 +1763,29 @@ var StrategieService = (function () {
     var promise = new Promise(function (res) { resolve = res; });
     feuilleRejetCourant_ = function () { resolve({ annule: true }); };
     var options = contexte.options.map(libelleOption_);
+    // Coût combiné sur ce même écran UNIQUEMENT si c'est le tout premier
+    // (feuillePile_ encore vide) — voir feuilleActionCourante_/
+    // feuillePrepaiement_ ci-dessus.
+    var infosCout = feuillePile_.length === 0 ? feuilleInfosCoutInitial_() : null;
+    var estadoCout = (infosCout && infosCout.substituable) ? {} : null;
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var titre = action ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Choisissez une option';
     feuillePousserEtape_({
-      titre: 'Choisissez une option', nbEtapes: 1, etapeIndex: 0,
-      html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('opt', options, false) + '</div>',
-      brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'opt', false); },
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
+      html: feuilleSectionCoutHTML_(infosCout, 'optCombine') +
+        '<div class="feuille-section"><p class="feuille-section-titre">Effet</p>' + feuilleRangeeChoixHTML_('opt', options, false) + '</div>',
+      brancher: function (el) {
+        feuilleBrancherRangeeChoix_(el, 'opt', false);
+        if (infosCout && infosCout.substituable) {
+          feuilleBrancherStepperCout_(el, 'optCombine', infosCout.label, infosCout.montant, infosCout.stockRessource, infosCout.stockCredit, estadoCout, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
+        }
+      },
       onValider: function () {
         var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
         feuilleRejetCourant_ = null;
+        if (infosCout && infosCout.substituable) {
+          feuillePrepaiement_ = { cle: infosCout.cle, montant: infosCout.montant, utiliseRessource: estadoCout.v };
+        }
         resolve({ indexChoisi: i });
       }
     }, feuillePile_.length ? 'avant' : null);
@@ -1701,12 +1798,24 @@ var StrategieService = (function () {
     var selection = [];
     feuilleRejetCourant_ = function () { resolve(selection); };
     var options = contexte.options.map(libelleOption_);
+    var infosCout = feuillePile_.length === 0 ? feuilleInfosCoutInitial_() : null;
+    var estadoCout = (infosCout && infosCout.substituable) ? {} : null;
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var titre = action ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Une ou plusieurs options (et/ou)';
     var etape = {
-      titre: 'Une ou plusieurs options (et/ou)', nbEtapes: 1, etapeIndex: 0,
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
       html: '',
-      brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'inc', true, function (indices) { selection = indices; etape.html = html(); }); },
+      brancher: function (el) {
+        feuilleBrancherRangeeChoix_(el, 'inc', true, function (indices) { selection = indices; etape.html = html(); });
+        if (infosCout && infosCout.substituable) {
+          feuilleBrancherStepperCout_(el, 'incCombine', infosCout.label, infosCout.montant, infosCout.stockRessource, infosCout.stockCredit, estadoCout, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
+        }
+      },
       onValider: function () {
         feuilleRejetCourant_ = null;
+        if (infosCout && infosCout.substituable) {
+          feuillePrepaiement_ = { cle: infosCout.cle, montant: infosCout.montant, utiliseRessource: estadoCout.v };
+        }
         // ≥ 2 options choisies -> focusEngine.js va résoudre chacune, DANS
         // L'ORDRE de contexte.options (resoudreOption_/reduce), via un
         // demanderChoix INDÉPENDANT à chaque fois — voir
@@ -1718,7 +1827,8 @@ var StrategieService = (function () {
       }
     };
     function html() {
-      return '<div class="feuille-section">' + feuilleRangeeChoixHTML_('inc', options, true, selection) + '</div>';
+      return feuilleSectionCoutHTML_(infosCout, 'incCombine') +
+        '<div class="feuille-section"><p class="feuille-section-titre">Effet — une ou plusieurs options</p>' + feuilleRangeeChoixHTML_('inc', options, true, selection) + '</div>';
     }
     etape.html = html();
     feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
@@ -1726,6 +1836,14 @@ var StrategieService = (function () {
   }
 
   function feuilleFlowPaiementRessource_(contexte) {
+    // Déjà réglé sur l'écran combiné Coût+Effet précédent (feuilleFlow
+    // OptionExclusive_/OptionsInclusives_) — répond immédiatement, aucun
+    // écran supplémentaire (voir feuillePrepaiement_ ci-dessus).
+    if (feuillePrepaiement_ && feuillePrepaiement_.cle === contexte.ressource && feuillePrepaiement_.montant === contexte.montant) {
+      var reponsePrepayee = { utiliseRessource: feuillePrepaiement_.utiliseRessource };
+      feuillePrepaiement_ = null;
+      return Promise.resolve(reponsePrepayee);
+    }
     var resolve;
     var promise = new Promise(function (res) { resolve = res; });
     feuilleRejetCourant_ = function () { resolve({ annule: true }); };
@@ -1735,12 +1853,23 @@ var StrategieService = (function () {
     var stockRessource = contexte.stockRessource || 0;
     var stockCredit = contexte.stockCredit || 0;
     var combinaisonImpossible = stockRessource + stockCredit < montant;
+    // Écran combiné Coût+Effet même ici, quand ce paiement est le tout
+    // premier ET seul écran de l'action (ex. Focus Conquête "Préparer" —
+    // effet silencieux "activer_cube", jamais de demanderChoix pour lui) :
+    // affiche le texte de l'action en section "Effet", fidèle à la
+    // maquette d'origine (toujours Coût + Effet, même quand l'un des deux
+    // n'a rien d'interactif).
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var sectionEffet = (feuillePile_.length === 0 && action)
+      ? '<div class="feuille-section"><p class="feuille-section-titre">Effet</p><p class="hint">' + (action.texte || 'Appliqué automatiquement.') + '</p></div>'
+      : '';
+    var titre = (feuillePile_.length === 0 && action) ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : ('Payer ' + montant + ' ' + label);
     feuillePousserEtape_({
-      titre: 'Payer ' + montant + ' ' + label, nbEtapes: 1, etapeIndex: 0,
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
       html: combinaisonImpossible
         ? '<p class="hint">Stock : ' + stockRessource + ' ' + label + ', ' + stockCredit + ' Crédit.</p>' +
           '<p class="hint" style="color:var(--color-coral);">Insuffisant même en substituant tout le Crédit disponible (1 Crédit = 1 ' + label + ') — Annuler.</p>'
-        : '<div class="feuille-section">' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>',
+        : '<div class="feuille-section"><p class="feuille-section-titre">Coût</p>' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>' + sectionEffet,
       brancher: combinaisonImpossible ? null : function (el) {
         feuilleBrancherStepperCout_(el, 'pay', label, montant, stockRessource, stockCredit, estado, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
       },
