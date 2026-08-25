@@ -1,9 +1,76 @@
 /**
  * version.js
- * Version 100 — 2026-08-25
+ * Version 101 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (retouche visuelle du stepper de Coût +
+ * 25/08/2026, dernière fois (chantier "résolution des Technologies",
+ * lancement — 3 premières technologies portées : Nacelles/Boucliers
+ * (Valnis), Collecte de données (Belitan), toutes maisons de complexité
+ * 1) :
+ * - Plat. maison, "Technologies obtenues" (5 emplacements) : le <select>
+ *   de choix manuel disparaît (retour utilisateur : "les techno sont
+ *   gagnées via des actions") — affichage en lecture seule, nom cliquable
+ *   pour révéler son texte (texteAmeliore si "Améliorée" cochée et fourni
+ *   par le catalogue, sinon le texte de base), même gabarit visuel que
+ *   .programme-nom-toggle/.programme-detail-texte (Programmes, juste
+ *   en-dessous sur le même écran). La case "Améliorée" reste (mécanique
+ *   DISTINCTE — améliore une Technologie déjà obtenue, peu importe
+ *   comment) : mise à jour en place (title + panneau détail) sans
+ *   re-render complet, pour ne pas refermer un panneau déjà ouvert.
+ * - gameService.js : nouvelle GameService.gagnerTechnologieEtResoudreEffet
+ *   (partieId, slot, nomTechnologie, amelioree, demanderChoix) — compose
+ *   choisirTechnologieObtenue + definirTechnologieAmelioree + résolution
+ *   de l'effet immédiat (technologies.json, champ `immediat`, jusqu'ici
+ *   jamais interprété). 2 nouvelles tables de traduction (vocabulaire
+ *   `immediat` du catalogue Technologies -> ce que le moteur PWA sait
+ *   déjà résoudre), étendues technologie par technologie au fil du
+ *   chantier :
+ *   - EFFET_TECHNOLOGIE_IMMEDIAT_ : sous-ensemble déjà exprimable en JSON
+ *     Effet FocusEngine (gains simples, gagner_commerce, activer_cube) —
+ *     résolu via FocusEngine.resoudreEffet, EXACTEMENT comme GameService.
+ *     utiliserProgramme (même moteur, même demanderChoix transmis tel
+ *     quel — nécessaire, ex. Nacelles/"gagner_commerce" déclenche la
+ *     popup 'bonus_commerce', choix parmi les 6 Bonus Commerce fixes).
+ *   - TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ : `immediat.deploy` à
+ *     destination TOUJOURS fixe "Secteur-Mère" (jamais un choix du
+ *     joueur) — hors du vocabulaire FocusEngine, résolu par un appel
+ *     direct SecteurService.deployerCube/obtenirSecteurMere.
+ *   Le reste de `immediat` (et tout `permanent`/`ameliore`) demeure hors
+ *   périmètre (bonus de combat/production non modélisés) — toute
+ *   Technologie SANS entrée dans ces 2 tables n'a, pour l'instant, aucun
+ *   effet immédiat résolu automatiquement (étendre ces tables est la
+ *   suite prévue de ce chantier).
+ * - strategieService.js : popup 'gagner_technologie' (Feuille d'action
+ *   ET #modal-choix) — liste déroulante <select>/<optgroup> groupée par
+ *   maison déchue (retour utilisateur : "semblable à programme"),
+ *   remplace l'ancienne liste de rangées-choix (Feuille) / le <select>
+ *   sans groupe (#modal-choix) ; un rappel du texte de la Technologie
+ *   sous le select (comme pour un Programme), réactif au niveau choisi
+ *   (De base/Améliorée). Le Valider appelle désormais GameService.
+ *   gagnerTechnologieEtResoudreEffet au lieu de choisirTechnologieObtenue
+ *   seule — le résumé "Technologie ... obtenue (niveau)." affiché au
+ *   joueur inclut désormais le détail de l'effet immédiat le cas échéant.
+ * - Gain d'Influence : déjà couvert nativement dès qu'un effet immédiat
+ *   futur en comportera un (clé "influence", déjà comprise par
+ *   FocusEngine — CLES_SIMPLES) — vérifié qu'aucune des 28 technologies
+ *   du catalogue n'a actuellement d'Influence dans son `immediat` (le
+ *   mécanisme d'Influence liée aux Technologies déjà en place,
+ *   "N par Technologie améliorée", focusEngine.js, est un effet Focus/
+ *   Piste SÉPARÉ, pas un gain automatique à l'acquisition).
+ * 145+19+13 tests au vert (145 *.test.js + 19 civilisationService_test.js
+ * + 13 gameService_cycle_focus_technologie.test.js, ainsi que les 9
+ * autres fichiers *_test.js/test_*.js individuels, tous verts). Vérifié
+ * en navigateur réel (Playwright, gabarit iPhone, adversaires forcées à
+ * Valnis+Belitan pour disposer des 3 technologies) : Nacelles (Bonus
+ * Commerce en repli #modal-choix fonctionnel, +1 cube actif), Collecte de
+ * données (+2 Crédit +2 Science), Boucliers (1 Corvette déployée sur le
+ * Secteur-Mère confirmé via SecteurService.obtenirSecteurMere) — les 3
+ * bien inscrites au Plat. maison, texte dépliable au clic, aucune erreur
+ * JS.
+ * Fichiers touchés : index.html, js/gameService.js,
+ * js/strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (retouche visuelle du stepper de Coût +
  * Focus Innovation "Inventer" — gagner une Technologie) :
  * - `.cout-stepper-resume` (css/style.css) : marge au-dessus réduite de
  *   8px à 4px (retour utilisateur : "un peu moins d'espace entre la
@@ -3366,4 +3433,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.16';
+var APP_VERSION = '20260825.17';

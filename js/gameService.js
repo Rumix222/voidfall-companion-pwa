@@ -108,6 +108,46 @@ var GameService = (function () {
   var TYPES_PROGRAMME_OFFRE = ['Domination', 'Force', 'Soutien', 'Richesse'];
 
   /**
+   * Chantier "résolution des Technologies" (retour utilisateur,
+   * 25/08/2026) : chaque Technologie obtenue (data/catalogue/
+   * technologies.json, champ `immediat`) a un effet immédiat à résoudre
+   * au moment même de son acquisition — voir GameService.
+   * gagnerTechnologieEtResoudreEffet ci-dessous. `immediat` utilise un
+   * vocabulaire PROPRE au catalogue Technologies (gain/cost/activate_cube/
+   * deploy/build), différent de celui de focus.json/pistesCivilisation.json
+   * — ces 2 tables traduisent, TECHNOLOGIE PAR TECHNOLOGIE (à la main, une
+   * seule fois portée), ce vocabulaire vers ce que le moteur PWA sait déjà
+   * résoudre :
+   * - EFFET_TECHNOLOGIE_IMMEDIAT_ : sous-ensemble de `immediat` déjà
+   *   entièrement exprimable en JSON Effet FocusEngine (gains simples,
+   *   gagner_commerce, activer_cube — mêmes clés que EFFET_PROGRAMME_
+   *   PAR_TYPE_ ci-dessus) — résolu via FocusEngine.resoudreEffet, EXACTEMENT
+   *   comme GameService.utiliserProgramme.
+   * - TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ : `immediat.deploy` avec
+   *   destination TOUJOURS fixe "Secteur-Mère" (jamais un choix du
+   *   joueur) — hors du vocabulaire FocusEngine (une action secteur),
+   *   résolu par un appel direct à SecteurService.deployerCube sur le
+   *   numéro du Secteur-Mère (SecteurService.obtenirSecteurMere).
+   * Seules les 3 premières Technologies portées (maisons de complexité 1 —
+   * Nacelles/Boucliers, Valnis ; Collecte de données, Belitan) ont une
+   * entrée ici ; toute AUTRE Technologie obtenue n'a, pour l'instant,
+   * aucun effet immédiat résolu automatiquement (le reste de son
+   * `immediat`, tout son `permanent`/`ameliore`, restent de toute façon
+   * hors périmètre — bonus de combat/production non modélisés, voir
+   * docs-architecture-pwa.md §10). Étendre ces 2 tables au fil de l'eau
+   * est la façon prévue de continuer ce chantier technologie par
+   * technologie, sans toucher à gagnerTechnologieEtResoudreEffet
+   * elle-même.
+   */
+  var EFFET_TECHNOLOGIE_IMMEDIAT_ = {
+    'Nacelles': { gagner_commerce: 1, activer_cube: 1 },
+    'Collecte de données': { credit: 2, science: 2 }
+  };
+  var TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ = {
+    'Boucliers': 'corvette'
+  };
+
+  /**
    * Identifiant de partie (retour utilisateur — "crypto.randomUUID is not
    * a function" à la création d'une partie sur iPhone via
    * http://<IP-LAN>:port) : `crypto.randomUUID()` (voir creerPartie
@@ -2106,6 +2146,84 @@ var GameService = (function () {
           return ajouterHistorique_(partieId, 'technologie_obtenue_slot' + slot, nomTechnologie || '(retirée)');
         }).then(function () {
           return rechargerPartie_(partieId);
+        });
+      });
+    },
+
+    /**
+     * Gagne une Technologie (choisirTechnologieObtenue) ET, dans la
+     * foulée, résout son effet immédiat — voir EFFET_TECHNOLOGIE_
+     * IMMEDIAT_/TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ ci-dessus.
+     * `demanderChoix` est transmis tel quel à FocusEngine.resoudreEffet
+     * (nécessaire si l'effet immédiat déclenche lui-même une popup — ex.
+     * Nacelles/"gagner_commerce" -> choix parmi les 6 Bonus Commerce) :
+     * appelée depuis la popup 'gagner_technologie' (strategieService.js,
+     * Feuille ET #modal-choix), qui lui transmet sa PROPRE fonction
+     * demanderChoix — la même que celle utilisée pour tout le reste de la
+     * résolution en cours, exactement comme CivilisationService.
+     * avancerPiste/GameService.utiliserProgramme.
+     * Retourne `{partie, detailImmediat}` — `detailImmediat` (chaîne,
+     * '' si la Technologie n'a pas encore d'entrée dans les 2 tables
+     * ci-dessus) est prêt à être ajouté au résumé "Technologie ... obtenue"
+     * affiché par l'appelant.
+     */
+    gagnerTechnologieEtResoudreEffet: function (partieId, slot, nomTechnologie, amelioree, demanderChoix) {
+      return GameService.choisirTechnologieObtenue(partieId, slot, nomTechnologie).then(function () {
+        return amelioree ? GameService.definirTechnologieAmelioree(partieId, slot, true) : Promise.resolve();
+      }).then(function () {
+        var effet = EFFET_TECHNOLOGIE_IMMEDIAT_[nomTechnologie];
+        var typeDeploiement = TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_[nomTechnologie];
+        var source = 'Technologie — ' + nomTechnologie;
+        var detailsImmediat = [];
+        var suite = Promise.resolve();
+
+        if (effet) {
+          suite = suite.then(function () {
+            if (typeof FocusEngine === 'undefined') return;
+            return DB.get('plateauMaison', partieId).then(function (ligne) {
+              var etatAvecId = Object.assign({ partieId: partieId }, ligne);
+              return FocusEngine.resoudreEffet(etatAvecId, effet, source, '', demanderChoix).then(function (resultatEffet) {
+                if (!resultatEffet.succes) return;
+                return DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+                  resultatEffet.mutations.forEach(function (m) { ligneFraiche[m.champ] = resultatEffet.etatResultat[m.champ]; });
+                  return DB.put('plateauMaison', ligneFraiche);
+                }).then(function () {
+                  // Retire le préfixe "source : " (ou "source (suffixe) : ",
+                  // ex. "Technologie — Nacelles (Bonus Commerce) : ..." —
+                  // resoudreJsonInterne_ ajoute ce suffixe pour les clés
+                  // résolues récursivement, gagner_commerce/choice —
+                  // resultatEffet.journal.map(...) — utiliserProgramme fait
+                  // le même strip mais sans ce cas de suffixe).
+                  resultatEffet.journal.forEach(function (ligne) {
+                    var indexSepare = ligne.indexOf(' : ');
+                    var prefixe = indexSepare !== -1 ? ligne.slice(0, indexSepare) : '';
+                    detailsImmediat.push(prefixe.indexOf(source) === 0 ? ligne.slice(indexSepare + 3) : ligne);
+                  });
+                });
+              });
+            });
+          });
+        }
+
+        if (typeDeploiement) {
+          suite = suite.then(function () {
+            if (typeof SecteurService === 'undefined') return;
+            return DB.get('parties', partieId).then(function (partieBrute) {
+              return SecteurService.obtenirSecteurMere(partieBrute ? partieBrute.scenarioId : null);
+            }).then(function (numero) {
+              if (numero == null) return;
+              return SecteurService.deployerCube(partieId, numero, typeDeploiement, 1).then(function () {
+                var labelType = typeDeploiement.charAt(0).toUpperCase() + typeDeploiement.slice(1);
+                detailsImmediat.push('1 ' + labelType + ' déployé(e) sur le Secteur-Mère.');
+              });
+            });
+          });
+        }
+
+        return suite.then(function () {
+          return rechargerPartie_(partieId);
+        }).then(function (partieFraiche) {
+          return { partie: partieFraiche, detailImmediat: detailsImmediat.join(' ') };
         });
       });
     },

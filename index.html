@@ -825,22 +825,33 @@
 
     /**
      * 5 emplacements de technologies obtenues (parmi les 8 des maisons
-     * déchues), chacun avec sa case "Améliorée". Un même nom de
-     * technologie ne peut apparaître qu'à un seul emplacement à la fois
-     * (retiré des options des 4 autres selects dès qu'il est choisi
-     * quelque part). Avec la Technologie de départ (fixe,
-     * #bloc-technologie-depart), cela fait 6 technologies maximum au
-     * total.
+     * déchues), chacun avec sa case "Améliorée". Avec la Technologie de
+     * départ (fixe, #bloc-technologie-depart), cela fait 6 technologies
+     * maximum au total.
      *
-     * La case "Améliorée" est verrouillée/déverrouillée selon
+     * Lecture seule (retour utilisateur, chantier "résolution des
+     * Technologies") : la Technologie de chaque emplacement n'est PLUS
+     * choisie manuellement ici (ancien <select>, supprimé) — elle est
+     * gagnée via une action (Focus Innovation "Inventer", ou une case de
+     * Piste de Civilisation), voir GameService.gagnerTechnologieEtResoudreEffet
+     * (popup 'gagner_technologie', strategieService.js), qui persiste
+     * directement le bon emplacement (le premier libre). Nom cliquable
+     * pour révéler son texte (texteAmeliore si la case "Améliorée" est
+     * cochée et que le catalogue en fournit un, sinon le texte de base) —
+     * même gabarit que .programme-nom-toggle/.programme-detail-texte
+     * (renderProgrammesPlateauMaison_ plus bas), attributs data-tech-*
+     * propres pour rester indépendant de ce dernier.
+     *
+     * La case "Améliorée" reste ici (mécanique DISTINCTE de l'acquisition
+     * elle-même — améliore une Technologie déjà obtenue, quel que soit
+     * son moyen d'obtention) : verrouillée/déverrouillée selon
      * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (liste
      * de noms — les 4 technologies choisies au cycle 1 pendant le cycle 2,
      * les 4 autres pendant le cycle 3, aucune au cycle 1 ni à l'état
      * 'termine' — même source de vérité que Plat. Galactique,
      * renderTechnologiesAvancees_ ci-dessus). Verrouillée dans tous les
-     * cas si aucune technologie n'est choisie dans la ddl, ou si la
-     * technologie choisie n'est pas dans le groupe actif du cycle en
-     * cours.
+     * cas si l'emplacement est vide, ou si la technologie qui l'occupe
+     * n'est pas dans le groupe actif du cycle en cours.
      */
     function renderTechnologiesObtenues_(partie) {
       var container = document.getElementById('technologies-obtenues-liste');
@@ -856,36 +867,23 @@
       toutesLesTechs.forEach(function (t) { infosTechParNom[t.nom] = t; });
 
       container.innerHTML = obtenues.map(function (tech, slot) {
-        var nomsPrisAilleurs = obtenues
-          .filter(function (_, i) { return i !== slot; })
-          .map(function (t) { return t ? t.nom : null; });
-        var optionsDisponibles = toutesLesTechs.filter(function (t) { return nomsPrisAilleurs.indexOf(t.nom) === -1; });
-        var options = '<option value="">— Aucune —</option>' + optionsDisponibles.map(function (t) {
-          return '<option value="' + t.nom + '"' + (tech && tech.nom === t.nom ? ' selected' : '') + '>' + t.nom +
-            (t.maison ? ' (' + t.maison + ')' : '') + '</option>';
-        }).join('');
+        var infosTech = tech ? (infosTechParNom[tech.nom] || null) : null;
+        var texteDetail = infosTech ? titreTechnologie_(infosTech, tech.amelioree) : '';
+        var libelle = tech ? (tech.nom + (tech.maison ? ' (' + tech.maison + ')' : '')) : '— Vide —';
         var verrouillee = !tech || nomsAmeliorables.indexOf(tech.nom) === -1;
-        var titreAmelioree = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, tech.amelioree).replace(/"/g, '&quot;') : '';
+        var titreAmelioree = texteDetail.replace(/"/g, '&quot;');
         return '<div class="techno-obtenue-ligne">' +
-          '<select class="select-technologie-obtenue" data-slot="' + slot + '">' + options + '</select>' +
+          '<span class="champ-technologie-fixe' + (texteDetail ? ' programme-nom-toggle' : '') + '" data-tech-detail="' + slot + '">' + libelle + '</span>' +
           '<label class="check-amelioree" title="' + titreAmelioree + '"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
           (tech && tech.amelioree ? ' checked' : '') + (verrouillee ? ' disabled' : '') + '> Améliorée</label>' +
-          '</div>';
+          '</div>' +
+          (texteDetail ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + slot + '" hidden><p>' + texteDetail + '</p></div>' : '');
       }).join('');
 
-      Array.prototype.forEach.call(container.querySelectorAll('.select-technologie-obtenue'), function (select) {
-        select.addEventListener('change', function () {
-          var slot = Number(select.dataset.slot);
-          select.disabled = true;
-          GameService.choisirTechnologieObtenue(partie.id, slot, select.value)
-            .then(function (partieMaj) {
-              partieCourante = partieMaj;
-              renderTechnologiesObtenues_(partieMaj);
-            })
-            .catch(function (erreur) {
-              select.disabled = false;
-              window.alert('Échec de l\'enregistrement : ' + erreur.message);
-            });
+      Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
+        nomEl.addEventListener('click', function () {
+          var cible = container.querySelector('[data-tech-detail-cible="' + nomEl.dataset.techDetail + '"]');
+          if (cible) cible.hidden = !cible.hidden;
         });
       });
 
@@ -899,7 +897,14 @@
               partieCourante = partieMaj;
               cb.disabled = false;
               var tech = obtenues[slot];
-              if (cb.parentElement) cb.parentElement.title = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, etatDemande) : '';
+              var texteMaj = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, etatDemande) : '';
+              if (cb.parentElement) cb.parentElement.title = texteMaj;
+              // Panneau détail (data-tech-detail-cible, pas juste le
+              // tooltip) mis à jour aussi, sans re-render complet — évite
+              // de refermer le panneau si l'utilisateur l'avait ouvert
+              // avant de cocher "Améliorée".
+              var panneauDetail = container.querySelector('[data-tech-detail-cible="' + slot + '"]');
+              if (panneauDetail && texteMaj) panneauDetail.innerHTML = '<p>' + texteMaj + '</p>';
             })
             .catch(function (erreur) {
               cb.checked = !etatDemande;
