@@ -1295,8 +1295,20 @@ var StrategieService = (function () {
     btn.disabled = true;
     btn.textContent = 'Passage en cours…';
 
+    // Feuille d'action (retour utilisateur, POC testé sur l'écran Test) :
+    // scopée à Focus Conquête Standard, voir carteEligibleFeuille_. Ouverte
+    // ICI (avant même le premier demanderChoix) pour reproduire le geste
+    // natif "la feuille apparaît dès l'appui sur l'action", pas seulement
+    // à la première popup — fermée dans TOUS les cas ci-dessous (succès,
+    // échec, erreur), filet de sécurité même si un contexte inattendu
+    // laissait la promesse de résolution en suspens.
+    carteEnFeuille_ = carteEligibleFeuille_(carte);
+    if (carteEnFeuille_) feuilleOuvrir_();
+
     FocusEngine.jouerActionEtPersister(partie.id, carte, action, demanderChoix)
       .then(function (resultat) {
+        feuilleFermer_();
+        carteEnFeuille_ = false;
         // Même libellé que AnnulationService (source de la pile, voir
         // FocusEngine.jouerActionEtPersister) — un seul "cadre" pour toute
         // la résolution (Effet + Coût + rappels manuels éventuels).
@@ -1316,6 +1328,8 @@ var StrategieService = (function () {
         App.renderSecteurs(partieFraiche);
       })
       .catch(function (erreur) {
+        feuilleFermer_();
+        carteEnFeuille_ = false;
         window.alert('Échec de l\'action : ' + erreur.message);
         btn.disabled = false;
         btn.textContent = texteOriginal;
@@ -1399,7 +1413,585 @@ var StrategieService = (function () {
     document.getElementById('modal-choix').hidden = true;
   }
 
+  // ============================================================
+  // Feuille d'action — rendu ALTERNATIF de demanderChoix (bottom sheet
+  // iPhone-first), retour utilisateur après test sur l'écran Test
+  // (index.html, état factice) : "implémente cette version du poc dans la
+  // vraie appli sur le même focus". Mécanique portée telle quelle depuis
+  // maquette-cartes-focus/variante-c-feuille.html / l'écran Test — seule
+  // différence : branchée ici sur les VRAIES données de la partie
+  // (SecteurService/CivilisationService/GameService), exactement les
+  // mêmes fonctions que les branches #modal-choix équivalentes plus bas,
+  // seul le CHROME visuel change.
+  //
+  // Scope VOLONTAIREMENT limité : `carteEligibleFeuille_` ne couvre QUE
+  // Focus Conquête Standard (celle testée tout du long) — les autres
+  // maisons ont un Conquête différent (Astoran/Yarvek/Zenor/Héroïque, avec
+  // des clés Effet non couvertes ici : nourriture_par_secteur_pur,
+  // gagner_technologie, etc.), et toutes les autres cartes du catalogue
+  // continuent d'utiliser #modal-choix, INCHANGÉ. `FEUILLE_TYPES_
+  // SUPPORTES_` ne couvre QUE les contexte.type déclenchés par cette carte
+  // (option_exclusive/options_inclusives/paiement_ressource/
+  // gagner_programme/deplacer_corruption) — "regrouper"/"envahir" (choix
+  // possibles d'Engager) retombent volontairement sur #modal-choix
+  // INCHANGÉ même en mode Feuille : leurs formulaires (engagement
+  // multi-unités, calculateur de combat) sont hors périmètre de ce
+  // portage — la feuille se referme, la modale classique prend le relais
+  // pour CETTE étape, puis la feuille reprend si d'autres étapes suivent.
+  function carteEligibleFeuille_(carte) {
+    return !!carte && carte.focus === 'Conquête' && carte.type === 'Standard';
+  }
+  var carteEnFeuille_ = false;
+  var FEUILLE_TYPES_SUPPORTES_ = ['option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption'];
+
+  var feuillePile_ = [];
+  var feuilleRejetCourant_ = null;
+  var feuilleInitialisee_ = false;
+  var feuilleEls_ = {};
+  // Choix "et/ou" à ≥ 2 options : mémorise leurs libellés dans l'ordre où
+  // focusEngine.js va les résoudre (chacune via un demanderChoix
+  // INDÉPENDANT) pour préfixer "Action X/N — " sur les flows délégués
+  // susceptibles d'apparaître dedans (gagner_programme/deplacer_corruption)
+  // — voir feuilleFlowOptionsInclusives_/feuilleConsommerEtiquetteSequence_.
+  var feuilleSequenceEtOu_ = null;
+  function feuilleConsommerEtiquetteSequence_() {
+    if (!feuilleSequenceEtOu_) return '';
+    feuilleSequenceEtOu_.position++;
+    var etiquette = 'Action ' + feuilleSequenceEtOu_.position + '/' + feuilleSequenceEtOu_.libelles.length + ' — ';
+    if (feuilleSequenceEtOu_.position >= feuilleSequenceEtOu_.libelles.length) feuilleSequenceEtOu_ = null;
+    return etiquette;
+  }
+
+  function feuilleInit_() {
+    if (feuilleInitialisee_) return;
+    feuilleInitialisee_ = true;
+    feuilleEls_.scrim = document.getElementById('feuille-scrim');
+    feuilleEls_.feuille = document.getElementById('feuille');
+    feuilleEls_.grabberZone = document.getElementById('feuille-grabber-zone');
+    feuilleEls_.teteRetour = document.getElementById('feuille-retour');
+    feuilleEls_.teteTitre = document.getElementById('feuille-titre');
+    feuilleEls_.teteEtapes = document.getElementById('feuille-etapes');
+    feuilleEls_.corpsInner = document.getElementById('feuille-corps-inner');
+    feuilleEls_.btnValider = document.getElementById('feuille-valider');
+    feuilleEls_.btnAnnuler = document.getElementById('feuille-annuler');
+    if (!feuilleEls_.scrim || !feuilleEls_.feuille) return;
+
+    var dragY = null, dragH = null;
+    feuilleEls_.grabberZone.addEventListener('pointerdown', function (e) {
+      dragY = e.clientY;
+      dragH = feuilleEls_.feuille.getBoundingClientRect().height;
+      feuilleEls_.feuille.classList.remove('feuille-animee');
+      feuilleEls_.grabberZone.setPointerCapture(e.pointerId);
+    });
+    feuilleEls_.grabberZone.addEventListener('pointermove', function (e) {
+      if (dragY === null) return;
+      var h = Math.max(20, Math.min(window.innerHeight * 0.92, dragH + (dragY - e.clientY)));
+      feuilleEls_.feuille.style.height = h + 'px';
+    });
+    function finDrag() {
+      if (dragY === null) return;
+      dragY = null;
+      feuilleEls_.feuille.classList.add('feuille-animee');
+      var h = feuilleEls_.feuille.getBoundingClientRect().height;
+      var auto = feuilleTailleAuContenu_();
+      var plein = window.innerHeight * 0.92;
+      if (h < auto * 0.55) { feuilleFermerEtAnnuler_(); return; }
+      feuilleEls_.feuille.style.height = (h > (auto + plein) / 2 ? plein : auto) + 'px';
+    }
+    feuilleEls_.grabberZone.addEventListener('pointerup', finDrag);
+    feuilleEls_.grabberZone.addEventListener('pointercancel', finDrag);
+
+    feuilleEls_.scrim.addEventListener('click', feuilleFermerEtAnnuler_);
+    feuilleEls_.btnAnnuler.addEventListener('click', feuilleFermerEtAnnuler_);
+    feuilleEls_.teteRetour.addEventListener('click', function () {
+      var actuelle = feuillePile_[feuillePile_.length - 1];
+      if (feuillePile_.length <= 1 || (actuelle && actuelle.racineSequence !== false)) return;
+      feuillePile_.pop();
+      feuilleRendreEtape_(feuillePile_[feuillePile_.length - 1], 'arriere');
+    });
+  }
+
+  function feuilleTailleAuContenu_() {
+    var chrome = document.querySelector('#feuille .feuille-tete').offsetHeight +
+      document.querySelector('#feuille .feuille-pied').offsetHeight + 26;
+    return Math.min(window.innerHeight * 0.92, Math.max(180, feuilleEls_.corpsInner.scrollHeight + chrome));
+  }
+  function feuilleAjusterHauteur_() {
+    feuilleEls_.feuille.classList.add('feuille-animee');
+    feuilleEls_.feuille.style.height = feuilleTailleAuContenu_() + 'px';
+  }
+  function feuilleOuvrir_() {
+    feuilleInit_();
+    feuillePile_ = [];
+    feuilleSequenceEtOu_ = null;
+    feuilleEls_.scrim.hidden = false;
+    feuilleEls_.feuille.classList.add('feuille-animee');
+    feuilleEls_.feuille.style.height = '0px';
+    requestAnimationFrame(function () { feuilleAjusterHauteur_(); });
+  }
+  // Chrono du masquage retardé du voile (voir feuilleFermer_) — annulé par
+  // feuillePousserEtape_ si une étape Feuille revient entre-temps (cas
+  // "Engager" : la feuille se masque le temps du repli #modal-choix pour
+  // Regrouper/Envahir, hors périmètre — voir FEUILLE_TYPES_SUPPORTES_ —
+  // puis DOIT ressurgir pour le paiement du coût qui suit).
+  var feuilleTimeoutFermeture_ = null;
+  function feuilleFermer_() {
+    if (!feuilleInitialisee_ || !feuilleEls_.feuille) return;
+    feuilleEls_.feuille.classList.add('feuille-animee');
+    feuilleEls_.feuille.style.height = '0px';
+    if (feuilleTimeoutFermeture_) clearTimeout(feuilleTimeoutFermeture_);
+    feuilleTimeoutFermeture_ = setTimeout(function () {
+      feuilleEls_.scrim.hidden = true;
+      feuilleTimeoutFermeture_ = null;
+    }, 280);
+  }
+  function feuilleFermerEtAnnuler_() {
+    var r = feuilleRejetCourant_;
+    feuilleRejetCourant_ = null;
+    feuilleFermer_();
+    if (r) r();
+  }
+
+  /**
+   * `racineSequence !== false` (par défaut, valeur absente sur la plupart
+   * des étapes) = étape racine d'un appel demanderChoix INDÉPENDANT (un
+   * par flow_* ci-dessous) — jamais de "← Retour" vers une racine
+   * précédente, dont la Promise est déjà résolue (un clic Valider dessus
+   * ne ferait plus rien : la résolution de l'action a déjà avancé au-delà,
+   * l'utilisateur resterait bloqué sur l'étape courante, toujours en
+   * attente). Seule une étape explicitement marquée `racineSequence:false`
+   * (sous-étape imbriquée DANS un même flow_*, ex. destination après
+   * source de "Déplacer une Corruption" — même Promise, pas encore
+   * résolue) peut être quittée par Retour.
+   */
+  function feuilleRendreEtape_(etape, direction) {
+    var els = feuilleEls_;
+    els.teteTitre.textContent = etape.titre;
+    els.teteRetour.hidden = feuillePile_.length <= 1 || etape.racineSequence !== false;
+    if (etape.nbEtapes > 1) {
+      els.teteEtapes.hidden = false;
+      els.teteEtapes.innerHTML = '';
+      for (var i = 0; i < etape.nbEtapes; i++) {
+        var s = document.createElement('span');
+        if (i === etape.etapeIndex) s.className = 'actif';
+        els.teteEtapes.appendChild(s);
+      }
+    } else {
+      els.teteEtapes.hidden = true;
+    }
+    var classeSortie = direction === 'avant' ? 'transition-sortie-avant' : 'transition-sortie-arriere';
+    els.corpsInner.classList.add(classeSortie);
+    setTimeout(function () {
+      els.corpsInner.innerHTML = etape.html;
+      if (etape.brancher) etape.brancher(els.corpsInner);
+      els.corpsInner.classList.remove(classeSortie);
+      els.corpsInner.classList.add('transition-entree');
+      requestAnimationFrame(function () { els.corpsInner.classList.remove('transition-entree'); feuilleAjusterHauteur_(); });
+    }, direction ? 150 : 0);
+    els.btnValider.hidden = !etape.onValider;
+    els.btnValider.disabled = false;
+    els.btnValider.onclick = etape.onValider || null;
+    els.btnAnnuler.textContent = feuillePile_.length <= 1 ? 'Annuler' : 'Fermer';
+  }
+  function feuillePousserEtape_(etape, direction) {
+    // Ré-affiche le voile/annule un masquage retardé en attente — voir
+    // feuilleFermer_ : couvre le cas "Engager" où la feuille a été
+    // masquée le temps du repli #modal-choix (Regrouper/Envahir) puis
+    // ressurgit pour le paiement du coût qui suit.
+    if (feuilleTimeoutFermeture_) { clearTimeout(feuilleTimeoutFermeture_); feuilleTimeoutFermeture_ = null; }
+    feuilleEls_.scrim.hidden = false;
+    feuillePile_.push(etape);
+    feuilleRendreEtape_(etape, direction || 'avant');
+  }
+
+  function feuilleRangeeChoixHTML_(nom, options, multiple, selectionParDefaut) {
+    return options.map(function (o, i) {
+      var selectionnee = multiple
+        ? (selectionParDefaut || []).indexOf(i) !== -1
+        : i === (selectionParDefaut || 0);
+      return '<button type="button" class="rangee-choix' + (selectionnee ? ' selectionnee' : '') + '"' +
+        (multiple ? ' data-multiple' : '') + ' data-groupe="' + nom + '" data-i="' + i + '">' +
+        '<span>' + o + '</span><span class="rangee-choix-marque">' + (selectionnee ? '✓' : '') + '</span></button>';
+    }).join('');
+  }
+  function feuilleBrancherRangeeChoix_(container, nom, multiple, onChange) {
+    var rangees = Array.prototype.slice.call(container.querySelectorAll('.rangee-choix[data-groupe="' + nom + '"]'));
+    rangees.forEach(function (r) {
+      r.addEventListener('click', function () {
+        if (!multiple) {
+          rangees.forEach(function (autre) {
+            autre.classList.remove('selectionnee');
+            autre.querySelector('.rangee-choix-marque').textContent = '';
+          });
+        }
+        var maintenantSelectionnee = !r.classList.contains('selectionnee');
+        r.classList.toggle('selectionnee', multiple ? maintenantSelectionnee : true);
+        r.querySelector('.rangee-choix-marque').textContent = r.classList.contains('selectionnee') ? '✓' : '';
+        if (onChange) onChange(rangees.filter(function (x) { return x.classList.contains('selectionnee'); }).map(function (x) { return Number(x.dataset.i); }));
+      });
+    });
+  }
+  // Cibles "catégorie" (source/destination de Déplacer une Corruption) :
+  // le tap navigue IMMÉDIATEMENT vers l'étape suivante (pas de Valider
+  // séparé) — même comportement que les boutons `.btn-choix-liste` de la
+  // branche #modal-choix équivalente plus bas.
+  function feuilleBrancherRangeeChoixImmediat_(container, nom, onChoisi) {
+    var rangees = Array.prototype.slice.call(container.querySelectorAll('.rangee-choix[data-groupe="' + nom + '"]'));
+    rangees.forEach(function (r, i) {
+      r.addEventListener('click', function () { onChoisi(i); });
+    });
+  }
+  function feuilleStepperCoutHTML_(id, label, montant, stock, credit) {
+    return '<div class="cout-stepper" id="stepper-' + id + '">' +
+      '<button type="button" class="cout-stepper-bouton" data-role="moins">−</button>' +
+      '<div class="cout-stepper-barre"><div class="cout-stepper-seg-ressource" id="seg-res-' + id + '"></div><div class="cout-stepper-seg-credit" id="seg-cred-' + id + '"></div></div>' +
+      '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
+      '</div>' +
+      '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
+      '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>';
+  }
+  function feuilleBrancherStepperCout_(container, id, label, montant, stock, credit, estado, onMaj) {
+    if (estado.v == null) estado.v = Math.min(montant, stock);
+    var boutons = container.querySelectorAll('#stepper-' + id + ' .cout-stepper-bouton');
+    var segRes = container.querySelector('#seg-res-' + id);
+    var segCred = container.querySelector('#seg-cred-' + id);
+    var resume = container.querySelector('#resume-' + id);
+    function maj() {
+      var v = estado.v;
+      var pctRes = montant ? (v / montant) * 100 : 0;
+      segRes.style.width = pctRes + '%';
+      segCred.style.width = (100 - pctRes) + '%';
+      resume.innerHTML = '<span class="valeur-ressource">' + v + ' ' + label + '</span>' +
+        (montant - v > 0 ? ' + <span class="valeur-credit">' + (montant - v) + ' Crédit</span>' : '');
+      boutons[0].disabled = v <= 0;
+      boutons[1].disabled = v >= Math.min(montant, stock);
+      if (onMaj) onMaj((montant - v) > credit);
+    }
+    boutons[0].onclick = function () { estado.v = Math.max(0, estado.v - 1); maj(); };
+    boutons[1].onclick = function () { estado.v = Math.min(Math.min(montant, stock), estado.v + 1); maj(); };
+    maj();
+  }
+
+  // --- Flows Feuille (un par contexte.type de FEUILLE_TYPES_SUPPORTES_),
+  // branchés sur les VRAIES données de la partie. ---
+
+  function feuilleFlowOptionExclusive_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var options = contexte.options.map(libelleOption_);
+    feuillePousserEtape_({
+      titre: 'Choisissez une option', nbEtapes: 1, etapeIndex: 0,
+      html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('opt', options, false) + '</div>',
+      brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'opt', false); },
+      onValider: function () {
+        var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+        feuilleRejetCourant_ = null;
+        resolve({ indexChoisi: i });
+      }
+    }, feuillePile_.length ? 'avant' : null);
+    return promise;
+  }
+
+  function feuilleFlowOptionsInclusives_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    var selection = [];
+    feuilleRejetCourant_ = function () { resolve(selection); };
+    var options = contexte.options.map(libelleOption_);
+    var etape = {
+      titre: 'Une ou plusieurs options (et/ou)', nbEtapes: 1, etapeIndex: 0,
+      html: '',
+      brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'inc', true, function (indices) { selection = indices; etape.html = html(); }); },
+      onValider: function () {
+        feuilleRejetCourant_ = null;
+        // ≥ 2 options choisies -> focusEngine.js va résoudre chacune, DANS
+        // L'ORDRE de contexte.options (resoudreOption_/reduce), via un
+        // demanderChoix INDÉPENDANT à chaque fois — voir
+        // feuilleConsommerEtiquetteSequence_.
+        feuilleSequenceEtOu_ = selection.length > 1
+          ? { libelles: selection.map(function (i) { return options[i]; }), position: 0 }
+          : null;
+        resolve(selection);
+      }
+    };
+    function html() {
+      return '<div class="feuille-section">' + feuilleRangeeChoixHTML_('inc', options, true, selection) + '</div>';
+    }
+    etape.html = html();
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+    return promise;
+  }
+
+  function feuilleFlowPaiementRessource_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var estado = {};
+    var label = CHAMP_RESSOURCE[contexte.ressource].label;
+    var montant = contexte.montant;
+    var stockRessource = contexte.stockRessource || 0;
+    var stockCredit = contexte.stockCredit || 0;
+    var combinaisonImpossible = stockRessource + stockCredit < montant;
+    feuillePousserEtape_({
+      titre: 'Payer ' + montant + ' ' + label, nbEtapes: 1, etapeIndex: 0,
+      html: combinaisonImpossible
+        ? '<p class="hint">Stock : ' + stockRessource + ' ' + label + ', ' + stockCredit + ' Crédit.</p>' +
+          '<p class="hint" style="color:var(--color-coral);">Insuffisant même en substituant tout le Crédit disponible (1 Crédit = 1 ' + label + ') — Annuler.</p>'
+        : '<div class="feuille-section">' + feuilleStepperCoutHTML_('pay', label, montant, stockRessource, stockCredit) + '</div>',
+      brancher: combinaisonImpossible ? null : function (el) {
+        feuilleBrancherStepperCout_(el, 'pay', label, montant, stockRessource, stockCredit, estado, function (impossible) { feuilleEls_.btnValider.disabled = impossible; });
+      },
+      onValider: combinaisonImpossible ? null : function () { feuilleRejetCourant_ = null; resolve({ utiliseRessource: estado.v }); }
+    }, feuillePile_.length ? 'avant' : null);
+    return promise;
+  }
+
+  function feuilleFlowGagnerProgramme_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var partieProgramme = partieAffichee;
+    var TYPES_PROGRAMME_ORDRE_ = ['Domination', 'Force', 'Soutien', 'Richesse'];
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+
+    feuillePousserEtape_({
+      titre: etiquette + 'Gagner un Programme', nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Chargement…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    DB.getAll('programmes').then(function (catalogue) {
+      var pm = partieProgramme.plateauMaison || {};
+      var dejaEnJeu = (Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : [])
+        .filter(Boolean).map(function (s) { return s.nom; }).filter(Boolean);
+      var dejaEnMain = (pm.programmesEnMain || []).concat(dejaEnJeu);
+      var offres = Array.isArray(pm.offresProgramme) ? pm.offresProgramme : [];
+      var typesAffiches = contexte.typeImpose ? [contexte.typeImpose] : TYPES_PROGRAMME_ORDRE_;
+      var offreParNom_ = {};
+      offres.forEach(function (o) { offreParNom_[o.nom] = true; });
+
+      var disponibles = catalogue.filter(function (p) {
+        return typesAffiches.indexOf(p.type) !== -1 && dejaEnMain.indexOf(p.nom) === -1;
+      }).sort(function (a, b) {
+        var ia = typesAffiches.indexOf(a.type), ib = typesAffiches.indexOf(b.type);
+        return ia !== ib ? ia - ib : a.nom.localeCompare(b.nom);
+      });
+
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!disponibles.length) {
+        etapeCourante.html = '<p class="hint">Aucun Programme disponible' + (contexte.typeImpose ? ' de type ' + contexte.typeImpose : '') + ' (déjà tous en main).</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+
+      var options = disponibles.map(function (p) { return (offreParNom_[p.nom] ? '★ ' : '') + p.nom + ' — ' + p.type; });
+      etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('prog', options, false) + '</div>';
+      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'prog', false); };
+      etapeCourante.onValider = function () {
+        var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+        var nomChoisi = disponibles[i].nom;
+        feuilleEls_.btnValider.disabled = true;
+        GameService.gagnerProgramme(partieProgramme.id, nomChoisi).then(function (resultat) {
+          feuilleEls_.btnValider.disabled = false;
+          feuilleRejetCourant_ = null;
+          resolve({ detail: 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.', nom: resultat.nom, type: resultat.type });
+        }).catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec de l\'obtention du Programme : ' + erreur.message);
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des Programmes : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  function feuilleFlowDeplacerCorruption_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var partieDeplacer = partieAffichee;
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+
+    var pistesCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
+      return !!(partieDeplacer.civilisation && partieDeplacer.civilisation.corrompues && partieDeplacer.civilisation.corrompues[p]);
+    });
+    var possedeChambreDep = nomsTechnologiesJoueur_(partieDeplacer).indexOf('chambres de décontamination') !== -1;
+    var techChambreDep = technologieChambreDecontamination_(partieDeplacer);
+    var maxChambreDep = techChambreDep ? (techChambreDep.amelioree ? 3 : 2) : 0;
+    var corruptionStockeeDep = (partieDeplacer.plateauMaison && partieDeplacer.plateauMaison.corruptionChambreDecontamination) || 0;
+    var optionsRetraitPisteDep_ = { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieDeplacer) };
+
+    function libelleCibleDep_(c) {
+      if (c.cle === 'secteur') return 'Secteur ' + c.numero;
+      if (c.cle === 'piste') return 'la piste ' + CivilisationService.NOM_PISTE[c.piste];
+      if (c.cle === 'techno') return 'Chambres de décontamination';
+      return 'un Programme (manuellement)';
+    }
+    function executerRetraitDep_(source) {
+      if (source.cle === 'secteur') return SecteurService.retirerCorruption(partieDeplacer.id, source.numero);
+      if (source.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, source.piste, false, optionsRetraitPisteDep_);
+      if (source.cle === 'techno') {
+        var champs = { corruptionChambreDecontamination: corruptionStockeeDep - 1 };
+        return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
+          partieDeplacer.plateauMaison.corruptionChambreDecontamination = corruptionStockeeDep - 1;
+        });
+      }
+      return Promise.resolve();
+    }
+    function executerPlacementDep_(destination) {
+      if (destination.cle === 'secteur') return SecteurService.placerCorruption(partieDeplacer.id, destination.numero);
+      if (destination.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, destination.piste, true);
+      if (destination.cle === 'techno') {
+        var champs = { corruptionChambreDecontamination: corruptionStockeeDep + 1 };
+        return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
+          partieDeplacer.plateauMaison.corruptionChambreDecontamination = corruptionStockeeDep + 1;
+        });
+      }
+      return Promise.resolve();
+    }
+    function terminerDeplacement_(source, destination) {
+      feuilleEls_.btnValider.disabled = true;
+      executerPlacementDep_(destination)
+        .then(function () { return executerRetraitDep_(source); })
+        .then(function () {
+          feuilleRejetCourant_ = null;
+          feuilleEls_.btnValider.disabled = false;
+          resolve({ detail: 'Corruption déplacée de ' + libelleCibleDep_(source) + ' vers ' + libelleCibleDep_(destination) + '.' });
+        })
+        .catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec du déplacement : ' + erreur.message);
+        });
+    }
+
+    function afficherSousChoixDestination_(source, cle, liste, labelFn) {
+      feuillePousserEtape_({
+        titre: etiquette + 'Destination — ' + (cle === 'secteur' ? 'Secteur' : 'Piste'), nbEtapes: 2, etapeIndex: 1,
+        racineSequence: false,
+        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstSel', liste.map(labelFn), false) + '</div>',
+        brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'depDstSel', false); },
+        onValider: function () {
+          var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          var item = liste[i];
+          terminerDeplacement_(source, cle === 'secteur' ? { cle: 'secteur', numero: item.numero } : { cle: 'piste', piste: item });
+        }
+      }, 'avant');
+    }
+
+    function chargerEtAfficherDestination_(source) {
+      var etapeChargement = { titre: etiquette + 'Destination', nbEtapes: 2, etapeIndex: 1, racineSequence: false, html: '<p class="hint">Chargement…</p>' };
+      feuillePousserEtape_(etapeChargement, 'avant');
+
+      var pistesNonCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
+        return !(partieDeplacer.civilisation && partieDeplacer.civilisation.corrompues && partieDeplacer.civilisation.corrompues[p]);
+      });
+      var chambreDisponibleDep = possedeChambreDep && corruptionStockeeDep < maxChambreDep;
+
+      SecteurService.obtenirSecteursEligiblesGainCorruption(partieDeplacer.id).then(function (eligiblesSecteursGain) {
+        var options = [];
+        if (eligiblesSecteursGain.length) options.push({ cle: 'secteur', label: 'Secteur' });
+        if (pistesNonCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+        options.push({ cle: 'programme', label: 'Programme (à placer manuellement)' });
+        if (source.cle !== 'techno' && chambreDisponibleDep) {
+          options.push({ cle: 'techno', label: 'Chambres de décontamination (' + (maxChambreDep - corruptionStockeeDep) + ' libre(s))' });
+        }
+
+        var etapeCourante = feuillePile_[feuillePile_.length - 1];
+        // -1 : aucune coche par défaut (feuilleRangeeChoixHTML_ marque
+        // sinon l'index 0 "sélectionné" — trompeur ici, ces rangées
+        // naviguent IMMÉDIATEMENT au tap, ne sont jamais "sélectionnées").
+        etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstCat', options.map(function (o) { return o.label; }), false, -1) + '</div>';
+        etapeCourante.brancher = function (el) {
+          feuilleBrancherRangeeChoixImmediat_(el, 'depDstCat', function (i) {
+            var cle = options[i].cle;
+            if (cle === 'secteur') return afficherSousChoixDestination_(source, 'secteur', eligiblesSecteursGain, function (e) { return 'Secteur ' + e.numero; });
+            if (cle === 'piste') return afficherSousChoixDestination_(source, 'piste', pistesNonCorrompuesDep, function (p) { return CivilisationService.NOM_PISTE[p]; });
+            if (cle === 'programme') return terminerDeplacement_(source, { cle: 'programme' });
+            if (cle === 'techno') return terminerDeplacement_(source, { cle: 'techno' });
+          });
+        };
+        feuilleRendreEtape_(etapeCourante, null);
+      }).catch(function (erreur) {
+        window.alert('Échec du chargement des secteurs : ' + erreur.message);
+      });
+    }
+
+    function afficherSousChoixSource_(cle, liste, labelFn) {
+      feuillePousserEtape_({
+        titre: etiquette + 'Source — ' + (cle === 'secteur' ? 'Secteur' : 'Piste'), nbEtapes: 2, etapeIndex: 0,
+        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depSrcSel', liste.map(labelFn), false) + '</div>',
+        brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'depSrcSel', false); },
+        onValider: function () {
+          var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          var item = liste[i];
+          chargerEtAfficherDestination_(cle === 'secteur' ? { cle: 'secteur', numero: item.numero } : { cle: 'piste', piste: item });
+        }
+      }, feuillePile_.length ? 'avant' : null);
+    }
+
+    SecteurService.obtenirSecteursEligiblesRetraitCorruption(partieDeplacer.id).then(function (eligiblesSecteursRetrait) {
+      var options = [];
+      if (eligiblesSecteursRetrait.length) options.push({ cle: 'secteur', label: 'Secteur' });
+      if (pistesCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+      options.push({ cle: 'programme', label: 'Programme (à retirer manuellement)' });
+      if (possedeChambreDep && corruptionStockeeDep > 0) {
+        options.push({ cle: 'techno', label: 'Chambres de décontamination (' + corruptionStockeeDep + ' stockée(s))' });
+      }
+
+      feuillePousserEtape_({
+        titre: etiquette + 'Déplacer une Corruption — Source', nbEtapes: 2, etapeIndex: 0,
+        // -1 : idem ci-dessus (voir chargerEtAfficherDestination_) — aucune
+        // coche par défaut sur ces rangées "catégorie" à navigation immédiate.
+        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depSrcCat', options.map(function (o) { return o.label; }), false, -1) + '</div>',
+        brancher: function (el) {
+          feuilleBrancherRangeeChoixImmediat_(el, 'depSrcCat', function (i) {
+            var cle = options[i].cle;
+            if (cle === 'secteur') return afficherSousChoixSource_('secteur', eligiblesSecteursRetrait, function (e) { return 'Secteur ' + e.numero; });
+            if (cle === 'piste') return afficherSousChoixSource_('piste', pistesCorrompuesDep, function (p) { return CivilisationService.NOM_PISTE[p]; });
+            if (cle === 'programme') return chargerEtAfficherDestination_({ cle: 'programme' });
+            if (cle === 'techno') return chargerEtAfficherDestination_({ cle: 'techno' });
+          });
+        }
+      }, feuillePile_.length ? 'avant' : null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  function demanderChoixFeuille_(contexte) {
+    if (contexte.type === 'option_exclusive') return feuilleFlowOptionExclusive_(contexte);
+    if (contexte.type === 'options_inclusives') return feuilleFlowOptionsInclusives_(contexte);
+    if (contexte.type === 'paiement_ressource') return feuilleFlowPaiementRessource_(contexte);
+    if (contexte.type === 'gagner_programme') return feuilleFlowGagnerProgramme_(contexte);
+    if (contexte.type === 'deplacer_corruption') return feuilleFlowDeplacerCorruption_();
+    return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
+  }
+
   function demanderChoix(contexte) {
+    // Feuille d'action (Focus Conquête Standard uniquement, voir
+    // carteEligibleFeuille_ ci-dessus) : intercepte les types qu'elle sait
+    // résoudre, court-circuitant TOUT le reste de cette fonction (y
+    // compris `modal.hidden = false` tout en bas) — #modal-choix ne
+    // s'affiche donc jamais pour ces types-là sur cette carte. Tout autre
+    // type (dont 'regrouper'/'envahir', volontairement hors de
+    // FEUILLE_TYPES_SUPPORTES_) et toute autre carte retombent sur le
+    // reste de cette fonction, INCHANGÉ.
+    if (carteEnFeuille_ && FEUILLE_TYPES_SUPPORTES_.indexOf(contexte.type) !== -1) {
+      return demanderChoixFeuille_(contexte);
+    }
+    // Repli #modal-choix alors qu'on est en mode Feuille (ex. 'regrouper'/
+    // 'envahir' choisis via Engager) : masque la feuille le temps de cette
+    // étape SANS l'annuler (feuilleFermer_ ne touche jamais feuillePile_/
+    // feuilleSequenceEtOu_) — elle ressurgira automatiquement si un type
+    // Feuille revient ensuite (le paiement du coût, voir
+    // feuillePousserEtape_ qui annule ce masquage).
+    if (carteEnFeuille_) feuilleFermer_();
+
     var modal = document.getElementById('modal-choix');
     var titre = document.getElementById('modal-choix-titre');
     var contenu = document.getElementById('modal-choix-contenu');

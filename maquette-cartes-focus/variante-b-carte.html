@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Variante B</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+  <nav class="maquette-nav">
+    <a href="index.html">Sommaire</a>
+    <a href="actuel.html">Design actuel (référence)</a>
+    <a href="variante-a-popup.html">Variante A — Toujours une popup</a>
+    <a href="variante-b-carte.html" class="actif">Variante B — Sélection depuis la carte (abandonnée)</a>
+    <a href="variante-c-feuille.html">Variante C — Feuille d'action</a>
+  </nav>
+
+  <header class="topbar">
+    <h1 class="topbar-titre">Variante B<span class="topbar-accent">Sélection depuis la carte</span></h1>
+  </header>
+
+  <div class="maquette-intro" style="border-color:var(--color-coral);color:var(--color-text);">
+    <strong>Abandonnée</strong> (décision utilisateur) — conservée telle
+    quelle pour référence. La piste retenue est la
+    <a href="variante-a-popup.html">Variante A</a>, déclinée pour mobile
+    dans la <a href="variante-c-feuille.html">Variante C</a>.
+  </div>
+
+  <div class="maquette-intro">
+    "▶" ne résout QUE les effets sans aucun choix réel (cas A/B — flash
+    immédiat, pas de popup pour rien). Dès qu'il y a une vraie décision à
+    prendre, la carte se déplie sur place (coût + effet inline, "Valider"
+    en bas du panneau) — sans quitter la liste des Focus. Seuls les
+    configurateurs multi-étapes (Regrouper/Envahir) restent en popup
+    dédiée : un bouton "Configurer →" les ouvre depuis le panneau déplié.
+  </div>
+
+  <div id="cartes"></div>
+
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="modal-titre">Titre</h3>
+      <div id="modal-contenu"></div>
+      <div class="modal-actions">
+        <button id="modal-annuler" class="btn btn-secondary">Annuler</button>
+        <button id="modal-valider" class="btn btn-primary" hidden>Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="donnees.js"></script>
+<script>
+(function () {
+  var overlay = document.getElementById('modal');
+  var titre = document.getElementById('modal-titre');
+  var contenu = document.getElementById('modal-contenu');
+  var btnAnnuler = document.getElementById('modal-annuler');
+  var btnValider = document.getElementById('modal-valider');
+  function ouvrirModal() { overlay.hidden = false; }
+  function fermerModal() { overlay.hidden = true; }
+  btnAnnuler.onclick = fermerModal;
+
+  function flash(carteId, texte) {
+    var el = document.querySelector('.focus-action[data-id="' + carteId + '"] .focus-action-resultat');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = '✓ ' + texte;
+  }
+
+  var container = document.getElementById('cartes');
+  container.innerHTML = CARTES_EXEMPLE.map(function (c) {
+    return '<div class="card focus-card" style="margin-bottom:14px;">' +
+      '<h3>' + c.focus + '</h3>' +
+      '<div class="focus-action" data-id="' + c.id + '">' +
+      '<div class="focus-action-corps">' +
+      '<p class="cas-tag">' + c.cas + '</p>' +
+      '<p class="focus-action-nom">' + c.action + '</p>' +
+      '<p>' + c.texte + '</p>' +
+      '<p class="section-auto focus-action-resultat" hidden style="margin-top:8px;"></p>' +
+      '</div>' +
+      '<div class="focus-action-side">' +
+      pastillesCoutHTML(c.cout) +
+      '<button class="btn-jouer-action" title="Jouer cette action">▶</button>' +
+      '</div>' +
+      '<div class="focus-action-panneau"></div>' +
+      '</div>' +
+      '</div>';
+  }).join('');
+
+  Array.prototype.forEach.call(container.querySelectorAll('.btn-jouer-action'), function (btn) {
+    btn.addEventListener('click', function () {
+      var ligne = btn.closest('.focus-action');
+      var id = ligne.dataset.id;
+      var carte = CARTES_EXEMPLE.filter(function (c) { return c.id === id; })[0];
+      document.querySelectorAll('.focus-action-resultat').forEach(function (el) { el.hidden = true; });
+
+      if (carte.type === 'auto') { flash(carte.id, '+1 Influence, −1 Crédit.'); return; }
+      if (carte.type === 'informatif') { flash(carte.id, '+' + carte.revenuActuel + ' ' + carte.ressource + ' (Revenu actuel).'); return; }
+
+      // Bascule l'accordéon (referme si déjà ouverte).
+      var etaitOuverte = ligne.classList.contains('ouverte');
+      document.querySelectorAll('.focus-action.ouverte').forEach(function (l) { l.classList.remove('ouverte'); });
+      if (etaitOuverte) return;
+      ligne.classList.add('ouverte');
+      remplirPanneau(carte, ligne.querySelector('.focus-action-panneau'));
+    });
+  });
+
+  function repartitionHTML(id, label, montant, stock, credit) {
+    var defaut = Math.min(montant, stock);
+    return '<div class="paiement-repartition" data-id="' + id + '">' +
+      '<input type="range" min="0" max="' + montant + '" value="' + defaut + '" id="range-' + id + '">' +
+      '<span class="paiement-repartition-resume" id="resume-' + id + '"></span>' +
+      '</div>' +
+      '<p class="hint" style="margin:-6px 0 10px;">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>';
+  }
+  function brancherRepartition(id, label, montant, stock, credit, onMaj) {
+    var range = document.getElementById('range-' + id);
+    var resume = document.getElementById('resume-' + id);
+    function maj() {
+      var v = Number(range.value);
+      var c = montant - v;
+      resume.innerHTML = '<span class="valeur-ressource">' + v + ' ' + label + '</span>' +
+        (c > 0 ? ' + <span class="valeur-credit">' + c + ' Crédit</span>' : '');
+      if (onMaj) onMaj(c > credit);
+    }
+    range.addEventListener('input', maj);
+    maj();
+  }
+
+  function remplirPanneau(carte, panneau) {
+    var html = '<p class="focus-action-panneau-titre">Coût</p>';
+    if (!carte.cout.length) {
+      html += '<p class="hint">Aucun coût.</p>';
+    } else if (carte.id === 'conquete-planifier') {
+      html += '<p class="hint">1 Crédit (non substituable).</p>' + repartitionHTML('energie', 'Énergie', 1, carte.energieReserve, carte.energieCredit);
+    } else if (carte.id === 'conquete-engager') {
+      html += repartitionHTML('materiel', 'Énergie', 2, 2, 4);
+    } else {
+      html += '<p class="hint">' + carte.cout.map(function (c) { return c.titre; }).join(', ') + '.</p>';
+    }
+
+    html += '<p class="focus-action-panneau-titre" style="margin-top:12px;">Effet</p>';
+
+    if (carte.type === 'exclusif') {
+      html += '<div class="modal-choix-cases">' + carte.options.map(function (o, i) {
+        return '<label class="modal-choix-case"><input type="radio" name="ex-' + carte.id + '" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + o + '</label>';
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-primary" id="valider-' + carte.id + '" style="width:100%;margin-top:6px;">Valider</button>';
+    } else if (carte.type === 'inclusif') {
+      html += '<div class="modal-choix-cases">' + carte.options.map(function (o, i) {
+        return '<label class="modal-choix-case"><input type="checkbox" name="in-' + carte.id + '" value="' + i + '"> ' + o + '</label>' +
+          (o === 'Déplacer une Corruption'
+            ? '<select id="cible-corruption-' + carte.id + '" class="modal-choix-select" style="display:none;">' +
+              carte.ciblesCorruption.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select>'
+            : '');
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-primary" id="valider-' + carte.id + '" style="width:100%;margin-top:6px;">Valider</button>';
+    } else if (carte.type === 'exclusif-configurateur') {
+      html += '<div class="modal-choix-cases">' + carte.options.map(function (o, i) {
+        return '<label class="modal-choix-case"><input type="radio" name="conf-' + carte.id + '" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + o + '</label>';
+      }).join('') + '</div>' +
+      '<p class="hint">Configuration multi-étapes (cibles, engagement) → reste en popup dédiée, comme aujourd’hui.</p>' +
+      '<button type="button" class="btn btn-primary" id="configurer-' + carte.id + '" style="width:100%;margin-top:6px;">Configurer →</button>';
+    }
+
+    panneau.innerHTML = html;
+
+    if (carte.id === 'conquete-planifier') {
+      var btnValiderInclusif = document.getElementById('valider-' + carte.id);
+      brancherRepartition('energie', 'Énergie', 1, carte.energieReserve, carte.energieCredit, function (impossible) { btnValiderInclusif.disabled = impossible; });
+      var caseCorruption = panneau.querySelector('input[value="1"]');
+      var selectCorruption = document.getElementById('cible-corruption-' + carte.id);
+      caseCorruption.addEventListener('change', function () { selectCorruption.style.display = caseCorruption.checked ? '' : 'none'; });
+      btnValiderInclusif.onclick = function () {
+        var choisies = Array.prototype.filter.call(panneau.querySelectorAll('input:checked'), function () { return true; })
+          .map(function (cb) { return carte.options[Number(cb.value)]; });
+        panneau.closest('.focus-action').classList.remove('ouverte');
+        flash(carte.id, (choisies.join(' + ') || 'aucune option') + ' — validé depuis la carte, sans quitter la liste.');
+      };
+    }
+
+    if (carte.id === 'developpement-harmoniser') {
+      document.getElementById('valider-' + carte.id).onclick = function () {
+        var i = Number(panneau.querySelector('input:checked').value);
+        panneau.closest('.focus-action').classList.remove('ouverte');
+        flash(carte.id, carte.options[i] + ' — appliqué.');
+      };
+    }
+
+    if (carte.id === 'conquete-engager') {
+      brancherRepartition('materiel', 'Énergie', 2, 2, 4);
+      document.getElementById('configurer-' + carte.id).onclick = function () {
+        var i = Number(panneau.querySelector('input:checked').value);
+        panneau.closest('.focus-action').classList.remove('ouverte');
+        ouvrirConfigurateur(carte, carte.options[i]);
+      };
+    }
+  }
+
+  function ouvrirConfigurateur(carte, option) {
+    if (option !== 'Regrouper') {
+      titre.textContent = 'Envahir un secteur';
+      contenu.innerHTML = '<p class="hint">Même configurateur qu’aujourd’hui (cible + engagement multi-source + résolution de combat) — non détaillé dans cette maquette, cas G identique à "actuel.html".</p>';
+      btnValider.hidden = true;
+      btnAnnuler.hidden = false;
+      ouvrirModal();
+      return;
+    }
+    var mouvements = [];
+    function render() {
+      titre.textContent = 'Regrouper';
+      btnAnnuler.hidden = false;
+      var total = mouvements.reduce(function (s, m) { return s + m.q; }, 0);
+      contenu.innerHTML = '<p class="hint">Déplacements utilisés : <strong>' + total + ' / 5</strong></p>' +
+        (mouvements.length
+          ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+              return '<li>' + m.q + '× Corvette : Secteur ' + m.d + ' → Secteur ' + m.a +
+                ' <button type="button" class="btn-lien" data-retirer="' + i + '">retirer</button></li>';
+            }).join('') + '</ul>'
+          : '<p class="hint">Aucun déplacement ajouté.</p>') +
+        '<div class="regrouper-form">' +
+        '<select id="mock-depart">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<select id="mock-arrivee" style="margin-top:6px;">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<input type="number" min="1" step="1" value="1" id="mock-quantite" style="margin-top:6px;">' +
+        '<button type="button" class="btn btn-secondary" id="mock-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+        '</div>';
+      Array.prototype.forEach.call(contenu.querySelectorAll('[data-retirer]'), function (btn) {
+        btn.onclick = function () { mouvements.splice(Number(btn.dataset.retirer), 1); render(); };
+      });
+      document.getElementById('mock-ajouter').onclick = function () {
+        mouvements.push({
+          d: document.getElementById('mock-depart').value,
+          a: document.getElementById('mock-arrivee').value,
+          q: Math.max(1, Number(document.getElementById('mock-quantite').value) || 1)
+        });
+        render();
+      };
+      btnValider.hidden = mouvements.length === 0;
+      btnValider.textContent = 'Valider';
+      btnValider.onclick = function () { fermerModal(); flash(carte.id, mouvements.reduce(function (s, m) { return s + m.q; }, 0) + ' unité(s) regroupée(s).'); };
+    }
+    render();
+    ouvrirModal();
+  }
+})();
+</script>
+</body>
+</html>

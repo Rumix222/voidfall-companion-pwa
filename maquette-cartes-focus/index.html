@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Cartes Focus</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+  <nav class="maquette-nav">
+    <a href="index.html" class="actif">Sommaire</a>
+    <a href="actuel.html">Design actuel (référence)</a>
+    <a href="variante-a-popup.html">Variante A — Toujours une popup</a>
+    <a href="variante-b-carte.html">Variante B — Sélection depuis la carte (abandonnée)</a>
+    <a href="variante-c-feuille.html">Variante C — Feuille d'action</a>
+  </nav>
+
+  <header class="topbar">
+    <h1 class="topbar-titre">Maquette<span class="topbar-accent">Cartes Focus</span></h1>
+  </header>
+
+  <div class="maquette-intro">
+    Maquette statique (HTML/CSS/JS minimal, <strong>aucun moteur de jeu
+    branché</strong>) explorant une refonte du design des cartes Focus —
+    voir <a href="NOTES.md">NOTES.md</a> pour l'inventaire complet des cas
+    d'interaction actuels et le détail de la démarche. État des lieux :
+    Variante A retenue comme principe (toujours le même composant),
+    Variante B abandonnée, Variante C = déclinaison mobile/iPhone de A.
+  </div>
+
+  <p class="maquette-section-titre">4 pages, mêmes 5 cartes d'exemple</p>
+
+  <div class="card">
+    <h3>Design actuel <span class="badge badge-type-standard">Référence</span></h3>
+    <p>Reconstitue le comportement d'aujourd'hui : chaque type d'effet a
+    son propre gabarit de popup (ou aucune popup) — sert de point de
+    comparaison, pas une proposition.</p>
+    <p><a href="actuel.html">Ouvrir →</a></p>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h3>Variante A <span class="badge badge-type-heroique">Toujours une popup — retenue</span></h3>
+    <p>Chaque clic sur une action Focus ouvre TOUJOURS une popup au
+    gabarit identique (Coût / Effet / Annuler-Valider), y compris pour un
+    effet aujourd'hui résolu sans aucune interaction.</p>
+    <p><a href="variante-a-popup.html">Ouvrir →</a></p>
+  </div>
+
+  <div class="card" style="margin-top:14px;opacity:0.6;">
+    <h3>Variante B <span class="badge">Sélection depuis la carte — abandonnée</span></h3>
+    <p>La carte se dépliait sur place (accordéon) pour montrer coût et
+    effet sans quitter la liste. Conservée pour référence, non retenue.</p>
+    <p><a href="variante-b-carte.html">Ouvrir →</a></p>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h3>Variante C <span class="badge badge-type-heroique">Feuille d'action — iPhone</span></h3>
+    <p>Même principe que A (toujours le même composant), décliné mobile
+    d'abord : feuille tactile ancrée en bas, hauteur au contenu,
+    glissable/rejetable au doigt, étapes qui glissent dans la même feuille
+    au lieu d'empiler des popups, coût réglé au stepper plutôt qu'au
+    curseur.</p>
+    <p><a href="variante-c-feuille.html">Ouvrir →</a></p>
+  </div>
+</div>
+
+</body>
+</html>

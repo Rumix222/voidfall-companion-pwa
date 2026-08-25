@@ -1,9 +1,224 @@
 /**
  * version.js
- * Version 84 — 2026-08-24
+ * Version 88 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 24/08/2026, dernière fois (POC — popup de paiement systématique pour
+ * 25/08/2026, dernière fois (Feuille d'action EN PRODUCTION — Focus
+ * Conquête Standard, retour utilisateur : "implémente cette version du
+ * poc dans la vraie appli sur le même focus") :
+ * Après validation sur l'écran Test (état factice), la feuille tactile
+ * (maquette-cartes-focus/variante-c-feuille.html) devient un VRAI rendu
+ * alternatif de `StrategieService.demanderChoix` — branchée sur les
+ * vraies données de la partie, pour de vrai jouable depuis l'écran Focus.
+ * - Scope VOLONTAIREMENT limité : `carteEligibleFeuille_` ne couvre QUE
+ *   Focus Conquête **Standard** (celle testée tout du long) — Astoran/
+ *   Yarvek/Zenor/Héroïque ont un Conquête différent (clés Effet non
+ *   couvertes ici), toute autre carte du catalogue continue d'utiliser
+ *   `#modal-choix`, INCHANGÉ. `FEUILLE_TYPES_SUPPORTES_` ne couvre que les
+ *   5 `contexte.type` que cette carte déclenche réellement
+ *   (option_exclusive/options_inclusives/paiement_ressource/
+ *   gagner_programme/deplacer_corruption) — "regrouper"/"envahir" (choix
+ *   possibles d'Engager, formulaires d'engagement multi-unités/
+ *   calculateur de combat) retombent volontairement sur `#modal-choix`
+ *   INCHANGÉ même en mode Feuille : la feuille se MASQUE (pas annulée —
+ *   `feuillePile_`/`feuilleSequenceEtOu_` intacts) le temps de cette
+ *   étape, la modale classique prend le relais, puis la feuille RESSURGIT
+ *   automatiquement si une étape Feuille suit (ex. le paiement du coût
+ *   d'Engager, après Regrouper/Envahir) — `feuillePousserEtape_` annule le
+ *   masquage retardé en attente et ré-affiche le voile.
+ * - `jouerAction_` : positionne `carteEnFeuille_` et ouvre la feuille
+ *   AVANT même le premier `demanderChoix` (dès l'appui sur l'action, pas
+ *   seulement à la première popup) ; la referme dans TOUS les cas
+ *   (succès/échec/erreur), filet de sécurité.
+ * - `demanderChoix` : nouveau garde-fou tout en haut — intercepte les
+ *   types supportés en mode Feuille (`demanderChoixFeuille_`), court-
+ *   circuitant tout le reste de la fonction (dont `modal.hidden = false`
+ *   en bas) ; sinon masque la feuille si elle était active puis continue
+ *   INCHANGÉ.
+ * - `demanderChoixFeuille_` + 5 `feuilleFlow*_` réutilisent EXACTEMENT les
+ *   mêmes fonctions métier que les branches `#modal-choix` équivalentes
+ *   (`SecteurService.retirerCorruption`/`placerCorruption`,
+ *   `CivilisationService.definirCorruption`,
+ *   `GameService.majPlateauMaison`/`gagnerProgramme`, `DB.getAll
+ *   ('programmes')`) — seul le CHROME (rendu HTML/DOM) change, jamais la
+ *   logique de persistance. "Déplacer une Corruption" (le plus complexe :
+ *   catégorie source → sous-choix → catégorie destination → sous-choix)
+ *   troque les `<select>`+bouton "Valider" de la modale contre des
+ *   rangées `rangée-choix` — cibles tactiles catégorie navigant
+ *   IMMÉDIATEMENT au tap (comme les boutons `.btn-choix-liste` d'origine),
+ *   sous-choix Secteur/Piste par rangée + Valider.
+ * - Bug de fond corrigé PENDANT la conception (repéré avant tout
+ *   dégât — jamais livré cassé) : le bouton "← Retour" restait visible
+ *   entre 2 appels `demanderChoix` INDÉPENDANTS (ex. entre "Gagner un
+ *   Programme" et "Déplacer une Corruption" au sein d'un même "et/ou"),
+ *   permettant de revenir sur une étape dont la Promise était déjà
+ *   résolue — un clic Valider dessus ne faisait plus rien, l'action
+ *   restait bloquée en attente indéfiniment. Nouveau champ d'étape
+ *   `racineSequence` (`false` UNIQUEMENT sur une sous-étape imbriquée DANS
+ *   un même flow, ex. destination après source de "Déplacer une
+ *   Corruption" — même Promise, pas encore résolue) ; `feuilleRendreEtape_`
+ *   ne montre "← Retour" que dans ce cas précis. **Même correctif appliqué
+ *   à l'écran Test** (`index.html`, `rendreEtape`), qui portait le même
+ *   bug latent (jamais cliqué pendant les vérifications précédentes).
+ * - Bug cosmétique corrigé en vérifiant : les rangées "catégorie" de
+ *   Déplacer une Corruption (navigation immédiate, pas de sélection
+ *   persistante) affichaient à tort une coche ✓ sur la première option par
+ *   défaut (`feuilleRangeeChoixHTML_` marque l'index 0 sauf 4e paramètre
+ *   explicite) — corrigé en passant `-1` (aucun index par défaut).
+ * `index.html` : nouveau markup `#feuille`/`#feuille-scrim` (identique à
+ * l'écran Test, ids sans préfixe `test-`) juste après `#modal-choix`.
+ * 145 tests `*.test.js` + toutes les suites `*_test.js` au vert (aucune
+ * logique de focusEngine.js/gameService.js/secteurService.js/
+ * civilisationService.js touchée par ce changement, uniquement
+ * strategieService.js/index.html). Vérifié aussi manuellement dans un vrai
+ * navigateur (Playwright, script ad-hoc, gabarit iPhone 390×844, partie
+ * réelle Belitan) : Préparer (paiement systématique, feuille se ferme
+ * après validation) ; Planifier (et/ou réel -> 32 Programmes du VRAI
+ * catalogue -> Déplacer Corruption réel avec les VRAIES éligibilités de la
+ * partie -> paiement) ; Engager (choix Envahir/Regrouper en Feuille ->
+ * repli #modal-choix confirmé pour Regrouper, feuille bien masquée
+ * pendant ce temps) — zéro erreur JS sur tout le parcours.
+ * Fichiers touchés : strategieService.js, index.html, version.js.
+ *
+ * 25/08/2026, avant (Substitution Crédit devenue SYSTÉMATIQUE
+ * pour Nourriture/Énergie/Matériel — retour utilisateur, après test sur
+ * l'écran Test/Feuille d'action sur iPhone : "je veux avoir le choix
+ * crédit s'il y a du coût nourriture énergie matériel") :
+ * Le POC limité à UNE carte (Focus Conquête "Préparer", entrée
+ * précédente) est retenu comme comportement DÉFINITIF ("option 1" des 3
+ * envisagées en session — la popup s'ouvre désormais TOUJOURS pour un
+ * Coût en Nourriture/Énergie/Matériel, même quand la réserve seule
+ * suffit, sur N'IMPORTE QUELLE carte du catalogue (Focus, Programme,
+ * Cadre d'Événement — tout ce qui passe par FocusEngine.resoudreCle_).
+ * - `focusEngine.js` : supprime `POC_TOUJOURS_PROPOSER_SUBSTITUTION_` et
+ *   la condition `etat[champ] < valeur || POC...indexOf(source)` du cas
+ *   dédié — ne reste que `RESSOURCES_SUBSTITUABLES_CREDIT_.indexOf(cle)
+ *   !== -1 && ... && signe < 0`, inconditionnel. Popup 'paiement_ressource'
+ *   (strategieService.js) et `coutSuffisant_` (grisage des boutons Focus)
+ *   INCHANGÉS — seule la CONDITION D'OUVERTURE de la popup change, pas sa
+ *   mécanique.
+ * - `focusEngine.test.js` : 2 tests renommés/réécrits pour refléter le
+ *   nouveau comportement par défaut ("réserve suffisante -> popup quand
+ *   même" au lieu de "aucune popup") plutôt que testé comme une exception
+ *   scopée à une carte ; 3 autres tests (effet_secteur, envahir, regrouper)
+ *   dont le coût Énergie n'était qu'un témoin accessoire mis à jour (soit
+ *   changé pour un coût en Crédit — non substituable, hors sujet — soit
+ *   leur stub `demanderChoix` étendu pour dispatcher aussi sur
+ *   'paiement_ressource'). `gameService_evolution18_undo_test.js` : même
+ *   correctif sur le stub du test Conquête "Planifier" (cout Énergie).
+ * 145 tests `*.test.js` + toutes les suites `*_test.js` au vert après ces
+ * changements. Vérifié aussi manuellement dans un vrai navigateur
+ * (Playwright, script ad-hoc, écran Test) : Focus Conquête "Planifier"
+ * (coût Crédit+Énergie, réserve large) ouvre bien la popup de paiement
+ * pour l'Énergie malgré la réserve suffisante, aucune erreur JS.
+ *
+ * Dans la foulée (même retour utilisateur, écran Test) : sur un choix
+ * "et/ou" à 2 options sélectionnées (ex. Focus Conquête "Planifier" —
+ * Gagner un Programme ET Déplacer une Corruption), rien ne signalait
+ * visuellement qu'une 2e action suivrait la première pendant la
+ * résolution de la première, ni qu'on était sur la 2e en la résolvant.
+ * - `index.html` (écran Test, `flowOptionsInclusives_`) : dès que ≥ 2
+ *   options sont cochées, mémorise leurs libellés dans l'ordre où
+ *   `focusEngine.js` va les résoudre (`sequenceEtOu_`) ; chaque flow
+ *   délégué susceptible d'apparaître dans un tel choix
+ *   (`flowGagnerProgramme_`/`flowDeplacerCorruption_`) préfixe désormais
+ *   son titre "Action X/N — " via `consommerEtiquetteSequence_()`, qui
+ *   avance le curseur et se réinitialise après la DERNIÈRE action de la
+ *   séquence (aussi réinitialisé au début de `jouerActionTest_`, pour ne
+ *   jamais fuiter d'une action à l'autre). Limité à l'écran Test pour
+ *   l'instant (pas encore porté dans `strategieService.js`/`#modal-choix`,
+ *   qui n'a pas ce concept de "feuille unique" pour l'instant).
+ * Vérifié manuellement (même script Playwright que ci-dessus) : "Action
+ * 1/2 — Gagner un Programme" puis "Action 2/2 — Déplacer une Corruption —
+ * source/destination" affichés correctement, aucune erreur JS.
+ * Fichiers touchés : focusEngine.js, focusEngine.test.js,
+ * gameService_evolution18_undo_test.js, index.html, version.js.
+ *
+ * 25/08/2026, avant (Bug bloquant — "crypto.randomUUID is not a
+ * function" à la création d'une partie sur iPhone, retour utilisateur en
+ * testant le nouvel écran Test ci-dessous) :
+ * `GameService.creerPartie` (js/gameService.js) appelait directement
+ * `crypto.randomUUID()` pour l'identifiant de partie — cette fonction
+ * n'existe QUE dans un contexte sécurisé (HTTPS ou localhost). Accéder à
+ * la PWA par son IP locale en simple HTTP (`http://192.168.x.x:8000`,
+ * nécessaire pour tester sur un vrai téléphone sans certificat) en fait un
+ * contexte non sécurisé : `crypto.randomUUID` y est absent de l'objet
+ * `crypto`, d'où l'erreur — jamais rencontrée en développement local
+ * (`localhost`/`127.0.0.1`, toujours considéré sécurisé).
+ * - Nouvelle fonction privée `genererIdPartie_()` : utilise
+ *   `crypto.randomUUID()` si disponible (comportement inchangé en
+ *   contexte sécurisé), sinon repli sur un UUID v4 assemblé à la main via
+ *   `crypto.getRandomValues()` (LUI n'est PAS restreint aux contextes
+ *   sécurisés, seuls `randomUUID`/`crypto.subtle` le sont — toujours
+ *   cryptographiquement fort), sinon `Math.random()` en tout dernier
+ *   recours si aucun des deux n'existe. Suffisant ici : l'unicité
+ *   recherchée n'est que locale par appareil (aucun serveur à consulter).
+ * Pas de nouveau test (fonction triviale, dépendante de l'environnement
+ * navigateur — vérifiée manuellement : module chargé avec succès dans un
+ * contexte Node dont `crypto.randomUUID` est absent, format d'UUID v4
+ * valide généré via le repli `getRandomValues`).
+ * Fichiers touchés : gameService.js, version.js.
+ *
+ * 25/08/2026, avant (Nouvel écran "Test" — bac à sable "Feuille
+ * d'action" branché sur le vrai moteur, retour utilisateur — suite à la
+ * Variante C de maquette-cartes-focus/, "quelle est la meilleure façon de
+ * procéder sur un cas réel sur mon iPhone ?") :
+ * Nouvel onglet `#nav-test`/`#screen-test` (index.html), visible dans la
+ * même barre de navigation que Focus/Secteurs/Combat une fois une partie
+ * ouverte. Objectif : valider le GESTE tactile réel (drag du grabber,
+ * snap, safe-area, élasticité du scroll Safari) sur un vrai iPhone avant
+ * d'envisager de remplacer la modale centrée `#modal-choix` en production
+ * — un émulateur desktop ne reproduit fidèlement aucun de ces points.
+ * - Reprend la mécanique de la feuille tactile de
+ *   `maquette-cartes-focus/variante-c-feuille.html` (grabber glissable,
+ *   snap fermé/au-contenu/plein-écran, étapes qui glissent dans la même
+ *   feuille avec puce d'étapes + "← Retour", coût au stepper +/-) — mais
+ *   la branche cette fois comme un VRAI `demanderChoix`, passé à
+ *   `FocusEngine.resoudreAction` (js/focusEngine.js, moteur pur), plutôt
+ *   que de rejouer la logique coût/effet à la main comme la maquette
+ *   statique. Testé sur un `etatTest_` (plateauMaison) FACTICE tenu en
+ *   mémoire (10 de chaque ressource, `partieId:'test'`) — AUCUNE lecture
+ *   ni écriture IndexedDB, la vraie partie n'est jamais touchée.
+ * - Carte testée : Focus Conquête Standard (focus.json id 1-3 — Engager/
+ *   Planifier/Préparer, recopiées telles quelles dans le script), choisie
+ *   pour la diversité de cas qu'elle couvre à elle seule : "Préparer" est
+ *   déjà la carte du POC de substitution Crédit systématique (entrée
+ *   précédente, `POC_TOUJOURS_PROPOSER_SUBSTITUTION_`) — la feuille de
+ *   paiement s'ouvre donc réellement, même réserve suffisante ; "Planifier"
+ *   ("et/ou") exerce le choix inclusif RÉEL (`options_inclusives`) menant à
+ *   1 ou 2 popups déléguées enchaînées ; "Engager" exerce le choix exclusif
+ *   RÉEL (`option_exclusive`) entre Envahir/Regrouper.
+ * - `demanderChoixTest_` (nouvelle IIFE en bas de `index.html`, après le
+ *   bloc Wake Lock) couvre exactement les `contexte.type` que ces 3
+ *   actions déclenchent : `paiement_ressource`/`option_exclusive`/
+ *   `options_inclusives` sont résolus par la feuille avec la MÊME
+ *   sémantique exacte que `strategieService.js` (mêmes formes de réponse
+ *   attendues par `focusEngine.js` — `{indexChoisi}`, tableau brut
+ *   d'indices, `{utiliseRessource}`) ; les popups NORMALEMENT déléguées à
+ *   une écriture DB directe (`gagner_programme`, `deplacer_corruption`,
+ *   `regrouper`, `envahir`) sont ici résolues par un mini-formulaire LOCAL
+ *   qui invente son propre résultat plausible (offre de Programmes/cibles
+ *   de Corruption/secteurs factices) — seule la MÉCANIQUE de la feuille est
+ *   ce qui est testé pour ces 4 cas, pas le vrai plateau des secteurs.
+ * - `css/style.css` : classes `.feuille*`/`.rangee-choix*`/`.cout-stepper*`
+ *   portées telles quelles depuis `maquette-cartes-focus/mockup.css`
+ *   (y compris les 2 correctifs déjà validés en maquette : `height:0` par
+ *   défaut au lieu d'un `min-height` qui empêchait la fermeture complète,
+ *   et une règle `[hidden]{display:none}` explicite sur `.feuille-retour`/
+ *   `.feuille-etapes`, dont le `display:flex` de la classe écrasait sinon
+ *   la règle `[hidden]` du navigateur).
+ * Pas de nouveau test `*.test.js` (écran 100% DOM/geste, hors périmètre de
+ * cette suite — la logique Coût/Effet elle-même, déjà exercée ici via le
+ * vrai `FocusEngine.resoudreAction`, reste couverte par
+ * `focusEngine.test.js` existant, inchangé). Vérifié manuellement dans un
+ * vrai navigateur (Playwright, scripts ad-hoc, gabarit iPhone 390×844) sur
+ * la maquette statique d'origine avant portage (fermeture complète de la
+ * feuille, sélection conservée après "← Retour", bouton "← Retour"/puce
+ * d'étapes bien masqués à l'étape unique, configurateur qui fait grandir
+ * la feuille) — zéro erreur JS.
+ * Fichiers touchés : index.html, css/style.css, version.js.
+ *
+ * 24/08/2026, avant (POC — popup de paiement systématique pour
  * Focus Conquête "Préparer", retour utilisateur) :
  * Suite à la substitution Crédit (entrée précédente) : l'utilisateur
  * hésite entre 3 options pour proposer la substitution même quand la
@@ -2629,4 +2844,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260824.18';
+var APP_VERSION = '20260825.4';

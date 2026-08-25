@@ -107,6 +107,40 @@ var GameService = (function () {
   // même ordre que le tableau ci-dessus.
   var TYPES_PROGRAMME_OFFRE = ['Domination', 'Force', 'Soutien', 'Richesse'];
 
+  /**
+   * Identifiant de partie (retour utilisateur — "crypto.randomUUID is not
+   * a function" à la création d'une partie sur iPhone via
+   * http://<IP-LAN>:port) : `crypto.randomUUID()` (voir creerPartie
+   * ci-dessous) n'existe QUE dans un contexte sécurisé (HTTPS ou
+   * localhost) — accéder à la PWA par son IP locale en simple HTTP (utile
+   * pour tester sur un vrai téléphone sans certificat) en fait un contexte
+   * non sécurisé où cette fonction est absente de l'objet `crypto`, d'où
+   * l'erreur. `crypto.getRandomValues()`, LUI, n'est PAS restreint aux
+   * contextes sécurisés (seuls `randomUUID`/`crypto.subtle` le sont) :
+   * repli vers un UUID v4 assemblé à la main à partir de ces octets
+   * aléatoires cryptographiquement forts, puis vers Math.random en tout
+   * dernier recours (ni l'un ni l'autre disponibles) — suffisant ici,
+   * l'unicité recherchée n'est que locale par appareil (aucun serveur à
+   * consulter, voir en-tête de fichier).
+   */
+  function genererIdPartie_() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      var octets = crypto.getRandomValues(new Uint8Array(16));
+      octets[6] = (octets[6] & 0x0f) | 0x40;
+      octets[8] = (octets[8] & 0x3f) | 0x80;
+      var hex = Array.prototype.map.call(octets, function (o) { return ('0' + o.toString(16)).slice(-2); });
+      return hex.slice(0, 4).join('') + '-' + hex.slice(4, 6).join('') + '-' + hex.slice(6, 8).join('') + '-' + hex.slice(8, 10).join('') + '-' + hex.slice(10, 16).join('');
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
   function offresProgrammeParDefaut_() {
     return TYPES_PROGRAMME_OFFRE.map(function (type) {
       return { type: type, nom: null, corrompu: false };
@@ -1039,7 +1073,7 @@ var GameService = (function () {
               console.warn('GameService.creerPartie : origine introuvable pour ' + maisonJoueur.nom + ' / ' + maisonJoueur.technologieDepart.nom + ' (civilisation/ressources de départ à 0).');
             }
 
-            var id = crypto.randomUUID();
+            var id = genererIdPartie_();
             var dateCreation = new Date().toISOString();
 
             var partie = {

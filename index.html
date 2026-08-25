@@ -37,6 +37,7 @@
       <button id="nav-focus" class="btn btn-toggle" data-nav="focus">Focus</button>
       <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs">Secteurs</button>
       <button id="nav-combat" class="btn btn-toggle" data-nav="combat">Combat</button>
+      <button id="nav-test" class="btn btn-toggle" data-nav="test">Test</button>
     </nav>
   </div>
 
@@ -416,6 +417,52 @@
     <div id="combat-resultat" class="combat-resultat"></div>
   </section>
 
+  <!-- Écran Test — bac à sable "Feuille d'action" (voir maquette-cartes-focus/
+       variante-c-feuille.html pour la maquette statique d'origine), branché
+       ici sur le VRAI FocusEngine.resoudreAction mais sur un plateauMaison
+       FACTICE (état en mémoire ci-dessous, JAMAIS d'écriture IndexedDB) —
+       sert à valider le geste tactile réel sur iPhone avant d'envisager de
+       remplacer #modal-choix en production. Carte Focus Conquête Standard
+       (focus.json id 1-3, ses 3 actions) : Coût/Effet réellement résolus
+       par focusEngine.js ; Regrouper et Envahir (délégués en production à
+       une popup qui écrit directement en base) sont ici simulés par un
+       formulaire local simplifié, jamais le vrai plateau des secteurs — voir
+       le bloc de script "Écran Test" en bas de page. -->
+  <section id="screen-test" class="screen" hidden>
+    <h2 class="section-title">Test — Feuille d'action</h2>
+    <p class="hint">
+      Bac à sable détaché de la partie : état factice (10 de chaque
+      ressource), zéro écriture IndexedDB. Le Coût/Effet des 3 actions
+      passe par le vrai moteur (js/focusEngine.js) ; Regrouper et Envahir
+      sont ici simulés (pas le vrai plateau des secteurs).
+    </p>
+
+    <div class="game-block" id="test-etat"></div>
+
+    <div id="test-cartes"></div>
+
+    <div id="test-journal" class="hint" style="margin-top:14px;white-space:pre-line;"></div>
+
+    <div id="test-feuille-scrim" class="feuille-scrim" hidden></div>
+    <div id="test-feuille" class="feuille">
+      <div id="test-feuille-grabber-zone" class="feuille-grabber-zone">
+        <div class="feuille-grabber"></div>
+      </div>
+      <div class="feuille-tete">
+        <button type="button" class="feuille-retour" id="test-feuille-retour" hidden>← Retour</button>
+        <h3 class="feuille-titre" id="test-feuille-titre">Titre</h3>
+        <div class="feuille-etapes" id="test-feuille-etapes" hidden></div>
+      </div>
+      <div class="feuille-corps" id="test-feuille-corps">
+        <div class="feuille-corps-inner" id="test-feuille-corps-inner"></div>
+      </div>
+      <div class="feuille-pied" id="test-feuille-pied">
+        <button type="button" class="btn btn-primary" id="test-feuille-valider">Valider</button>
+        <button type="button" class="feuille-pied-lien" id="test-feuille-annuler">Annuler</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Écran Historique — liste enrichie (événements, technologies,
        vainqueur), reprendre/archiver/supprimer par partie + suppression
        en masse des parties non archivées (voir historiqueVueService.js). -->
@@ -439,6 +486,32 @@
         <button id="modal-choix-annuler" class="btn btn-secondary">Annuler</button>
         <button id="modal-choix-valider" class="btn btn-primary" hidden>Valider</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Feuille d'action — rendu alternatif de StrategieService.demanderChoix
+       (bottom sheet iPhone-first), utilisé UNIQUEMENT pour le Focus
+       Conquête Standard (voir StrategieService.CARTE_EN_FEUILLE_,
+       maquette-cartes-focus/variante-c-feuille.html pour la maquette
+       d'origine et l'écran Test pour le POC branché sur un état factice).
+       Toute autre carte continue d'utiliser #modal-choix ci-dessus,
+       inchangé. -->
+  <div id="feuille-scrim" class="feuille-scrim" hidden></div>
+  <div id="feuille" class="feuille">
+    <div id="feuille-grabber-zone" class="feuille-grabber-zone">
+      <div class="feuille-grabber"></div>
+    </div>
+    <div class="feuille-tete">
+      <button type="button" class="feuille-retour" id="feuille-retour" hidden>← Retour</button>
+      <h3 class="feuille-titre" id="feuille-titre">Titre</h3>
+      <div class="feuille-etapes" id="feuille-etapes" hidden></div>
+    </div>
+    <div class="feuille-corps" id="feuille-corps">
+      <div class="feuille-corps-inner" id="feuille-corps-inner"></div>
+    </div>
+    <div class="feuille-pied" id="feuille-pied">
+      <button type="button" class="btn btn-primary" id="feuille-valider">Valider</button>
+      <button type="button" class="feuille-pied-lien" id="feuille-annuler">Annuler</button>
     </div>
   </div>
 
@@ -2717,6 +2790,547 @@
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible') demanderVerrou_();
     });
+  })();
+
+  /**
+   * Écran Test (#screen-test) — bac à sable "Feuille d'action" (voir
+   * maquette-cartes-focus/variante-c-feuille.html pour la maquette
+   * statique d'origine, et NOTES.md du même dossier pour la démarche).
+   * Mécanique de la feuille (drag/snap/étapes glissées) reprise TELLE
+   * QUELLE de la maquette ; la différence ici est que `demanderChoixTest_`
+   * est un VRAI `demanderChoix` branché sur `FocusEngine.resoudreAction`
+   * (js/focusEngine.js, moteur pur) — pas un script figé. `etatTest_`
+   * (10 de chaque ressource) est un plateauMaison FACTICE tenu en mémoire,
+   * jamais lu/écrit en IndexedDB : les 3 actions de la carte Focus
+   * Conquête Standard (focus.json id 1-3, recopiées ci-dessous) peuvent
+   * être rejouées librement sans jamais affecter une vraie partie.
+   * Regrouper/Envahir (délégués en production à une popup qui écrit
+   * directement en base sur le vrai plateau des secteurs) sont ici résolus
+   * par un mini-formulaire local qui invente son propre résultat — hors
+   * périmètre de ce bac à sable, seule la MÉCANIQUE de la feuille (geste,
+   * étapes, stepper) est ce qui est testé.
+   */
+  (function () {
+    var scrim = document.getElementById('test-feuille-scrim');
+    var feuille = document.getElementById('test-feuille');
+    if (!scrim || !feuille || typeof FocusEngine === 'undefined') return;
+
+    var CARTE_TEST_ = {
+      focus: 'Conquête', type: 'Standard',
+      actions: [
+        { action: 'Engager', cout: { energie: 2 }, effet: { choice: ['envahir', 'regrouper'] }, texte: 'Envahissez un secteur ou regroupez.' },
+        { action: 'Planifier', cout: { credit: 1, energie: 1 }, effet: { choice: ['gagner_programme', 'deplacer_corruption'] }, texte: 'Gagnez un Programme et/ou déplacez une Corruption.' },
+        { action: 'Préparer', cout: { materiel: 3 }, effet: { activer_cube: 2 }, texte: 'Activez 2 cubes.' }
+      ]
+    };
+
+    var LIBELLES_TEST_ = {
+      envahir: 'Envahir un secteur', regrouper: 'Regrouper',
+      gagner_programme: 'Gagner un Programme', deplacer_corruption: 'Déplacer une Corruption',
+      nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel', credit: 'Crédit'
+    };
+    function libelleOptionTest_(opt) {
+      return typeof opt === 'string' ? (LIBELLES_TEST_[opt] || opt) : JSON.stringify(opt);
+    }
+
+    var PROGRAMMES_TEST_ = ['Poigne de Fer', 'Marché Noir', 'Aide Humanitaire', 'Blocus Commercial'];
+    var CIBLES_CORRUPTION_TEST_ = ['Secteur 4 (test)', 'Piste Économie (test)', 'Programme « Poigne de Fer » (test)'];
+    var SECTEURS_TEST_ = ['Secteur-Mère (test)', 'Secteur 4 (test)', 'Secteur 7 (test)'];
+
+    function creerEtatTest_() {
+      return {
+        ressourceNourriture: 10, ressourceEnergie: 10, ressourceMateriel: 10,
+        ressourceCredit: 10, ressourceScience: 10, influence: 10,
+        jetonPrime: 0, jetonLiberation: 0, cubeActif: 0,
+        actionsFocusUtilisees: [], partieId: 'test'
+      };
+    }
+    var etatTest_ = creerEtatTest_();
+
+    function rendreEtatTest_() {
+      var el = document.getElementById('test-etat');
+      if (!el) return;
+      el.innerHTML = '<p class="hint">Nourriture ' + etatTest_.ressourceNourriture +
+        ' · Énergie ' + etatTest_.ressourceEnergie +
+        ' · Matériel ' + etatTest_.ressourceMateriel +
+        ' · Crédit ' + etatTest_.ressourceCredit +
+        ' · Science ' + etatTest_.ressourceScience +
+        ' · Influence ' + etatTest_.influence +
+        ' · Cube actif ' + etatTest_.cubeActif + '</p>';
+    }
+
+    function rendreCartesTest_() {
+      var conteneur = document.getElementById('test-cartes');
+      if (!conteneur) return;
+      conteneur.innerHTML = '<div class="card focus-card"><h3>' + CARTE_TEST_.focus + ' <span class="badge">Standard — test</span></h3>' +
+        CARTE_TEST_.actions.map(function (action, i) {
+          var cout = Object.keys(action.cout).map(function (c) { return action.cout[c] + ' ' + (LIBELLES_TEST_[c] || c); }).join(' + ');
+          return '<div class="focus-action">' +
+            '<div class="focus-action-corps">' +
+            '<p class="focus-action-nom">' + action.action + '</p>' +
+            '<p>' + action.texte + '</p>' +
+            '</div>' +
+            '<div class="focus-action-side">' +
+            '<span class="hint" style="white-space:nowrap;">' + cout + '</span>' +
+            '<button class="btn-jouer-action" data-action-index="' + i + '" title="Jouer cette action">▶</button>' +
+            '</div>' +
+            '</div>';
+        }).join('') + '</div>';
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.btn-jouer-action'), function (btn) {
+        btn.addEventListener('click', function () {
+          jouerActionTest_(CARTE_TEST_.actions[Number(btn.dataset.actionIndex)]);
+        });
+      });
+    }
+
+    // --- Mécanique de la feuille (identique à variante-c-feuille.html) ---
+    var grabberZone = document.getElementById('test-feuille-grabber-zone');
+    var teteRetour = document.getElementById('test-feuille-retour');
+    var teteTitre = document.getElementById('test-feuille-titre');
+    var teteEtapes = document.getElementById('test-feuille-etapes');
+    var corpsInner = document.getElementById('test-feuille-corps-inner');
+    var btnValider = document.getElementById('test-feuille-valider');
+    var btnAnnuler = document.getElementById('test-feuille-annuler');
+    var pile = [];
+    // Callback résolvant la Promise du "demanderChoix" en cours quand
+    // l'utilisateur ferme sans valider (voile/Annuler/glissé vers le bas) —
+    // chaque flow ci-dessous y branche la valeur d'annulation attendue par
+    // FocusEngine pour SON contexte.type précis (voir focusEngine.js).
+    var rejetCourant = null;
+    // Retour utilisateur (test iPhone) : sur un choix "et/ou" à 2 options
+    // sélectionnées, rien ne signalait visuellement qu'une 2e action allait
+    // suivre la première. `flowOptionsInclusives_` remplit ceci quand ≥ 2
+    // options sont choisies (libellés dans l'ordre où focusEngine.js va les
+    // résoudre) ; chaque flow délégué susceptible d'apparaître dans un
+    // "et/ou" (gagner_programme/deplacer_corruption ici) consomme 1 cran
+    // via `consommerEtiquetteSequence_()` pour préfixer son titre "Action
+    // X/N — ", et la remet à null après la DERNIÈRE. Réinitialisé à chaque
+    // nouvelle action jouée (voir jouerActionTest_).
+    var sequenceEtOu_ = null;
+    function consommerEtiquetteSequence_() {
+      if (!sequenceEtOu_) return '';
+      sequenceEtOu_.position++;
+      var etiquette = 'Action ' + sequenceEtOu_.position + '/' + sequenceEtOu_.libelles.length + ' — ';
+      if (sequenceEtOu_.position >= sequenceEtOu_.libelles.length) sequenceEtOu_ = null;
+      return etiquette;
+    }
+
+    function tailleAuContenu() {
+      var chrome = document.querySelector('#test-feuille .feuille-tete').offsetHeight +
+        document.querySelector('#test-feuille .feuille-pied').offsetHeight + 26;
+      return Math.min(window.innerHeight * 0.92, Math.max(180, corpsInner.scrollHeight + chrome));
+    }
+    function ajusterHauteur() {
+      feuille.classList.add('feuille-animee');
+      feuille.style.height = tailleAuContenu() + 'px';
+    }
+    function ouvrirFeuille() {
+      pile = [];
+      scrim.hidden = false;
+      feuille.classList.add('feuille-animee');
+      feuille.style.height = '0px';
+      requestAnimationFrame(function () { ajusterHauteur(); });
+    }
+    function fermerFeuille() {
+      feuille.classList.add('feuille-animee');
+      feuille.style.height = '0px';
+      setTimeout(function () { scrim.hidden = true; }, 280);
+    }
+    function fermerEtAnnuler_() {
+      var r = rejetCourant;
+      rejetCourant = null;
+      fermerFeuille();
+      if (r) r();
+    }
+    scrim.addEventListener('click', fermerEtAnnuler_);
+    btnAnnuler.addEventListener('click', fermerEtAnnuler_);
+
+    var dragY = null, dragH = null;
+    grabberZone.addEventListener('pointerdown', function (e) {
+      dragY = e.clientY;
+      dragH = feuille.getBoundingClientRect().height;
+      feuille.classList.remove('feuille-animee');
+      grabberZone.setPointerCapture(e.pointerId);
+    });
+    grabberZone.addEventListener('pointermove', function (e) {
+      if (dragY === null) return;
+      var h = Math.max(20, Math.min(window.innerHeight * 0.92, dragH + (dragY - e.clientY)));
+      feuille.style.height = h + 'px';
+    });
+    function finDrag() {
+      if (dragY === null) return;
+      dragY = null;
+      feuille.classList.add('feuille-animee');
+      var h = feuille.getBoundingClientRect().height;
+      var auto = tailleAuContenu();
+      var plein = window.innerHeight * 0.92;
+      if (h < auto * 0.55) { fermerEtAnnuler_(); return; }
+      feuille.style.height = (h > (auto + plein) / 2 ? plein : auto) + 'px';
+    }
+    grabberZone.addEventListener('pointerup', finDrag);
+    grabberZone.addEventListener('pointercancel', finDrag);
+
+    function rendreEtape(etape, direction) {
+      teteTitre.textContent = etape.titre;
+      // `racineSequence !== false` (par défaut) = étape racine d'un appel
+      // demanderChoix INDÉPENDANT (chaque flow_* ci-dessous en pousse une à
+      // son ouverture) — jamais de "← Retour" vers une racine précédente,
+      // dont la Promise est déjà résolue (un clic Valider dessus ne ferait
+      // plus rien, l'utilisateur resterait bloqué sur l'étape courante,
+      // toujours en attente). Seule une étape explicitement marquée
+      // `racineSequence:false` (sous-étape imbriquée DANS un même flow_*,
+      // ex. destination après source de "Déplacer une Corruption") peut
+      // être quittée par Retour.
+      teteRetour.hidden = pile.length <= 1 || etape.racineSequence !== false;
+      if (etape.nbEtapes > 1) {
+        teteEtapes.hidden = false;
+        teteEtapes.innerHTML = '';
+        for (var i = 0; i < etape.nbEtapes; i++) {
+          var s = document.createElement('span');
+          if (i === etape.etapeIndex) s.className = 'actif';
+          teteEtapes.appendChild(s);
+        }
+      } else {
+        teteEtapes.hidden = true;
+      }
+      var classeSortie = direction === 'avant' ? 'transition-sortie-avant' : 'transition-sortie-arriere';
+      corpsInner.classList.add(classeSortie);
+      setTimeout(function () {
+        corpsInner.innerHTML = etape.html;
+        if (etape.brancher) etape.brancher(corpsInner);
+        corpsInner.classList.remove(classeSortie);
+        corpsInner.classList.add('transition-entree');
+        requestAnimationFrame(function () { corpsInner.classList.remove('transition-entree'); ajusterHauteur(); });
+      }, direction ? 150 : 0);
+      btnValider.hidden = !etape.onValider;
+      btnValider.disabled = false;
+      btnValider.onclick = etape.onValider || null;
+      btnAnnuler.textContent = pile.length <= 1 ? 'Annuler' : 'Fermer';
+    }
+    function pousserEtape(etape, direction) {
+      pile.push(etape);
+      rendreEtape(etape, direction || 'avant');
+    }
+    teteRetour.addEventListener('click', function () {
+      if (pile.length <= 1) return;
+      pile.pop();
+      rendreEtape(pile[pile.length - 1], 'arriere');
+    });
+
+    function rangeeChoixHTML(nom, options, multiple, selectionParDefaut) {
+      return options.map(function (o, i) {
+        var selectionnee = multiple
+          ? (selectionParDefaut || []).indexOf(i) !== -1
+          : i === (selectionParDefaut || 0);
+        return '<button type="button" class="rangee-choix' + (selectionnee ? ' selectionnee' : '') + '"' +
+          (multiple ? ' data-multiple' : '') + ' data-groupe="' + nom + '" data-i="' + i + '">' +
+          '<span>' + o + '</span><span class="rangee-choix-marque">' + (selectionnee ? '✓' : '') + '</span></button>';
+      }).join('');
+    }
+    function brancherRangeeChoix(container, nom, multiple, onChange) {
+      var rangees = Array.prototype.slice.call(container.querySelectorAll('.rangee-choix[data-groupe="' + nom + '"]'));
+      rangees.forEach(function (r) {
+        r.addEventListener('click', function () {
+          if (!multiple) {
+            rangees.forEach(function (autre) {
+              autre.classList.remove('selectionnee');
+              autre.querySelector('.rangee-choix-marque').textContent = '';
+            });
+          }
+          var maintenantSelectionnee = !r.classList.contains('selectionnee');
+          r.classList.toggle('selectionnee', multiple ? maintenantSelectionnee : true);
+          r.querySelector('.rangee-choix-marque').textContent = r.classList.contains('selectionnee') ? '✓' : '';
+          if (onChange) onChange(rangees.filter(function (x) { return x.classList.contains('selectionnee'); }).map(function (x) { return Number(x.dataset.i); }));
+        });
+      });
+    }
+    function stepperCoutHTML(id, label, montant, stock, credit) {
+      return '<div class="cout-stepper" id="stepper-' + id + '">' +
+        '<button type="button" class="cout-stepper-bouton" data-role="moins">−</button>' +
+        '<div class="cout-stepper-barre"><div class="cout-stepper-seg-ressource" id="seg-res-' + id + '"></div><div class="cout-stepper-seg-credit" id="seg-cred-' + id + '"></div></div>' +
+        '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
+        '</div>' +
+        '<p class="cout-stepper-resume" id="resume-' + id + '"></p>' +
+        '<p class="hint cout-stepper-hint">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>';
+    }
+    function brancherStepperCout(container, id, label, montant, stock, credit, estado, onMaj) {
+      if (estado.v == null) estado.v = Math.min(montant, stock);
+      var boutons = container.querySelectorAll('#stepper-' + id + ' .cout-stepper-bouton');
+      var segRes = container.querySelector('#seg-res-' + id);
+      var segCred = container.querySelector('#seg-cred-' + id);
+      var resume = container.querySelector('#resume-' + id);
+      function maj() {
+        var v = estado.v;
+        var pctRes = montant ? (v / montant) * 100 : 0;
+        segRes.style.width = pctRes + '%';
+        segCred.style.width = (100 - pctRes) + '%';
+        resume.innerHTML = '<span class="valeur-ressource">' + v + ' ' + label + '</span>' +
+          (montant - v > 0 ? ' + <span class="valeur-credit">' + (montant - v) + ' Crédit</span>' : '');
+        boutons[0].disabled = v <= 0;
+        boutons[1].disabled = v >= Math.min(montant, stock);
+        if (onMaj) onMaj((montant - v) > credit);
+      }
+      boutons[0].onclick = function () { estado.v = Math.max(0, estado.v - 1); maj(); };
+      boutons[1].onclick = function () { estado.v = Math.min(Math.min(montant, stock), estado.v + 1); maj(); };
+      maj();
+    }
+
+    // --- Un flow par contexte.type effectivement déclenché par la carte
+    // de test (voir focus.json id 1-3) — chacun pousse 1 (ou 2) étape(s)
+    // sur la feuille DÉJÀ OUVERTE (ouvrirFeuille appelée une seule fois par
+    // jouerActionTest_, PAS ici) et retourne la Promise attendue par
+    // FocusEngine.resoudreCle_ pour ce contexte.type précis. ---
+
+    function flowOptionExclusive_(contexte) {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      var options = contexte.options.map(libelleOptionTest_);
+      pousserEtape({
+        titre: contexte.source || 'Choisir une option', nbEtapes: 1, etapeIndex: 0,
+        html: '<div class="feuille-section"><p class="feuille-section-titre">Choisir une option</p>' + rangeeChoixHTML('opt', options, false) + '</div>',
+        brancher: function (el) { brancherRangeeChoix(el, 'opt', false); },
+        onValider: function () {
+          var i = Number(corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          rejetCourant = null;
+          resolve({ indexChoisi: i });
+        }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowOptionsInclusives_(contexte) {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      var selection = [];
+      rejetCourant = function () { resolve(selection); };
+      var options = contexte.options.map(libelleOptionTest_);
+      var etape = {
+        titre: contexte.source || 'Une ou plusieurs options', nbEtapes: 1, etapeIndex: 0,
+        html: '',
+        brancher: function (el) { brancherRangeeChoix(el, 'inc', true, function (indices) { selection = indices; etape.html = html(); }); },
+        onValider: function () {
+          rejetCourant = null;
+          // ≥ 2 options choisies -> focusEngine.js va résoudre chacune,
+          // DANS L'ORDRE de `contexte.options` (resoudreOption_/reduce),
+          // via un demanderChoix INDÉPENDANT à chaque fois : sans ce
+          // marqueur, rien ne distingue "1re action sur 2" de "la seule
+          // action" une fois sur l'étape suivante.
+          sequenceEtOu_ = selection.length > 1
+            ? { libelles: selection.map(function (i) { return options[i]; }), position: 0 }
+            : null;
+          resolve(selection);
+        }
+      };
+      function html() {
+        return '<div class="feuille-section"><p class="feuille-section-titre">Une ou plusieurs options</p>' + rangeeChoixHTML('inc', options, true, selection) + '</div>';
+      }
+      etape.html = html();
+      pousserEtape(etape, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowPaiementRessource_(contexte) {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      var estado = {};
+      var label = LIBELLES_TEST_[contexte.ressource] || contexte.ressource;
+      pousserEtape({
+        titre: contexte.source || 'Paiement', nbEtapes: 1, etapeIndex: 0,
+        html: '<div class="feuille-section"><p class="feuille-section-titre">Coût — ' + contexte.montant + ' ' + label + '</p>' +
+          stepperCoutHTML('pay', label, contexte.montant, contexte.stockRessource, contexte.stockCredit) + '</div>',
+        brancher: function (el) {
+          brancherStepperCout(el, 'pay', label, contexte.montant, contexte.stockRessource, contexte.stockCredit, estado, function (impossible) { btnValider.disabled = impossible; });
+        },
+        onValider: function () { rejetCourant = null; resolve({ utiliseRessource: estado.v }); }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowGagnerProgramme_() {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      pousserEtape({
+        titre: consommerEtiquetteSequence_() + 'Gagner un Programme', nbEtapes: 1, etapeIndex: 0,
+        html: '<div class="feuille-section"><p class="feuille-section-titre">Choisir un Programme (offre factice)</p>' + rangeeChoixHTML('prog', PROGRAMMES_TEST_, false) + '</div>',
+        brancher: function (el) { brancherRangeeChoix(el, 'prog', false); },
+        onValider: function () {
+          var i = Number(corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          rejetCourant = null;
+          resolve({ detail: 'Programme « ' + PROGRAMMES_TEST_[i] + ' » gagné (test, offre factice).' });
+        }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowDeplacerCorruption_() {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      // Capturée UNE fois pour les 2 sous-étapes (source/destination) de ce
+      // flow : elles font partie de la MÊME position dans la séquence
+      // et/ou, pas de 2 positions distinctes.
+      var etiquette = consommerEtiquetteSequence_();
+      pousserEtape({
+        titre: etiquette + 'Déplacer une Corruption — source', nbEtapes: 2, etapeIndex: 0,
+        html: rangeeChoixHTML('corSrc', CIBLES_CORRUPTION_TEST_, false),
+        brancher: function (el) { brancherRangeeChoix(el, 'corSrc', false); },
+        onValider: function () {
+          var iSrc = Number(corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          pousserEtape({
+            titre: etiquette + 'Déplacer une Corruption — destination', nbEtapes: 2, etapeIndex: 1,
+            racineSequence: false, // sous-étape de CE flow (retour vers la source, promesse pas encore résolue) — voir rendreEtape
+            html: rangeeChoixHTML('corDst', CIBLES_CORRUPTION_TEST_, false),
+            brancher: function (el) { brancherRangeeChoix(el, 'corDst', false); },
+            onValider: function () {
+              var iDst = Number(corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+              rejetCourant = null;
+              resolve({ detail: 'Corruption déplacée (test) : ' + CIBLES_CORRUPTION_TEST_[iSrc] + ' → ' + CIBLES_CORRUPTION_TEST_[iDst] + '.' });
+            }
+          }, 'avant');
+        }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowRegrouper_() {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      var mouvements = [];
+      function html() {
+        var total = mouvements.reduce(function (s, m) { return s + m.q; }, 0);
+        return '<p class="hint">Déplacements utilisés (test) : <strong>' + total + ' / 5</strong></p>' +
+          (mouvements.length
+            ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+                return '<li>' + m.q + '× Corvette : ' + m.d + ' → ' + m.a + ' <button type="button" class="btn-lien" data-retirer="' + i + '">retirer</button></li>';
+              }).join('') + '</ul>'
+            : '<p class="hint">Aucun déplacement ajouté.</p>') +
+          '<div class="regrouper-form">' +
+          '<select id="test-mock-depart">' + SECTEURS_TEST_.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+          '<select id="test-mock-arrivee" style="margin-top:6px;">' + SECTEURS_TEST_.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+          '<input type="number" min="1" step="1" value="1" id="test-mock-quantite" style="margin-top:6px;">' +
+          '<button type="button" class="btn btn-secondary" id="test-mock-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+          '</div>';
+      }
+      function brancher(el) {
+        Array.prototype.forEach.call(el.querySelectorAll('[data-retirer]'), function (btn) {
+          btn.onclick = function () { mouvements.splice(Number(btn.dataset.retirer), 1); rerender(); };
+        });
+        var ajouter = el.querySelector('#test-mock-ajouter');
+        if (ajouter) ajouter.onclick = function () {
+          mouvements.push({
+            d: document.getElementById('test-mock-depart').value,
+            a: document.getElementById('test-mock-arrivee').value,
+            q: Math.max(1, Number(document.getElementById('test-mock-quantite').value) || 1)
+          });
+          rerender();
+        };
+        btnValider.disabled = mouvements.length === 0;
+      }
+      function rerender() {
+        corpsInner.innerHTML = html();
+        brancher(corpsInner);
+        ajusterHauteur();
+      }
+      pousserEtape({
+        titre: 'Regrouper (test — pas le vrai plateau)', nbEtapes: 1, etapeIndex: 0,
+        html: html(),
+        brancher: brancher,
+        onValider: function () {
+          rejetCourant = null;
+          var total = mouvements.reduce(function (s, m) { return s + m.q; }, 0);
+          resolve({ deplacements: total, detail: total + ' déplacement(s) simulé(s) (test).' });
+        }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function flowEnvahir_() {
+      var resolve;
+      var promise = new Promise(function (res) { resolve = res; });
+      rejetCourant = function () { resolve({ annule: true }); };
+      var cibleIndex = 0;
+      var engages = 2;
+      function html() {
+        return '<div class="feuille-section"><p class="feuille-section-titre">Secteur ciblé (test)</p>' +
+          rangeeChoixHTML('cible', SECTEURS_TEST_, false, cibleIndex) + '</div>' +
+          '<div class="feuille-section"><p class="feuille-section-titre">Cubes engagés</p>' +
+          '<div class="cout-stepper" id="test-stepper-envahir">' +
+          '<button type="button" class="cout-stepper-bouton" data-role="moins">−</button>' +
+          '<p class="cout-stepper-resume" style="flex:1;margin:0;">' + engages + '</p>' +
+          '<button type="button" class="cout-stepper-bouton" data-role="plus">+</button>' +
+          '</div></div>';
+      }
+      function brancher(el) {
+        brancherRangeeChoix(el, 'cible', false, function (indices) { cibleIndex = indices[0]; });
+        var boutons = el.querySelectorAll('#test-stepper-envahir .cout-stepper-bouton');
+        boutons[0].onclick = function () { engages = Math.max(1, engages - 1); rerender(); };
+        boutons[1].onclick = function () { engages = Math.min(6, engages + 1); rerender(); };
+      }
+      function rerender() {
+        corpsInner.innerHTML = html();
+        brancher(corpsInner);
+        ajusterHauteur();
+      }
+      pousserEtape({
+        titre: 'Envahir (test — combat simplifié)', nbEtapes: 1, etapeIndex: 0,
+        html: html(),
+        brancher: brancher,
+        onValider: function () {
+          rejetCourant = null;
+          var victoire = engages >= 2;
+          var survivants = victoire ? Math.max(1, engages - 1) : 0;
+          var cubesPerdus = engages - survivants;
+          resolve({
+            victoire: victoire,
+            jetonPrime: victoire ? 1 : 0,
+            jetonLiberation: 0,
+            influenceGagnee: victoire ? 1 : 0,
+            cubesPerdus: cubesPerdus,
+            totalEngage: engages,
+            detail: (victoire ? 'Victoire (test)' : 'Défaite (test)') + ' — ' + engages + ' cube(s) engagé(s) sur ' + SECTEURS_TEST_[cibleIndex] + '.'
+          });
+        }
+      }, pile.length ? 'avant' : null);
+      return promise;
+    }
+
+    function demanderChoixTest_(contexte) {
+      if (contexte.type === 'paiement_ressource') return flowPaiementRessource_(contexte);
+      if (contexte.type === 'option_exclusive') return flowOptionExclusive_(contexte);
+      if (contexte.type === 'options_inclusives') return flowOptionsInclusives_(contexte);
+      if (contexte.type === 'gagner_programme') return flowGagnerProgramme_();
+      if (contexte.type === 'deplacer_corruption') return flowDeplacerCorruption_();
+      if (contexte.type === 'regrouper') return flowRegrouper_();
+      if (contexte.type === 'envahir') return flowEnvahir_();
+      // Repli : contexte hors périmètre des 3 actions testées ici -> annule
+      // proprement plutôt que de bloquer indéfiniment la Promise.
+      return Promise.resolve({ annule: true });
+    }
+
+    function jouerActionTest_(action) {
+      var journal = document.getElementById('test-journal');
+      journal.textContent = '';
+      sequenceEtOu_ = null;
+      ouvrirFeuille();
+      FocusEngine.resoudreAction(etatTest_, CARTE_TEST_, action, demanderChoixTest_).then(function (resultat) {
+        fermerFeuille();
+        if (resultat.succes) {
+          etatTest_ = resultat.plateauMaisonApres;
+          rendreEtatTest_();
+        }
+        journal.textContent = resultat.journal.join('\n') || '(aucune ligne journalisée)';
+      }).catch(function (erreur) {
+        fermerFeuille();
+        journal.textContent = 'Erreur : ' + erreur.message;
+      });
+    }
+
+    rendreEtatTest_();
+    rendreCartesTest_();
   })();
 </script>
 </body>

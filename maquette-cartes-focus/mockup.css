@@ -1,0 +1,369 @@
+/**
+ * mockup.css — additif pour la maquette de refonte des cartes Focus.
+ * Vient APRÈS ../css/style.css (voir <link> des 3 pages) : ne redéfinit
+ * rien du thème (couleurs, typo, boutons...), ajoute seulement les
+ * quelques composants propres à cette maquette (nav entre variantes,
+ * étiquette "cas X", accordéon inline, répartition Crédit).
+ * Maquette statique — pas de contrainte "zéro dépendance runtime" ici
+ * (ce dossier n'est jamais servi par l'app ni le Service Worker).
+ */
+
+.maquette-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(10, 8, 19, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--color-border);
+  margin: -20px -18px 24px;
+}
+.maquette-nav a {
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  background: var(--color-surface-2);
+}
+.maquette-nav a.actif {
+  color: var(--color-bg);
+  background: var(--color-coral);
+  border-color: var(--color-coral);
+  font-weight: 600;
+}
+
+.maquette-intro {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 22px;
+  font-size: 0.86rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+.maquette-intro strong { color: var(--color-text); }
+.maquette-intro a { color: var(--color-coral); }
+
+.maquette-section-titre {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 28px 0 10px;
+}
+.maquette-section-titre:first-of-type { margin-top: 0; }
+
+/* Étiquette "Cas C — Choix exclusif" au-dessus de chaque carte d'exemple,
+   renvoie au découpage de NOTES.md (aucune fonction pratique, juste un
+   repère de lecture pour comparer les 3 pages à contenu égal). */
+.cas-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.4px;
+  color: var(--color-coral);
+  border: 1px solid var(--color-coral-dim);
+  background: rgba(255, 107, 82, 0.08);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-bottom: 6px;
+}
+
+/* --- Variante B : carte dépliable (accordéon) --- */
+.focus-action-corps { cursor: pointer; }
+.focus-action.ouverte { flex-direction: column; align-items: stretch; }
+.focus-action.ouverte .focus-action-side {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 10px;
+}
+.focus-action-panneau {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.focus-action.ouverte .focus-action-panneau { display: block; }
+.focus-action-panneau-titre {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.focus-action-panneau .modal-choix-boutons,
+.focus-action-panneau .modal-choix-cases { margin-bottom: 10px; }
+
+/* --- Répartition ressource / Crédit (cas F, paiement_ressource) --- */
+.paiement-repartition {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+.paiement-repartition input[type="range"] {
+  flex: 1;
+  accent-color: var(--color-coral);
+}
+.paiement-repartition-resume {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.paiement-repartition-resume .valeur-ressource { color: var(--color-text); font-weight: 600; }
+.paiement-repartition-resume .valeur-credit { color: var(--color-coral); font-weight: 600; }
+
+/* --- Popup standardisée (Variante A) : sections Coût / Effet toujours
+   présentes, même quand le contenu est un simple texte auto-résolu. --- */
+.section-auto {
+  font-size: 0.86rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.section-auto .badge { margin: 0; }
+
+.carte-source-texte {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0 0 14px;
+}
+
+/* ============================================================
+   Variante C — "Feuille d'action" (bottom sheet natif, iPhone)
+   ============================================================
+   Toujours le même composant (comme la Variante A), mais pensé mobile
+   d'abord : feuille tactile ancrée en bas (grabber glissable, hauteur
+   "au contenu" par défaut, extensible en plein écran, rejetable par un
+   balayage vers le bas ou un tap sur le voile) plutôt qu'une simple boîte
+   modale centrée. Les enchaînements multi-étapes (cas E niché dans D, cas
+   G) transitionnent le CONTENU de la même feuille (glissement horizontal +
+   fondu, puce d'étapes, bouton "Retour") au lieu d'empiler une nouvelle
+   popup. Le coût se règle via un stepper à grosses cibles tactiles (44px,
+   norme Apple HIG) plutôt qu'un curseur fin peu précis au doigt. */
+
+.feuille-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(6, 4, 12, 0.72);
+}
+.feuille-scrim[hidden] { display: none; }
+
+.feuille {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  height: 0;
+  max-height: 92vh;
+  touch-action: none;
+  overflow: hidden;
+}
+.feuille.feuille-animee { transition: height .28s cubic-bezier(.32,.72,0,1); }
+
+.feuille-grabber-zone {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.feuille-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+.feuille-grabber-zone:active { cursor: grabbing; }
+
+.feuille-tete {
+  flex-shrink: 0;
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.feuille-retour {
+  background: none;
+  border: none;
+  color: var(--color-coral);
+  font-size: 0.82rem;
+  padding: 0 0 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.feuille-retour[hidden] { display: none; }
+.feuille-titre {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0;
+}
+.feuille-etapes {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+.feuille-etapes[hidden] { display: none; }
+.feuille-etapes span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+.feuille-etapes span.actif { background: var(--color-coral); width: 16px; border-radius: 3px; }
+
+.feuille-corps {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.feuille-corps-inner { transition: transform .18s ease, opacity .18s ease; }
+.feuille-corps-inner.transition-sortie-avant { transform: translateX(-24px); opacity: 0; }
+.feuille-corps-inner.transition-sortie-arriere { transform: translateX(24px); opacity: 0; }
+.feuille-corps-inner.transition-entree { transform: translateX(0); opacity: 1; }
+
+.feuille-pied {
+  flex-shrink: 0;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.feuille-pied .btn { width: 100%; min-height: 48px; font-size: 1rem; }
+.feuille-pied-lien {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: 6px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.feuille-section-titre {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+}
+.feuille-section + .feuille-section { margin-top: 20px; }
+
+/* Rangée de choix (exclusif/inclusif) — cible tactile pleine largeur
+   min. 44px (norme Apple HIG), coche/puce à droite plutôt qu'un petit
+   input radio/checkbox de 18px difficile à viser au doigt. */
+.rangee-choix {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rangee-choix:active { transform: scale(0.98); }
+.rangee-choix.selectionnee {
+  border-color: var(--color-coral);
+  background: rgba(255, 107, 82, 0.1);
+}
+.rangee-choix-marque {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: transparent;
+}
+.rangee-choix.selectionnee .rangee-choix-marque {
+  border-color: var(--color-coral);
+  background: var(--color-coral);
+  color: var(--color-bg);
+}
+/* Case à cocher (inclusif) : carré plutôt que rond, même logique. */
+.rangee-choix[data-multiple] .rangee-choix-marque { border-radius: 6px; }
+
+/* Stepper de coût (cas F) — remplace le curseur fin par 2 gros boutons
+   +/- (44×44 min.) qui déplacent le curseur d'1 unité à la fois entre la
+   réserve et le Crédit ; barre segmentée en lecture, pas en saisie. */
+.cout-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cout-stepper-bouton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.cout-stepper-bouton:active { transform: scale(0.94); }
+.cout-stepper-bouton:disabled { opacity: 0.35; cursor: default; }
+.cout-stepper-barre {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-border);
+}
+.cout-stepper-seg-ressource { background: var(--color-text-muted); height: 100%; }
+.cout-stepper-seg-credit { background: var(--color-coral); height: 100%; }
+.cout-stepper-resume {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  text-align: center;
+}
+.cout-stepper-resume .valeur-ressource { color: var(--color-text); font-weight: 600; }
+.cout-stepper-resume .valeur-credit { color: var(--color-coral); font-weight: 600; }
+.cout-stepper-hint { margin: 4px 0 0; text-align: center; }

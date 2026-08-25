@@ -91,24 +91,32 @@ test('action simple : effet crédite, coût débite, mutations correctes', funct
 
 // todo.md (retour utilisateur) — docs-rules-Influence-et-ressources.md §2 :
 // substitution Crédit pour un coût en Nourriture/Énergie/Matériel.
-test('coût Énergie : réserve suffisante seule -> aucune popup (comportement inchangé)', function () {
+// Retour utilisateur ultérieur (test sur l'écran Test/Feuille d'action,
+// iPhone) : comportement devenu SYSTÉMATIQUE — la popup s'ouvre désormais
+// TOUJOURS pour ces 3 ressources, même quand la réserve seule suffit (le
+// POC limité à une seule carte, Focus Conquête "Préparer", a été retenu
+// comme comportement définitif après évaluation).
+test('coût Énergie : réserve suffisante seule -> popup quand même (comportement systématique)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Jouer', effet: { science: 1 }, cout: { energie: 3 }, texte: '' }; // PLATEAU_BASE.ressourceEnergie = 5
 
-  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    assert.strictEqual(contexte.ressource, 'energie');
+    assert.strictEqual(contexte.montant, 3);
+    assert.strictEqual(contexte.stockRessource, 5); // la réserve N'A PAS encore été débitée
+    return { utiliseRessource: 3 }; // le joueur paie entièrement depuis la réserve
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 2);
-    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit); // jamais touché
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit); // jamais touché (tout payé en réserve)
   });
 });
 
-// POC (todo.md, retour utilisateur — "option 1 : systématiquement avoir
-// la popup pour choisir") : Focus Conquête "Préparer" (cout:{materiel:3})
-// est volontairement en liste POC_TOUJOURS_PROPOSER_SUBSTITUTION_ — la
-// popup s'ouvre MÊME quand la réserve suffit seule, contrairement au
-// comportement par défaut testé ci-dessus.
-test('POC — Conquête "Préparer" : popup "paiement_ressource" MÊME quand la réserve suffit seule', function () {
+test('coût Matériel : popup "paiement_ressource" MÊME quand la réserve suffit seule, substitution partielle possible', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Conquête' };
   var action = { action: 'Préparer', effet: { activer_cube: 2 }, cout: { materiel: 3 }, texte: '' }; // PLATEAU_BASE.ressourceMateriel = 5, largement suffisant
@@ -129,15 +137,20 @@ test('POC — Conquête "Préparer" : popup "paiement_ressource" MÊME quand la 
   });
 });
 
-// Autre carte (hors POC) : comportement par défaut inchangé même avec un
-// coût matériel similaire — confirme que le POC est bien scopé à UNE
-// seule carte, pas à la clé "materiel" en général.
-test('POC — autre carte que "Conquête Préparer" avec un coût matériel : comportement par défaut (aucune popup si suffisant)', function () {
+// Confirme que le comportement systématique s'applique à N'IMPORTE QUELLE
+// carte (pas seulement Conquête "Préparer", qui a servi de POC initial) —
+// même clé "materiel", carte générique quelconque.
+test('coût Matériel sur une autre carte : popup quand même (comportement systématique, pas limité au POC initial)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Jouer', effet: {}, cout: { materiel: 3 }, texte: '' };
 
-  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    return { utiliseRessource: 3 };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 2);
   });
@@ -335,11 +348,15 @@ test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jeto
 test('clé secteur hors périmètre (effet_secteur) : ne bloque pas, journalisé', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
-  var action = { action: 'Effet secteur', effet: { effet_secteur: 1 }, cout: { energie: 2 }, texte: '' };
+  // Coût en Crédit (non substituable, jamais de popup) plutôt qu'Énergie —
+  // ce témoin de "coût quand même débité" n'a pas à se soucier de la
+  // popup "paiement_ressource" (comportement systématique, voir tests
+  // dédiés plus haut), hors sujet ici.
+  var action = { action: 'Effet secteur', effet: { effet_secteur: 1 }, cout: { credit: 2 }, texte: '' };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
-    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, 1); // coût quand même débité
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('effet_secteur') !== -1 && l.indexOf('non automatisé') !== -1; }));
   });
 });
@@ -423,7 +440,11 @@ test('envahir : victoire — jetonPrime/jetonLiberation/influence crédités, jo
   var carte = { focus: 'Test' };
   var action = { action: 'Envahir', effet: { envahir: 1 }, cout: { energie: 2 }, texte: '' };
 
+  // Le même demanderChoix est réutilisé pour l'Effet ('envahir') ET le
+  // Coût en Énergie (popup 'paiement_ressource', comportement systématique
+  // — voir tests dédiés plus haut) : dispatche sur contexte.type.
   var demanderChoix = function (contexte) {
+    if (contexte.type === 'paiement_ressource') return { utiliseRessource: contexte.montant };
     assert.strictEqual(contexte.type, 'envahir');
     assert.strictEqual(contexte.corrompu, false);
     assert.strictEqual(contexte.partieId, 'partie-test');
@@ -508,7 +529,11 @@ test('regrouper : succès — délègue à demanderChoix({type:"regrouper"}), jo
   var carte = { focus: 'Test' };
   var action = { action: 'Regrouper', effet: { regrouper: 1 }, cout: { energie: 2 }, texte: '' };
 
+  // Le même demanderChoix est réutilisé pour l'Effet ('regrouper') ET le
+  // Coût en Énergie (popup 'paiement_ressource', comportement systématique
+  // — voir tests dédiés plus haut) : dispatche sur contexte.type.
   var demanderChoix = function (contexte) {
+    if (contexte.type === 'paiement_ressource') return { utiliseRessource: contexte.montant };
     assert.strictEqual(contexte.type, 'regrouper');
     assert.strictEqual(contexte.partieId, 'partie-test');
     return { deplacements: 3, detail: '3× Corvette 1→2' };

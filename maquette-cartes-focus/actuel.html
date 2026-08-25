@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Design actuel</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+  <nav class="maquette-nav">
+    <a href="index.html">Sommaire</a>
+    <a href="actuel.html" class="actif">Design actuel (référence)</a>
+    <a href="variante-a-popup.html">Variante A — Toujours une popup</a>
+    <a href="variante-b-carte.html">Variante B — Sélection depuis la carte (abandonnée)</a>
+    <a href="variante-c-feuille.html">Variante C — Feuille d'action</a>
+  </nav>
+
+  <header class="topbar">
+    <h1 class="topbar-titre">Design actuel<span class="topbar-accent">Référence</span></h1>
+  </header>
+
+  <div class="maquette-intro">
+    Reconstitue le comportement d'AUJOURD'HUI (voir <a href="NOTES.md">NOTES.md</a>) :
+    chaque carte ci-dessous ouvre une popup différente — ou aucune —
+    selon la nature de son effet. Clique sur "▶" pour chaque carte et
+    observe l'hétérogénéité des gabarits (titre, présence d'Annuler,
+    libellé de Valider, nombre de popups à la chaîne pour la 4ᵉ carte).
+  </div>
+
+  <div id="cartes"></div>
+
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="modal-titre">Titre</h3>
+      <div id="modal-contenu"></div>
+      <div class="modal-actions">
+        <button id="modal-annuler" class="btn btn-secondary">Annuler</button>
+        <button id="modal-valider" class="btn btn-primary" hidden>Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="donnees.js"></script>
+<script>
+(function () {
+  var overlay = document.getElementById('modal');
+  var titre = document.getElementById('modal-titre');
+  var contenu = document.getElementById('modal-contenu');
+  var btnAnnuler = document.getElementById('modal-annuler');
+  var btnValider = document.getElementById('modal-valider');
+
+  function ouvrir() { overlay.hidden = false; }
+  function fermer() { overlay.hidden = true; }
+  btnAnnuler.onclick = fermer;
+
+  function flash(carteId, texte) {
+    var el = document.querySelector('.focus-action[data-id="' + carteId + '"] .focus-action-resultat');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = '✓ ' + texte;
+  }
+
+  // --- Rendu des 5 cartes (chacune dans sa propre .card.focus-card, un
+  // Focus = une carte du jeu, comme dans l'app réelle) ---
+  var container = document.getElementById('cartes');
+  container.innerHTML = CARTES_EXEMPLE.map(function (c) {
+    return '<div class="card focus-card" style="margin-bottom:14px;">' +
+      '<h3>' + c.focus + '</h3>' +
+      '<div class="focus-action" data-id="' + c.id + '">' +
+      '<div class="focus-action-corps">' +
+      '<p class="cas-tag">' + c.cas + '</p>' +
+      '<p class="focus-action-nom">' + c.action + '</p>' +
+      '<p>' + c.texte + '</p>' +
+      '<p class="section-auto focus-action-resultat" hidden style="margin-top:8px;"></p>' +
+      '</div>' +
+      '<div class="focus-action-side">' +
+      pastillesCoutHTML(c.cout) +
+      '<button class="btn-jouer-action" title="Jouer cette action">▶</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }).join('');
+
+  Array.prototype.forEach.call(container.querySelectorAll('.btn-jouer-action'), function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.closest('.focus-action').dataset.id;
+      var carte = CARTES_EXEMPLE.filter(function (c) { return c.id === id; })[0];
+      document.querySelectorAll('.focus-action-resultat').forEach(function (el) { el.hidden = true; });
+      jouerCarte(carte);
+    });
+  });
+
+  function jouerCarte(carte) {
+    if (carte.type === 'auto') {
+      // Cas A : AUCUNE popup — résolution immédiate.
+      flash(carte.id, carte.resultat);
+      return;
+    }
+    if (carte.type === 'informatif') { ouvrirInformatif(carte); return; }
+    if (carte.type === 'exclusif') { ouvrirExclusif(carte, function (option) { flash(carte.id, option + ' — appliqué.'); }); return; }
+    if (carte.type === 'inclusif') { ouvrirInclusif(carte); return; }
+    if (carte.type === 'exclusif-configurateur') { ouvrirConfigurateurChoix(carte); return; }
+  }
+
+  // Cas B — popup informative, sans choix.
+  function ouvrirInformatif(carte) {
+    titre.textContent = 'Produire de l’' + carte.ressource;
+    contenu.innerHTML = '<p class="hint">Revenu actuel : ' + carte.revenuActuel + ' ' + carte.ressource + '.</p>';
+    btnAnnuler.hidden = false;
+    btnValider.hidden = false;
+    btnValider.textContent = 'Valider';
+    btnValider.onclick = function () { fermer(); flash(carte.id, '+' + carte.revenuActuel + ' ' + carte.ressource + '.'); };
+    ouvrir();
+  }
+
+  // Cas C — choix exclusif (un clic = résolu, comme le vrai
+  // 'option_exclusive' : pas de bouton Valider séparé).
+  function ouvrirExclusif(carte, onChoisi) {
+    titre.textContent = 'Choisissez une option';
+    btnValider.hidden = true;
+    btnAnnuler.hidden = false;
+    contenu.innerHTML = '<div class="modal-choix-boutons">' +
+      carte.options.map(function (o, i) { return '<button class="btn btn-secondary" data-i="' + i + '">' + o + '</button>'; }).join('') +
+      '</div>';
+    Array.prototype.forEach.call(contenu.querySelectorAll('button'), function (btn) {
+      btn.onclick = function () { fermer(); onChoisi(carte.options[Number(btn.dataset.i)]); };
+    });
+    ouvrir();
+  }
+
+  // Cas D — choix inclusif "et/ou" (cases à cocher, Valider unique, pas
+  // d'Annuler — comme le vrai 'options_inclusives').
+  function ouvrirInclusif(carte) {
+    titre.textContent = 'Choisissez une ou plusieurs options (et/ou)';
+    btnAnnuler.hidden = true;
+    btnValider.hidden = false;
+    btnValider.textContent = 'Valider';
+    contenu.innerHTML = '<div class="modal-choix-cases">' +
+      carte.options.map(function (o, i) {
+        return '<label class="modal-choix-case"><input type="checkbox" data-i="' + i + '"> ' + o + '</label>';
+      }).join('') + '</div>';
+    btnValider.onclick = function () {
+      var choisies = Array.prototype.filter.call(contenu.querySelectorAll('input:checked'), function () { return true; })
+        .map(function (cb) { return carte.options[Number(cb.dataset.i)]; });
+      fermer();
+      enchainerApresInclusif(carte, choisies, 0);
+    };
+    ouvrir();
+  }
+
+  // Enchaîne les popups déclenchées par les options cochées (cas E), PUIS
+  // le paiement du coût si nécessaire (cas F) — reproduit la chaîne
+  // "Effet d'abord, Coût ensuite" de focusEngine.js, popup par popup,
+  // chacune avec son propre gabarit (illustration du constat "aucune
+  // continuité visuelle entre les popups" de NOTES.md).
+  function enchainerApresInclusif(carte, choisies, index) {
+    if (index >= choisies.length) { payerCoutSiNecessaire(carte); return; }
+    var option = choisies[index];
+    if (option === 'Déplacer une Corruption') {
+      ouvrirSelectionCorruption(carte, function () { enchainerApresInclusif(carte, choisies, index + 1); });
+    } else {
+      // "Gagner un Programme" : simule une résolution simple, une seule
+      // popup de sélection (liste catalogue) — non détaillée ici.
+      setTimeout(function () { enchainerApresInclusif(carte, choisies, index + 1); }, 10);
+    }
+  }
+
+  // Cas E — sélection dynamique (ici : source de la Corruption à
+  // déplacer, une liste calculée).
+  function ouvrirSelectionCorruption(carte, suite) {
+    titre.textContent = 'Retirer une Corruption';
+    btnValider.hidden = true;
+    btnAnnuler.hidden = false;
+    contenu.innerHTML = '<div class="modal-choix-boutons">' +
+      carte.ciblesCorruption.map(function (o, i) { return '<button class="btn btn-secondary" data-i="' + i + '">' + o + '</button>'; }).join('') +
+      '</div>';
+    Array.prototype.forEach.call(contenu.querySelectorAll('button'), function (btn) {
+      btn.onclick = function () { fermer(); suite(); };
+    });
+    ouvrir();
+  }
+
+  // Cas F — paiement/substitution Crédit, seulement si la réserve
+  // indiquée est insuffisante (comportement actuel : jamais proposé sinon).
+  function payerCoutSiNecessaire(carte) {
+    if (carte.energieReserve === undefined || carte.energieReserve >= 1) {
+      fermer();
+      flash(carte.id, 'Effet(s) appliqué(s), coût débité.');
+      return;
+    }
+    titre.textContent = 'Payer 1 Énergie';
+    btnAnnuler.hidden = false;
+    btnValider.hidden = false;
+    btnValider.textContent = 'Valider';
+    contenu.innerHTML = '<p class="hint">Stock : ' + carte.energieReserve + ' Énergie, ' + carte.energieCredit + ' Crédit.</p>' +
+      '<p class="hint">Réserve insuffisante → 1 Crédit substitué automatiquement à la place.</p>';
+    btnValider.onclick = function () { fermer(); flash(carte.id, 'Effet(s) appliqué(s), 1 Énergie payée en Crédit.'); };
+    ouvrir();
+  }
+
+  // Cas G — exclusif puis, si "Regrouper" choisi, configurateur
+  // multi-étapes (ajout de déplacements, jauge N/5).
+  function ouvrirConfigurateurChoix(carte) {
+    ouvrirExclusif(carte, function (option) {
+      if (option === 'Regrouper') { ouvrirConfigurateurRegrouper(carte); }
+      else { flash(carte.id, 'Invasion résolue.'); }
+    });
+  }
+
+  function ouvrirConfigurateurRegrouper(carte) {
+    var mouvements = [];
+    function render() {
+      titre.textContent = 'Regrouper';
+      btnAnnuler.hidden = false;
+      var total = mouvements.reduce(function (s, m) { return s + m.q; }, 0);
+      contenu.innerHTML = '<p class="hint">Déplacements utilisés : <strong>' + total + ' / 5</strong></p>' +
+        (mouvements.length
+          ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+              return '<li>' + m.q + '× Corvette : Secteur ' + m.d + ' → Secteur ' + m.a +
+                ' <button type="button" class="btn-lien" data-retirer="' + i + '">retirer</button></li>';
+            }).join('') + '</ul>'
+          : '<p class="hint">Aucun déplacement ajouté.</p>') +
+        '<div class="regrouper-form">' +
+        '<select id="mock-depart">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<select id="mock-arrivee" style="margin-top:6px;">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+        '<input type="number" min="1" step="1" value="1" id="mock-quantite" style="margin-top:6px;">' +
+        '<button type="button" class="btn btn-secondary" id="mock-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+        '</div>';
+      Array.prototype.forEach.call(contenu.querySelectorAll('[data-retirer]'), function (btn) {
+        btn.onclick = function () { mouvements.splice(Number(btn.dataset.retirer), 1); render(); };
+      });
+      document.getElementById('mock-ajouter').onclick = function () {
+        mouvements.push({
+          d: document.getElementById('mock-depart').value,
+          a: document.getElementById('mock-arrivee').value,
+          q: Math.max(1, Number(document.getElementById('mock-quantite').value) || 1)
+        });
+        render();
+      };
+      btnValider.hidden = mouvements.length === 0;
+      btnValider.textContent = 'Valider';
+      btnValider.onclick = function () { fermer(); flash(carte.id, mouvements.reduce(function (s, m) { return s + m.q; }, 0) + ' unité(s) regroupée(s).'); };
+    }
+    render();
+    ouvrir();
+  }
+})();
+</script>
+</body>
+</html>

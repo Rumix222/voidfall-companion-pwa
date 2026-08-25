@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette — Variante A</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+  <nav class="maquette-nav">
+    <a href="index.html">Sommaire</a>
+    <a href="actuel.html">Design actuel (référence)</a>
+    <a href="variante-a-popup.html" class="actif">Variante A — Toujours une popup</a>
+    <a href="variante-b-carte.html">Variante B — Sélection depuis la carte (abandonnée)</a>
+    <a href="variante-c-feuille.html">Variante C — Feuille d'action</a>
+  </nav>
+
+  <header class="topbar">
+    <h1 class="topbar-titre">Variante A<span class="topbar-accent">Toujours une popup</span></h1>
+  </header>
+
+  <div class="maquette-intro">
+    Chaque "▶" ouvre TOUJOURS UNE SEULE popup, au gabarit identique :
+    texte imprimé de la carte, section <strong>Coût</strong> (toujours
+    visible, éditable dès qu'une ressource Nourriture/Énergie/Matériel
+    est substituable par du Crédit — même quand la réserve suffit),
+    section <strong>Effet</strong> (choix radio/cases, configurateur
+    inline si besoin), puis Annuler/Valider. Comparer avec
+    <a href="actuel.html">le design actuel</a> : la carte "Conquête —
+    Planifier" (3 popups en chaîne aujourd'hui) tient ici dans une seule.
+  </div>
+
+  <div id="cartes"></div>
+
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="modal-titre">Titre</h3>
+      <p class="carte-source-texte" id="modal-source-texte"></p>
+      <div class="modal-section">
+        <p class="modal-section-titre">Coût</p>
+        <div id="modal-cout"></div>
+      </div>
+      <div class="modal-section">
+        <p class="modal-section-titre">Effet</p>
+        <div id="modal-effet"></div>
+      </div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button id="modal-annuler" class="btn btn-secondary">Annuler</button>
+        <button id="modal-valider" class="btn btn-primary">Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="donnees.js"></script>
+<script>
+(function () {
+  var overlay = document.getElementById('modal');
+  var titre = document.getElementById('modal-titre');
+  var sourceTexte = document.getElementById('modal-source-texte');
+  var zoneCout = document.getElementById('modal-cout');
+  var zoneEffet = document.getElementById('modal-effet');
+  var btnAnnuler = document.getElementById('modal-annuler');
+  var btnValider = document.getElementById('modal-valider');
+
+  function ouvrir() { overlay.hidden = false; }
+  function fermer() { overlay.hidden = true; }
+  btnAnnuler.onclick = fermer;
+
+  function flash(carteId, texte) {
+    var el = document.querySelector('.focus-action[data-id="' + carteId + '"] .focus-action-resultat');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = '✓ ' + texte;
+  }
+
+  var container = document.getElementById('cartes');
+  container.innerHTML = CARTES_EXEMPLE.map(function (c) {
+    return '<div class="card focus-card" style="margin-bottom:14px;">' +
+      '<h3>' + c.focus + '</h3>' +
+      '<div class="focus-action" data-id="' + c.id + '">' +
+      '<div class="focus-action-corps">' +
+      '<p class="cas-tag">' + c.cas + '</p>' +
+      '<p class="focus-action-nom">' + c.action + '</p>' +
+      '<p>' + c.texte + '</p>' +
+      '<p class="section-auto focus-action-resultat" hidden style="margin-top:8px;"></p>' +
+      '</div>' +
+      '<div class="focus-action-side">' +
+      pastillesCoutHTML(c.cout) +
+      '<button class="btn-jouer-action" title="Jouer cette action">▶</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+  }).join('');
+
+  Array.prototype.forEach.call(container.querySelectorAll('.btn-jouer-action'), function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.closest('.focus-action').dataset.id;
+      var carte = CARTES_EXEMPLE.filter(function (c) { return c.id === id; })[0];
+      document.querySelectorAll('.focus-action-resultat').forEach(function (el) { el.hidden = true; });
+      ouvrirPopupStandard(carte);
+    });
+  });
+
+  // Contrôle de répartition ressource/Crédit — TOUJOURS affiché pour une
+  // ressource substituable (Énergie/Matériel/Nourriture), même quand la
+  // réserve suffit seule (généralisation du POC "Conquête Préparer" —
+  // voir version.js). Curseur 0..montant : à droite = tout en ressource,
+  // à gauche = tout en Crédit substitué.
+  function repartitionHTML(id, label, montant, stock, credit) {
+    var defaut = Math.min(montant, stock);
+    return '<div class="paiement-repartition" data-id="' + id + '">' +
+      '<input type="range" min="0" max="' + montant + '" value="' + defaut + '" id="range-' + id + '">' +
+      '<span class="paiement-repartition-resume" id="resume-' + id + '"></span>' +
+      '</div>' +
+      '<p class="hint" style="margin:-6px 0 10px;">Stock : ' + stock + ' ' + label + ', ' + credit + ' Crédit disponible.</p>';
+  }
+
+  function brancherRepartition(id, label, montant, stock, credit) {
+    var range = document.getElementById('range-' + id);
+    var resume = document.getElementById('resume-' + id);
+    function maj() {
+      var v = Number(range.value);
+      var c = montant - v;
+      resume.innerHTML = '<span class="valeur-ressource">' + v + ' ' + label + '</span>' +
+        (c > 0 ? ' + <span class="valeur-credit">' + c + ' Crédit</span>' : '');
+      btnValider.disabled = c > credit;
+    }
+    range.addEventListener('input', maj);
+    maj();
+  }
+
+  function ouvrirPopupStandard(carte) {
+    titre.textContent = carte.focus + ' — ' + carte.action;
+    sourceTexte.textContent = '« ' + carte.texte + ' »';
+    btnValider.disabled = false;
+    btnAnnuler.hidden = false;
+
+    // --- Section Coût (toujours affichée, même vide) ---
+    if (!carte.cout.length) {
+      zoneCout.innerHTML = '<p class="section-auto">Aucun coût.</p>';
+    } else if (carte.id === 'conquete-planifier') {
+      zoneCout.innerHTML = '<p class="hint">1 Crédit (non substituable, prélevé directement).</p>' +
+        repartitionHTML('energie', 'Énergie', 1, carte.energieReserve, carte.energieCredit);
+    } else if (carte.id === 'conquete-engager') {
+      zoneCout.innerHTML = repartitionHTML('materiel', 'Énergie', 2, 2, 4);
+    } else {
+      zoneCout.innerHTML = '<p class="hint">' + carte.cout.map(function (c) { return c.titre; }).join(', ') + ' (réserve suffisante, non substituable pour cette carte).</p>';
+    }
+
+    // --- Section Effet (dépend du type) ---
+    var valider = function () {}; // rebranché ci-dessous selon le cas
+
+    if (carte.type === 'auto') {
+      zoneEffet.innerHTML = '<p class="section-auto">S’applique automatiquement — aucun choix : <strong>+1 Influence</strong>.</p>';
+      valider = function () { fermer(); flash(carte.id, '+1 Influence, −1 Crédit.'); };
+
+    } else if (carte.type === 'informatif') {
+      zoneEffet.innerHTML = '<p class="section-auto">Revenu actuel : <strong>' + carte.revenuActuel + ' ' + carte.ressource + '</strong> → sera crédité tel quel.</p>';
+      valider = function () { fermer(); flash(carte.id, '+' + carte.revenuActuel + ' ' + carte.ressource + '.'); };
+
+    } else if (carte.type === 'exclusif') {
+      zoneEffet.innerHTML = '<div class="modal-choix-cases">' +
+        carte.options.map(function (o, i) {
+          return '<label class="modal-choix-case"><input type="radio" name="ex" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + o + '</label>';
+        }).join('') + '</div>';
+      valider = function () {
+        var i = Number(document.querySelector('input[name="ex"]:checked').value);
+        fermer();
+        flash(carte.id, carte.options[i] + ' — appliqué.');
+      };
+
+    } else if (carte.type === 'inclusif') {
+      zoneEffet.innerHTML = '<div class="modal-choix-cases">' +
+        carte.options.map(function (o, i) {
+          return '<label class="modal-choix-case"><input type="checkbox" name="in" value="' + i + '"> ' + o + '</label>' +
+            (o === 'Déplacer une Corruption'
+              ? '<select id="cible-corruption" class="modal-choix-select" style="display:none;">' +
+                carte.ciblesCorruption.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select>'
+              : '');
+        }).join('') + '</div>';
+      var caseCorruption = zoneEffet.querySelector('input[value="1"]');
+      var selectCorruption = document.getElementById('cible-corruption');
+      caseCorruption.addEventListener('change', function () { selectCorruption.style.display = caseCorruption.checked ? '' : 'none'; });
+      valider = function () {
+        var choisies = Array.prototype.filter.call(zoneEffet.querySelectorAll('input:checked'), function () { return true; })
+          .map(function (cb) { return carte.options[Number(cb.value)]; });
+        fermer();
+        flash(carte.id, (choisies.join(' + ') || 'aucune option') + ' — appliqué en un seul Valider (au lieu de 3 popups).');
+      };
+
+    } else if (carte.type === 'exclusif-configurateur') {
+      zoneEffet.innerHTML = '<div class="modal-choix-cases">' +
+        carte.options.map(function (o, i) {
+          return '<label class="modal-choix-case"><input type="radio" name="conf" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + o + '</label>';
+        }).join('') + '</div>' +
+        '<div id="conf-regrouper" style="display:none;margin-top:10px;"></div>';
+      var mouvements = [];
+      var zoneConf = document.getElementById('conf-regrouper');
+      function renderConf() {
+        var total = mouvements.reduce(function (s, m) { return s + m.q; }, 0);
+        zoneConf.innerHTML = '<p class="hint">Déplacements utilisés : <strong>' + total + ' / 5</strong></p>' +
+          (mouvements.length
+            ? '<ul class="regrouper-liste">' + mouvements.map(function (m, i) {
+                return '<li>' + m.q + '× Corvette : Secteur ' + m.d + ' → Secteur ' + m.a +
+                  ' <button type="button" class="btn-lien" data-retirer="' + i + '">retirer</button></li>';
+              }).join('') + '</ul>'
+            : '<p class="hint">Aucun déplacement ajouté.</p>') +
+          '<div class="regrouper-form">' +
+          '<select id="mock-depart">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+          '<select id="mock-arrivee" style="margin-top:6px;">' + carte.secteursRegrouper.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+          '<input type="number" min="1" step="1" value="1" id="mock-quantite" style="margin-top:6px;">' +
+          '<button type="button" class="btn btn-secondary" id="mock-ajouter" style="width:100%;margin-top:10px;">Ajouter ce déplacement</button>' +
+          '</div>';
+        Array.prototype.forEach.call(zoneConf.querySelectorAll('[data-retirer]'), function (btn) {
+          btn.onclick = function () { mouvements.splice(Number(btn.dataset.retirer), 1); renderConf(); };
+        });
+        document.getElementById('mock-ajouter').onclick = function () {
+          mouvements.push({
+            d: document.getElementById('mock-depart').value,
+            a: document.getElementById('mock-arrivee').value,
+            q: Math.max(1, Number(document.getElementById('mock-quantite').value) || 1)
+          });
+          renderConf();
+        };
+      }
+      renderConf();
+      Array.prototype.forEach.call(zoneEffet.querySelectorAll('input[name="conf"]'), function (r) {
+        r.addEventListener('change', function () {
+          var v = document.querySelector('input[name="conf"]:checked').value;
+          zoneConf.style.display = v === '1' ? '' : 'none';
+        });
+      });
+      valider = function () {
+        var choixIndex = Number(document.querySelector('input[name="conf"]:checked').value);
+        fermer();
+        if (choixIndex === 1) {
+          flash(carte.id, mouvements.reduce(function (s, m) { return s + m.q; }, 0) + ' unité(s) regroupée(s) — même configurateur, mais dans la popup unique.');
+        } else {
+          flash(carte.id, 'Invasion résolue.');
+        }
+      };
+    }
+
+    // Branche la répartition Coût APRÈS le rendu (a besoin du DOM en place).
+    if (carte.id === 'conquete-planifier') brancherRepartition('energie', 'Énergie', 1, carte.energieReserve, carte.energieCredit);
+    if (carte.id === 'conquete-engager') brancherRepartition('materiel', 'Énergie', 2, 2, 4);
+
+    btnValider.onclick = function () { valider(); };
+    ouvrir();
+  }
+})();
+</script>
+</body>
+</html>

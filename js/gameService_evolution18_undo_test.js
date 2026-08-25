@@ -198,6 +198,12 @@ test("EVOLUTION 18 — Conquête « Planifier » (et/ou) : annuler rétablit AUS
 
   var demanderChoix = function (contexte) {
     if (contexte.type === 'options_inclusives') return [0, 1]; // les 2 options
+    // Coût {credit:1, energie:1} : le Crédit n'est jamais substituable
+    // (silencieux), mais l'Énergie déclenche désormais TOUJOURS la popup
+    // 'paiement_ressource' (comportement systématique, focusEngine.js) —
+    // paie entièrement depuis la réserve pour préserver l'assertion
+    // ressourceEnergie ci-dessous.
+    if (contexte.type === 'paiement_ressource') return { utiliseRessource: contexte.montant };
     if (contexte.type === 'gagner_programme') {
       // Simule la popup réelle : persistance DIRECTE en base (comme
       // GameService.gagnerProgramme), hors du diff plateauMaison.
