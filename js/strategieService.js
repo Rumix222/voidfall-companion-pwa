@@ -1932,12 +1932,36 @@ var StrategieService = (function () {
         return;
       }
 
-      var options = disponibles.map(function (p) { return (offreParNom_[p.nom] ? '★ ' : '') + p.nom + ' — ' + p.type; });
-      etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('prog', options, false) + '</div>';
-      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'prog', false); };
+      // Retour utilisateur : reprend le <select>/<optgroup> (groupé par
+      // type, comme #modal-choix ci-dessous) plutôt qu'une liste plate de
+      // rangée-choix — étoile "★" sur le Programme actuellement révélé
+      // dans l'offre publique, détail (objectif1/objectif2) affiché sous
+      // le select au changement de sélection.
+      var groupes = typesAffiches.map(function (type) {
+        var optionsType = disponibles.filter(function (p) { return p.type === type; })
+          .map(function (p) { return '<option value="' + p.nom + '">' + (offreParNom_[p.nom] ? '★ ' : '') + p.nom + '</option>'; })
+          .join('');
+        return optionsType ? '<optgroup label="' + type + '">' + optionsType + '</optgroup>' : '';
+      }).join('');
+      var parNom_ = {};
+      disponibles.forEach(function (p) { parNom_[p.nom] = p; });
+
+      etapeCourante.html = '<div class="feuille-section">' +
+        '<select id="feuille-programme-select" class="modal-choix-select">' + groupes + '</select>' +
+        '<p class="hint" id="feuille-programme-detail" style="margin-top:8px;"></p>' +
+        '</div>';
+      etapeCourante.brancher = function (el) {
+        var selectProgramme = el.querySelector('#feuille-programme-select');
+        var detailProgramme = el.querySelector('#feuille-programme-detail');
+        function majDetail_() {
+          var carte = parNom_[selectProgramme.value];
+          detailProgramme.innerHTML = carte ? (carte.objectif1 || '') + '<br>' + (carte.objectif2 || '') : '';
+        }
+        selectProgramme.addEventListener('change', majDetail_);
+        majDetail_();
+      };
       etapeCourante.onValider = function () {
-        var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
-        var nomChoisi = disponibles[i].nom;
+        var nomChoisi = feuilleEls_.corpsInner.querySelector('#feuille-programme-select').value;
         feuilleEls_.btnValider.disabled = true;
         GameService.gagnerProgramme(partieProgramme.id, nomChoisi).then(function (resultat) {
           feuilleEls_.btnValider.disabled = false;

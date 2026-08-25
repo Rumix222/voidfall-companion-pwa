@@ -1803,12 +1803,15 @@ input[type="number"]:focus-visible {
   background: var(--color-border);
 }
 .cout-stepper-seg-ressource { background: var(--color-text-muted); height: 100%; }
-.cout-stepper-seg-credit { background: var(--color-coral); height: 100%; }
+/* Couleur du Crédit (CHAMP_RESSOURCE.credit.couleur, strategieService.js)
+   plutôt que le corail générique — retour utilisateur, même principe que
+   le segment "ressource" ci-dessus (coloré selon la ressource réelle). */
+.cout-stepper-seg-credit { background: #d1a671; height: 100%; }
 .cout-stepper-resume {
   margin: 8px 0 0;
   font-size: 0.86rem;
   text-align: center;
 }
 .cout-stepper-resume .valeur-ressource { color: var(--color-text); font-weight: 600; }
-.cout-stepper-resume .valeur-credit { color: var(--color-coral); font-weight: 600; }
+.cout-stepper-resume .valeur-credit { color: #d1a671; font-weight: 600; }
 .cout-stepper-hint { margin: 4px 0 0; text-align: center; }

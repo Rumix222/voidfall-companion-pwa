@@ -1,9 +1,33 @@
 /**
  * version.js
- * Version 92 — 2026-08-25
+ * Version 93 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — Regrouper/Envahir
+ * 25/08/2026, dernière fois (Feuille d'action — couleur Crédit sur la
+ * barre + <select>/<optgroup> pour "Gagner un Programme", retour
+ * utilisateur) :
+ * - `.cout-stepper-seg-credit`/`.valeur-credit` (css/style.css) :
+ *   couleur du Crédit (#d1a671, CHAMP_RESSOURCE.credit.couleur) au lieu
+ *   du corail générique — même principe que le segment "ressource" déjà
+ *   coloré par ressource (entrée précédente). Le badge "Insuffisant"
+ *   reste corail (avertissement, pas une couleur de ressource).
+ * - `feuilleFlowGagnerProgramme_` : "on peut reprendre la ddl qu'on avait
+ *   avant avec séparation par type et étoile sur les programmes de
+ *   l'offre" — remplace la liste plate de rangée-choix par le
+ *   `<select>`/`<optgroup>` groupé par type (Domination/Force/Soutien/
+ *   Richesse) de l'ancienne branche #modal-choix 'gagner_programme'
+ *   équivalente plus bas, étoile "★" sur le Programme actuellement révélé
+ *   dans l'offre publique conservée, ET le détail (objectif1/objectif2)
+ *   affiché sous le select au changement de sélection — repris à
+ *   l'identique, seul le conteneur change (feuille au lieu de
+ *   #modal-choix).
+ * 145 tests au vert. Vérifié manuellement dans un vrai navigateur
+ * (Playwright) : couleur du segment Crédit exacte (rgb(209,166,113)) ;
+ * 4 groupes de type affichés, détail des objectifs mis à jour au
+ * changement de sélection — aucune erreur JS.
+ * Fichiers touchés : css/style.css, strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — Regrouper/Envahir
  * portés DANS la feuille + 2 ajustements visuels, retour utilisateur :
  * "quand on passe à l'action regrouper ou envahir il faudrait rester
  * dans la même popup comme dans le POC") :
@@ -3029,4 +3053,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.8';
+var APP_VERSION = '20260825.9';
