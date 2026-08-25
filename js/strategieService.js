@@ -757,6 +757,26 @@ var StrategieService = (function () {
   }
 
   /**
+   * Retour utilisateur : les sous-lignes d'un "cadre" (voir renderJournal_
+   * ci-dessous) répètent le libellé Focus/Action déjà affiché comme titre
+   * du cadre — chaque ligne produite par focusEngine.js est préfixée
+   * "<carte.focus> — <action> (effet|coût) : " (resoudreAction,
+   * focusEngine.js), IDENTIQUE au `entree.action` de son propre cadre.
+   * Retire ce préfixe s'il correspond EXACTEMENT au titre du cadre — ne
+   * touche jamais une ligne dont le préfixe diffère (ex. le cadre "Piste
+   * X" ci-dessous, dont les sous-lignes viennent de focusEngine.js avec
+   * un préfixe différent, correctement laissées intactes).
+   */
+  function allegerLigneJournal_(ligne, actionTitre) {
+    if (!actionTitre) return ligne;
+    var prefixes = [actionTitre + ' (effet) : ', actionTitre + ' (coût) : ', actionTitre + ' : '];
+    for (var i = 0; i < prefixes.length; i++) {
+      if (ligne.indexOf(prefixes[i]) === 0) return ligne.slice(prefixes[i].length);
+    }
+    return ligne;
+  }
+
+  /**
    * EVOLUTION 18 (todo.md) : une entrée `{action, lignes}` avec `action`
    * renseigné devient un "cadre" — titre (le libellé Focus/Programme) +
    * sous-cadre listant chaque ligne produite par CETTE résolution (Effet/
@@ -783,7 +803,8 @@ var StrategieService = (function () {
           '<ul class="journal-action-effets">' +
           entree.lignes.map(function (ligne) {
             var estAvertissement = journalLigneEstAvertissement_(ligne);
-            return '<li' + (estAvertissement ? ' class="journal-avertissement"' : '') + '>' + ligne + '</li>';
+            var ligneAllegee = allegerLigneJournal_(ligne, entree.action);
+            return '<li' + (estAvertissement ? ' class="journal-avertissement"' : '') + '>' + ligneAllegee + '</li>';
           }).join('') +
           '</ul>' +
           '</li>';
@@ -1432,26 +1453,31 @@ var StrategieService = (function () {
   // seul le CHROME visuel change.
   //
   // Scope VOLONTAIREMENT limité : `carteEligibleFeuille_` ne couvre QUE
-  // Focus Conquête Standard (celle testée tout du long) — les autres
-  // maisons ont un Conquête différent (Astoran/Yarvek/Zenor/Héroïque, avec
-  // des clés Effet non couvertes ici : nourriture_par_secteur_pur,
-  // gagner_technologie, etc.), et toutes les autres cartes du catalogue
-  // continuent d'utiliser #modal-choix, INCHANGÉ. `FEUILLE_TYPES_
-  // SUPPORTES_` couvre les contexte.type déclenchés par cette carte,
-  // désormais TOUS (option_exclusive/options_inclusives/
-  // paiement_ressource/gagner_programme/deplacer_corruption/regrouper/
-  // envahir) — retour utilisateur : "il faudrait rester dans la même
-  // popup [pour Regrouper/Envahir] comme dans le POC" (auparavant repli
-  // volontaire sur #modal-choix, formulaires jugés hors périmètre du
-  // premier portage — feuilleFlowRegrouper_/feuilleFlowEnvahir_, plus
-  // bas, les portent maintenant directement DANS la feuille, réutilisant
-  // la logique métier des branches #modal-choix équivalentes SANS aucun
-  // changement).
+  // Cartes migrées une par une (plan explicite de l'utilisateur : "on va
+  // implanter tous les focus petit à petit en gardant le reste
+  // fonctionnel", #modal-choix retiré seulement à la toute fin) — chaque
+  // maison ayant potentiellement une variante différente d'un même Focus
+  // (clés Effet différentes, non couvertes par les feuilleFlow* ci-
+  // dessous), seul le TYPE exact testé est whitelisté ici. Toute autre
+  // carte du catalogue continue d'utiliser #modal-choix, INCHANGÉ.
+  // `FEUILLE_TYPES_SUPPORTES_` couvre l'UNION des contexte.type
+  // déclenchés par TOUTES les cartes de cette liste (une carte migrée
+  // n'utilise qu'un sous-ensemble — sans risque, un contexte.type que sa
+  // propre résolution ne déclenche jamais n'est simplement jamais
+  // demandé pour elle).
+  var CARTES_ELIGIBLES_FEUILLE_ = [
+    { focus: 'Conquête', type: 'Standard' },
+    { focus: 'Développement', type: 'Standard' }
+  ];
   function carteEligibleFeuille_(carte) {
-    return !!carte && carte.focus === 'Conquête' && carte.type === 'Standard';
+    return !!carte && CARTES_ELIGIBLES_FEUILLE_.some(function (c) { return c.focus === carte.focus && c.type === carte.type; });
   }
   var carteEnFeuille_ = false;
-  var FEUILLE_TYPES_SUPPORTES_ = ['option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption', 'regrouper', 'envahir'];
+  var FEUILLE_TYPES_SUPPORTES_ = [
+    'option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption', 'regrouper', 'envahir',
+    // Focus Développement Standard (Harmoniser/Croître/Installer) :
+    'retirer_corruption', 'construire', 'augmenter_population_pure', 'rappeler_cube_cout'
+  ];
 
   var feuillePile_ = [];
   var feuilleRejetCourant_ = null;
@@ -2600,6 +2626,319 @@ var StrategieService = (function () {
     return promise;
   }
 
+  /**
+   * Retirer une Corruption, DANS la feuille — Focus Développement
+   * Standard "Harmoniser" (une des 2 options de son choix exclusif).
+   * Portage direct de la branche #modal-choix 'retirer_corruption'
+   * équivalente plus bas (même logique/appels métier) : menu de cibles
+   * (Secteur/Piste/Programme/Chambres de décontamination, chacune
+   * affichée seulement si éligible) puis, sauf pour Chambres de
+   * décontamination (résolution immédiate, pas de sous-choix), un
+   * sous-choix de la cible précise. "Programme" réutilise le choix
+   * numéroté par emplacement (1/2/3) introduit pour "Déplacer une
+   * Corruption" ci-dessus — code volontairement dupliqué (pas factorisé)
+   * pour ne pas risquer de régression sur cette dernière, déjà vérifiée ;
+   * une factorisation commune est prévue une fois toutes les cartes
+   * migrées (voir le plan de migration, mémoire persistante).
+   */
+  function feuilleFlowRetirerCorruption_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partieCorruption = partieAffichee;
+
+    var pistesCorrompues = CivilisationService.PISTES.filter(function (p) {
+      return !!(partieCorruption.civilisation && partieCorruption.civilisation.corrompues && partieCorruption.civilisation.corrompues[p]);
+    });
+    var possedeChambreDecontamination = nomsTechnologiesJoueur_(partieCorruption).indexOf('chambres de décontamination') !== -1;
+    var corruptionStockee = (partieCorruption.plateauMaison && partieCorruption.plateauMaison.corruptionChambreDecontamination) || 0;
+    var optionsRetraitPiste_ = { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieCorruption) };
+    function detailRetraitPiste_(piste, resultat) {
+      var base = 'Corruption retirée de la piste ' + CivilisationService.NOM_PISTE[piste] + '.';
+      if (resultat && resultat.corruptionMaisonConservee) {
+        base += ' Compteur de Corruption (plateau maison) conservé — Événement « Le visage du mal » actif ce cycle.';
+      }
+      return base;
+    }
+    var slotsProgrammeRC_ = (partieCorruption.plateauMaison && Array.isArray(partieCorruption.plateauMaison.programmesUtilises))
+      ? partieCorruption.plateauMaison.programmesUtilises : [];
+    function slotProgrammeRC_(i) { return slotsProgrammeRC_[i] || { nom: null, entretienActif: false, corrompu: false }; }
+    var indicesProgrammeCorrompusRC = [1, 2, 3].filter(function (i) { return slotProgrammeRC_(i).corrompu; });
+    function libelleSlotProgrammeRC_(i) {
+      var s = slotProgrammeRC_(i);
+      return 'Programme ' + i + (s.nom ? ' — ' + s.nom : '');
+    }
+    function ecrireProgrammeCorrompuRC_(index, corrompu) {
+      var nouveauxSlots = slotsProgrammeRC_.map(function (s, i) { return i === index ? Object.assign({}, slotProgrammeRC_(i), { corrompu: corrompu }) : s; });
+      var delta = corrompu ? 1 : -1;
+      var corruptionMaison = Math.max(0, ((partieCorruption.plateauMaison && partieCorruption.plateauMaison.corruptionMaison) || 0) + delta);
+      return GameService.majPlateauMaison(partieCorruption.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison }).then(function () {
+        partieCorruption.plateauMaison.programmesUtilises = nouveauxSlots;
+        partieCorruption.plateauMaison.corruptionMaison = corruptionMaison;
+        slotsProgrammeRC_ = nouveauxSlots;
+      });
+    }
+
+    function afficherSousChoixCibleRC_(cle, liste, labelFn) {
+      var libelleCategorie = cle === 'secteur' ? 'Secteur' : cle === 'piste' ? 'Piste' : 'Programme';
+      feuillePousserEtape_({
+        titre: etiquette + 'Retirer une Corruption — ' + libelleCategorie, nbEtapes: 1, etapeIndex: 0,
+        racineSequence: false,
+        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('retCorSel', liste.map(labelFn), false) + '</div>',
+        brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'retCorSel', false); },
+        onValider: function () {
+          var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          feuilleEls_.btnValider.disabled = true;
+          if (cle === 'secteur') {
+            var numero = liste[i].numero;
+            SecteurService.retirerCorruption(partieCorruption.id, numero).then(function () {
+              feuilleEls_.btnValider.disabled = false;
+              feuilleRejetCourant_ = null;
+              resolve({ detail: 'Corruption retirée du Secteur ' + numero + '.', numero: numero });
+            }).catch(function (erreur) { feuilleEls_.btnValider.disabled = false; window.alert('Échec du retrait : ' + erreur.message); });
+          } else if (cle === 'piste') {
+            var piste = liste[i];
+            CivilisationService.definirCorruption(partieCorruption.id, piste, false, optionsRetraitPiste_).then(function (resultat) {
+              feuilleEls_.btnValider.disabled = false;
+              feuilleRejetCourant_ = null;
+              resolve({ detail: detailRetraitPiste_(piste, resultat), piste: piste });
+            }).catch(function (erreur) { feuilleEls_.btnValider.disabled = false; window.alert('Échec du retrait : ' + erreur.message); });
+          } else if (cle === 'programme') {
+            var index = liste[i];
+            ecrireProgrammeCorrompuRC_(index, false).then(function () {
+              feuilleEls_.btnValider.disabled = false;
+              feuilleRejetCourant_ = null;
+              resolve({ detail: 'Corruption retirée de ' + libelleSlotProgrammeRC_(index) + '.', index: index });
+            }).catch(function (erreur) { feuilleEls_.btnValider.disabled = false; window.alert('Échec du retrait : ' + erreur.message); });
+          }
+        }
+      }, feuillePile_.length ? 'avant' : null);
+    }
+
+    var etape = { titre: etiquette + 'Retirer une Corruption', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    SecteurService.obtenirSecteursEligiblesRetraitCorruption(partieCorruption.id).then(function (eligiblesSecteurs) {
+      var options = [];
+      if (eligiblesSecteurs.length) options.push({ cle: 'secteur', label: 'Secteur' });
+      if (pistesCorrompues.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
+      if (indicesProgrammeCorrompusRC.length) options.push({ cle: 'programme', label: 'Programme' });
+      if (possedeChambreDecontamination && corruptionStockee > 0) {
+        options.push({ cle: 'techno', label: 'Chambres de décontamination (' + corruptionStockee + ' stockée(s))' });
+      }
+
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!options.length) {
+        etapeCourante.html = '<p class="hint">Aucune Corruption à retirer actuellement.</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+      etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('retCorCat', options.map(function (o) { return o.label; }), false, -1) + '</div>';
+      etapeCourante.brancher = function (el) {
+        feuilleBrancherRangeeChoixImmediat_(el, 'retCorCat', function (i) {
+          var cle = options[i].cle;
+          if (cle === 'secteur') return afficherSousChoixCibleRC_('secteur', eligiblesSecteurs, function (e) { return 'Secteur ' + e.numero; });
+          if (cle === 'piste') return afficherSousChoixCibleRC_('piste', pistesCorrompues, function (p) { return CivilisationService.NOM_PISTE[p]; });
+          if (cle === 'programme') return afficherSousChoixCibleRC_('programme', indicesProgrammeCorrompusRC, libelleSlotProgrammeRC_);
+          if (cle === 'techno') {
+            feuilleEls_.btnValider.disabled = true;
+            var champs = { corruptionChambreDecontamination: corruptionStockee - 1 };
+            GameService.majPlateauMaison(partieCorruption.id, champs).then(function () {
+              partieCorruption.plateauMaison.corruptionChambreDecontamination = corruptionStockee - 1;
+              feuilleEls_.btnValider.disabled = false;
+              feuilleRejetCourant_ = null;
+              resolve({ detail: 'Corruption retirée de Chambres de décontamination (reste ' + (corruptionStockee - 1) + ').' });
+            }).catch(function (erreur) { feuilleEls_.btnValider.disabled = false; window.alert('Échec du retrait : ' + erreur.message); });
+          }
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Construire (Installation ou Guilde), DANS la feuille — Focus
+   * Développement Standard "Croître" (choix exclusif Guilde/Installation).
+   * Portage direct de la branche #modal-choix 'construire' équivalente
+   * plus bas : secteur (avec ❗ si dernier emplacement libre) + type
+   * précis, tous deux via `<select>` dans `.regrouper-form` (même
+   * composant que Regrouper/Envahir ci-dessus — formulaire à 2 champs
+   * liés, POC déjà validé pour ce genre de configurateur simple).
+   */
+  function feuilleFlowConstruire_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partie = partieAffichee;
+    var estInstallation = contexte.categorie === 'installation';
+    var titreAction = estInstallation ? 'Construire une Installation' : 'Établir une Guilde';
+    var typesConstruire = estInstallation ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
+    if (contexte.typeForce) typesConstruire = typesConstruire.filter(function (t) { return t.cle === contexte.typeForce; });
+
+    var etape = { titre: etiquette + titreAction, nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    SecteurService.obtenirSecteursEligiblesConstruction(partie.id, contexte.categorie).then(function (eligibles) {
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!eligibles.length) {
+        etapeCourante.html = '<p class="hint">Aucun secteur possédé avec un emplacement ' + (estInstallation ? 'Installation' : 'Guilde') + ' libre actuellement.</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+      etapeCourante.html = '<div class="regrouper-form">' +
+        '<label class="hint" for="feuille-construire-secteur">Secteur</label>' +
+        '<select id="feuille-construire-secteur">' + eligibles.map(function (e) { return '<option value="' + e.numero + '">Secteur ' + e.numero + (e.emplacementsLibres === 1 ? ' ❗' : '') + '</option>'; }).join('') + '</select>' +
+        '<label class="hint" for="feuille-construire-type" style="margin-top:8px;display:block;">Type</label>' +
+        '<select id="feuille-construire-type"' + (contexte.typeForce ? ' disabled' : '') + '>' + typesConstruire.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+        '</div>';
+      etapeCourante.onValider = function () {
+        var numero = Number(feuilleEls_.corpsInner.querySelector('#feuille-construire-secteur').value);
+        var type = feuilleEls_.corpsInner.querySelector('#feuille-construire-type').value;
+        var labelType = typesConstruire.filter(function (t) { return t.cle === type; })[0].label;
+        feuilleEls_.btnValider.disabled = true;
+        SecteurService.construire(partie.id, numero, contexte.categorie, type).then(function () {
+          feuilleEls_.btnValider.disabled = false;
+          feuilleRejetCourant_ = null;
+          var detail = estInstallation ? 'Installation ' + labelType + ' construite sur le Secteur ' + numero + '.' : 'Guilde ' + labelType + ' établie sur le Secteur ' + numero + '.';
+          resolve({ detail: detail, numero: numero, type: type });
+        }).catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec de la construction : ' + erreur.message);
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Augmenter la Population (Pure), DANS la feuille — Focus Développement
+   * Standard "Harmoniser" (l'autre option de son choix exclusif). Portage
+   * direct de la branche #modal-choix 'augmenter_population_pure'
+   * équivalente plus bas — un simple choix de secteur (rangée-choix, plus
+   * adapté au tactile qu'un <select> pour une liste à un seul champ).
+   */
+  function feuilleFlowAugmenterPopulationPure_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partie = partieAffichee;
+
+    var etape = { titre: etiquette + 'Augmenter la Population', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure(partie.id).then(function (eligibles) {
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!eligibles.length) {
+        etapeCourante.html = '<p class="hint">Aucun secteur Pur (non Corrompu) avec une Population inférieure à 6 actuellement.</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+      var options = eligibles.map(function (e) { return 'Secteur ' + e.numero; });
+      etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('popAug', options, false) + '</div>';
+      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'popAug', false); };
+      etapeCourante.onValider = function () {
+        var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+        var numero = eligibles[i].numero;
+        feuilleEls_.btnValider.disabled = true;
+        SecteurService.augmenterPopulationPure(partie.id, numero).then(function () {
+          feuilleEls_.btnValider.disabled = false;
+          feuilleRejetCourant_ = null;
+          resolve({ detail: 'Population du Secteur ' + numero + ' augmentée de 1.', numero: numero });
+        }).catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec de l\'augmentation de Population : ' + erreur.message);
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Rappeler un cube (Coût), DANS la feuille — Focus Développement
+   * Standard "Installer" (cout: {rappeler_cube:1}). Portage direct de la
+   * branche #modal-choix 'rappeler_cube_cout' équivalente plus bas —
+   * secteur + type via `<select>` (même composant que
+   * feuilleFlowConstruire_ ci-dessus). "Installer" n'a AUCUN choix
+   * d'Effet (`effet_secteur` hors périmètre de focusEngine.js, résolu
+   * silencieusement) : cette étape est donc son SEUL écran — affiche,
+   * comme feuilleFlowPaiementRessource_ dans ce cas, une section "Effet"
+   * statique (texte de l'action) en plus du formulaire, pour ne jamais
+   * laisser un écran unique sans section Effet (principe de la maquette).
+   */
+  function feuilleFlowRappelerCubeCout_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partie = partieAffichee;
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var sectionEffet = (feuillePile_.length === 0 && action)
+      ? '<hr class="feuille-separateur"><div class="feuille-section"><p class="feuille-section-titre">Effet</p><p class="hint">' + (action.texte || 'Appliqué automatiquement.') + '</p></div>'
+      : '';
+
+    var etape = { titre: etiquette + 'Rappeler un cube', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    Promise.all([
+      SecteurService.obtenirSecteurs(partie.id),
+      SecteurService.obtenirSecteurMere(partie.scenarioId)
+    ]).then(function (resultats) {
+      var secteurs = resultats[0];
+      var numeroSecteurMere = resultats[1];
+      var eligibles = secteurs.filter(function (s) {
+        if (!secteurEstPossede_(s)) return false;
+        if (s.numero === numeroSecteurMere) return true;
+        var total = (s.pnCorvette || 0) + (s.pnSentinelle || 0) + (s.pnDestroyer || 0) + (s.pnCuirasse || 0) + (s.pnPorteVaisseau || 0);
+        return total > 1;
+      });
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!eligibles.length) {
+        etapeCourante.html = sectionEffet + '<p class="hint">Aucun secteur ne permet de rappeler un cube sans l\'abandonner.</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+      etapeCourante.html = sectionEffet + '<div class="regrouper-form">' +
+        '<label class="hint" for="feuille-rappel-secteur">Secteur</label>' +
+        '<select id="feuille-rappel-secteur">' + eligibles.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('') + '</select>' +
+        '<label class="hint" for="feuille-rappel-type" style="margin-top:8px;display:block;">Type</label>' +
+        '<select id="feuille-rappel-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+        '</div>';
+      etapeCourante.onValider = function () {
+        var numero = Number(feuilleEls_.corpsInner.querySelector('#feuille-rappel-secteur').value);
+        var type = feuilleEls_.corpsInner.querySelector('#feuille-rappel-type').value;
+        feuilleEls_.btnValider.disabled = true;
+        SecteurService.rappelerCube(partie.id, numero, type).then(function () {
+          feuilleEls_.btnValider.disabled = false;
+          feuilleRejetCourant_ = null;
+          resolve({ detail: 'Cube de ' + labelVaisseau_(type) + ' rappelé depuis le Secteur ' + numero + '.', numero: numero, type: type });
+        }).catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec du rappel : ' + erreur.message);
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
   function demanderChoixFeuille_(contexte) {
     if (contexte.type === 'option_exclusive') return feuilleFlowOptionExclusive_(contexte);
     if (contexte.type === 'options_inclusives') return feuilleFlowOptionsInclusives_(contexte);
@@ -2608,6 +2947,10 @@ var StrategieService = (function () {
     if (contexte.type === 'deplacer_corruption') return feuilleFlowDeplacerCorruption_();
     if (contexte.type === 'regrouper') return feuilleFlowRegrouper_();
     if (contexte.type === 'envahir') return feuilleFlowEnvahir_(contexte);
+    if (contexte.type === 'retirer_corruption') return feuilleFlowRetirerCorruption_();
+    if (contexte.type === 'construire') return feuilleFlowConstruire_(contexte);
+    if (contexte.type === 'augmenter_population_pure') return feuilleFlowAugmenterPopulationPure_();
+    if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
     return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
   }
 

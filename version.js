@@ -1,9 +1,54 @@
 /**
  * version.js
- * Version 94 — 2026-08-25
+ * Version 95 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — "Déplacer une
+ * 25/08/2026, dernière fois (Historique allégé + Feuille d'action portée
+ * sur Focus Développement Standard, retour utilisateur : "continuons
+ * l'implémentation du nouveau pattern sur le focus développement") :
+ * - Historique ("Actions réalisées", #ressources-journal) : "ne pas
+ *   rappeler le focus et l'action dans les sous-sections... on l'a déjà
+ *   dans la section principale" — chaque sous-ligne d'un cadre répétait
+ *   son titre en préfixe (ex. "Conquête — Planifier (effet) : ..."), déjà
+ *   affiché comme titre du cadre. Nouvelle fonction
+ *   `allegerLigneJournal_` (renderJournal_) retire ce préfixe s'il
+ *   correspond EXACTEMENT au titre du cadre — ne touche jamais un cadre
+ *   dont les sous-lignes ont un préfixe différent (ex. le cadre "Piste X"
+ *   de CivilisationService.avancerPiste, laissé intact).
+ * - Feuille d'action étendue à Focus Développement Standard (Harmoniser/
+ *   Croître/Installer) — 2e carte migrée, `CARTES_ELIGIBLES_FEUILLE_`
+ *   devient une liste (plan de migration, mémoire persistante : "petit à
+ *   petit", #modal-choix retiré seulement à la fin). 4 nouveaux
+ *   `feuilleFlow*_`, portage direct des branches #modal-choix
+ *   équivalentes (même logique métier, SANS changement) :
+ *   - `feuilleFlowRetirerCorruption_` ("Harmoniser") : menu de cibles
+ *     Secteur/Piste/Programme/Chambres de décontamination, réutilise le
+ *     choix de Programme numéroté (1/2/3) introduit pour "Déplacer une
+ *     Corruption" (dupliqué volontairement, pas factorisé, pour ne pas
+ *     risquer de régression sur du code déjà vérifié — factorisation
+ *     prévue une fois toutes les cartes migrées).
+ *   - `feuilleFlowConstruire_` ("Croître") : secteur + type via
+ *     `<select>` (`.regrouper-form`, même composant que Regrouper/
+ *     Envahir).
+ *   - `feuilleFlowAugmenterPopulationPure_` ("Harmoniser", autre
+ *     branche) : simple choix de secteur en rangée-choix.
+ *   - `feuilleFlowRappelerCubeCout_` ("Installer") : secteur + type via
+ *     `<select>` ; "Installer" n'a AUCUN choix d'Effet (`effet_secteur`
+ *     hors périmètre de focusEngine.js, résolu silencieusement) — cet
+ *     écran est donc son SEUL écran, affiche une section "Effet"
+ *     statique en plus du formulaire (même principe que
+ *     feuilleFlowPaiementRessource_ pour Focus Conquête "Préparer").
+ * 145 tests au vert (aucune régression — logique métier inchangée,
+ * seule la fonction appelante change). Vérifié manuellement dans un vrai
+ * navigateur (Playwright, partie réelle + Programmes forcés via
+ * IndexedDB) : Harmoniser (les 2 branches, y compris le retrait de
+ * Corruption sur Programme numéroté) ; Croître (coût combiné + choix
+ * secteur/type) ; Installer (section Effet statique + rappel de cube) —
+ * jamais #modal-choix affiché sur les 3 actions, aucune erreur JS ;
+ * historique confirmé sans répétition du titre dans les sous-lignes.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — "Déplacer une
  * Corruption" : libellé, rappel de la source, choix du Programme
  * numéroté, titres cohérents — retour utilisateur) :
  * - Libellé manquant : "deplacer_corruption" (clé brute) s'affichait dans
@@ -3100,4 +3145,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.10';
+var APP_VERSION = '20260825.11';
