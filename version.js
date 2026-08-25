@@ -1,9 +1,71 @@
 /**
  * version.js
- * Version 99 — 2026-08-25
+ * Version 100 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Focus Innovation "Consolider" — retour
+ * 25/08/2026, dernière fois (retouche visuelle du stepper de Coût +
+ * Focus Innovation "Inventer" — gagner une Technologie) :
+ * - `.cout-stepper-resume` (css/style.css) : marge au-dessus réduite de
+ *   8px à 4px (retour utilisateur : "un peu moins d'espace entre la
+ *   barre de ressource et le nombre en dessous").
+ * - `gagner_technologie` (focusEngine.js, clé jusqu'ici SANS AUCUNE
+ *   résolution — repli générique "effet non chiffré... à appliquer
+ *   manuellement", jamais automatisée) obtient désormais un cas dédié :
+ *   ouvre une popup dédiée (contexte 'gagner_technologie') qui liste les
+ *   technologies encore disponibles parmi les 4 maisons déchues
+ *   (partie.adversaires), choisie automatiquement au premier emplacement
+ *   libre des 5 "Technologies obtenues" (comme gagner_programme n'impose
+ *   pas quel emplacement de Programme). Si `valeur` propose plusieurs
+ *   niveaux (tableau, ex. ["base","amelioree"]), un second choix permet
+ *   de trancher — ceci COURT-CIRCUITE délibérément la restriction
+ *   habituelle "Technologies avancées" (verrouillée hors du bon cycle) :
+ *   c'est exactement ce que ce tableau signifie dans le catalogue, pas un
+ *   bug. Persiste via GameService.choisirTechnologieObtenue (+
+ *   GameService.definirTechnologieAmelioree si "Améliorée" retenu) —
+ *   fonctions déjà existantes et testées, réutilisées telles quelles
+ *   (aucune modification de gameService.js).
+ * - Double implémentation (comme 'gagner_programme') : `feuilleFlow
+ *   GagnerTechnologie_` (strategieService.js, Feuille d'action) pour Focus
+ *   Innovation Standard "Inventer" (`CARTES_ELIGIBLES_FEUILLE_`,
+ *   `FEUILLE_TYPES_SUPPORTES_` étendus) ET une branche équivalente dans
+ *   `#modal-choix` — INDISPENSABLE, pas une simple précaution : la clé
+ *   "gagner_technologie" est aussi déclenchée par des cases de Piste de
+ *   Civilisation (pistesCivilisation.json, ~14 occurrences) via
+ *   CivilisationService.avancerPiste, un chemin qui n'est JAMAIS scopé à
+ *   la Feuille (carteEnFeuille_ reste toujours faux pour un avancement de
+ *   piste) — sans ce 2e cas, ces cases seraient tombées sur une popup
+ *   vide (repli `{annule:true}` de demanderChoixFeuille_, hors périmètre
+ *   Feuille).
+ * - civilisationService.js : le mécanisme `texteRappelPourCle_`/
+ *   `afficherRappelsManuelsEtAjusterJournal_` dédié à "gagner_technologie"
+ *   (rappel "Choisir une technologie... manuellement", basé sur la
+ *   détection du gabarit générique "à appliquer manuellement" dans le
+ *   journal) devient MORT pour cette clé — cette clé n'emprunte plus
+ *   jamais ce gabarit désormais — même principe que le devenir de ce
+ *   même mécanisme pour "gagner_programme" lors de sa propre migration
+ *   (voir commentaires historiques du fichier, dead code volontairement
+ *   laissé en place, pas de suppression). 2 tests civilisationService_test.js
+ *   mis à jour en conséquence (asserts sur l'ancien comportement "rappel
+ *   manuel" remplacés par l'assertion du nouveau contexte
+ *   'gagner_technologie' — cross-realm deepStrictEqual évité sur les
+ *   tableaux `niveaux`, harnais de test vm avec JSON injecté dans le
+ *   sandbox, comparaison élément par élément à la place). 145+19 tests au
+ *   vert (145 *.test.js + 19 civilisationService_test.js, ainsi que les 10
+ *   autres fichiers *_test.js/test_*.js individuels, tous verts). Vérifié
+ *   en navigateur réel (Focus Innovation "Inventer") : écran combiné
+ *   Coût ("2 Science.") + Effet (8 technologies proposées, labellées par
+ *   maison d'origine — bug mineur préexistant corrigé au passage,
+ *   t.maison était toujours `undefined` sur partie.adversaires[].
+ *   technologies[] car formatMaison_ (gameService.js) ne garde que
+ *   {nom, type, texte, texteAmeliore} — rattaché localement à l'affichage
+ *   sans toucher gameService.js), choix du niveau (De base/Améliorée),
+ *   Technologie bien inscrite au premier emplacement libre du Plat.
+ *   maison avec le bon niveau, journal propre ("Technologie ... obtenue
+ *   (Améliorée)."), aucune erreur JS.
+ * Fichiers touchés : css/style.css, focusEngine.js, strategieService.js,
+ * civilisationService_test.js, version.js.
+ *
+ * 25/08/2026, avant (Focus Innovation "Consolider" — retour
  * utilisateur : "il ne faut pas répéter 3 fois le stock une fois suffit,
  * comme ça on peut resserrer les slide des ressource") :
  * `feuilleSectionCoutHTML_` affiche désormais un SEUL rappel de stock
@@ -3304,4 +3366,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.15';
+var APP_VERSION = '20260825.16';

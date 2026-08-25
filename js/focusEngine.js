@@ -758,6 +758,35 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Gagner une Technologie : Effet UNIQUEMENT (signe > 0). `valeur`
+    // = "base" (chaîne, niveau imposé, aucun choix de niveau) ou un
+    // tableau de niveaux possibles (ex. ["base","amelioree"], Focus
+    // Innovation "Inventer" — le joueur choisit le niveau au moment même
+    // où il l'invente. Ceci COURT-CIRCUITE délibérément la restriction
+    // habituelle "Technologies avancées" (GameService.
+    // obtenirTechnologiesAvanceesGroupes — case Améliorée verrouillée
+    // hors du bon cycle) : cette clé accorde le niveau choisi
+    // immédiatement, quel que soit le cycle en cours — pas un bug, c'est
+    // exactement ce que "gagner_technologie":["base","amelioree"]
+    // signifie dans le catalogue). Ouvre une popup dédiée (contexte
+    // 'gagner_technologie', strategieService.js) qui liste les
+    // technologies encore disponibles parmi les 4 maisons déchues (celles
+    // pas déjà occupant un des 5 emplacements "Technologies obtenues") et
+    // fait le choix ET la persistance (GameService.choisirTechnologieObtenue
+    // puis, si "amelioree" est proposé et retenu,
+    // GameService.definirTechnologieAmelioree) — focusEngine reste pur,
+    // aucun accès DB ici. Si aucun emplacement libre ou aucune technologie
+    // disponible, la popup l'affiche et bloque (Annuler). ---
+    if (cle === 'gagner_technologie' && signe > 0) {
+      var niveauxTech = Array.isArray(valeur) ? valeur : (typeof valeur === 'string' && valeur ? [valeur] : ['base']);
+      return demanderChoixEtJournaliser_({
+        type: 'gagner_technologie',
+        source: source,
+        partieId: etat.partieId,
+        niveaux: niveauxTech
+      }, source, journal, demanderChoix);
+    }
+
     // --- Toute autre clé contenant "cube" (ex. activer_cube, cube) :
     // n'agit QUE sur cubeActif (seul champ Cube persisté côté plateauMaison
     // PWA — cubeInactif/cubeDeploye sont dérivés des secteurs, non stockés

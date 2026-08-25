@@ -129,37 +129,61 @@ test('avance_rapide : piste déjà au niveau maximum en cours de chaîne -> s\'a
   });
 });
 
-test('gagner_technologie [base, amelioree] : rappel "de base ou avancée", journal simplifié', function () {
+// gagner_technologie est désormais résolu directement par
+// FocusEngine.resoudreCle_ (popup dédiée 'gagner_technologie',
+// strategieService.js — voir focusEngine.js) — plus de rappel/
+// simplification de journal côté CivilisationService pour cette clé (voir
+// texteRappelPourCle_, civilisationService.js, désormais mort pour cette
+// clé) : resoudreCaseEtChainerAvanceRapide_ appelle déjà FocusEngine.
+// resoudreEffet en interne, donc le comportement est identique au chemin
+// Focus, sans code spécifique ici (même principe que gagner_programme
+// ci-dessous).
+test('gagner_technologie [base, amelioree] : délègue à demanderChoix({type:"gagner_technologie", niveaux:["base","amelioree"]}), pas de rappel manuel', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Gouvernement', caseNumero: 2, texte: 'Gagnez une Technologie de base ou améliorée.', effet: JSON.stringify({ gagner_technologie: ['base', 'amelioree'] }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civGouvernement: 1 });
 
   var popup = null;
-  var demanderChoix = function (contexte) { popup = contexte; return { confirme: true }; };
+  var demanderChoix = function (contexte) { popup = contexte; return { detail: 'Technologie "Nacelles" obtenue (Améliorée).' }; };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'gouvernement', demanderChoix).then(function (resultat) {
-    assert.ok(popup, 'la popup de rappel doit être affichée');
-    assert.strictEqual(popup.type, 'confirmation');
-    assert.strictEqual(popup.message, '<em>Choisir une technologie de base ou avancée manuellement</em>');
+    assert.strictEqual(popup.type, 'gagner_technologie');
+    // deepStrictEqual évité ici : niveauxTech (focusEngine.js) est un
+    // tableau littéral créé DANS le contexte vm de ce test (voir
+    // creerContexte_ ci-dessus) — un tableau "étranger" au réalm du test
+    // lui-même échoue deepStrictEqual contre un littéral ['base'] du
+    // réalm du test, même à contenu strictement identique (V8 : un
+    // littéral tableau prend le réalm du CODE qui l'exécute, alors que
+    // JSON.parse — expressément injecté dans le sandbox, sandbox.JSON =
+    // JSON — construit ses tableaux dans le réalm de LA FONCTION,
+    // c'est-à-dire celui du test ; incohérence purement due à ce
+    // harnais de test, jamais rencontrée en navigateur réel — un seul
+    // réalm là-bas).
+    assert.strictEqual(popup.niveaux.length, 2);
+    assert.strictEqual(popup.niveaux[0], 'base');
+    assert.strictEqual(popup.niveaux[1], 'amelioree');
     assert.strictEqual(resultat.effetJournal.length, 1);
-    assert.strictEqual(resultat.effetJournal[0], 'Case 2 — Gouvernement : technologie choisie manuellement');
+    assert.strictEqual(resultat.effetJournal[0], 'Case 2 — Gouvernement : Technologie "Nacelles" obtenue (Améliorée).');
   });
 });
 
-test('gagner_technologie "base" (seule) : rappel "de base", journal simplifié', function () {
+test('gagner_technologie "base" (seule) : délègue à demanderChoix({type:"gagner_technologie", niveaux:["base"]}), pas de rappel manuel', function () {
   var ctx = creerContexte_([
     { type: 'Standard', piste: 'Économie', caseNumero: 2, texte: 'Gagnez une Technologie de base.', effet: JSON.stringify({ gagner_technologie: 'base' }) }
   ]);
   ctx.stores.plateauMaison[PARTIE_ID] = plateauBase_({ civEconomie: 1 });
 
   var popup = null;
-  var demanderChoix = function (contexte) { popup = contexte; return { confirme: true }; };
+  var demanderChoix = function (contexte) { popup = contexte; return { detail: 'Technologie "Ciblage" obtenue (De base).' }; };
 
   return ctx.sandbox.CivilisationService.avancerPiste(PARTIE_ID, 'MaMaison', 'economie', demanderChoix).then(function (resultat) {
-    assert.strictEqual(popup.message, '<em>Choisir une technologie de base manuellement</em>');
+    assert.strictEqual(popup.type, 'gagner_technologie');
+    // deepStrictEqual évité ici aussi — voir commentaire du test précédent.
+    assert.strictEqual(popup.niveaux.length, 1);
+    assert.strictEqual(popup.niveaux[0], 'base');
     assert.strictEqual(resultat.effetJournal.length, 1);
-    assert.strictEqual(resultat.effetJournal[0], 'Case 2 — Économie : technologie choisie manuellement');
+    assert.strictEqual(resultat.effetJournal[0], 'Case 2 — Économie : Technologie "Ciblage" obtenue (De base).');
   });
 });
 

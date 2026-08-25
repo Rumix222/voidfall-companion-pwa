@@ -1524,7 +1524,9 @@ var StrategieService = (function () {
     // Focus Innovation Standard (Rechercher) — résolution automatique, sans
     // interaction utilisateur (feuilleFlowInfluenceSecteur_/
     // feuilleFlowProduireRevenu_) :
-    'influence_secteur', 'produire_revenu'
+    'influence_secteur', 'produire_revenu',
+    // Focus Innovation Standard (Inventer) :
+    'gagner_technologie'
   ];
 
   var feuillePile_ = [];
@@ -2282,6 +2284,99 @@ var StrategieService = (function () {
       window.alert('Échec du calcul de production : ' + erreur.message);
     });
 
+    return promise;
+  }
+
+  /**
+   * Gagner une Technologie (Focus Innovation "Inventer",
+   * effet:{gagner_technologie:["base","amelioree"]}) : liste les
+   * technologies encore disponibles parmi les 4 maisons déchues
+   * (partie.adversaires), en excluant celles déjà occupant un des 5
+   * emplacements "Technologies obtenues" — même filtre que
+   * renderTechnologiesObtenues_ (index.html, écran Plat. maison). Choisie
+   * automatiquement au premier emplacement libre (aucune raison de faire
+   * choisir LEQUEL, comme gagner_programme n'impose pas quel emplacement
+   * de Programme). Si `contexte.niveaux` propose plusieurs niveaux (ex.
+   * ["base","amelioree"]), une 2e rangée-choix permet de trancher — sinon
+   * le niveau unique est appliqué sans le demander. Écran combiné Coût
+   * (science, non substituable — texte fixe) + Effet quand c'est le
+   * premier écran de l'action (cas d'"Inventer").
+   */
+  function feuilleFlowGagnerTechnologie_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var partieTech = partieAffichee;
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var estPremierEcran = feuillePile_.length === 0;
+    var titre = (estPremierEcran && action) ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : (etiquette + 'Gagner une Technologie');
+
+    var toutesLesTechs = [];
+    (partieTech.adversaires || []).forEach(function (m) {
+      // formatMaison_ (gameService.js) ne garde que {nom, type, texte,
+      // texteAmeliore} sur chaque technologie de partie.adversaires — le
+      // nom de la maison d'origine (pourtant présent au catalogue) est
+      // rattaché ici pour l'affichage, sans muter l'objet d'origine.
+      (m.technologies || []).forEach(function (t) { toutesLesTechs.push(Object.assign({}, t, { maison: m.nom })); });
+    });
+    var obtenues = (partieTech.technologiesObtenues || [null, null, null, null, null]).slice(0, 5);
+    var nomsPris = obtenues.filter(Boolean).map(function (t) { return t.nom; });
+    var disponibles = toutesLesTechs.filter(function (t) { return nomsPris.indexOf(t.nom) === -1; });
+    var slotVide = obtenues.indexOf(null);
+    var niveaux = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
+    var choixNiveau = niveaux.length > 1;
+    var libellesNiveau = niveaux.map(function (n) { return n === 'amelioree' ? 'Améliorée' : 'De base'; });
+
+    if (slotVide === -1 || !disponibles.length) {
+      feuillePousserEtape_({
+        titre: titre, nbEtapes: 1, etapeIndex: 0,
+        html: '<p class="hint">' + (slotVide === -1
+          ? 'Les 5 emplacements "Technologies obtenues" sont déjà remplis.'
+          : 'Aucune Technologie disponible parmi les maisons déchues (déjà toutes obtenues).') + '</p>'
+      }, feuillePile_.length ? 'avant' : null);
+      return promise;
+    }
+
+    var infosCout = estPremierEcran ? feuilleInfosCoutInitial_() : null;
+    var sectionCout = feuilleSectionCoutHTML_(infosCout, 'techCombine');
+    var libellesTech = disponibles.map(function (t) { return t.nom + (t.maison ? ' (' + t.maison + ')' : ''); });
+
+    feuillePousserEtape_({
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
+      html: sectionCout + (sectionCout ? '<hr class="feuille-separateur">' : '') +
+        '<div class="feuille-section">' + (sectionCout ? '<p class="feuille-section-titre">Effet</p>' : '') +
+        feuilleRangeeChoixHTML_('tech', libellesTech, false) +
+        (choixNiveau ? '<div style="margin-top:14px;"></div>' + feuilleRangeeChoixHTML_('techNiveau', libellesNiveau, false) : '') +
+        '</div>',
+      brancher: function (el) {
+        feuilleBrancherRangeeChoix_(el, 'tech', false);
+        if (choixNiveau) feuilleBrancherRangeeChoix_(el, 'techNiveau', false);
+      },
+      onValider: function () {
+        var iTech = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix[data-groupe="tech"].selectionnee').dataset.i);
+        var nomChoisi = disponibles[iTech].nom;
+        var iNiveau = choixNiveau
+          ? Number(feuilleEls_.corpsInner.querySelector('.rangee-choix[data-groupe="techNiveau"].selectionnee').dataset.i)
+          : 0;
+        var niveauChoisi = niveaux[iNiveau];
+        feuilleRejetCourant_ = null;
+        feuilleEls_.btnValider.disabled = true;
+        GameService.choisirTechnologieObtenue(partieTech.id, slotVide, nomChoisi)
+          .then(function () {
+            return niveauChoisi === 'amelioree'
+              ? GameService.definirTechnologieAmelioree(partieTech.id, slotVide, true)
+              : Promise.resolve();
+          })
+          .then(function () {
+            resolve({ detail: 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisi === 'amelioree' ? 'Améliorée' : 'De base') + ').' });
+          })
+          .catch(function (erreur) {
+            feuilleEls_.btnValider.disabled = false;
+            window.alert('Échec de l\'obtention de la Technologie : ' + erreur.message);
+          });
+      }
+    }, feuillePile_.length ? 'avant' : null);
     return promise;
   }
 
@@ -3340,6 +3435,7 @@ var StrategieService = (function () {
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
     if (contexte.type === 'influence_secteur') return feuilleFlowInfluenceSecteur_(contexte);
     if (contexte.type === 'produire_revenu') return feuilleFlowProduireRevenu_(contexte);
+    if (contexte.type === 'gagner_technologie') return feuilleFlowGagnerTechnologie_(contexte);
     return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
   }
 
@@ -4670,6 +4766,79 @@ var StrategieService = (function () {
           contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
           window.alert('Échec du chargement des Programmes : ' + erreur.message);
         });
+
+      } else if (contexte.type === 'gagner_technologie') {
+        // Effet "Gagner une Technologie" (voir focusEngine.js, clé
+        // "gagner_technologie") — repli #modal-choix pour les résolutions
+        // HORS Feuille (notamment le chemin Piste de Civilisation,
+        // CivilisationService.avancerPiste, qui utilise aussi cette clé
+        // mais n'est jamais scopé à carteEnFeuille_ — voir feuilleFlow
+        // GagnerTechnologie_ ci-dessus pour la version Feuille, même
+        // logique dupliquée ici comme 'gagner_programme' juste au-dessus).
+        // Liste les technologies encore disponibles parmi les 4 maisons
+        // déchues (partie.adversaires), en excluant celles déjà occupant
+        // un des 5 emplacements "Technologies obtenues" (même filtre que
+        // renderTechnologiesObtenues_, index.html) ; choisie automatiquement
+        // au premier emplacement libre. Si `contexte.niveaux` propose
+        // plusieurs niveaux (ex. ["base","amelioree"]), un 2e <select>
+        // permet de trancher.
+        titre.textContent = 'Gagner une Technologie';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieTechModale = partieAffichee;
+        var toutesLesTechsModale = [];
+        (partieTechModale.adversaires || []).forEach(function (m) {
+          (m.technologies || []).forEach(function (t) { toutesLesTechsModale.push(Object.assign({}, t, { maison: m.nom })); });
+        });
+        var obtenuesModale = (partieTechModale.technologiesObtenues || [null, null, null, null, null]).slice(0, 5);
+        var nomsPrisModale = obtenuesModale.filter(Boolean).map(function (t) { return t.nom; });
+        var disponiblesModale = toutesLesTechsModale.filter(function (t) { return nomsPrisModale.indexOf(t.nom) === -1; });
+        var slotVideModale = obtenuesModale.indexOf(null);
+        var niveauxModale = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
+        var choixNiveauModale = niveauxModale.length > 1;
+
+        if (slotVideModale === -1 || !disponiblesModale.length) {
+          contenu.innerHTML = '<p class="hint">' + (slotVideModale === -1
+            ? 'Les 5 emplacements "Technologies obtenues" sont déjà remplis.'
+            : 'Aucune Technologie disponible parmi les maisons déchues (déjà toutes obtenues).') + '</p>';
+        } else {
+          var optionsTechModale = disponiblesModale.map(function (t) {
+            return '<option value="' + t.nom + '">' + t.nom + (t.maison ? ' (' + t.maison + ')' : '') + '</option>';
+          }).join('');
+          contenu.innerHTML = '<select id="techno-gain-select" class="modal-choix-select">' + optionsTechModale + '</select>' +
+            (choixNiveauModale
+              ? '<select id="techno-gain-niveau" class="modal-choix-select" style="margin-top:8px;">' +
+                niveauxModale.map(function (n) { return '<option value="' + n + '">' + (n === 'amelioree' ? 'Améliorée' : 'De base') + '</option>'; }).join('') +
+                '</select>'
+              : '');
+
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var nomChoisi = document.getElementById('techno-gain-select').value;
+            var selectNiveauModale = document.getElementById('techno-gain-niveau');
+            var niveauChoisiModale = selectNiveauModale ? selectNiveauModale.value : niveauxModale[0];
+            btnValider.disabled = true;
+
+            GameService.choisirTechnologieObtenue(partieTechModale.id, slotVideModale, nomChoisi)
+              .then(function () {
+                return niveauChoisiModale === 'amelioree'
+                  ? GameService.definirTechnologieAmelioree(partieTechModale.id, slotVideModale, true)
+                  : Promise.resolve();
+              })
+              .then(function () {
+                fermerModale_();
+                btnValider.disabled = false;
+                resolve({ detail: 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisiModale === 'amelioree' ? 'Améliorée' : 'De base') + ').' });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec de l\'obtention de la Technologie : ' + erreur.message);
+              });
+          };
+        }
 
       } else if (contexte.type === 'utiliser_programme') {
         // Utiliser un Programme "en main" (Phase 3) — popup légère :

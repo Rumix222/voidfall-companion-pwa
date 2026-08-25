@@ -1808,7 +1808,7 @@ input[type="number"]:focus-visible {
    le segment "ressource" ci-dessus (coloré selon la ressource réelle). */
 .cout-stepper-seg-credit { background: #d1a671; height: 100%; }
 .cout-stepper-resume {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   font-size: 0.86rem;
   text-align: center;
 }
