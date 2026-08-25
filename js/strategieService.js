@@ -2869,125 +2869,80 @@ var StrategieService = (function () {
   }
 
   /**
-   * Une fois le cube rappelé (feuilleFlowRappelerCubeCout_ ci-dessous),
-   * enchaîne l'Effet "effet_secteur" QUAND il s'agit de construire
-   * (Guilde et/ou Installation, ex. Focus Développement "Installer" —
-   * retour utilisateur : "pour la partie coût proposer les secteurs où
-   * je peux retirer un cube, et pour la partie effet utiliser CE secteur
-   * comme destination") — focusEngine.js classe `effet_secteur` hors
-   * périmètre (CLES_SECTEUR_HORS_PERIMETRE, résolu silencieusement,
-   * JAMAIS de demanderChoix pour lui) : c'est donc le SEUL point
-   * d'accroche possible, à l'intérieur même de la résolution du Coût qui
-   * partage son secteur avec l'Effet. Générique via `action.effet.
-   * effet_secteur` (pas le nom de l'action) : couvre aussi bien
-   * "Installer" (['guilde','installation']) qu'une future carte
-   * partageant ce même sous-ensemble de clés — "Progrès Standard
-   * Restaurer" (catalogue, ['retirer_corruption','regrouper']) n'a
-   * AUCUNE de ces 2 clés et retombe donc simplement sur le comportement
-   * inchangé (résolution immédiate) tant qu'elle n'est pas elle-même
-   * migrée à la Feuille.
+   * Une fois le cube rappelé ET les catégories Guilde/Installation
+   * choisies sur l'écran combiné (feuilleFlowRappelerCubeCout_
+   * ci-dessous), enchaîne le sous-choix du TYPE précis pour chacune,
+   * séquentiellement, DANS la même feuille — persistance via
+   * SecteurService.construire, comme feuilleFlowConstruire_ plus haut.
+   * `categories` est déjà la liste RETENUE (peut être vide) : aucun
+   * choix supplémentaire de catégorie ici (fait sur l'écran précédent).
    */
-  function feuilleEnchainerEffetSecteurConstruction_(resolve, partie, numero, detailRappel) {
-    var action = feuilleActionCourante_ && feuilleActionCourante_.action;
-    var cles = (action && action.effet && Array.isArray(action.effet.effet_secteur)) ? action.effet.effet_secteur : [];
-    var veutGuilde = cles.indexOf('guilde') !== -1;
-    var veutInstallation = cles.indexOf('installation') !== -1;
-    if (!veutGuilde && !veutInstallation) {
+  function feuilleTraiterCategoriesConstruction_(resolve, partie, numero, detailRappel, categories) {
+    if (!categories.length) {
       feuilleRejetCourant_ = null;
       resolve({ detail: detailRappel, numero: numero });
       return;
     }
-
-    Promise.all([
-      veutInstallation ? SecteurService.obtenirSecteursEligiblesConstruction(partie.id, 'installation') : Promise.resolve([]),
-      veutGuilde ? SecteurService.obtenirSecteursEligiblesConstruction(partie.id, 'guilde') : Promise.resolve([])
-    ]).then(function (resultats) {
-      var installationEligible = veutInstallation && resultats[0].some(function (e) { return e.numero === numero; });
-      var guildeEligible = veutGuilde && resultats[1].some(function (e) { return e.numero === numero; });
-
-      var options = [];
-      if (guildeEligible) options.push({ cle: 'guilde', label: 'Établir une Guilde' });
-      if (installationEligible) options.push({ cle: 'installation', label: 'Construire une Installation' });
-
-      if (!options.length) {
+    function afficherChoixType_(categorie, callback) {
+      var estInstallation = categorie === 'installation';
+      var types = estInstallation ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
+      var labels = types.map(function (t) { return t.label; });
+      feuillePousserEtape_({
+        titre: (estInstallation ? 'Construire une Installation' : 'Établir une Guilde') + ' — Secteur ' + numero,
+        nbEtapes: 1, etapeIndex: 0, racineSequence: false,
+        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('effetSecteurType', labels, false) + '</div>',
+        brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'effetSecteurType', false); },
+        onValider: function () {
+          var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+          var type = types[i];
+          feuilleEls_.btnValider.disabled = true;
+          SecteurService.construire(partie.id, numero, categorie, type.cle).then(function () {
+            feuilleEls_.btnValider.disabled = false;
+            callback(estInstallation
+              ? 'Installation ' + type.label + ' construite sur le Secteur ' + numero + '.'
+              : 'Guilde ' + type.label + ' établie sur le Secteur ' + numero + '.');
+          }).catch(function (erreur) {
+            feuilleEls_.btnValider.disabled = false;
+            window.alert('Échec de la construction : ' + erreur.message);
+          });
+        }
+      }, 'avant');
+    }
+    function suite_(restantes, details) {
+      if (!restantes.length) {
         feuilleRejetCourant_ = null;
-        resolve({ detail: detailRappel + ' Aucun emplacement Guilde/Installation libre sur ce secteur.', numero: numero });
+        resolve({ detail: details.join(' '), numero: numero });
         return;
       }
-
-      function afficherChoixType_(categorie, callback) {
-        var estInstallation = categorie === 'installation';
-        var types = estInstallation ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
-        var labels = types.map(function (t) { return t.label; });
-        feuillePousserEtape_({
-          titre: (estInstallation ? 'Construire une Installation' : 'Établir une Guilde') + ' — Secteur ' + numero,
-          nbEtapes: 1, etapeIndex: 0, racineSequence: false,
-          html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('effetSecteurType', labels, false) + '</div>',
-          brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'effetSecteurType', false); },
-          onValider: function () {
-            var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
-            var type = types[i];
-            feuilleEls_.btnValider.disabled = true;
-            SecteurService.construire(partie.id, numero, categorie, type.cle).then(function () {
-              feuilleEls_.btnValider.disabled = false;
-              callback(estInstallation
-                ? 'Installation ' + type.label + ' construite sur le Secteur ' + numero + '.'
-                : 'Guilde ' + type.label + ' établie sur le Secteur ' + numero + '.');
-            }).catch(function (erreur) {
-              feuilleEls_.btnValider.disabled = false;
-              window.alert('Échec de la construction : ' + erreur.message);
-            });
-          }
-        }, 'avant');
-      }
-      function traiterCategories_(restantes, details) {
-        if (!restantes.length) {
-          feuilleRejetCourant_ = null;
-          resolve({ detail: details.join(' '), numero: numero });
-          return;
-        }
-        afficherChoixType_(restantes.shift(), function (detailConstruction) {
-          details.push(detailConstruction);
-          traiterCategories_(restantes, details);
-        });
-      }
-
-      var selection = [];
-      var etapeChoix = {
-        titre: 'Effet — Secteur ' + numero, nbEtapes: 1, etapeIndex: 0, racineSequence: false,
-        html: '',
-        brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'effetSecteurCat', true, function (indices) { selection = indices; etapeChoix.html = html(); }); },
-        onValider: function () {
-          traiterCategories_(selection.map(function (i) { return options[i].cle; }), [detailRappel]);
-        }
-      };
-      function html() {
-        return '<p class="hint">Dans le Secteur ' + numero + ' :</p><div class="feuille-section">' +
-          feuilleRangeeChoixHTML_('effetSecteurCat', options.map(function (o) { return o.label; }), true, selection) + '</div>';
-      }
-      etapeChoix.html = html();
-      feuillePousserEtape_(etapeChoix, 'avant');
-    }).catch(function (erreur) {
-      window.alert('Échec du chargement des secteurs : ' + erreur.message);
-      feuilleRejetCourant_ = null;
-      resolve({ detail: detailRappel, numero: numero });
-    });
+      afficherChoixType_(restantes.shift(), function (detailConstruction) {
+        details.push(detailConstruction);
+        suite_(restantes, details);
+      });
+    }
+    suite_(categories.slice(), [detailRappel]);
   }
 
   /**
-   * Rappeler un cube (Coût), DANS la feuille — Focus Développement
-   * Standard "Installer" (cout: {rappeler_cube:1}). Portage direct de la
-   * branche #modal-choix 'rappeler_cube_cout' équivalente plus bas —
-   * secteur + type via `<select>` (même composant que
-   * feuilleFlowConstruire_ ci-dessus). "Installer" n'a AUCUN choix
-   * d'Effet automatisé par focusEngine.js (`effet_secteur` hors
-   * périmètre, résolu silencieusement) : le rappel de cube réussi
-   * enchaîne donc lui-même, DANS la même feuille,
-   * feuilleEnchainerEffetSecteurConstruction_ ci-dessus — le secteur
-   * choisi pour le Coût sert de destination à l'Effet (retour
-   * utilisateur), fidèle au texte de la carte ("Dans le secteur d'où
-   * vous avez rappelé le cube : établissez une Guilde et/ou construisez
-   * une Installation.").
+   * Rappeler un cube (Coût) + Guilde/Installation (Effet), DANS la
+   * feuille — Focus Développement Standard "Installer" (cout:
+   * {rappeler_cube:1}, effet: {effet_secteur:['guilde','installation']}).
+   * Retour utilisateur (2e itération, la 1re avait le Coût/Effet dans le
+   * mauvais ordre visuel) : UN SEUL écran combiné — "Coût" (secteur où
+   * rappeler + type de vaisseau) TOUJOURS en haut, "Effet" (choisir
+   * Guilde et/ou Installation, PUIS leur type précis) en dessous. Le
+   * secteur du Coût sert de destination à l'Effet (texte de la carte :
+   * "Dans le secteur d'où vous avez rappelé le cube..."), donc la section
+   * Effet se recalcule dynamiquement (options Guilde/Installation
+   * disponibles) à chaque changement du <select> Secteur — jamais de
+   * ré-appel réseau, les éligibilités des 2 catégories sont chargées une
+   * fois pour tous les secteurs au départ. `effet_secteur` restant hors
+   * périmètre de focusEngine.js (CLES_SECTEUR_HORS_PERIMETRE, aucun
+   * demanderChoix dédié), cette étape de Coût est le SEUL point
+   * d'accroche possible pour l'Effet — générique via `action.effet.
+   * effet_secteur` (pas le nom de l'action), donc sans incidence sur une
+   * autre carte au coût `rappeler_cube` qui n'utiliserait pas ces 2 clés
+   * (ex. "Progrès Standard Restaurer" du catalogue, hors périmètre tant
+   * que non migrée à la Feuille).
    */
   function feuilleFlowRappelerCubeCout_() {
     var resolve;
@@ -2996,19 +2951,24 @@ var StrategieService = (function () {
     var etiquette = feuilleConsommerEtiquetteSequence_();
     var partie = partieAffichee;
     var action = feuilleActionCourante_ && feuilleActionCourante_.action;
-    var sectionEffet = (feuillePile_.length === 0 && action)
-      ? '<hr class="feuille-separateur"><div class="feuille-section"><p class="feuille-section-titre">Effet</p><p class="hint">' + (action.texte || 'Appliqué automatiquement.') + '</p></div>'
-      : '';
+    var cles = (action && action.effet && Array.isArray(action.effet.effet_secteur)) ? action.effet.effet_secteur : [];
+    var veutGuilde = cles.indexOf('guilde') !== -1;
+    var veutInstallation = cles.indexOf('installation') !== -1;
+    var titre = (feuillePile_.length === 0 && action) ? (feuilleActionCourante_.carte.focus + ' — ' + (action.action || 'action')) : 'Rappeler un cube';
 
-    var etape = { titre: etiquette + 'Rappeler un cube', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    var etape = { titre: etiquette + titre, nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
     feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
 
     Promise.all([
       SecteurService.obtenirSecteurs(partie.id),
-      SecteurService.obtenirSecteurMere(partie.scenarioId)
+      SecteurService.obtenirSecteurMere(partie.scenarioId),
+      veutInstallation ? SecteurService.obtenirSecteursEligiblesConstruction(partie.id, 'installation') : Promise.resolve([]),
+      veutGuilde ? SecteurService.obtenirSecteursEligiblesConstruction(partie.id, 'guilde') : Promise.resolve([])
     ]).then(function (resultats) {
       var secteurs = resultats[0];
       var numeroSecteurMere = resultats[1];
+      var installEligibles = resultats[2];
+      var guildeEligibles = resultats[3];
       var eligibles = secteurs.filter(function (s) {
         if (!secteurEstPossede_(s)) return false;
         if (s.numero === numeroSecteurMere) return true;
@@ -3017,24 +2977,66 @@ var StrategieService = (function () {
       });
       var etapeCourante = feuillePile_[feuillePile_.length - 1];
       if (!eligibles.length) {
-        etapeCourante.html = sectionEffet + '<p class="hint">Aucun secteur ne permet de rappeler un cube sans l\'abandonner.</p>';
+        etapeCourante.html = '<p class="hint">Aucun secteur ne permet de rappeler un cube sans l\'abandonner.</p>';
         feuilleRendreEtape_(etapeCourante, null);
         return;
       }
-      etapeCourante.html = sectionEffet + '<div class="regrouper-form">' +
+
+      var afficheEffet = veutGuilde || veutInstallation;
+      var secteurCourant = eligibles[0].numero;
+      var selectionEffet = [];
+
+      function optionsEffetPour_(numero) {
+        var options = [];
+        if (veutGuilde && guildeEligibles.some(function (e) { return e.numero === numero; })) options.push({ cle: 'guilde', label: 'Établir une Guilde' });
+        if (veutInstallation && installEligibles.some(function (e) { return e.numero === numero; })) options.push({ cle: 'installation', label: 'Construire une Installation' });
+        return options;
+      }
+      function htmlEffet_() {
+        var options = optionsEffetPour_(secteurCourant);
+        if (!options.length) return '<p class="hint">Aucun emplacement Guilde/Installation libre sur le Secteur ' + secteurCourant + '.</p>';
+        return feuilleRangeeChoixHTML_('rappelEffet', options.map(function (o) { return o.label; }), true, selectionEffet);
+      }
+      function brancherEffet_(conteneur) {
+        feuilleBrancherRangeeChoix_(conteneur, 'rappelEffet', true, function (indices) { selectionEffet = indices; });
+      }
+
+      etapeCourante.html = '<div class="feuille-section"><p class="feuille-section-titre">Coût</p><div class="regrouper-form">' +
         '<label class="hint" for="feuille-rappel-secteur">Secteur</label>' +
         '<select id="feuille-rappel-secteur">' + eligibles.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('') + '</select>' +
         '<label class="hint" for="feuille-rappel-type" style="margin-top:8px;display:block;">Type</label>' +
         '<select id="feuille-rappel-type">' + TYPES_VAISSEAU.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
-        '</div>';
+        '</div></div>' +
+        (afficheEffet
+          ? '<hr class="feuille-separateur"><div class="feuille-section"><p class="feuille-section-titre">Effet</p><div id="feuille-rappel-effet-contenu">' + htmlEffet_() + '</div></div>'
+          : '');
+
+      etapeCourante.brancher = function (el) {
+        var selectSecteur = el.querySelector('#feuille-rappel-secteur');
+        selectSecteur.addEventListener('change', function () {
+          secteurCourant = Number(selectSecteur.value);
+          selectionEffet = [];
+          var conteneurEffet = document.getElementById('feuille-rappel-effet-contenu');
+          if (conteneurEffet) {
+            conteneurEffet.innerHTML = htmlEffet_();
+            brancherEffet_(conteneurEffet);
+            feuilleAjusterHauteur_();
+          }
+        });
+        var conteneurEffet = el.querySelector('#feuille-rappel-effet-contenu');
+        if (conteneurEffet) brancherEffet_(conteneurEffet);
+      };
+
       etapeCourante.onValider = function () {
         var numero = Number(feuilleEls_.corpsInner.querySelector('#feuille-rappel-secteur').value);
         var type = feuilleEls_.corpsInner.querySelector('#feuille-rappel-type').value;
+        var optionsChoisies = optionsEffetPour_(numero);
+        var categoriesChoisies = selectionEffet.map(function (i) { return optionsChoisies[i] && optionsChoisies[i].cle; }).filter(Boolean);
         feuilleEls_.btnValider.disabled = true;
         SecteurService.rappelerCube(partie.id, numero, type).then(function () {
           feuilleEls_.btnValider.disabled = false;
           var detailRappel = 'Cube de ' + labelVaisseau_(type) + ' rappelé depuis le Secteur ' + numero + '.';
-          feuilleEnchainerEffetSecteurConstruction_(resolve, partie, numero, detailRappel);
+          feuilleTraiterCategoriesConstruction_(resolve, partie, numero, detailRappel, categoriesChoisies);
         }).catch(function (erreur) {
           feuilleEls_.btnValider.disabled = false;
           window.alert('Échec du rappel : ' + erreur.message);

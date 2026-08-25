@@ -1,9 +1,40 @@
 /**
  * version.js
- * Version 96 — 2026-08-25
+ * Version 97 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Focus Développement "Installer" — l'Effet
+ * 25/08/2026, dernière fois (Focus Développement "Installer" — refonte
+ * de l'écran, retour utilisateur : "ça ne fonctionne pas" (l'entrée
+ * précédente enchaînait Coût puis Effet sur 2 écrans SÉPARÉS, section
+ * "Effet" affichée en HAUT sans son propre choix de secteur visible) —
+ * "la sélection du secteur pour le coût doit être dans la section coût
+ * (en haut), dans la partie effet je dois sélectionner guilde ou
+ * installation, puis le type") :
+ * `feuilleFlowRappelerCubeCout_` fusionne désormais Coût et Effet sur UN
+ * SEUL écran, dans le bon ordre : "Coût" (secteur + type de vaisseau)
+ * TOUJOURS en haut, "Effet" (Guilde et/ou Installation) en dessous — la
+ * section Effet se recalcule DYNAMIQUEMENT (sans nouvel appel réseau, les
+ * éligibilités des 2 catégories pour TOUS les secteurs sont chargées une
+ * seule fois au départ) à chaque changement du `<select>` Secteur, pour
+ * refléter les emplacements réellement libres sur le secteur choisi. Au
+ * clic sur Valider : rappelle le cube PUIS enchaîne
+ * (feuilleTraiterCategoriesConstruction_, nouvelle — reprend le
+ * séquencement de l'ex-feuilleEnchainerEffetSecteurConstruction_,
+ * supprimée) le sous-choix du TYPE précis pour chaque catégorie cochée,
+ * l'une après l'autre. Titre de l'écran aligné sur les autres écrans
+ * combinés Coût+Effet (nom de l'action, "Développement — Installer" —
+ * plus "Rappeler un cube", redondant avec le titre de la section Coût).
+ * 145 tests au vert (aucune régression métier — même logique
+ * SecteurService.construire/rappelerCube, seule la présentation change).
+ * Vérifié manuellement dans un vrai navigateur (Playwright, partie
+ * réelle) : contenu HTML confirme "Coût" avant "Effet" ; changement de
+ * secteur re-calcule bien les options disponibles (Secteur 1 -> Guilde
+ * seule, Secteur 11 -> Guilde ET Installation) ; parcours complet des 2
+ * catégories sur le même secteur, persistance réelle confirmée, jamais
+ * l'ancienne modale affichée, aucune erreur JS.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Focus Développement "Installer" — l'Effet
  * (Guilde et/ou Installation) utilise désormais le secteur choisi pour le
  * Coût comme destination, retour utilisateur : "pour la partie coût
  * proposer les secteurs où je peux retirer un cube, et pour la partie
@@ -3183,4 +3214,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.12';
+var APP_VERSION = '20260825.13';
