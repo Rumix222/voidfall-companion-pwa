@@ -1,9 +1,56 @@
 /**
  * version.js
- * Version 93 — 2026-08-25
+ * Version 94 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Feuille d'action — couleur Crédit sur la
+ * 25/08/2026, dernière fois (Feuille d'action — "Déplacer une
+ * Corruption" : libellé, rappel de la source, choix du Programme
+ * numéroté, titres cohérents — retour utilisateur) :
+ * - Libellé manquant : "deplacer_corruption" (clé brute) s'affichait dans
+ *   la liste "et/ou" (ex. Focus Conquête "Planifier") — `LIBELLES_OPTIONS`
+ *   n'avait jamais cette entrée. Ajoutée : "Déplacer une Corruption".
+ * - Rappel des choix précédents : les écrans Destination (catégorie ET
+ *   sous-choix) affichent désormais "Source : X." en haut — repris de
+ *   l'ancienne #modal-choix (qui le faisait déjà), perdu lors du premier
+ *   portage en Feuille (entrée d'il y a plusieurs versions).
+ * - Choix du Programme désormais RÉELLEMENT implémenté (auparavant "à
+ *   retirer/placer manuellement", aucune écriture) : emplacements 1/2/3 de
+ *   la fiche Maison (hors Programme de départ, sans notion de Corruption)
+ *   sélectionnables par leur NUMÉRO — Source limité aux emplacements
+ *   CORROMPUS, Destination aux NON corrompus. Écrit `.corrompu` sur
+ *   `plateauMaison.programmesUtilises` (même pattern que le clic manuel
+ *   sur la case "Cor." de l'écran Plat. maison — `corruptionMaison` suit
+ *   le même delta ±1).
+ *   - PRÉREQUIS (`index.html`, `renderProgrammesPlateauMaison_`) : les 3
+ *     emplacements 1/2/3 affichent désormais leur numéro en préfixe
+ *     ("1. Nom (Type)") sur l'écran Plat. maison, pour que le joueur
+ *     retrouve l'emplacement désigné par son numéro dans la popup.
+ * - Titres incohérents corrigés : seul le tout premier écran ("Source")
+ *   portait le préfixe "Déplacer une Corruption — " ; les écrans suivants
+ *   (Source — Secteur/Piste, Destination, Destination — Secteur/Piste)
+ *   affichaient un titre tronqué ("Source — Secteur", "Destination"...).
+ *   Tous préfixés uniformément maintenant.
+ * - Bug latent corrigé au passage : `afficherSousChoixSource_` (sous-choix
+ *   Secteur/Piste/Programme de la Source) n'était pas marquée
+ *   `racineSequence:false` — "← Retour" y restait masqué à tort (même
+ *   bug que celui corrigé pour Programme/Corruption dans une entrée
+ *   précédente, resté sur cette seule fonction).
+ * - Comptage des pastilles d'étape confirmé inchangé (2, "Source"/
+ *   "Destination") : les sous-écrans (catégorie, sous-choix Secteur/
+ *   Piste/Programme) restent toujours rattachés à la même pastille que
+ *   leur phase (etapeIndex 0 pour tout ce qui précède la Destination, 1
+ *   pour tout le reste) — comportement déjà correct, pas de régression.
+ * 145 tests au vert (aucune régression sur SecteurService.js/
+ * CivilisationService.js/GameService.js — seule la fonction appelante
+ * change). Vérifié manuellement dans un vrai navigateur (Playwright,
+ * emplacements Programme forcés via IndexedDB) : parcours complet Source
+ * (Programme 1 corrompu) -> Destination (Programme 2 non corrompu),
+ * rappel "Source : Programme 1..." affiché, titres cohérents à chaque
+ * étape, ET persistance réelle vérifiée en base après coup (emplacement 1
+ * décorrompu, emplacement 2 devenu corrompu) — aucune erreur JS.
+ * Fichiers touchés : index.html, strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Feuille d'action — couleur Crédit sur la
  * barre + <select>/<optgroup> pour "Gagner un Programme", retour
  * utilisateur) :
  * - `.cout-stepper-seg-credit`/`.valeur-credit` (css/style.css) :
@@ -3053,4 +3100,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.9';
+var APP_VERSION = '20260825.10';

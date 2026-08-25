@@ -976,7 +976,11 @@
         var lignesUtilisees = [1, 2, 3].map(function (index) {
           var slot = slots[index] || { nom: null, entretienActif: false, corrompu: false };
           var carte = slot.nom ? parNom[slot.nom] : null;
-          var libelle = slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —';
+          // Numéro d'emplacement (1/2/3, hors Programme de départ) en
+          // préfixe — prérequis pour que la popup "Déplacer une Corruption"
+          // (strategieService.js) puisse désigner un emplacement par son
+          // numéro ("Programme 2"), retrouvable ici par le joueur.
+          var libelle = index + '. ' + (slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —');
           var detail = carte ? [carte.objectif1, carte.objectif2].filter(Boolean).map(function (o) { return '<p>' + o + '</p>'; }).join('') : '';
           return '<div class="programme-plateau-item">' +
             '<div class="techno-obtenue-ligne">' +

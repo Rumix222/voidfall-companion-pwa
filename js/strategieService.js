@@ -305,6 +305,9 @@ var StrategieService = (function () {
     envahir_corrompu: 'Envahir un secteur Corrompu',
     regrouper: 'Regrouper',
     regroupe: 'Regrouper',
+    // Manquait (retour utilisateur) : affichait la clé brute "deplacer_corruption"
+    // dans la popup et/ou "et/ou" (ex. Focus Conquête "Planifier").
+    deplacer_corruption: 'Déplacer une Corruption',
     installation: 'Construire une Installation',
     construire_installation: 'Construire une Installation',
     guilde: 'Établir une Guilde',
@@ -1986,6 +1989,7 @@ var StrategieService = (function () {
     feuilleRejetCourant_ = function () { resolve({ annule: true }); };
     var partieDeplacer = partieAffichee;
     var etiquette = feuilleConsommerEtiquetteSequence_();
+    var TITRE_BASE_DEP_ = 'Déplacer une Corruption';
 
     var pistesCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
       return !!(partieDeplacer.civilisation && partieDeplacer.civilisation.corrompues && partieDeplacer.civilisation.corrompues[p]);
@@ -1996,15 +2000,50 @@ var StrategieService = (function () {
     var corruptionStockeeDep = (partieDeplacer.plateauMaison && partieDeplacer.plateauMaison.corruptionChambreDecontamination) || 0;
     var optionsRetraitPisteDep_ = { conserverCorruptionRetiree: evenementConserveCorruptionActif_(partieDeplacer) };
 
+    // Retour utilisateur : "le choix du programme peut maintenant être
+    // implémenté" — emplacements 1/2/3 de la fiche Maison (hors Programme
+    // de départ, emplacement 0, qui n'a pas de notion de Corruption),
+    // désignés par leur NUMÉRO (visible sur l'écran Plat. maison depuis ce
+    // même retour utilisateur, renderProgrammesPlateauMaison_, index.html).
+    var slotsProgrammeDep = (partieDeplacer.plateauMaison && Array.isArray(partieDeplacer.plateauMaison.programmesUtilises))
+      ? partieDeplacer.plateauMaison.programmesUtilises : [];
+    function slotProgrammeDep_(i) { return slotsProgrammeDep[i] || { nom: null, entretienActif: false, corrompu: false }; }
+    var indicesProgrammeCorrompusDep = [1, 2, 3].filter(function (i) { return slotProgrammeDep_(i).corrompu; });
+    var indicesProgrammeNonCorrompusDep = [1, 2, 3].filter(function (i) { return !slotProgrammeDep_(i).corrompu; });
+    function libelleSlotProgrammeDep_(i) {
+      var s = slotProgrammeDep_(i);
+      return 'Programme ' + i + (s.nom ? ' — ' + s.nom : '');
+    }
+    // Écrit .corrompu sur l'emplacement `index` (persistance directe via
+    // GameService.majPlateauMaison, même pattern que le clic manuel sur la
+    // case "Cor." de l'écran Plat. maison — .corruptionMaison suit le
+    // même delta ±1) ; garde slotsProgrammeDep synchronisé pour un
+    // éventuel second écrit dans la MÊME résolution (source ET destination
+    // toutes deux "Programme", sur 2 emplacements différents).
+    function ecrireProgrammeCorrompuDep_(index, corrompu) {
+      var nouveauxSlots = slotsProgrammeDep.map(function (s, i) {
+        return i === index ? Object.assign({}, slotProgrammeDep_(i), { corrompu: corrompu }) : s;
+      });
+      var delta = corrompu ? 1 : -1;
+      var corruptionMaison = Math.max(0, ((partieDeplacer.plateauMaison && partieDeplacer.plateauMaison.corruptionMaison) || 0) + delta);
+      return GameService.majPlateauMaison(partieDeplacer.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison }).then(function () {
+        partieDeplacer.plateauMaison.programmesUtilises = nouveauxSlots;
+        partieDeplacer.plateauMaison.corruptionMaison = corruptionMaison;
+        slotsProgrammeDep = nouveauxSlots;
+      });
+    }
+
     function libelleCibleDep_(c) {
       if (c.cle === 'secteur') return 'Secteur ' + c.numero;
       if (c.cle === 'piste') return 'la piste ' + CivilisationService.NOM_PISTE[c.piste];
       if (c.cle === 'techno') return 'Chambres de décontamination';
-      return 'un Programme (manuellement)';
+      if (c.cle === 'programme') return libelleSlotProgrammeDep_(c.index);
+      return 'un Programme (manuellement)'; // repli, ne devrait plus arriver
     }
     function executerRetraitDep_(source) {
       if (source.cle === 'secteur') return SecteurService.retirerCorruption(partieDeplacer.id, source.numero);
       if (source.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, source.piste, false, optionsRetraitPisteDep_);
+      if (source.cle === 'programme') return ecrireProgrammeCorrompuDep_(source.index, false);
       if (source.cle === 'techno') {
         var champs = { corruptionChambreDecontamination: corruptionStockeeDep - 1 };
         return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
@@ -2016,6 +2055,7 @@ var StrategieService = (function () {
     function executerPlacementDep_(destination) {
       if (destination.cle === 'secteur') return SecteurService.placerCorruption(partieDeplacer.id, destination.numero);
       if (destination.cle === 'piste') return CivilisationService.definirCorruption(partieDeplacer.id, destination.piste, true);
+      if (destination.cle === 'programme') return ecrireProgrammeCorrompuDep_(destination.index, true);
       if (destination.cle === 'techno') {
         var champs = { corruptionChambreDecontamination: corruptionStockeeDep + 1 };
         return GameService.majPlateauMaison(partieDeplacer.id, champs).then(function () {
@@ -2039,22 +2079,39 @@ var StrategieService = (function () {
         });
     }
 
+    // Convertit (catégorie, item choisi dans la liste) en cible {cle, ...}
+    // — item est un objet secteur pour 'secteur', une chaîne pour 'piste',
+    // un numéro d'emplacement pour 'programme'.
+    function construireCibleDep_(cle, item) {
+      if (cle === 'secteur') return { cle: 'secteur', numero: item.numero };
+      if (cle === 'piste') return { cle: 'piste', piste: item };
+      if (cle === 'programme') return { cle: 'programme', index: item };
+      return { cle: cle };
+    }
+    // Rappel de la Source déjà choisie, affiché sur les étapes Destination
+    // qui suivent (retour utilisateur : "afficher le choix des étapes
+    // précédentes dans les étapes suivantes") — même principe que
+    // l'ancienne #modal-choix 'deplacer_corruption' (identique plus bas).
+    function rappelSourceDep_(source) {
+      return '<p class="hint">Source : ' + libelleCibleDep_(source) + '.</p>';
+    }
+
     function afficherSousChoixDestination_(source, cle, liste, labelFn) {
+      var libelleCategorie = cle === 'secteur' ? 'Secteur' : cle === 'piste' ? 'Piste' : 'Programme';
       feuillePousserEtape_({
-        titre: etiquette + 'Destination — ' + (cle === 'secteur' ? 'Secteur' : 'Piste'), nbEtapes: 2, etapeIndex: 1,
+        titre: etiquette + TITRE_BASE_DEP_ + ' — Destination — ' + libelleCategorie, nbEtapes: 2, etapeIndex: 1,
         racineSequence: false,
-        html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstSel', liste.map(labelFn), false) + '</div>',
+        html: rappelSourceDep_(source) + '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstSel', liste.map(labelFn), false) + '</div>',
         brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'depDstSel', false); },
         onValider: function () {
           var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
-          var item = liste[i];
-          terminerDeplacement_(source, cle === 'secteur' ? { cle: 'secteur', numero: item.numero } : { cle: 'piste', piste: item });
+          terminerDeplacement_(source, construireCibleDep_(cle, liste[i]));
         }
       }, 'avant');
     }
 
     function chargerEtAfficherDestination_(source) {
-      var etapeChargement = { titre: etiquette + 'Destination', nbEtapes: 2, etapeIndex: 1, racineSequence: false, html: '<p class="hint">Chargement…</p>' };
+      var etapeChargement = { titre: etiquette + TITRE_BASE_DEP_ + ' — Destination', nbEtapes: 2, etapeIndex: 1, racineSequence: false, html: rappelSourceDep_(source) + '<p class="hint">Chargement…</p>' };
       feuillePousserEtape_(etapeChargement, 'avant');
 
       var pistesNonCorrompuesDep = CivilisationService.PISTES.filter(function (p) {
@@ -2066,7 +2123,7 @@ var StrategieService = (function () {
         var options = [];
         if (eligiblesSecteursGain.length) options.push({ cle: 'secteur', label: 'Secteur' });
         if (pistesNonCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
-        options.push({ cle: 'programme', label: 'Programme (à placer manuellement)' });
+        if (indicesProgrammeNonCorrompusDep.length) options.push({ cle: 'programme', label: 'Programme' });
         if (source.cle !== 'techno' && chambreDisponibleDep) {
           options.push({ cle: 'techno', label: 'Chambres de décontamination (' + (maxChambreDep - corruptionStockeeDep) + ' libre(s))' });
         }
@@ -2075,13 +2132,13 @@ var StrategieService = (function () {
         // -1 : aucune coche par défaut (feuilleRangeeChoixHTML_ marque
         // sinon l'index 0 "sélectionné" — trompeur ici, ces rangées
         // naviguent IMMÉDIATEMENT au tap, ne sont jamais "sélectionnées").
-        etapeCourante.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstCat', options.map(function (o) { return o.label; }), false, -1) + '</div>';
+        etapeCourante.html = rappelSourceDep_(source) + '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depDstCat', options.map(function (o) { return o.label; }), false, -1) + '</div>';
         etapeCourante.brancher = function (el) {
           feuilleBrancherRangeeChoixImmediat_(el, 'depDstCat', function (i) {
             var cle = options[i].cle;
             if (cle === 'secteur') return afficherSousChoixDestination_(source, 'secteur', eligiblesSecteursGain, function (e) { return 'Secteur ' + e.numero; });
             if (cle === 'piste') return afficherSousChoixDestination_(source, 'piste', pistesNonCorrompuesDep, function (p) { return CivilisationService.NOM_PISTE[p]; });
-            if (cle === 'programme') return terminerDeplacement_(source, { cle: 'programme' });
+            if (cle === 'programme') return afficherSousChoixDestination_(source, 'programme', indicesProgrammeNonCorrompusDep, libelleSlotProgrammeDep_);
             if (cle === 'techno') return terminerDeplacement_(source, { cle: 'techno' });
           });
         };
@@ -2092,14 +2149,15 @@ var StrategieService = (function () {
     }
 
     function afficherSousChoixSource_(cle, liste, labelFn) {
+      var libelleCategorie = cle === 'secteur' ? 'Secteur' : cle === 'piste' ? 'Piste' : 'Programme';
       feuillePousserEtape_({
-        titre: etiquette + 'Source — ' + (cle === 'secteur' ? 'Secteur' : 'Piste'), nbEtapes: 2, etapeIndex: 0,
+        titre: etiquette + TITRE_BASE_DEP_ + ' — Source — ' + libelleCategorie, nbEtapes: 2, etapeIndex: 0,
+        racineSequence: false,
         html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depSrcSel', liste.map(labelFn), false) + '</div>',
         brancher: function (el) { feuilleBrancherRangeeChoix_(el, 'depSrcSel', false); },
         onValider: function () {
           var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
-          var item = liste[i];
-          chargerEtAfficherDestination_(cle === 'secteur' ? { cle: 'secteur', numero: item.numero } : { cle: 'piste', piste: item });
+          chargerEtAfficherDestination_(construireCibleDep_(cle, liste[i]));
         }
       }, feuillePile_.length ? 'avant' : null);
     }
@@ -2108,13 +2166,13 @@ var StrategieService = (function () {
       var options = [];
       if (eligiblesSecteursRetrait.length) options.push({ cle: 'secteur', label: 'Secteur' });
       if (pistesCorrompuesDep.length) options.push({ cle: 'piste', label: 'Piste de Civilisation' });
-      options.push({ cle: 'programme', label: 'Programme (à retirer manuellement)' });
+      if (indicesProgrammeCorrompusDep.length) options.push({ cle: 'programme', label: 'Programme' });
       if (possedeChambreDep && corruptionStockeeDep > 0) {
         options.push({ cle: 'techno', label: 'Chambres de décontamination (' + corruptionStockeeDep + ' stockée(s))' });
       }
 
       feuillePousserEtape_({
-        titre: etiquette + 'Déplacer une Corruption — Source', nbEtapes: 2, etapeIndex: 0,
+        titre: etiquette + TITRE_BASE_DEP_ + ' — Source', nbEtapes: 2, etapeIndex: 0,
         // -1 : idem ci-dessus (voir chargerEtAfficherDestination_) — aucune
         // coche par défaut sur ces rangées "catégorie" à navigation immédiate.
         html: '<div class="feuille-section">' + feuilleRangeeChoixHTML_('depSrcCat', options.map(function (o) { return o.label; }), false, -1) + '</div>',
@@ -2123,7 +2181,7 @@ var StrategieService = (function () {
             var cle = options[i].cle;
             if (cle === 'secteur') return afficherSousChoixSource_('secteur', eligiblesSecteursRetrait, function (e) { return 'Secteur ' + e.numero; });
             if (cle === 'piste') return afficherSousChoixSource_('piste', pistesCorrompuesDep, function (p) { return CivilisationService.NOM_PISTE[p]; });
-            if (cle === 'programme') return chargerEtAfficherDestination_({ cle: 'programme' });
+            if (cle === 'programme') return afficherSousChoixSource_('programme', indicesProgrammeCorrompusDep, libelleSlotProgrammeDep_);
             if (cle === 'techno') return chargerEtAfficherDestination_({ cle: 'techno' });
           });
         }
