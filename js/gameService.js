@@ -148,6 +148,34 @@ var GameService = (function () {
   };
 
   /**
+   * Gain d'Influence propre à la VALEUR d'une Technologie du pool
+   * "Technologies obtenues" (retour utilisateur, 25/08/2026) : à la mise
+   * en place, 5 des 8 technologies des maisons déchues sont désignées
+   * "avec gain", 3 "sans gain" (`sansPoint`, choisi manuellement en mise
+   * en place, ou tiré aléatoirement — marquerTechnologiesSansPoint_/
+   * marquerTechnologiesSansPointManuel_ ci-dessous, déjà en place avant ce
+   * chantier). Une Technologie "avec gain" (sansPoint === false) vaut 4
+   * Influence De base, 6 Améliorée — SÉPARÉ de tout gain d'Influence
+   * propre à l'effet immédiat de la carte elle-même (ex. Bonus Commerce,
+   * "Gagnez 3 Influence" — les deux s'additionnent, ce n'est PAS un
+   * doublon). Modélisé comme une base (INFLUENCE_TECHNOLOGIE_BASE_,
+   * accordée une fois à l'acquisition, gagnerTechnologieEtResoudreEffet
+   * ci-dessous) + un delta (INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_,
+   * appliqué par definirTechnologieAmelioree à CHAQUE changement d'état
+   * de la case "Améliorée" — que ce changement ait lieu au moment même de
+   * l'acquisition — Focus Innovation "Inventer" peut accorder le niveau
+   * Améliorée directement — ou plus tard, via la case normale du Plat.
+   * maison une fois le cycle d'amélioration débloqué) plutôt qu'une
+   * valeur fixe 4/6 dupliquée à 2 endroits : 4 + 2 = 6, une seule source
+   * de vérité pour "2". Volontairement JAMAIS appliqué à la Technologie
+   * de départ (cible === 'depart' de definirTechnologieAmelioree) — hors
+   * périmètre de ce chantier pour l'instant, elle n'est de toute façon
+   * jamais "acquise" via une action.
+   */
+  var INFLUENCE_TECHNOLOGIE_BASE_ = 4;
+  var INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_ = 2;
+
+  /**
    * Identifiant de partie (retour utilisateur — "crypto.randomUUID is not
    * a function" à la création d'une partie sur iPhone via
    * http://<IP-LAN>:port) : `crypto.randomUUID()` (voir creerPartie
@@ -1976,6 +2004,17 @@ var GameService = (function () {
      * majPlateauMaison, qui exclut volontairement technologieDepart et
      * technologiesObtenues — "leurs propres fonctions dédiées", voir
      * commentaire de CHAMPS_PLATEAU_MAISON_AUTORISES).
+     *
+     * Pool "Technologies obtenues" (cible = slot 0-4) UNIQUEMENT (jamais
+     * pour la Technologie de départ — voir INFLUENCE_TECHNOLOGIE_BASE_
+     * ci-dessus) : ajuste l'Influence de ±INFLUENCE_TECHNOLOGIE_
+     * DELTA_AMELIOREE_ à CHAQUE changement RÉEL d'état de cette case,
+     * sauf si la Technologie est `sansPoint` (aucun gain d'Influence dans
+     * un sens comme dans l'autre). Couvre aussi bien l'amélioration
+     * "normale" (case cochée plus tard, une fois le cycle débloqué) que
+     * le niveau Améliorée accordé directement à l'acquisition (Focus
+     * Innovation "Inventer" — gagnerTechnologieEtResoudreEffet appelle
+     * cette même fonction).
      */
     definirTechnologieAmelioree: function (partieId, cible, amelioree) {
       amelioree = !!amelioree;
@@ -1991,8 +2030,13 @@ var GameService = (function () {
         if (slot < 0 || slot > 4) throw new Error('Emplacement de technologie invalide.');
         var technologiesObtenues = ligne.technologiesObtenues || [null, null, null, null, null];
         if (!technologiesObtenues[slot]) throw new Error('Aucune technologie à cet emplacement.');
+        var etaitAmelioree = !!technologiesObtenues[slot].amelioree;
         technologiesObtenues[slot] = Object.assign({}, technologiesObtenues[slot], { amelioree: amelioree });
         ligne.technologiesObtenues = technologiesObtenues;
+        if (etaitAmelioree !== amelioree && !technologiesObtenues[slot].sansPoint) {
+          var delta = amelioree ? INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_ : -INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_;
+          ligne.influence = Math.max(0, (ligne.influence || 0) + delta);
+        }
         return DB.put('plateauMaison', ligne);
       }).then(function () {
         return rechargerPartie_(partieId);
@@ -2168,13 +2212,36 @@ var GameService = (function () {
      * affiché par l'appelant.
      */
     gagnerTechnologieEtResoudreEffet: function (partieId, slot, nomTechnologie, amelioree, demanderChoix) {
+      var detailsImmediat = [];
       return GameService.choisirTechnologieObtenue(partieId, slot, nomTechnologie).then(function () {
+        // Valeur de la Technologie elle-même (INFLUENCE_TECHNOLOGIE_BASE_
+        // ci-dessus) — SÉPARÉE de tout gain d'Influence propre à l'effet
+        // immédiat de la carte (ex. Bonus Commerce "Gagnez 3 Influence",
+        // détail plus bas) : les deux s'additionnent. `sansPoint` = 0
+        // (3 des 8 technologies des maisons déchues, fixé à la mise en
+        // place) : aucun gain ici, ni via definirTechnologieAmelioree
+        // plus bas.
+        return DB.get('plateauMaison', partieId).then(function (ligne) {
+          var slotObj = (ligne.technologiesObtenues || [])[slot];
+          if (!slotObj || slotObj.sansPoint) return;
+          ligne.influence = (ligne.influence || 0) + INFLUENCE_TECHNOLOGIE_BASE_;
+          return DB.put('plateauMaison', ligne).then(function () {
+            detailsImmediat.push('+' + INFLUENCE_TECHNOLOGIE_BASE_ + ' Influence (valeur de la Technologie).');
+          });
+        });
+      }).then(function () {
+        // Le delta Améliorée (+INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_,
+        // 4 -> 6 au total) est appliqué PAR definirTechnologieAmelioree
+        // elle-même (même fonction que la case à cocher normale du Plat.
+        // maison) — pas dupliqué ici.
         return amelioree ? GameService.definirTechnologieAmelioree(partieId, slot, true) : Promise.resolve();
       }).then(function () {
+        if (amelioree && detailsImmediat.length) {
+          detailsImmediat.push('+' + INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_ + ' Influence (Améliorée).');
+        }
         var effet = EFFET_TECHNOLOGIE_IMMEDIAT_[nomTechnologie];
         var typeDeploiement = TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_[nomTechnologie];
         var source = 'Technologie — ' + nomTechnologie;
-        var detailsImmediat = [];
         var suite = Promise.resolve();
 
         if (effet) {

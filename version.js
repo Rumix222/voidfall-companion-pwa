@@ -1,9 +1,40 @@
 /**
  * version.js
- * Version 101 — 2026-08-25
+ * Version 102 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (chantier "résolution des Technologies",
+ * 25/08/2026, dernière fois (chantier Technologies — gain d'Influence lié
+ * à la VALEUR d'une Technologie obtenue, retour utilisateur : "à la
+ * création de la partie on définit 5 techno avec gain et 3 sans gain...
+ * les techno de base font gagner 4 influence, les techno avancées 6") :
+ * - `INFLUENCE_TECHNOLOGIE_BASE_` (4) / `INFLUENCE_TECHNOLOGIE_
+ *   DELTA_AMELIOREE_` (2, soit 4+2=6 Améliorée — une seule source de
+ *   vérité pour "6", jamais dupliquée) : gagnerTechnologieEtResoudreEffet
+ *   accorde +4 Influence à l'acquisition de toute Technologie du pool
+ *   "avec gain" (sansPoint === false — 5 des 8 technologies des maisons
+ *   déchues, fixé à la mise en place, déjà en place avant ce chantier) ;
+ *   `definirTechnologieAmelioree` accorde/retire ±2 Influence à CHAQUE
+ *   changement de la case "Améliorée" (couvre aussi bien l'amélioration
+ *   normale — case cochée plus tard, cycle débloqué — que le niveau
+ *   Améliorée accordé directement à l'acquisition, Focus Innovation
+ *   "Inventer"). SÉPARÉ de tout gain d'Influence propre à l'effet
+ *   immédiat de la carte elle-même (ex. Nacelles/Bonus Commerce "Gagnez 3
+ *   Influence") : les deux s'additionnent, ce n'est pas un doublon.
+ *   `sansPoint` (3 des 8) : aucun gain, dans un sens comme dans l'autre.
+ *   Volontairement PAS appliqué à la Technologie de départ (jamais
+ *   "acquise" via une action, hors périmètre de ce chantier pour
+ *   l'instant).
+ * 145 tests au vert. Vérifié en navigateur réel (3 scénarios, Influence
+ * remise à 0) : Technologie "avec gain" De base -> exactement +4 ;
+ * Technologie "avec gain" Améliorée (Nacelles, effet immédiat propre
+ * "Gagnez 3 Influence" inclus) -> +4+2+3 = +9 au total ; Technologie
+ * `sansPoint` (Boucliers, forcée pour ce test) prise Améliorée ->
+ * Influence bien INCHANGÉE. Journal lisible : chaque composante
+ * (valeur de base, delta Améliorée, effet propre de la carte) sur sa
+ * propre ligne.
+ * Fichiers touchés : js/gameService.js, version.js.
+ *
+ * 25/08/2026, avant (chantier "résolution des Technologies",
  * lancement — 3 premières technologies portées : Nacelles/Boucliers
  * (Valnis), Collecte de données (Belitan), toutes maisons de complexité
  * 1) :
@@ -3433,4 +3464,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.17';
+var APP_VERSION = '20260825.18';
