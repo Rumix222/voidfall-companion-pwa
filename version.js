@@ -1,9 +1,47 @@
 /**
  * version.js
- * Version 95 — 2026-08-25
+ * Version 96 — 2026-08-25
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (Historique allégé + Feuille d'action portée
+ * 25/08/2026, dernière fois (Focus Développement "Installer" — l'Effet
+ * (Guilde et/ou Installation) utilise désormais le secteur choisi pour le
+ * Coût comme destination, retour utilisateur : "pour la partie coût
+ * proposer les secteurs où je peux retirer un cube, et pour la partie
+ * effet utiliser ce secteur comme destination") :
+ * `focusEngine.js` classe `effet_secteur` hors périmètre
+ * (CLES_SECTEUR_HORS_PERIMETRE) : AUCUN `demanderChoix` n'est jamais émis
+ * pour l'Effet de "Installer" (résolu silencieusement, "à appliquer
+ * manuellement") — le SEUL point d'accroche possible est donc à
+ * l'intérieur même de la résolution du Coût (`rappeler_cube_cout`), qui
+ * partage son secteur avec l'Effet selon le texte de la carte ("Dans le
+ * secteur d'où vous avez rappelé le cube...").
+ * - Nouvelle `feuilleEnchainerEffetSecteurConstruction_` : une fois le
+ *   cube rappelé, vérifie `action.effet.effet_secteur` (générique — pas
+ *   le nom de l'action, couvre aussi une future carte au même
+ *   sous-ensemble de clés) ; si 'guilde'/'installation' y figurent,
+ *   vérifie l'éligibilité RÉELLE du secteur du rappel
+ *   (SecteurService.obtenirSecteursEligiblesConstruction, filtré sur ce
+ *   numéro précis) puis enchaîne, DANS LA MÊME feuille, un choix inclusif
+ *   (et/ou, fidèle au texte de la carte) → pour chaque catégorie cochée,
+ *   un sous-choix du type précis (Guilde : Fermiers/Ingénieurs/etc. ;
+ *   Installation : Chantier Naval/etc.) → persistance via
+ *   SecteurService.construire pour chacune, séquentiellement. Repli
+ *   inchangé (résolution immédiate) si le secteur n'a aucun emplacement
+ *   libre, ou si la carte n'utilise pas ces 2 clés (ex. "Progrès Standard
+ *   Restaurer" du catalogue, `effet_secteur:['retirer_corruption',
+ *   'regrouper']` — non couvert ici, hors périmètre tant que non migrée
+ *   à la Feuille).
+ * 145 tests au vert (aucune régression — logique métier inchangée,
+ * réutilise SecteurService.construire/obtenirSecteursEligiblesConstruction
+ * déjà existants). Vérifié manuellement dans un vrai navigateur
+ * (Playwright, partie réelle) : rappel de cube sur un secteur avec
+ * emplacements Guilde ET Installation libres -> choix et/ou -> les 2
+ * construites l'une après l'autre sur CE secteur -> persistance réelle
+ * confirmée en base (guildeFermiers/installationChantierNaval incrémentés
+ * sur le bon secteur) -> jamais #modal-choix affiché, aucune erreur JS.
+ * Fichiers touchés : strategieService.js, version.js.
+ *
+ * 25/08/2026, avant (Historique allégé + Feuille d'action portée
  * sur Focus Développement Standard, retour utilisateur : "continuons
  * l'implémentation du nouveau pattern sur le focus développement") :
  * - Historique ("Actions réalisées", #ressources-journal) : "ne pas
@@ -3145,4 +3183,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.11';
+var APP_VERSION = '20260825.12';
