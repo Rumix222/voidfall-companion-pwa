@@ -128,12 +128,15 @@ var GameService = (function () {
    *   joueur) — hors du vocabulaire FocusEngine (une action secteur),
    *   résolu par un appel direct à SecteurService.deployerCube sur le
    *   numéro du Secteur-Mère (SecteurService.obtenirSecteurMere).
-   * Seules les 3 premières Technologies portées (maisons de complexité 1 —
-   * Nacelles/Boucliers, Valnis ; Collecte de données, Belitan) ont une
-   * entrée ici ; toute AUTRE Technologie obtenue n'a, pour l'instant,
-   * aucun effet immédiat résolu automatiquement (le reste de son
-   * `immediat`, tout son `permanent`/`ameliore`, restent de toute façon
-   * hors périmètre — bonus de combat/production non modélisés, voir
+   * 6 Technologies portées à ce jour (maisons de complexité 1 — Nacelles/
+   * Boucliers, Valnis ; Collecte de données, Belitan — puis Réplicateurs
+   * de combat/Robotique, Novaris/Nervo, et Destroyers, Zenor, retenues
+   * pour la simplicité de leur `immediat` : une seule clé déjà comprise
+   * par FocusEngine, ou un `deploy` à destination fixe Secteur-Mère déjà
+   * outillé) ; toute AUTRE Technologie obtenue n'a, pour l'instant, aucun
+   * effet immédiat résolu automatiquement (le reste de son `immediat`,
+   * tout son `permanent`/`ameliore`, restent de toute façon hors
+   * périmètre — bonus de combat/production non modélisés, voir
    * docs-architecture-pwa.md §10). Étendre ces 2 tables au fil de l'eau
    * est la façon prévue de continuer ce chantier technologie par
    * technologie, sans toucher à gagnerTechnologieEtResoudreEffet
@@ -141,10 +144,13 @@ var GameService = (function () {
    */
   var EFFET_TECHNOLOGIE_IMMEDIAT_ = {
     'Nacelles': { gagner_commerce: 1, activer_cube: 1 },
-    'Collecte de données': { credit: 2, science: 2 }
+    'Collecte de données': { credit: 2, science: 2 },
+    'Réplicateurs de combat': { activer_cube: 1 },
+    'Robotique': { materiel: 2 }
   };
   var TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ = {
-    'Boucliers': 'corvette'
+    'Boucliers': 'corvette',
+    'Destroyers': 'destroyer'
   };
   // Le rappel "Effet immédiat" affiché à la popup 'gagner_technologie'
   // (strategieService.js) est désormais dérivé DIRECTEMENT du champ brut

@@ -1,9 +1,28 @@
 /**
  * version.js
- * Version 106 — 2026-08-26
+ * Version 107 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — "Effet immédiat"
+ * 26/08/2026, dernière fois (chantier Technologies — 3 Technologies
+ * supplémentaires portées, retour utilisateur : "implémente l'effet
+ * immédiat de 3 techno supplémentaires, choisis les faciles") :
+ * - Réplicateurs de combat (Novaris) : `{activate_cube:1}` — une seule
+ *   clé déjà comprise par FocusEngine, ajoutée à EFFET_TECHNOLOGIE_
+ *   IMMEDIAT_.
+ * - Robotique (Nervo) : `{gain:{materiel:2}}` — idem, gain simple.
+ * - Destroyers (Zenor) : `{deploy:{unit:"destroyer",...,destination:
+ *   "secteur_mere"}}` — ajoutée à TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_
+ *   (déjà outillée pour Boucliers, juste une nouvelle entrée).
+ * 6 Technologies portées au total désormais (voir liste à jour dans la
+ * mémoire de session voidfall-technologies-resolution-plan.md).
+ * 145 tests au vert. Vérifié en navigateur réel (Focus Innovation
+ * "Inventer" × 3, adversaires forcées à Novaris/Nervo/Zenor) : cubeActif
+ * +1 (Réplicateurs de combat), Matériel +2 (Robotique), 1 Destroyer
+ * déployé sur le Secteur-Mère (Destroyers) — les 3 exactement conformes,
+ * aucune erreur JS.
+ * Fichiers touchés : js/gameService.js, version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — "Effet immédiat"
  * aussi sur l'onglet Mise en place, retour utilisateur : "ajouter aussi
  * un texte pour l'effet immédiat") :
  * - `StrategieService.texteEffetImmediatTechnologie` (strategieService.js)
@@ -3587,4 +3606,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.4';
+var APP_VERSION = '20260826.5';
