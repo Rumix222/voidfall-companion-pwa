@@ -1,9 +1,49 @@
 /**
  * version.js
- * Version 102 — 2026-08-25
+ * Version 103 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 25/08/2026, dernière fois (chantier Technologies — gain d'Influence lié
+ * 26/08/2026, dernière fois (chantier Technologies — popup 'gagner_
+ * technologie' : "Améliorée" verrouillée à l'offre du cycle + rappel
+ * complet à la sélection, retour utilisateur : "propose la version
+ * améliorée uniquement si la technologie est dans l'offre sur le plat.
+ * galactique et à partir du cycle 2 ; à la sélection dans la ddl, ajoute
+ * le texte de l'effet immédiat et le nombre d'influence") :
+ * - "Améliorée" n'est proposée QUE si la Technologie sélectionnée dans la
+ *   liste fait partie de l'offre "Technologies avancées" du cycle en
+ *   cours — GameService.obtenirTechnologiesAvanceesGroupes(partie).actif,
+ *   même source de vérité que la case "Améliorée" du Plat. maison ([] au
+ *   cycle 1, couvre "à partir du cycle 2" sans vérification de cycle
+ *   séparée). DÉPEND du nom de la Technologie choisie (pas un simple
+ *   "verrouillé/déverrouillé" global comme avant) : la zone niveau
+ *   (rangée-choix côté Feuille, <select> côté #modal-choix) se reconstruit
+ *   dynamiquement à chaque changement de sélection dans la ddl —
+ *   feuilleFlowGagnerTechnologie_/#modal-choix, strategieService.js.
+ * - Le rappel sous la ddl (déjà le texte de la Technologie, texteAmeliore
+ *   si "Améliorée" choisie) s'enrichit de 2 lignes : "Effet immédiat :
+ *   ..." (nouvelle table gameService.js TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE_,
+ *   texte FR écrit à la main technologie par technologie en PARALLÈLE de
+ *   EFFET_TECHNOLOGIE_IMMEDIAT_/TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ —
+ *   "si dispo dans catalogue", donc seulement les 3 technologies déjà
+ *   portées) et "+N Influence." (calculé depuis GameService.
+ *   INFLUENCE_TECHNOLOGIE_BASE/DELTA_AMELIOREE, réagit aussi au niveau
+ *   choisi — "Aucun gain d'Influence" si `sansPoint`). Les 3 nouvelles
+ *   tables/constantes gameService.js sont exposées publiquement (comme
+ *   INFO_PROGRAMME_PAR_TYPE) pour rester une SEULE source de vérité avec
+ *   ce que gagnerTechnologieEtResoudreEffet/definirTechnologieAmelioree
+ *   résolvent réellement — jamais une copie dupliquée côté affichage.
+ * 145 tests au vert. Vérifié en navigateur réel (Feuille ET #modal-choix,
+ * partie forcée cycle 1 puis cycle 2 avec 4 technologies dans l'offre) :
+ * cycle 1 -> aucune Technologie n'offre "Améliorée" ; cycle 2, Technologie
+ * dans l'offre -> "Améliorée" proposée, bascule bien le texte/l'Influence
+ * affichés (+4 -> +6) ; cycle 2, Technologie HORS offre -> "Améliorée"
+ * non proposée même si le catalogue l'autoriserait pour cette carte.
+ * Aucune erreur JS sur les 2 chemins (Focus Innovation "Inventer" ET
+ * avancement de Piste de Civilisation, Gouvernement Case 2).
+ * Fichiers touchés : js/gameService.js, js/strategieService.js,
+ * version.js.
+ *
+ * 25/08/2026, avant (chantier Technologies — gain d'Influence lié
  * à la VALEUR d'une Technologie obtenue, retour utilisateur : "à la
  * création de la partie on définit 5 techno avec gain et 3 sans gain...
  * les techno de base font gagner 4 influence, les techno avancées 6") :
@@ -3464,4 +3504,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260825.18';
+var APP_VERSION = '20260826.1';

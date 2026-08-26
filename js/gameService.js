@@ -146,6 +146,22 @@ var GameService = (function () {
   var TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ = {
     'Boucliers': 'corvette'
   };
+  // Pendant du couple de tables ci-dessus, à l'usage EXCLUSIF de l'IHM
+  // (retour utilisateur : rappel de l'effet immédiat, popup 'gagner_
+  // technologie', strategieService.js — "si dispo dans catalogue", donc
+  // seulement pour les technologies déjà portées ci-dessus) — texte
+  // FR humain écrit à la main, technologie par technologie, plutôt qu'un
+  // traducteur générique JSON Effet -> texte (les libellés de ressources/
+  // clés, LIBELLES_OPTIONS/CHAMP_RESSOURCE, vivent côté strategieService.js,
+  // chargé APRÈS ce fichier — hors de portée ici). Étendre EN MÊME TEMPS
+  // que EFFET_TECHNOLOGIE_IMMEDIAT_/TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_
+  // à chaque nouvelle Technologie portée, jamais séparément (sinon le
+  // texte affiché divergerait de ce qui est réellement résolu).
+  var TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE_ = {
+    'Nacelles': 'Gagnez un Bonus Commerce (choix parmi 6) et activez 1 cube.',
+    'Collecte de données': 'Gagnez 2 Crédits et 2 Science.',
+    'Boucliers': 'Déployez 1 Corvette sur votre Secteur-Mère.'
+  };
 
   /**
    * Gain d'Influence propre à la VALEUR d'une Technologie du pool
@@ -1020,6 +1036,16 @@ var GameService = (function () {
     // plus haut) — exposée pour index.html ("Programmes en main", écran
     // Focus).
     INFO_PROGRAMME_PAR_TYPE: INFO_PROGRAMME_PAR_TYPE,
+
+    // Chantier Technologies (voir déclarations plus haut) — exposés pour
+    // la popup 'gagner_technologie' (strategieService.js) : rappel du
+    // texte d'effet immédiat + du nombre d'Influence à la sélection dans
+    // la liste déroulante, une seule source de vérité avec ce qui est
+    // réellement résolu par GameService.gagnerTechnologieEtResoudreEffet/
+    // definirTechnologieAmelioree.
+    TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE: TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE_,
+    INFLUENCE_TECHNOLOGIE_BASE: INFLUENCE_TECHNOLOGIE_BASE_,
+    INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE: INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE_,
 
     /**
      * Crée une nouvelle partie : tire une maison (ou utilise celle choisie

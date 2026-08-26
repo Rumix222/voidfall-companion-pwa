@@ -2324,9 +2324,28 @@ var StrategieService = (function () {
     var nomsPris = obtenues.filter(Boolean).map(function (t) { return t.nom; });
     var disponibles = toutesLesTechs.filter(function (t) { return nomsPris.indexOf(t.nom) === -1; });
     var slotVide = obtenues.indexOf(null);
-    var niveaux = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
-    var choixNiveau = niveaux.length > 1;
-    var libellesNiveau = niveaux.map(function (n) { return n === 'amelioree' ? 'Améliorée' : 'De base'; });
+    var niveauxCatalogue = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
+    // Retour utilisateur : "Améliorée" ne doit être PROPOSÉE que si la
+    // Technologie fait partie de l'offre "Technologies avancées" du cycle
+    // en cours (Plat. Galactique) — GameService.obtenirTechnologiesAvanceesGroupes
+    // (même source de vérité que la case "Améliorée" normale du Plat.
+    // maison, verrouillée pareil) : [] au cycle 1 (donc "à partir du
+    // cycle 2" est automatiquement couvert, aucune vérification de cycle
+    // séparée nécessaire), les 4 technologies choisies au cycle 1 au
+    // cycle 2, les 4 AUTRES au cycle 3. Dépend donc du nom de la
+    // Technologie SÉLECTIONNÉE — recalculé dynamiquement à chaque
+    // changement de select (niveauxPourTech_ ci-dessous), PAS figé une
+    // fois pour toutes comme avant.
+    var nomsAmeliorables = GameService.obtenirTechnologiesAvanceesGroupes(partieTech).actif;
+    function niveauxPourTech_(nomTech) {
+      var ameliorable = niveauxCatalogue.indexOf('amelioree') !== -1 && nomsAmeliorables.indexOf(nomTech) !== -1;
+      return ameliorable ? niveauxCatalogue : niveauxCatalogue.filter(function (n) { return n !== 'amelioree'; });
+    }
+    // Partagé entre `brancher` (recalculé à chaque changement de select,
+    // dépend de la Technologie choisie) et `onValider` (lit l'état
+    // courant) — évite d'accrocher une propriété au DOM pour faire le
+    // même lien.
+    var niveauxCourantsPartages = [];
 
     if (slotVide === -1 || !disponibles.length) {
       feuillePousserEtape_({
@@ -2346,7 +2365,11 @@ var StrategieService = (function () {
     // Un rappel du texte de la Technologie sous le select (comme pour un
     // Programme) réagit AUSSI au niveau choisi (De base/Améliorée), via
     // titreTechnologie_-like logique locale (texteAmeliore si "Améliorée"
-    // sélectionnée ET fourni par le catalogue, sinon texte de base).
+    // sélectionnée ET fourni par le catalogue, sinon texte de base) —
+    // complété du rappel de l'effet immédiat (GameService.TEXTE_EFFET_
+    // IMMEDIAT_TECHNOLOGIE, uniquement les Technologies déjà portées) et
+    // du nombre d'Influence que la Technologie rapportera (GameService.
+    // INFLUENCE_TECHNOLOGIE_BASE/DELTA_AMELIOREE, 0 si `sansPoint`).
     var parNomTech = {};
     disponibles.forEach(function (t) { parNomTech[t.nom] = t; });
     var maisonsOrdre = [];
@@ -2363,30 +2386,57 @@ var StrategieService = (function () {
         '<div class="feuille-section">' + (sectionCout ? '<p class="feuille-section-titre">Effet</p>' : '') +
         '<select id="feuille-techno-select" class="modal-choix-select">' + groupesTech + '</select>' +
         '<p class="hint" id="feuille-techno-detail" style="margin-top:8px;"></p>' +
-        (choixNiveau ? '<div style="margin-top:14px;"></div>' + feuilleRangeeChoixHTML_('techNiveau', libellesNiveau, false) : '') +
+        '<div id="feuille-techno-niveau-zone"></div>' +
         '</div>',
       brancher: function (el) {
         var selectTech = el.querySelector('#feuille-techno-select');
         var detailTech = el.querySelector('#feuille-techno-detail');
+        var zoneNiveau = el.querySelector('#feuille-techno-niveau-zone');
+
         function niveauCourantAmelioree_() {
-          if (!choixNiveau) return false;
-          var selectionnee = el.querySelector('.rangee-choix[data-groupe="techNiveau"].selectionnee');
-          return !!selectionnee && niveaux[Number(selectionnee.dataset.i)] === 'amelioree';
+          var selectionnee = zoneNiveau.querySelector('.rangee-choix[data-groupe="techNiveau"].selectionnee');
+          return niveauxCourantsPartages.length > 1
+            ? (!!selectionnee && niveauxCourantsPartages[Number(selectionnee.dataset.i)] === 'amelioree')
+            : niveauxCourantsPartages[0] === 'amelioree';
         }
         function majDetail_() {
           var t = parNomTech[selectTech.value];
-          detailTech.textContent = t ? ((niveauCourantAmelioree_() && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '')) : '';
+          if (!t) { detailTech.innerHTML = ''; return; }
+          var ameliore = niveauCourantAmelioree_();
+          var lignes = [];
+          var texteBase = (ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '');
+          if (texteBase) lignes.push(texteBase);
+          var texteEffetImmediat = GameService.TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE[t.nom];
+          if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
+          if (t.sansPoint) {
+            lignes.push('Aucun gain d’Influence (Technologie sans gain).');
+          } else {
+            var gainInfluence = GameService.INFLUENCE_TECHNOLOGIE_BASE + (ameliore ? GameService.INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE : 0);
+            lignes.push('+' + gainInfluence + ' Influence.');
+          }
+          detailTech.innerHTML = lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('');
         }
-        selectTech.addEventListener('change', majDetail_);
-        if (choixNiveau) feuilleBrancherRangeeChoix_(el, 'techNiveau', false, majDetail_);
-        majDetail_();
+        function rendreZoneNiveau_() {
+          niveauxCourantsPartages = niveauxPourTech_(selectTech.value);
+          if (niveauxCourantsPartages.length <= 1) {
+            zoneNiveau.innerHTML = '';
+          } else {
+            var libelles = niveauxCourantsPartages.map(function (n) { return n === 'amelioree' ? 'Améliorée' : 'De base'; });
+            zoneNiveau.innerHTML = '<div style="margin-top:14px;"></div>' + feuilleRangeeChoixHTML_('techNiveau', libelles, false);
+            feuilleBrancherRangeeChoix_(zoneNiveau, 'techNiveau', false, majDetail_);
+          }
+          majDetail_();
+          feuilleAjusterHauteur_();
+        }
+        selectTech.addEventListener('change', rendreZoneNiveau_);
+        rendreZoneNiveau_();
       },
       onValider: function () {
         var nomChoisi = feuilleEls_.corpsInner.querySelector('#feuille-techno-select').value;
-        var iNiveau = choixNiveau
+        var iNiveau = niveauxCourantsPartages.length > 1
           ? Number(feuilleEls_.corpsInner.querySelector('.rangee-choix[data-groupe="techNiveau"].selectionnee').dataset.i)
           : 0;
-        var niveauChoisi = niveaux[iNiveau];
+        var niveauChoisi = niveauxCourantsPartages[iNiveau];
         feuilleRejetCourant_ = null;
         feuilleEls_.btnValider.disabled = true;
         GameService.gagnerTechnologieEtResoudreEffet(partieTech.id, slotVide, nomChoisi, niveauChoisi === 'amelioree', demanderChoix)
@@ -4819,8 +4869,17 @@ var StrategieService = (function () {
         var nomsPrisModale = obtenuesModale.filter(Boolean).map(function (t) { return t.nom; });
         var disponiblesModale = toutesLesTechsModale.filter(function (t) { return nomsPrisModale.indexOf(t.nom) === -1; });
         var slotVideModale = obtenuesModale.indexOf(null);
-        var niveauxModale = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
-        var choixNiveauModale = niveauxModale.length > 1;
+        var niveauxCatalogueModale = Array.isArray(contexte.niveaux) ? contexte.niveaux : ['base'];
+        // Même règle que feuilleFlowGagnerTechnologie_ (Feuille) : "Améliorée"
+        // seulement si la Technologie est dans l'offre "Technologies
+        // avancées" du cycle en cours — [] au cycle 1, couvre "à partir du
+        // cycle 2" sans vérification de cycle séparée.
+        var nomsAmeliorablesModale = GameService.obtenirTechnologiesAvanceesGroupes(partieTechModale).actif;
+        function niveauxPourTechModale_(nomTech) {
+          var ameliorable = niveauxCatalogueModale.indexOf('amelioree') !== -1 && nomsAmeliorablesModale.indexOf(nomTech) !== -1;
+          return ameliorable ? niveauxCatalogueModale : niveauxCatalogueModale.filter(function (n) { return n !== 'amelioree'; });
+        }
+        var niveauxCourantsModale = [];
 
         if (slotVideModale === -1 || !disponiblesModale.length) {
           contenu.innerHTML = '<p class="hint">' + (slotVideModale === -1
@@ -4839,29 +4898,53 @@ var StrategieService = (function () {
 
           contenu.innerHTML = '<select id="techno-gain-select" class="modal-choix-select">' + groupesTechModale + '</select>' +
             '<p class="hint" id="techno-gain-detail" style="margin-top:8px;"></p>' +
-            (choixNiveauModale
-              ? '<select id="techno-gain-niveau" class="modal-choix-select" style="margin-top:8px;">' +
-                niveauxModale.map(function (n) { return '<option value="' + n + '">' + (n === 'amelioree' ? 'Améliorée' : 'De base') + '</option>'; }).join('') +
-                '</select>'
-              : '');
+            '<div id="techno-gain-niveau-zone"></div>';
 
           var selectTechModale = document.getElementById('techno-gain-select');
           var detailTechModale = document.getElementById('techno-gain-detail');
-          var selectNiveauModale = document.getElementById('techno-gain-niveau');
+          var zoneNiveauModale = document.getElementById('techno-gain-niveau-zone');
+
+          function niveauCourantAmelioreeModale_() {
+            var selectNiveau = document.getElementById('techno-gain-niveau');
+            return !!selectNiveau && selectNiveau.value === 'amelioree';
+          }
           function majDetailTechModale_() {
             var t = parNomTechModale[selectTechModale.value];
-            var ameliore = !!selectNiveauModale && selectNiveauModale.value === 'amelioree';
-            detailTechModale.textContent = t ? ((ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '')) : '';
+            if (!t) { detailTechModale.innerHTML = ''; return; }
+            var ameliore = niveauCourantAmelioreeModale_();
+            var lignes = [];
+            var texteBase = (ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '');
+            if (texteBase) lignes.push(texteBase);
+            var texteEffetImmediat = GameService.TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE[t.nom];
+            if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
+            if (t.sansPoint) {
+              lignes.push('Aucun gain d’Influence (Technologie sans gain).');
+            } else {
+              var gainInfluence = GameService.INFLUENCE_TECHNOLOGIE_BASE + (ameliore ? GameService.INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE : 0);
+              lignes.push('+' + gainInfluence + ' Influence.');
+            }
+            detailTechModale.innerHTML = lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('');
           }
-          selectTechModale.addEventListener('change', majDetailTechModale_);
-          if (selectNiveauModale) selectNiveauModale.addEventListener('change', majDetailTechModale_);
-          majDetailTechModale_();
+          function rendreZoneNiveauModale_() {
+            niveauxCourantsModale = niveauxPourTechModale_(selectTechModale.value);
+            if (niveauxCourantsModale.length <= 1) {
+              zoneNiveauModale.innerHTML = '';
+            } else {
+              zoneNiveauModale.innerHTML = '<select id="techno-gain-niveau" class="modal-choix-select" style="margin-top:8px;">' +
+                niveauxCourantsModale.map(function (n) { return '<option value="' + n + '">' + (n === 'amelioree' ? 'Améliorée' : 'De base') + '</option>'; }).join('') +
+                '</select>';
+              document.getElementById('techno-gain-niveau').addEventListener('change', majDetailTechModale_);
+            }
+            majDetailTechModale_();
+          }
+          selectTechModale.addEventListener('change', rendreZoneNiveauModale_);
+          rendreZoneNiveauModale_();
 
           btnValider.hidden = false;
           btnValider.textContent = 'Valider';
           btnValider.onclick = function () {
             var nomChoisi = selectTechModale.value;
-            var niveauChoisiModale = selectNiveauModale ? selectNiveauModale.value : niveauxModale[0];
+            var niveauChoisiModale = niveauxCourantsModale.length > 1 ? document.getElementById('techno-gain-niveau').value : niveauxCourantsModale[0];
             btnValider.disabled = true;
 
             GameService.gagnerTechnologieEtResoudreEffet(partieTechModale.id, slotVideModale, nomChoisi, niveauChoisiModale === 'amelioree', demanderChoix)
