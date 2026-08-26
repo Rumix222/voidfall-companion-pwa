@@ -128,29 +128,41 @@ var GameService = (function () {
    *   joueur) — hors du vocabulaire FocusEngine (une action secteur),
    *   résolu par un appel direct à SecteurService.deployerCube sur le
    *   numéro du Secteur-Mère (SecteurService.obtenirSecteurMere).
-   * 6 Technologies portées à ce jour (maisons de complexité 1 — Nacelles/
-   * Boucliers, Valnis ; Collecte de données, Belitan — puis Réplicateurs
-   * de combat/Robotique, Novaris/Nervo, et Destroyers, Zenor, retenues
-   * pour la simplicité de leur `immediat` : une seule clé déjà comprise
-   * par FocusEngine, ou un `deploy` à destination fixe Secteur-Mère déjà
-   * outillé) ; toute AUTRE Technologie obtenue n'a, pour l'instant, aucun
-   * effet immédiat résolu automatiquement (le reste de son `immediat`,
-   * tout son `permanent`/`ameliore`, restent de toute façon hors
-   * périmètre — bonus de combat/production non modélisés, voir
-   * docs-architecture-pwa.md §10). Étendre ces 2 tables au fil de l'eau
-   * est la façon prévue de continuer ce chantier technologie par
-   * technologie, sans toucher à gagnerTechnologieEtResoudreEffet
-   * elle-même.
+   * 11 Technologies portées à ce jour ; toute AUTRE Technologie obtenue
+   * n'a, pour l'instant, aucun effet immédiat résolu automatiquement (le
+   * reste de son `immediat`, tout son `permanent`/`ameliore`, restent de
+   * toute façon hors périmètre — bonus de combat/production non
+   * modélisés, voir docs-architecture-pwa.md §10). Étendre ces 2 tables
+   * au fil de l'eau est la façon prévue de continuer ce chantier
+   * technologie par technologie, sans toucher à
+   * gagnerTechnologieEtResoudreEffet elle-même.
+   *
+   * `EFFET_TECHNOLOGIE_IMMEDIAT_` accepte aussi une clé "choice" — MÊME
+   * FORMAT tableau que focus.json (PAS le format objet {cle:valeur,...}
+   * du catalogue Technologies, traduit à la main ici) : résolu en mode
+   * EXCLUSIF (`texteAction` transmis vide par gagnerTechnologieEtResoudreEffet
+   * ci-dessous, jamais "et/ou") via la MÊME popup 'option_exclusive' déjà
+   * portée Feuille (contrairement à 'bonus_commerce', jamais migrée —
+   * voir Nacelles/gagner_commerce ci-dessous, qui retombe donc sur
+   * #modal-choix le temps de ce sous-choix) : Clonage/Nexus de commerce
+   * s'affichent donc entièrement DANS la Feuille, sans aucun repli.
    */
   var EFFET_TECHNOLOGIE_IMMEDIAT_ = {
     'Nacelles': { gagner_commerce: 1, activer_cube: 1 },
     'Collecte de données': { credit: 2, science: 2 },
     'Réplicateurs de combat': { activer_cube: 1 },
-    'Robotique': { materiel: 2 }
+    'Robotique': { materiel: 2 },
+    'Torpilles': { materiel: 2 },
+    'Ciblage': { energie: 2 },
+    'Hyperpropulsion': { prime: 3 },
+    'Clonage': { choice: [{ credit: 1 }, { activer_cube: 1 }] },
+    'Nexus de commerce': { choice: [{ nourriture: 2 }, { gagner_commerce: 1 }] }
   };
   var TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ = {
     'Boucliers': 'corvette',
-    'Destroyers': 'destroyer'
+    'Destroyers': 'destroyer',
+    'Torpilles': 'corvette',
+    'Ciblage': 'corvette'
   };
   // Le rappel "Effet immédiat" affiché à la popup 'gagner_technologie'
   // (strategieService.js) est désormais dérivé DIRECTEMENT du champ brut

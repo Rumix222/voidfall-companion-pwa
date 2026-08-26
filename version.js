@@ -1,9 +1,33 @@
 /**
  * version.js
- * Version 107 — 2026-08-26
+ * Version 108 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — 3 Technologies
+ * 26/08/2026, dernière fois (chantier Technologies — 5 Technologies
+ * supplémentaires portées, retour utilisateur : "déploie 5 nouvelles") :
+ * - Torpilles (Cortozaar) / Ciblage (Belitan) : gain simple + `deploy`
+ *   Corvette → Secteur-Mère, même mécanique que Boucliers/Destroyers
+ *   (2 entrées, une par table).
+ * - Hyperpropulsion (Yarvek) : `{gain:{prime_token:3}}` — gain simple
+ *   (jetonPrime), aussi facile que Robotique.
+ * - Clonage (Zenor) / Nexus de commerce (Marqualos) : PREMIÈRES
+ *   Technologies à choix (`immediat.choice`, format OBJET du catalogue
+ *   Technologies — traduit à la main vers le format TABLEAU de
+ *   focus.json dans EFFET_TECHNOLOGIE_IMMEDIAT_, résolu en mode EXCLUSIF
+ *   via la MÊME popup 'option_exclusive' déjà portée Feuille — au
+ *   contraire de 'bonus_commerce' (Nacelles), jamais migrée, ces 2 sous-
+ *   choix s'affichent donc ENTIÈREMENT dans la Feuille, sans aucun repli
+ *   #modal-choix).
+ * 11 Technologies portées au total désormais (liste à jour dans la
+ * mémoire de session voidfall-technologies-resolution-plan.md).
+ * 145 tests au vert. Vérifié en navigateur réel (Focus Innovation
+ * "Inventer" × 5, adversaires forcées à Cortozaar/Belitan/Yarvek/Zenor/
+ * Marqualos) : les 5 exactement conformes (gains, déploiements cumulés
+ * sur le Secteur-Mère, et les 2 sous-choix résolus dans les 2 branches
+ * testées), aucune erreur JS.
+ * Fichiers touchés : js/gameService.js, version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — 3 Technologies
  * supplémentaires portées, retour utilisateur : "implémente l'effet
  * immédiat de 3 techno supplémentaires, choisis les faciles") :
  * - Réplicateurs de combat (Novaris) : `{activate_cube:1}` — une seule
@@ -3606,4 +3630,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.5';
+var APP_VERSION = '20260826.6';
