@@ -591,10 +591,17 @@
       if (el) el.textContent = texte;
     }
 
-    function badgeTechnologie_(t) {
-      var classe = 'badge' + (t.sansPoint ? ' badge-sans-point' : '');
+    // `cle` : identifiant unique du badge dans l'écran (index maison +
+    // index technologie) — retour utilisateur : "ajouter les textes des
+    // technologies au clic également dans l'onglet Mise en place, afin
+    // de pouvoir les consulter avant de faire une action" (le `title`
+    // seul, hover uniquement, est peu utilisable au doigt sur mobile).
+    // `title` conservé en plus (bonus desktop, sans coût).
+    function badgeTechnologie_(t, cle) {
+      var cliquable = !!t.texte;
+      var classe = 'badge' + (t.sansPoint ? ' badge-sans-point' : '') + (cliquable ? ' badge-cliquable' : '');
       var titre = (t.texte || '').replace(/"/g, '&quot;');
-      return '<span class="' + classe + '" title="' + titre + '">' + t.nom + '</span>';
+      return '<span class="' + classe + '"' + (cliquable ? ' data-tech-badge="' + cle + '"' : '') + ' title="' + titre + '">' + t.nom + '</span>';
     }
 
     /**
@@ -637,7 +644,12 @@
      * des maisons déchues sont affichées en badges (badge-sans-point pour
      * celles qui ne rapportent pas d'Influence) plutôt qu'en simple liste
      * de noms, pour garder visible l'information la plus utile de cet
-     * écran.
+     * écran. Retour utilisateur : le nom cliquable révèle son texte en
+     * dessous (même gabarit .programme-detail-texte que Programmes/
+     * Technologies obtenues) — permet de consulter le texte AVANT de
+     * jouer une action qui gagnerait cette Technologie (Focus Innovation
+     * "Inventer", popup 'gagner_technologie'), pas seulement une fois
+     * obtenue.
      */
     function renderEcranMiseEnPlace_(partie) {
       var joueur = partie.joueur || {};
@@ -646,12 +658,27 @@
         (joueur.complexite ? '<p>Difficulté : ' + joueur.complexite + '</p>' : '');
 
       var adversaires = partie.adversaires || [];
-      document.getElementById('liste-adversaires').innerHTML = adversaires.map(function (m) {
-        var technologies = (m.technologies || []).map(badgeTechnologie_).join('');
+      var container = document.getElementById('liste-adversaires');
+      container.innerHTML = adversaires.map(function (m, indexMaison) {
+        var technologies = (m.technologies || []).map(function (t, indexTech) {
+          return badgeTechnologie_(t, indexMaison + '-' + indexTech);
+        }).join('');
+        var details = (m.technologies || []).map(function (t, indexTech) {
+          return t.texte
+            ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + indexMaison + '-' + indexTech + '" hidden><p>' + t.texte + '</p></div>'
+            : '';
+        }).join('');
         return '<div class="card"><h3>' + m.nom + '</h3>' +
-          (technologies ? '<div>' + technologies + '</div>' : '') +
+          (technologies ? '<div>' + technologies + '</div>' + details : '') +
           '</div>';
       }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
+
+      Array.prototype.forEach.call(container.querySelectorAll('.badge-cliquable'), function (badge) {
+        badge.addEventListener('click', function () {
+          var cible = container.querySelector('[data-tech-detail-cible="' + badge.dataset.techBadge + '"]');
+          if (cible) cible.hidden = !cible.hidden;
+        });
+      });
     }
 
     /**

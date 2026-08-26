@@ -1186,6 +1186,10 @@ input:disabled {
   margin: 2px 4px 0 0;
   cursor: default;
 }
+/* Badge Technologie (Mise en place) dont le texte peut être révélé au
+   clic — voir badgeTechnologie_/renderEcranMiseEnPlace_, index.html. */
+.badge-cliquable { cursor: pointer; }
+.badge-cliquable:active { opacity: 0.7; }
 .badge-type-standard { background: var(--color-surface-2); }
 .badge-type-heroique { background: rgba(255, 107, 82, 0.14); border: 1px solid var(--color-coral); color: var(--color-coral); }
 .badge-type-maison { background: rgba(76, 29, 149, 0.25); border: 1px solid var(--color-nebula-1); }

@@ -1,9 +1,32 @@
 /**
  * version.js
- * Version 104 — 2026-08-26
+ * Version 105 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — traducteur générique
+ * 26/08/2026, dernière fois (chantier Technologies — texte au clic sur
+ * l'onglet Mise en place, retour utilisateur : "afin de pouvoir les
+ * consulter avant de faire une action") :
+ * - `badgeTechnologie_`/`renderEcranMiseEnPlace_` (index.html) : les
+ *   badges de Technologie des maisons déchues (écran Mise en place,
+ *   figé à la création de partie) étaient jusqu'ici seulement au survol
+ *   (`title`, inutilisable au doigt sur mobile). Nom cliquable révèle
+ *   désormais son texte en dessous — même gabarit `.programme-detail-texte`
+ *   que Programmes/Technologies obtenues (Plat. maison) — chaque badge
+ *   indépendant (plusieurs peuvent être ouverts en même temps, y compris
+ *   sur des maisons différentes). `title` conservé en plus (bonus survol
+ *   desktop, sans coût). Permet de consulter le texte d'une Technologie
+ *   AVANT de jouer l'action qui pourrait la gagner (Focus Innovation
+ *   "Inventer"), pas seulement une fois obtenue.
+ * - `.badge-cliquable` (css/style.css) : `cursor:pointer` + retour visuel
+ *   au clic — pas de soulignement (`.programme-nom-toggle`, réutilisé
+ *   ailleurs) qui jurerait sur un badge en pilule.
+ * 145 tests au vert. Vérifié en navigateur réel (gabarit iPhone) : 8
+ * badges cliquables (4 maisons déchues × 2 technologies), texte révélé/
+ * masqué au clic, plusieurs badges ouverts simultanément sans se gêner,
+ * aucune erreur JS.
+ * Fichiers touchés : index.html, css/style.css, version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — traducteur générique
  * "immediat" -> texte, retour utilisateur : "il n'y a pas de texte pour
  * l'effet immédiat, afficher le gain directement à partir de l'effet
  * (immediat dans le json je crois)") :
@@ -3543,4 +3566,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.2';
+var APP_VERSION = '20260826.3';
