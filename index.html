@@ -659,24 +659,45 @@
 
       var adversaires = partie.adversaires || [];
       var container = document.getElementById('liste-adversaires');
-      container.innerHTML = adversaires.map(function (m, indexMaison) {
-        var technologies = (m.technologies || []).map(function (t, indexTech) {
-          return badgeTechnologie_(t, indexMaison + '-' + indexTech);
-        }).join('');
-        var details = (m.technologies || []).map(function (t, indexTech) {
-          return t.texte
-            ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + indexMaison + '-' + indexTech + '" hidden><p>' + t.texte + '</p></div>'
-            : '';
-        }).join('');
-        return '<div class="card"><h3>' + m.nom + '</h3>' +
-          (technologies ? '<div>' + technologies + '</div>' + details : '') +
-          '</div>';
-      }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
 
-      Array.prototype.forEach.call(container.querySelectorAll('.badge-cliquable'), function (badge) {
-        badge.addEventListener('click', function () {
-          var cible = container.querySelector('[data-tech-detail-cible="' + badge.dataset.techBadge + '"]');
-          if (cible) cible.hidden = !cible.hidden;
+      // Champ brut "immediat" absent de partie.adversaires[].technologies[]
+      // (formatMaison_, gameService.js, ne garde que nom/type/texte/
+      // texteAmeliore) — fetch séparé pour le rappel "Effet immédiat",
+      // même principe que la popup 'gagner_technologie' (strategieService.js).
+      var immediatParNomPromise = (typeof DB !== 'undefined')
+        ? DB.getAll('technologies').then(function (catalogue) {
+            var parNom = {};
+            catalogue.forEach(function (t) { parNom[t.nom] = t.immediat; });
+            return parNom;
+          }).catch(function () { return {}; })
+        : Promise.resolve({});
+
+      immediatParNomPromise.then(function (immediatParNom) {
+        container.innerHTML = adversaires.map(function (m, indexMaison) {
+          var technologies = (m.technologies || []).map(function (t, indexTech) {
+            return badgeTechnologie_(t, indexMaison + '-' + indexTech);
+          }).join('');
+          var details = (m.technologies || []).map(function (t, indexTech) {
+            var texteEffetImmediat = (typeof StrategieService !== 'undefined')
+              ? StrategieService.texteEffetImmediatTechnologie(immediatParNom[t.nom])
+              : '';
+            var lignes = [];
+            if (t.texte) lignes.push(t.texte);
+            if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
+            if (!lignes.length) return '';
+            return '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + indexMaison + '-' + indexTech + '" hidden>' +
+              lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('') + '</div>';
+          }).join('');
+          return '<div class="card"><h3>' + m.nom + '</h3>' +
+            (technologies ? '<div>' + technologies + '</div>' + details : '') +
+            '</div>';
+        }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
+
+        Array.prototype.forEach.call(container.querySelectorAll('.badge-cliquable'), function (badge) {
+          badge.addEventListener('click', function () {
+            var cible = container.querySelector('[data-tech-detail-cible="' + badge.dataset.techBadge + '"]');
+            if (cible) cible.hidden = !cible.hidden;
+          });
         });
       });
     }

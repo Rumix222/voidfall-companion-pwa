@@ -1,9 +1,30 @@
 /**
  * version.js
- * Version 105 — 2026-08-26
+ * Version 106 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — texte au clic sur
+ * 26/08/2026, dernière fois (chantier Technologies — "Effet immédiat"
+ * aussi sur l'onglet Mise en place, retour utilisateur : "ajouter aussi
+ * un texte pour l'effet immédiat") :
+ * - `StrategieService.texteEffetImmediatTechnologie` (strategieService.js)
+ *   : nouvel alias public de `texteEffetImmediatDepuisJson_` (traducteur
+ *   générique champ `immediat` -> texte FR, déjà utilisé par la popup
+ *   'gagner_technologie') — même principe que CHAMP_RESSOURCE/TYPES_
+ *   VAISSEAU déjà exposés, une seule source de vérité, index.html n'en
+ *   tient pas de copie locale.
+ * - `renderEcranMiseEnPlace_` (index.html) : devient asynchrone
+ *   (DB.getAll('technologies'), le champ brut `immediat` n'étant pas
+ *   présent sur partie.adversaires[].technologies[] — formatMaison_ ne
+ *   garde que nom/type/texte/texteAmeliore) pour ajouter une 2e ligne
+ *   "Effet immédiat : ..." sous le texte permanent déjà révélé au clic
+ *   sur chaque badge (version précédente) — appelé "fire-and-forget"
+ *   depuis App.ouvrirPartie, aucun appelant n'attend son retour.
+ * 145 tests au vert. Vérifié en navigateur réel (gabarit iPhone) : les 8
+ * badges affichent bien texte permanent + effet immédiat (gains simples,
+ * `choice` avec clés nues comme Vaisseaux-Arches), aucune erreur JS.
+ * Fichiers touchés : index.html, js/strategieService.js, version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — texte au clic sur
  * l'onglet Mise en place, retour utilisateur : "afin de pouvoir les
  * consulter avant de faire une action") :
  * - `badgeTechnologie_`/`renderEcranMiseEnPlace_` (index.html) : les
@@ -3566,4 +3587,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.3';
+var APP_VERSION = '20260826.4';

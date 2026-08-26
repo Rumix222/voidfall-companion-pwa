@@ -6423,6 +6423,11 @@ var StrategieService = (function () {
     TYPES_INSTALLATION_CONSTRUIRE_: TYPES_INSTALLATION_CONSTRUIRE_,
     TYPES_GUILDE_CONSTRUIRE_: TYPES_GUILDE_CONSTRUIRE_,
     TYPES_VAISSEAU: TYPES_VAISSEAU,
-    GUILDE_VERS_RESSOURCE: GUILDE_VERS_RESSOURCE
+    GUILDE_VERS_RESSOURCE: GUILDE_VERS_RESSOURCE,
+    // Traducteur générique champ "immediat" (catalogue Technologies) ->
+    // texte FR — exposé pour index.html/renderEcranMiseEnPlace_ (rappel
+    // "Effet immédiat" au clic sur un badge Technologie, écran Mise en
+    // place), même fonction que la popup 'gagner_technologie' ci-dessus.
+    texteEffetImmediatTechnologie: texteEffetImmediatDepuisJson_
   };
 })();
