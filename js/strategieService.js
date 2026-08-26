@@ -67,6 +67,104 @@ var StrategieService = (function () {
     cubeDeploye: { label: 'Cube déployé', couleur: '#6b6285' }
   };
 
+  // Traduction du champ brut "immediat" du catalogue Technologies
+  // (data/catalogue/technologies.json) vers un libellé FR — voir
+  // texteEffetImmediatDepuisJson_ ci-dessous. RESSOURCES_TOUTES couvre
+  // déjà energie/credit/science/materiel/nourriture/commerce/prime ;
+  // ces 2 tables complètent avec les quelques clés propres aux
+  // Technologies (structures à construire, unités à déployer).
+  var LIBELLES_TECHNOLOGIE_AUTRES_ = {
+    population_pure: 'Population Pure', gloire: 'jeton Gloire', corruption: 'Corruption'
+  };
+  var LIBELLES_STRUCTURE_TECHNOLOGIE_ = {
+    chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
+    guilde_banquier: 'Guilde de Banquiers', guilde: 'Guilde',
+    defense_secteur: 'Défense de Secteur'
+  };
+  var LIBELLES_UNITE_TECHNOLOGIE_ = {
+    corvette: 'Corvette', destroyer: 'Destroyer', cuirasse: 'Cuirassé',
+    sentinelle: 'Sentinelle', portevaisseau: 'Porte-Vaisseau'
+  };
+  function libelleCleTechnologie_(cle) {
+    var cleRessource = cle === 'commerce_token' ? 'commerce' : (cle === 'prime_token' ? 'prime' : cle);
+    return (RESSOURCES_TOUTES[cleRessource] && RESSOURCES_TOUTES[cleRessource].label)
+      || LIBELLES_TECHNOLOGIE_AUTRES_[cle]
+      || LIBELLES_STRUCTURE_TECHNOLOGIE_[cle]
+      || cle;
+  }
+
+  /**
+   * Traduit le champ brut "immediat" (ou un fragment de son "choice") du
+   * catalogue Technologies en phrases FR lisibles — PUREMENT informatif
+   * (popup 'gagner_technologie', rappel "Effet immédiat" à la sélection
+   * dans la ddl), indépendant de ce qui est RÉELLEMENT résolu par
+   * GameService.gagnerTechnologieEtResoudreEffet (EFFET_TECHNOLOGIE_
+   * IMMEDIAT_/TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_, gameService.js —
+   * n'y touche pas). Retour utilisateur : "il n'y a pas de texte pour
+   * l'effet immédiat... afficher le gain directement à partir de
+   * l'effet" — couvre les 28 technologies du catalogue, pas seulement
+   * celles déjà portées côté résolution (remplace l'ancienne table
+   * TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE_ écrite à la main, limitée à 3).
+   * Clé non reconnue : ignorée silencieusement plutôt que d'afficher du
+   * JSON brut — un rappel incomplet reste préférable à un rappel
+   * illisible (voir aussi le repli générique de focusEngine.js,
+   * resoudreCle_, même principe).
+   */
+  function texteEffetImmediatDepuisJson_(json) {
+    if (!json || typeof json !== 'object') return '';
+    var fragments = [];
+    Object.keys(json).forEach(function (cle) {
+      var valeur = json[cle];
+      if (cle === 'gain' && valeur && typeof valeur === 'object') {
+        Object.keys(valeur).forEach(function (r) { fragments.push('Gagnez ' + valeur[r] + ' ' + libelleCleTechnologie_(r) + '.'); });
+      } else if (cle === 'cost' && valeur && typeof valeur === 'object') {
+        Object.keys(valeur).forEach(function (r) { fragments.push('Coût : ' + valeur[r] + ' ' + libelleCleTechnologie_(r) + '.'); });
+      } else if (cle === 'activate_cube' && typeof valeur === 'number') {
+        fragments.push('Activez ' + valeur + ' cube' + (valeur > 1 ? 's' : '') + '.');
+      } else if (cle === 'activate' && valeur && typeof valeur === 'object') {
+        Object.keys(valeur).forEach(function (r) {
+          var label = r === 'puissance_navale' ? ('cube' + (valeur[r] > 1 ? 's' : '') + ' de Puissance Navale') : libelleCleTechnologie_(r);
+          fragments.push('Activez ' + valeur[r] + ' ' + label + '.');
+        });
+      } else if (cle === 'deploy' && valeur && typeof valeur === 'object') {
+        var destination = valeur.destination === 'secteur_mere' ? 'votre Secteur-Mère' : (valeur.destination || '');
+        fragments.push('Déployez ' + valeur.quantity + ' ' + (LIBELLES_UNITE_TECHNOLOGIE_[valeur.unit] || valeur.unit) + ' sur ' + destination + '.');
+      } else if (cle === 'deploy_cube' && typeof valeur === 'number') {
+        fragments.push('Déployez ' + valeur + ' cube' + (valeur > 1 ? 's' : '') + '.');
+      } else if (cle === 'build' && valeur && typeof valeur === 'object') {
+        fragments.push('Construisez ' + valeur.quantity + ' ' + (LIBELLES_STRUCTURE_TECHNOLOGIE_[valeur.structure] || valeur.structure) + '.');
+      } else if (cle.indexOf('build_') === 0 && typeof valeur === 'number') {
+        var structure = cle.slice('build_'.length);
+        fragments.push('Construisez ' + valeur + ' ' + (LIBELLES_STRUCTURE_TECHNOLOGIE_[structure] || structure) + '.');
+      } else if (cle === 'move' && valeur && typeof valeur === 'object') {
+        Object.keys(valeur).forEach(function (r) { fragments.push('Déplacez ' + valeur[r] + ' ' + libelleCleTechnologie_(r) + '.'); });
+      } else if (cle === 'upgrade' && valeur && typeof valeur === 'object') {
+        Object.keys(valeur).forEach(function (r) { fragments.push('Améliorez ' + valeur[r] + ' ' + libelleCleTechnologie_(r) + '.'); });
+      } else if (cle === 'remove_corruption' && typeof valeur === 'number') {
+        fragments.push('Retirez ' + valeur + ' Corruption.');
+      } else if (cle === 'choice' && valeur && typeof valeur === 'object' && !Array.isArray(valeur)) {
+        var alternatives = Object.keys(valeur).map(function (k) {
+          var sousJson = {};
+          sousJson[k] = valeur[k];
+          return texteEffetImmediatDepuisJson_(sousJson);
+        }).filter(Boolean);
+        if (alternatives.length) fragments.push('Au choix : ' + alternatives.join(' OU '));
+      } else if (typeof valeur === 'number') {
+        // Repli : clé "nue" non reconnue ci-dessus (ex. "credit"/
+        // "materiel"/"population_pure"/"guilde" rencontrées TELLES
+        // QUELLES à l'intérieur d'un "choice", sans le wrapper "gain" —
+        // bug constaté : Clonage/Missiles longue portée n'affichaient
+        // qu'UNE seule des 2 alternatives du choix, l'autre — une clé
+        // nue — ne matchait aucune branche ci-dessus et disparaissait
+        // silencieusement) — traitée comme un gain implicite, même
+        // convention que focusEngine.js (CLES_SIMPLES, une clé bare
+        // vaut +N sur la ressource/jeton du même nom).
+        fragments.push('Gagnez ' + valeur + ' ' + libelleCleTechnologie_(cle) + '.');
+      }
+    });
+    return fragments.join(' ');
+  }
+
   // Colonne Stock -> champ plateauMaison correspondant, pour la persistance
   // directe d'une saisie manuelle (noms alignés sur gameService.js :
   // CHAMPS_PLATEAU_MAISON_AUTORISES).
@@ -2357,38 +2455,55 @@ var StrategieService = (function () {
       return promise;
     }
 
-    var infosCout = estPremierEcran ? feuilleInfosCoutInitial_() : null;
-    var sectionCout = feuilleSectionCoutHTML_(infosCout, 'techCombine');
-    // Retour utilisateur : liste déroulante groupée par maison déchue
-    // (<select>/<optgroup>), même gabarit que feuilleFlowGagnerProgramme_
-    // (groupé par type) — remplace la liste de rangées-choix d'origine.
-    // Un rappel du texte de la Technologie sous le select (comme pour un
-    // Programme) réagit AUSSI au niveau choisi (De base/Améliorée), via
-    // titreTechnologie_-like logique locale (texteAmeliore si "Améliorée"
-    // sélectionnée ET fourni par le catalogue, sinon texte de base) —
-    // complété du rappel de l'effet immédiat (GameService.TEXTE_EFFET_
-    // IMMEDIAT_TECHNOLOGIE, uniquement les Technologies déjà portées) et
-    // du nombre d'Influence que la Technologie rapportera (GameService.
-    // INFLUENCE_TECHNOLOGIE_BASE/DELTA_AMELIOREE, 0 si `sansPoint`).
-    var parNomTech = {};
-    disponibles.forEach(function (t) { parNomTech[t.nom] = t; });
-    var maisonsOrdre = [];
-    disponibles.forEach(function (t) { if (maisonsOrdre.indexOf(t.maison) === -1) maisonsOrdre.push(t.maison); });
-    var groupesTech = maisonsOrdre.map(function (maison) {
-      var options = disponibles.filter(function (t) { return t.maison === maison; })
-        .map(function (t) { return '<option value="' + t.nom + '">' + t.nom + '</option>'; }).join('');
-      return '<optgroup label="' + (maison || '—') + '">' + options + '</optgroup>';
-    }).join('');
-
+    // Retour utilisateur : "il n'y a pas de texte pour l'effet immédiat...
+    // afficher le gain directement à partir de l'effet" — le champ brut
+    // `immediat` (data/catalogue/technologies.json) n'est PAS présent sur
+    // partie.adversaires[].technologies[] (formatMaison_, gameService.js,
+    // ne garde que nom/type/texte/texteAmeliore) : un aller simple
+    // DB.getAll('technologies') est nécessaire ici, comme
+    // feuilleFlowGagnerProgramme_/DB.getAll('programmes') — écran
+    // "Chargement…" le temps du fetch.
     feuillePousserEtape_({
       titre: titre, nbEtapes: 1, etapeIndex: 0,
-      html: sectionCout + (sectionCout ? '<hr class="feuille-separateur">' : '') +
+      html: '<p class="hint">Chargement…</p>'
+    }, feuillePile_.length ? 'avant' : null);
+
+    DB.getAll('technologies').then(function (catalogueTechnologies) {
+      var immediatParNom = {};
+      catalogueTechnologies.forEach(function (t) { immediatParNom[t.nom] = t.immediat; });
+
+      var infosCout = estPremierEcran ? feuilleInfosCoutInitial_() : null;
+      var sectionCout = feuilleSectionCoutHTML_(infosCout, 'techCombine');
+      // Liste déroulante groupée par maison déchue (<select>/<optgroup>),
+      // même gabarit que feuilleFlowGagnerProgramme_ (groupé par type).
+      // Rappel du texte de la Technologie sous le select (comme pour un
+      // Programme) réagit AUSSI au niveau choisi (De base/Améliorée) —
+      // texteAmeliore si "Améliorée" sélectionnée ET fourni par le
+      // catalogue, sinon texte de base — complété du gain tel qu'écrit
+      // dans le catalogue (texteEffetImmediatDepuisJson_, TOUTES les
+      // Technologies, pas seulement celles déjà portées côté résolution
+      // — voir GameService.EFFET_TECHNOLOGIE_IMMEDIAT_/TECHNOLOGIES_
+      // DEPLOIEMENT_SECTEUR_MERE_) et du nombre d'Influence que la
+      // Technologie rapportera (GameService.INFLUENCE_TECHNOLOGIE_BASE/
+      // DELTA_AMELIOREE, 0 si `sansPoint`).
+      var parNomTech = {};
+      disponibles.forEach(function (t) { parNomTech[t.nom] = t; });
+      var maisonsOrdre = [];
+      disponibles.forEach(function (t) { if (maisonsOrdre.indexOf(t.maison) === -1) maisonsOrdre.push(t.maison); });
+      var groupesTech = maisonsOrdre.map(function (maison) {
+        var options = disponibles.filter(function (t) { return t.maison === maison; })
+          .map(function (t) { return '<option value="' + t.nom + '">' + t.nom + '</option>'; }).join('');
+        return '<optgroup label="' + (maison || '—') + '">' + options + '</optgroup>';
+      }).join('');
+
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      etapeCourante.html = sectionCout + (sectionCout ? '<hr class="feuille-separateur">' : '') +
         '<div class="feuille-section">' + (sectionCout ? '<p class="feuille-section-titre">Effet</p>' : '') +
         '<select id="feuille-techno-select" class="modal-choix-select">' + groupesTech + '</select>' +
         '<p class="hint" id="feuille-techno-detail" style="margin-top:8px;"></p>' +
         '<div id="feuille-techno-niveau-zone"></div>' +
-        '</div>',
-      brancher: function (el) {
+        '</div>';
+      etapeCourante.brancher = function (el) {
         var selectTech = el.querySelector('#feuille-techno-select');
         var detailTech = el.querySelector('#feuille-techno-detail');
         var zoneNiveau = el.querySelector('#feuille-techno-niveau-zone');
@@ -2406,7 +2521,7 @@ var StrategieService = (function () {
           var lignes = [];
           var texteBase = (ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '');
           if (texteBase) lignes.push(texteBase);
-          var texteEffetImmediat = GameService.TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE[t.nom];
+          var texteEffetImmediat = texteEffetImmediatDepuisJson_(immediatParNom[t.nom]);
           if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
           if (t.sansPoint) {
             lignes.push('Aucun gain d’Influence (Technologie sans gain).');
@@ -2430,8 +2545,8 @@ var StrategieService = (function () {
         }
         selectTech.addEventListener('change', rendreZoneNiveau_);
         rendreZoneNiveau_();
-      },
-      onValider: function () {
+      };
+      etapeCourante.onValider = function () {
         var nomChoisi = feuilleEls_.corpsInner.querySelector('#feuille-techno-select').value;
         var iNiveau = niveauxCourantsPartages.length > 1
           ? Number(feuilleEls_.corpsInner.querySelector('.rangee-choix[data-groupe="techNiveau"].selectionnee').dataset.i)
@@ -2448,8 +2563,12 @@ var StrategieService = (function () {
             feuilleEls_.btnValider.disabled = false;
             window.alert('Échec de l\'obtention de la Technologie : ' + erreur.message);
           });
-      }
-    }, feuillePile_.length ? 'avant' : null);
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des Technologies : ' + erreur.message);
+    });
+
     return promise;
   }
 
@@ -4886,79 +5005,92 @@ var StrategieService = (function () {
             ? 'Les 5 emplacements "Technologies obtenues" sont déjà remplis.'
             : 'Aucune Technologie disponible parmi les maisons déchues (déjà toutes obtenues).') + '</p>';
         } else {
-          var parNomTechModale = {};
-          disponiblesModale.forEach(function (t) { parNomTechModale[t.nom] = t; });
-          var maisonsOrdreModale = [];
-          disponiblesModale.forEach(function (t) { if (maisonsOrdreModale.indexOf(t.maison) === -1) maisonsOrdreModale.push(t.maison); });
-          var groupesTechModale = maisonsOrdreModale.map(function (maison) {
-            var options = disponiblesModale.filter(function (t) { return t.maison === maison; })
-              .map(function (t) { return '<option value="' + t.nom + '">' + t.nom + '</option>'; }).join('');
-            return '<optgroup label="' + (maison || '—') + '">' + options + '</optgroup>';
-          }).join('');
+          // Champ brut "immediat" absent de partie.adversaires (formatMaison_
+          // ne garde que nom/type/texte/texteAmeliore) — fetch séparé, comme
+          // côté Feuille (feuilleFlowGagnerTechnologie_ ci-dessus).
+          contenu.innerHTML = '<p class="hint">Chargement…</p>';
 
-          contenu.innerHTML = '<select id="techno-gain-select" class="modal-choix-select">' + groupesTechModale + '</select>' +
-            '<p class="hint" id="techno-gain-detail" style="margin-top:8px;"></p>' +
-            '<div id="techno-gain-niveau-zone"></div>';
+          DB.getAll('technologies').then(function (catalogueTechnologies) {
+            var immediatParNomModale = {};
+            catalogueTechnologies.forEach(function (t) { immediatParNomModale[t.nom] = t.immediat; });
 
-          var selectTechModale = document.getElementById('techno-gain-select');
-          var detailTechModale = document.getElementById('techno-gain-detail');
-          var zoneNiveauModale = document.getElementById('techno-gain-niveau-zone');
+            var parNomTechModale = {};
+            disponiblesModale.forEach(function (t) { parNomTechModale[t.nom] = t; });
+            var maisonsOrdreModale = [];
+            disponiblesModale.forEach(function (t) { if (maisonsOrdreModale.indexOf(t.maison) === -1) maisonsOrdreModale.push(t.maison); });
+            var groupesTechModale = maisonsOrdreModale.map(function (maison) {
+              var options = disponiblesModale.filter(function (t) { return t.maison === maison; })
+                .map(function (t) { return '<option value="' + t.nom + '">' + t.nom + '</option>'; }).join('');
+              return '<optgroup label="' + (maison || '—') + '">' + options + '</optgroup>';
+            }).join('');
 
-          function niveauCourantAmelioreeModale_() {
-            var selectNiveau = document.getElementById('techno-gain-niveau');
-            return !!selectNiveau && selectNiveau.value === 'amelioree';
-          }
-          function majDetailTechModale_() {
-            var t = parNomTechModale[selectTechModale.value];
-            if (!t) { detailTechModale.innerHTML = ''; return; }
-            var ameliore = niveauCourantAmelioreeModale_();
-            var lignes = [];
-            var texteBase = (ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '');
-            if (texteBase) lignes.push(texteBase);
-            var texteEffetImmediat = GameService.TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE[t.nom];
-            if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
-            if (t.sansPoint) {
-              lignes.push('Aucun gain d’Influence (Technologie sans gain).');
-            } else {
-              var gainInfluence = GameService.INFLUENCE_TECHNOLOGIE_BASE + (ameliore ? GameService.INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE : 0);
-              lignes.push('+' + gainInfluence + ' Influence.');
+            contenu.innerHTML = '<select id="techno-gain-select" class="modal-choix-select">' + groupesTechModale + '</select>' +
+              '<p class="hint" id="techno-gain-detail" style="margin-top:8px;"></p>' +
+              '<div id="techno-gain-niveau-zone"></div>';
+
+            var selectTechModale = document.getElementById('techno-gain-select');
+            var detailTechModale = document.getElementById('techno-gain-detail');
+            var zoneNiveauModale = document.getElementById('techno-gain-niveau-zone');
+
+            function niveauCourantAmelioreeModale_() {
+              var selectNiveau = document.getElementById('techno-gain-niveau');
+              return !!selectNiveau && selectNiveau.value === 'amelioree';
             }
-            detailTechModale.innerHTML = lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('');
-          }
-          function rendreZoneNiveauModale_() {
-            niveauxCourantsModale = niveauxPourTechModale_(selectTechModale.value);
-            if (niveauxCourantsModale.length <= 1) {
-              zoneNiveauModale.innerHTML = '';
-            } else {
-              zoneNiveauModale.innerHTML = '<select id="techno-gain-niveau" class="modal-choix-select" style="margin-top:8px;">' +
-                niveauxCourantsModale.map(function (n) { return '<option value="' + n + '">' + (n === 'amelioree' ? 'Améliorée' : 'De base') + '</option>'; }).join('') +
-                '</select>';
-              document.getElementById('techno-gain-niveau').addEventListener('change', majDetailTechModale_);
+            function majDetailTechModale_() {
+              var t = parNomTechModale[selectTechModale.value];
+              if (!t) { detailTechModale.innerHTML = ''; return; }
+              var ameliore = niveauCourantAmelioreeModale_();
+              var lignes = [];
+              var texteBase = (ameliore && t.texteAmeliore) ? t.texteAmeliore : (t.texte || '');
+              if (texteBase) lignes.push(texteBase);
+              var texteEffetImmediat = texteEffetImmediatDepuisJson_(immediatParNomModale[t.nom]);
+              if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
+              if (t.sansPoint) {
+                lignes.push('Aucun gain d’Influence (Technologie sans gain).');
+              } else {
+                var gainInfluence = GameService.INFLUENCE_TECHNOLOGIE_BASE + (ameliore ? GameService.INFLUENCE_TECHNOLOGIE_DELTA_AMELIOREE : 0);
+                lignes.push('+' + gainInfluence + ' Influence.');
+              }
+              detailTechModale.innerHTML = lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('');
             }
-            majDetailTechModale_();
-          }
-          selectTechModale.addEventListener('change', rendreZoneNiveauModale_);
-          rendreZoneNiveauModale_();
+            function rendreZoneNiveauModale_() {
+              niveauxCourantsModale = niveauxPourTechModale_(selectTechModale.value);
+              if (niveauxCourantsModale.length <= 1) {
+                zoneNiveauModale.innerHTML = '';
+              } else {
+                zoneNiveauModale.innerHTML = '<select id="techno-gain-niveau" class="modal-choix-select" style="margin-top:8px;">' +
+                  niveauxCourantsModale.map(function (n) { return '<option value="' + n + '">' + (n === 'amelioree' ? 'Améliorée' : 'De base') + '</option>'; }).join('') +
+                  '</select>';
+                document.getElementById('techno-gain-niveau').addEventListener('change', majDetailTechModale_);
+              }
+              majDetailTechModale_();
+            }
+            selectTechModale.addEventListener('change', rendreZoneNiveauModale_);
+            rendreZoneNiveauModale_();
 
-          btnValider.hidden = false;
-          btnValider.textContent = 'Valider';
-          btnValider.onclick = function () {
-            var nomChoisi = selectTechModale.value;
-            var niveauChoisiModale = niveauxCourantsModale.length > 1 ? document.getElementById('techno-gain-niveau').value : niveauxCourantsModale[0];
-            btnValider.disabled = true;
+            btnValider.hidden = false;
+            btnValider.textContent = 'Valider';
+            btnValider.onclick = function () {
+              var nomChoisi = selectTechModale.value;
+              var niveauChoisiModale = niveauxCourantsModale.length > 1 ? document.getElementById('techno-gain-niveau').value : niveauxCourantsModale[0];
+              btnValider.disabled = true;
 
-            GameService.gagnerTechnologieEtResoudreEffet(partieTechModale.id, slotVideModale, nomChoisi, niveauChoisiModale === 'amelioree', demanderChoix)
-              .then(function (resultat) {
-                fermerModale_();
-                btnValider.disabled = false;
-                var detailBase = 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisiModale === 'amelioree' ? 'Améliorée' : 'De base') + ').';
-                resolve({ detail: resultat.detailImmediat ? (detailBase + ' ' + resultat.detailImmediat) : detailBase });
-              })
-              .catch(function (erreur) {
-                btnValider.disabled = false;
-                window.alert('Échec de l\'obtention de la Technologie : ' + erreur.message);
-              });
-          };
+              GameService.gagnerTechnologieEtResoudreEffet(partieTechModale.id, slotVideModale, nomChoisi, niveauChoisiModale === 'amelioree', demanderChoix)
+                .then(function (resultat) {
+                  fermerModale_();
+                  btnValider.disabled = false;
+                  var detailBase = 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisiModale === 'amelioree' ? 'Améliorée' : 'De base') + ').';
+                  resolve({ detail: resultat.detailImmediat ? (detailBase + ' ' + resultat.detailImmediat) : detailBase });
+                })
+                .catch(function (erreur) {
+                  btnValider.disabled = false;
+                  window.alert('Échec de l\'obtention de la Technologie : ' + erreur.message);
+                });
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du chargement des Technologies : ' + erreur.message);
+          });
         }
 
       } else if (contexte.type === 'utiliser_programme') {

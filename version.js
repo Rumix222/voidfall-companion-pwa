@@ -1,9 +1,48 @@
 /**
  * version.js
- * Version 103 — 2026-08-26
+ * Version 104 — 2026-08-26
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — popup 'gagner_
+ * 26/08/2026, dernière fois (chantier Technologies — traducteur générique
+ * "immediat" -> texte, retour utilisateur : "il n'y a pas de texte pour
+ * l'effet immédiat, afficher le gain directement à partir de l'effet
+ * (immediat dans le json je crois)") :
+ * - Remplace l'ancienne table `TEXTE_EFFET_IMMEDIAT_TECHNOLOGIE_`
+ *   (gameService.js, texte FR écrit à la main, limitée aux 3 technologies
+ *   déjà portées côté résolution) par `texteEffetImmediatDepuisJson_`
+ *   (NOUVELLE, strategieService.js) : traduit GÉNÉRIQUEMENT le champ brut
+ *   `immediat` du catalogue (gain/cost/activate_cube/activate/deploy/
+ *   deploy_cube/build/build_<structure>/move/upgrade/remove_corruption/
+ *   choice — vocabulaire complet vérifié sur les 28 technologies du
+ *   catalogue) en phrases FR lisibles, PUREMENT informatif — indépendant
+ *   de ce qui est RÉELLEMENT résolu par GameService.
+ *   gagnerTechnologieEtResoudreEffet (EFFET_TECHNOLOGIE_IMMEDIAT_/
+ *   TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_, gameService.js — INCHANGÉES,
+ *   seul le RAPPEL affiché change). Couvre donc les 28 technologies, pas
+ *   seulement les 3 déjà portées.
+ * - Le champ brut `immediat` n'est pas présent sur partie.adversaires[].
+ *   technologies[] (formatMaison_ ne garde que nom/type/texte/
+ *   texteAmeliore) : la popup 'gagner_technologie' (Feuille ET
+ *   #modal-choix) fait désormais un DB.getAll('technologies') au moment
+ *   de l'ouverture (écran "Chargement…" le temps du fetch — même gabarit
+ *   que feuilleFlowGagnerProgramme_/DB.getAll('programmes')), pour
+ *   accéder à ce champ.
+ * - Bug trouvé et corrigé PENDANT la vérification (pas dans la version
+ *   livrée) : une clé "nue" dans un `choice` (ex. Clonage
+ *   {"choice":{"credit":1,"activate_cube":1}} — "credit" sans le wrapper
+ *   "gain") ne matchait aucune branche du traducteur et disparaissait
+ *   silencieusement — seule UNE des 2 alternatives du choix s'affichait.
+ *   Repli générique ajouté (clé nue + valeur numérique -> gain implicite,
+ *   même convention que focusEngine.js/CLES_SIMPLES) — vérifié sur
+ *   Clonage ET Missiles longue portée (2 alternatives affichées).
+ * 145 tests au vert. Vérifié en navigateur réel (Feuille ET #modal-choix)
+ * sur 7 technologies variées (gain simple, deploy secteur-mère fixe,
+ * build, et 2 avec `choice`) — texte complet et correct dans les 2
+ * chemins, aucune erreur JS.
+ * Fichiers touchés : js/gameService.js, js/strategieService.js,
+ * version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — popup 'gagner_
  * technologie' : "Améliorée" verrouillée à l'offre du cycle + rappel
  * complet à la sélection, retour utilisateur : "propose la version
  * améliorée uniquement si la technologie est dans l'offre sur le plat.
@@ -3504,4 +3543,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.1';
+var APP_VERSION = '20260826.2';
