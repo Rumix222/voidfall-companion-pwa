@@ -128,14 +128,32 @@ var GameService = (function () {
    *   joueur) — hors du vocabulaire FocusEngine (une action secteur),
    *   résolu par un appel direct à SecteurService.deployerCube sur le
    *   numéro du Secteur-Mère (SecteurService.obtenirSecteurMere).
-   * 11 Technologies portées à ce jour ; toute AUTRE Technologie obtenue
-   * n'a, pour l'instant, aucun effet immédiat résolu automatiquement (le
-   * reste de son `immediat`, tout son `permanent`/`ameliore`, restent de
-   * toute façon hors périmètre — bonus de combat/production non
-   * modélisés, voir docs-architecture-pwa.md §10). Étendre ces 2 tables
-   * au fil de l'eau est la façon prévue de continuer ce chantier
-   * technologie par technologie, sans toucher à
-   * gagnerTechnologieEtResoudreEffet elle-même.
+   * - EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_ : `immediat.cost` combiné à un
+   *   Effet (`activate`/`remove_corruption` exprimables en JSON FocusEngine,
+   *   ou `{}` quand le "vrai" Effet est un déploiement Secteur-Mère résolu
+   *   à part) — résolu via FocusEngine.resoudreEffetEtCout (Effet-puis-
+   *   Coût, comme resoudreAction pour une action Focus, mais SANS le
+   *   suivi actionsFocusUtilisees).
+   * - TECHNOLOGIES_CHOIX_DEPLOIEMENT_SECTEUR_MERE_ : `immediat.choice`
+   *   dont une alternative est un déploiement FIXE Secteur-Mère (donc
+   *   hors vocabulaire FocusEngine, comme TECHNOLOGIES_DEPLOIEMENT_
+   *   SECTEUR_MERE_ ci-dessus, mais DANS un choice) — le choix est posé
+   *   directement par gagnerTechnologieEtResoudreEffet (popup
+   *   'option_exclusive' à la main) puis dispatché entre SecteurService.
+   *   deployerCube et FocusEngine.resoudreEffet selon la réponse.
+   *
+   * TOUTES les 28 Technologies du catalogue ont désormais un effet
+   * immédiat résolu automatiquement (chantier complet, 27/08/2026) —
+   * seuls restent hors périmètre le champ `permanent` (bonus passifs de
+   * combat/production, jamais modélisés) et `ameliore` (version
+   * améliorée du bonus permanent), affichés comme texte informatif
+   * uniquement (voir docs-architecture-pwa.md §10). Ces 4 tables
+   * couvrent tout le vocabulaire `immediat` rencontré dans le
+   * catalogue : gains simples, gagner_commerce/activer_cube, deploy
+   * fixe Secteur-Mère (seul ou combiné à un cost), build sur secteur au
+   * choix (seul ou combiné à un cost/activate), choice exclusif entre 2
+   * alternatives (dont l'une peut être un deploy fixe ou un build), et
+   * upgrade.gloire/move.corruption (mécaniques déterministes uniques).
    *
    * `EFFET_TECHNOLOGIE_IMMEDIAT_` accepte aussi une clé "choice" — MÊME
    * FORMAT tableau que focus.json (PAS le format objet {cle:valeur,...}
@@ -156,13 +174,129 @@ var GameService = (function () {
     'Ciblage': { energie: 2 },
     'Hyperpropulsion': { prime: 3 },
     'Clonage': { choice: [{ credit: 1 }, { activer_cube: 1 }] },
-    'Nexus de commerce': { choice: [{ nourriture: 2 }, { gagner_commerce: 1 }] }
+    'Nexus de commerce': { choice: [{ nourriture: 2 }, { gagner_commerce: 1 }] },
+    // `immediat.upgrade.gloire`/`immediat.move.corruption` — mécaniques
+    // "uniques" (aucun choix, aucun secteur) déjà entièrement outillées
+    // côté FocusEngine (clés 'ameliorer_gloire'/'deplacer_corruption',
+    // popups dédiées qui ciblent automatiquement le jeton Gloire le plus
+    // bas / ouvrent le menu Source-Destination de Corruption) — aucune
+    // nouvelle mécanique à construire, une simple entrée de table.
+    'Surveillance centrale': { ameliorer_gloire: 1 },
+    'Chambres de décontamination': { deplacer_corruption: 1 },
+    // `immediat.build` (secteur au CHOIX du joueur) — la popup 'construire'
+    // (FocusEngine, CLES_CONSTRUIRE) gère déjà nativement le choix de
+    // secteur ET de type forcé (voir etablir_guilde_banquier ci-dessus,
+    // même principe) : 'construire_chantier_naval'/'construire_
+    // base_stellaire' (2 nouvelles entrées CATEGORIE_PAR_CLE_CONSTRUIRE_/
+    // TYPE_FORCE_PAR_CLE_CONSTRUIRE_, focusEngine.js) forcent le type de
+    // structure exigé par la carte, sans jamais laisser le joueur en
+    // choisir un autre.
+    'Quais orbitaux': { construire_chantier_naval: 1, activer_cube: 1 },
+    'Bases Stellaires': { construire_base_stellaire: 1 },
+    'Matrice neuronale': { etablir_guilde_banquier: 1 },
+    // Cybernétique : `immediat.build.structure === "guilde"` (type de
+    // Guilde au LIBRE choix du joueur, contrairement à Matrice neuronale
+    // ci-dessus) — clé `etablir_guilde` déjà existante (catégorie 'guilde',
+    // AUCUN typeForce), même popup 'construire'.
+    'Cybernétique': { etablir_guilde: 1 },
+    // 4 Technologies suivantes : `immediat.choice` dont au moins une
+    // alternative retombe elle-même sur une popup à choix de secteur
+    // (augmenter_population_pure/deployer_cube/etablir_guilde/construire_
+    // chantier_naval) — déjà un enchaînement ÉPROUVÉ par focusEngine.js
+    // (choice -> option choisie -> resoudreJsonInterne_ récursif, EXACT
+    // même mécanisme que 'choice': ['augmenter_population',
+    // 'augmenter_population_pure'] déjà couvert par focusEngine.test.js),
+    // aucune nouvelle mécanique de choix à construire ici, juste des
+    // clés déjà connues combinées dans un tableau. `population_pure` du
+    // catalogue Technologies -> `augmenter_population_pure` (FocusEngine) ;
+    // `deploy_cube` du catalogue Technologies -> `deployer_cube`
+    // (FocusEngine, forme "mode libre" déjà exercée par focus.json/
+    // pistesCivilisation.json, plutôt que l'alias `deploy_cube`, jamais
+    // rencontré ailleurs dans le vrai catalogue) ; `build_chantier_naval`
+    // -> `construire_chantier_naval` (voir Quais orbitaux ci-dessus).
+    'Terraformation': { choice: [{ materiel: 2 }, { augmenter_population_pure: 1 }] },
+    'Transports tactiques': { choice: [{ deployer_cube: 1 }, { augmenter_population_pure: 1 }] },
+    'Vaisseaux-Arches': { choice: [{ guilde: 1 }, { augmenter_population_pure: 1 }] },
+    'Scanner de récupération': { choice: [{ deployer_cube: 1 }, { activer_cube: 1 }] },
+    'Missiles longue portée': { choice: [{ energie: 2 }, { construire_chantier_naval: 1 }] },
+    // Drones autonomes : `immediat` = `{gain:{commerce_token:1},
+    // choice:{deploy_cube:1}}` — un `choice` à UNE SEULE clé (le catalogue
+    // ne propose ici qu'UNE alternative, pas un "A ou B") : traduit tel
+    // quel en tableau à 1 élément, la popup 'option_exclusive' affiche
+    // simplement cette unique alternative + Annuler (aucun mécanisme
+    // nouveau — un `choice` à 1 option est un cas valide, pas un cas
+    // particulier, de la résolution `choice` déjà en place).
+    'Drones autonomes': { gagner_commerce: 1, choice: [{ deployer_cube: 1 }] }
   };
   var TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ = {
     'Boucliers': 'corvette',
     'Destroyers': 'destroyer',
     'Torpilles': 'corvette',
-    'Ciblage': 'corvette'
+    'Ciblage': 'corvette',
+    // Cuirassés : `immediat.deploy` fixe Secteur-Mère comme les 4
+    // ci-dessus, mais avec en PLUS un `cost` — voir EFFET_TECHNOLOGIE_
+    // IMMEDIAT_AVEC_COUT_ ci-dessous, résolu APRÈS ce déploiement
+    // (toujours inconditionnel, comme les autres entrées de cette table).
+    'Cuirassés': 'cuirasse'
+  };
+  /**
+   * 3e table de traduction du chantier (voir EFFET_TECHNOLOGIE_IMMEDIAT_/
+   * TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_ ci-dessus) : `immediat.cost`
+   * combiné à un Effet (Cellules énergétiques/Purificateur : `activate`/
+   * `remove_corruption`, tous deux EXPRIMABLES en JSON FocusEngine ; ou
+   * Cuirassés/Porte-Vaisseaux : `effet: {}`, leur "vrai" Effet — un
+   * déploiement fixe Secteur-Mère, direct ou au choix — étant résolu à
+   * PART, voir TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_/TECHNOLOGIES_
+   * CHOIX_DEPLOIEMENT_SECTEUR_MERE_, cette entrée ne sert alors qu'à
+   * débiter le `cost`). Résolu via FocusEngine.resoudreEffetEtCout
+   * (Effet-puis-Coût, MÊME moteur que resoudreAction pour une action
+   * Focus, sans le suivi `actionsFocusUtilisees` — nouvelle fonction,
+   * gameService.gagnerTechnologieEtResoudreEffet n'avait jusqu'ici jamais
+   * eu besoin de débiter un coût, seulement d'accorder des gains
+   * signe=+1 via resoudreEffet).
+   */
+  var EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_ = {
+    'Cellules énergétiques': { effet: { activer_cube: 2 }, cout: { energie: 2 } },
+    'Purificateur': { effet: { retirer_corruption: 1 }, cout: { science: 1 } },
+    'Cuirassés': { effet: {}, cout: { materiel: 1 } },
+    'Porte-Vaisseaux': { effet: {}, cout: { nourriture: 1 } }
+  };
+  /**
+   * 4e table : `immediat.choice` dont une alternative est un déploiement
+   * FIXE Secteur-Mère (hors vocabulaire FocusEngine, comme TECHNOLOGIES_
+   * DEPLOIEMENT_SECTEUR_MERE_ ci-dessus, mais ICI dans un `choice` — donc
+   * PAS de résolution inconditionnelle possible) et l'autre une clé
+   * FocusEngine ordinaire. Comme cette alternative "déploiement fixe" n'a
+   * aucune traduction possible en clé FocusEngine (le moteur reste pur,
+   * aucun accès direct à SecteurService), le choix lui-même est posé ICI,
+   * directement par gagnerTechnologieEtResoudreEffet (demanderChoix au
+   * format 'option_exclusive', options = 2 libellés FR bruts — la popup
+   * affiche tel quel toute chaîne absente de LIBELLES_OPTIONS, aucune
+   * modif strategieService.js nécessaire), puis DISPATCHE manuellement
+   * vers SecteurService.deployerCube (option 0) ou FocusEngine.resoudreEffet
+   * (option 1, `effetAutre`) — jamais via le `choice` générique de
+   * FocusEngine (qui ne saurait pas résoudre l'option 0). `Porte-Vaisseaux`
+   * a EN PLUS un `cost` (EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_ ci-dessus,
+   * hors du choice dans le catalogue -> débité après, quelle que soit
+   * l'option choisie) ; `Sentinelles` n'en a aucun.
+   */
+  var TECHNOLOGIES_CHOIX_DEPLOIEMENT_SECTEUR_MERE_ = {
+    'Porte-Vaisseaux': {
+      typeUnite: 'portevaisseau',
+      labelDeploiement: 'Déployer 1 Porte-Vaisseau sur le Secteur-Mère.',
+      labelAutre: 'Activer 1 cube de Puissance Navale.',
+      effetAutre: { activer_cube: 1 }
+    },
+    'Sentinelles': {
+      typeUnite: 'sentinelle',
+      labelDeploiement: 'Déployer 1 Sentinelle sur le Secteur-Mère.',
+      labelAutre: 'Construire une Défense de Secteur.',
+      // `construire_defense_secteur` : 3e clé à type forcé de
+      // CATEGORIE_PAR_CLE_CONSTRUIRE_/TYPE_FORCE_PAR_CLE_CONSTRUIRE_
+      // (focusEngine.js), même principe que construire_chantier_naval/
+      // construire_base_stellaire.
+      effetAutre: { construire_defense_secteur: 1 }
+    }
   };
   // Le rappel "Effet immédiat" affiché à la popup 'gagner_technologie'
   // (strategieService.js) est désormais dérivé DIRECTEMENT du champ brut
@@ -2275,33 +2409,40 @@ var GameService = (function () {
         }
         var effet = EFFET_TECHNOLOGIE_IMMEDIAT_[nomTechnologie];
         var typeDeploiement = TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_[nomTechnologie];
+        var avecCout = EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_[nomTechnologie];
+        var choixDeploiement = TECHNOLOGIES_CHOIX_DEPLOIEMENT_SECTEUR_MERE_[nomTechnologie];
         var source = 'Technologie — ' + nomTechnologie;
         var suite = Promise.resolve();
+
+        // Factorise l'application d'un résultat {succes, journal, mutations,
+        // etatResultat} (FocusEngine.resoudreEffet OU resoudreEffetEtCout,
+        // MÊME forme) : écrit les champs mutés en base et journalise, en
+        // retirant le préfixe "source : " (ou "source (suffixe) : ", ex.
+        // "Technologie — Nacelles (Bonus Commerce) : ..." —
+        // resoudreJsonInterne_ ajoute ce suffixe pour les clés résolues
+        // récursivement, gagner_commerce/choice) déjà présent en tête de
+        // chaque ligne — utilisée par les 3 blocs ci-dessous (`effet`
+        // principal, `effetAutre` du choix Secteur-Mère, `avecCout`).
+        function appliquerResultatEffet_(resultatEffet) {
+          if (!resultatEffet.succes) return Promise.resolve();
+          return DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+            resultatEffet.mutations.forEach(function (m) { ligneFraiche[m.champ] = resultatEffet.etatResultat[m.champ]; });
+            return DB.put('plateauMaison', ligneFraiche);
+          }).then(function () {
+            resultatEffet.journal.forEach(function (ligne) {
+              var indexSepare = ligne.indexOf(' : ');
+              var prefixe = indexSepare !== -1 ? ligne.slice(0, indexSepare) : '';
+              detailsImmediat.push(prefixe.indexOf(source) === 0 ? ligne.slice(indexSepare + 3) : ligne);
+            });
+          });
+        }
 
         if (effet) {
           suite = suite.then(function () {
             if (typeof FocusEngine === 'undefined') return;
             return DB.get('plateauMaison', partieId).then(function (ligne) {
               var etatAvecId = Object.assign({ partieId: partieId }, ligne);
-              return FocusEngine.resoudreEffet(etatAvecId, effet, source, '', demanderChoix).then(function (resultatEffet) {
-                if (!resultatEffet.succes) return;
-                return DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
-                  resultatEffet.mutations.forEach(function (m) { ligneFraiche[m.champ] = resultatEffet.etatResultat[m.champ]; });
-                  return DB.put('plateauMaison', ligneFraiche);
-                }).then(function () {
-                  // Retire le préfixe "source : " (ou "source (suffixe) : ",
-                  // ex. "Technologie — Nacelles (Bonus Commerce) : ..." —
-                  // resoudreJsonInterne_ ajoute ce suffixe pour les clés
-                  // résolues récursivement, gagner_commerce/choice —
-                  // resultatEffet.journal.map(...) — utiliserProgramme fait
-                  // le même strip mais sans ce cas de suffixe).
-                  resultatEffet.journal.forEach(function (ligne) {
-                    var indexSepare = ligne.indexOf(' : ');
-                    var prefixe = indexSepare !== -1 ? ligne.slice(0, indexSepare) : '';
-                    detailsImmediat.push(prefixe.indexOf(source) === 0 ? ligne.slice(indexSepare + 3) : ligne);
-                  });
-                });
-              });
+              return FocusEngine.resoudreEffet(etatAvecId, effet, source, '', demanderChoix).then(appliquerResultatEffet_);
             });
           });
         }
@@ -2317,6 +2458,56 @@ var GameService = (function () {
                 var labelType = typeDeploiement.charAt(0).toUpperCase() + typeDeploiement.slice(1);
                 detailsImmediat.push('1 ' + labelType + ' déployé(e) sur le Secteur-Mère.');
               });
+            });
+          });
+        }
+
+        // `choice` dont une alternative est un déploiement FIXE Secteur-
+        // Mère (voir TECHNOLOGIES_CHOIX_DEPLOIEMENT_SECTEUR_MERE_
+        // ci-dessus) : hors vocabulaire FocusEngine, le choix est posé ICI
+        // directement (popup 'option_exclusive', options = libellés FR
+        // bruts) puis dispatché à la main — jamais via le `choice`
+        // générique de FocusEngine, qui ne saurait pas résoudre l'option
+        // "déploiement fixe".
+        if (choixDeploiement) {
+          suite = suite.then(function () {
+            return Promise.resolve(demanderChoix({
+              type: 'option_exclusive',
+              options: [choixDeploiement.labelDeploiement, choixDeploiement.labelAutre],
+              source: source
+            })).then(function (reponse) {
+              if (!reponse || reponse.annule) return;
+              if (reponse.indexChoisi === 0) {
+                if (typeof SecteurService === 'undefined') return;
+                return DB.get('parties', partieId).then(function (partieBrute) {
+                  return SecteurService.obtenirSecteurMere(partieBrute ? partieBrute.scenarioId : null);
+                }).then(function (numero) {
+                  if (numero == null) return;
+                  return SecteurService.deployerCube(partieId, numero, choixDeploiement.typeUnite, 1).then(function () {
+                    detailsImmediat.push(choixDeploiement.labelDeploiement);
+                  });
+                });
+              }
+              if (typeof FocusEngine === 'undefined') return;
+              return DB.get('plateauMaison', partieId).then(function (ligne) {
+                var etatAvecId = Object.assign({ partieId: partieId }, ligne);
+                return FocusEngine.resoudreEffet(etatAvecId, choixDeploiement.effetAutre, source, '', demanderChoix).then(appliquerResultatEffet_);
+              });
+            });
+          });
+        }
+
+        // `cost` combiné à un Effet (voir EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_
+        // COUT_ ci-dessus) — résolu EN DERNIER (le Coût n'est débité
+        // qu'après tout le reste de l'Effet de la carte, cohérent avec la
+        // RÈGLE MÉTIER Effet-puis-Coût de FocusEngine.resoudreEffetEtCout
+        // elle-même).
+        if (avecCout) {
+          suite = suite.then(function () {
+            if (typeof FocusEngine === 'undefined') return;
+            return DB.get('plateauMaison', partieId).then(function (ligne) {
+              var etatAvecId = Object.assign({ partieId: partieId }, ligne);
+              return FocusEngine.resoudreEffetEtCout(etatAvecId, avecCout.effet, avecCout.cout, source, demanderChoix).then(appliquerResultatEffet_);
             });
           });
         }

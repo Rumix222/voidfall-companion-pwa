@@ -525,6 +525,7 @@
 <script src="js/annulationService.js"></script>
 <script src="js/civilisationService.js"></script>
 <script src="js/combatService.js"></script>
+<script src="js/programmeScoreService.js"></script>
 <script src="js/scoreService.js"></script>
 <script src="js/setupService.js"></script>
 <script src="js/strategieService.js"></script>
@@ -998,9 +999,16 @@
         ? partie.plateauMaison.programmesUtilises
         : [null, null, null, null];
 
-      Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart')]).then(function (resultats) {
+      Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart'), StrategieService.calculerPointsProgrammesActifs(partie)]).then(function (resultats) {
         var catalogue = resultats[0];
         var catalogueDepart = resultats[1];
+        // Chantier "Points de victoire des Programmes" : { [emplacement 1/2/3]:
+        // {objectif1, objectif2, total, code, nom} } — jamais l'emplacement 0
+        // (Programme de départ, forme de donnée différente, voir
+        // js/programmeScoreService.js). Affiché en "+N" à côté de chaque
+        // objectif ci-dessous (pointsProgrammes[index] peut être absent si
+        // l'emplacement est vide ou le code introuvable au catalogue).
+        var pointsProgrammes = resultats[2] || {};
         var parNom = {};
         catalogue.forEach(function (p) { parNom[p.nom] = p; });
         var parCode = {};
@@ -1034,7 +1042,12 @@
           // (strategieService.js) puisse désigner un emplacement par son
           // numéro ("Programme 2"), retrouvable ici par le joueur.
           var libelle = index + '. ' + (slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —');
-          var detail = carte ? [carte.objectif1, carte.objectif2].filter(Boolean).map(function (o) { return '<p>' + o + '</p>'; }).join('') : '';
+          var points = pointsProgrammes[index];
+          var detail = carte ? [carte.objectif1, carte.objectif2].map(function (texte, i) {
+            if (!texte) return '';
+            var badge = points ? ' <span class="badge">+' + (i === 0 ? points.objectif1 : points.objectif2) + '</span>' : '';
+            return '<p>' + texte + badge + '</p>';
+          }).join('') : '';
           return '<div class="programme-plateau-item">' +
             '<div class="techno-obtenue-ligne">' +
             '<span class="champ-technologie-fixe' + (detail ? ' programme-nom-toggle' : '') + '" data-slot-detail="' + index + '">' + libelle + '</span>' +

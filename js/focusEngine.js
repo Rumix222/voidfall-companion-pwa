@@ -144,14 +144,28 @@ var FocusEngine = (function () {
     // Même popup 'construire' (catégorie 'guilde') que etablir_guilde,
     // avec le type forcé sur "Banquiers" (voir TYPE_FORCE_PAR_CLE_
     // CONSTRUIRE_ ci-dessous).
-    etablir_guilde_banquier: 'guilde'
+    etablir_guilde_banquier: 'guilde',
+    // Même popup 'construire' (catégorie 'installation') que
+    // construire_installation, type forcé — utilisées par gameService.js/
+    // EFFET_TECHNOLOGIE_IMMEDIAT_ (Quais orbitaux/Bases Stellaires,
+    // `immediat.build.structure` toujours fixe, jamais un choix de type)
+    // sur le même principe que etablir_guilde_banquier ci-dessus.
+    construire_chantier_naval: 'installation',
+    construire_base_stellaire: 'installation',
+    // Idem — Sentinelles (gameService.js/TECHNOLOGIES_CHOIX_DEPLOIEMENT_
+    // SECTEUR_MERE_) : autre alternative de son `choice` que le déploiement
+    // fixe sur le Secteur-Mère.
+    construire_defense_secteur: 'installation'
   };
   // Clé de CLES_CONSTRUIRE -> type forcé (présélectionné et non modifiable
   // côté popup 'construire', strategieService.js) — absent pour les clés
   // dont le type reste au libre choix du joueur (etablir_guilde/
   // construire_installation).
   var TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = {
-    etablir_guilde_banquier: 'banquiers'
+    etablir_guilde_banquier: 'banquiers',
+    construire_chantier_naval: 'chantier_naval',
+    construire_base_stellaire: 'base_stellaire',
+    construire_defense_secteur: 'defense_secteur'
   };
   var CLES_CONSTRUIRE = Object.keys(CATEGORIE_PAR_CLE_CONSTRUIRE_);
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
@@ -200,6 +214,39 @@ var FocusEngine = (function () {
     { label: 'Gagnez 2 ressources (Nourriture, Énergie et/ou Matériel).', effet: { choice_repeat: { times: 2, options: ['nourriture', 'energie', 'materiel'] } } },
     { label: 'Gagnez un jeton Prime.', effet: { gagner_prime: 1 } },
     { label: 'Gagnez 1 Science.', effet: { science: 1 } }
+  ];
+
+  /**
+   * Jetons Prime — 11 faces distinctes du jeu physique (retour utilisateur,
+   * capture des jetons réels : "le nombre en bleu est le nombre de jeton de
+   * chaque type dans la boîte, ne pas prendre en compte" — seul le TEXTE de
+   * chaque face compte, pas sa quantité physique). Comme BONUS_COMMERCE
+   * ci-dessus, données de règles statiques portées en dur.
+   *
+   * Puisqu'on ne peut pas tirer un jeton au hasard dans une appli, le
+   * joueur choisit LUI-MÊME quelle face il a tirée (popup 'option_exclusive'
+   * listant les 11 libellés exacts du jeu physique, voir
+   * resoudreGainJetonsPrime_ ci-dessous) puis, pour les faces qui ont
+   * elles-mêmes un choix interne ("ou"/"et/ou"), un 2e sous-choix. `effet`
+   * de chaque face est un `choice` FocusEngine ordinaire (options à 1 ou
+   * plusieurs clés simples, résolues via resoudreOption_/
+   * resoudreJsonInterne_, EXACTEMENT comme un `choice` de focus.json) —
+   * `inclusif: true` (SEULE la face "Science et/ou Influence") force le
+   * mode "et/ou" (options_inclusives) via texteAction='et/ou', les 10
+   * autres restant exclusives ("ou" — un seul des 2 côtés).
+   */
+  var TOKENS_PRIME_ = [
+    { label: 'Gagnez 2 Nourriture ou 1 Influence.', effet: { choice: [{ nourriture: 2 }, { influence: 1 }] } },
+    { label: 'Gagnez 2 Matériel ou 1 Influence.', effet: { choice: [{ materiel: 2 }, { influence: 1 }] } },
+    { label: 'Gagnez 2 Énergie ou 1 Influence.', effet: { choice: [{ energie: 2 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Nourriture et 1 Énergie ou gagnez 1 Influence.', effet: { choice: [{ nourriture: 1, energie: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Nourriture et 1 Science ou gagnez 1 Influence.', effet: { choice: [{ nourriture: 1, science: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Nourriture et 1 Matériel ou gagnez 1 Influence.', effet: { choice: [{ nourriture: 1, materiel: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Énergie et 1 Science ou gagnez 1 Influence.', effet: { choice: [{ energie: 1, science: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Énergie et 1 Matériel ou gagnez 1 Influence.', effet: { choice: [{ energie: 1, materiel: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 Matériel et 1 Science ou gagnez 1 Influence.', effet: { choice: [{ materiel: 1, science: 1 }, { influence: 1 }] } },
+    { label: 'Gagnez 1 ressource.', effet: { choice: [{ nourriture: 1 }, { energie: 1 }, { materiel: 1 }, { science: 1 }] } },
+    { label: 'Gagnez 1 Science et/ou 1 Influence.', effet: { choice: [{ science: 1 }, { influence: 1 }] }, inclusif: true }
   ];
 
   // Clé "programme_<type>" bare (focus.json, ex. {"choice":["programme_force",
@@ -282,6 +329,49 @@ var FocusEngine = (function () {
     });
   }
 
+  /**
+   * Résout le gain de `n` jeton(s) Prime (retour utilisateur : "chaque
+   * jeton prime donne le choix d'une... récompense... en réalité dans le
+   * jeu je pioche au hasard un jeton avec le gain écrit dessus") : pour
+   * CHAQUE jeton, incrémente `etat.jetonPrime` (le compteur physique,
+   * inchangé) PUIS fait choisir au joueur LAQUELLE des 11 faces réelles il
+   * a tirée (popup 'option_exclusive', libellés exacts de TOKENS_PRIME_ —
+   * voir sa description), et résout l'`effet` (un `choice` FocusEngine
+   * ordinaire, éventuellement lui-même 'et/ou' pour la face Science/
+   * Influence) de la face choisie via resoudreJsonInterne_ récursivement.
+   * Utilisée par la clé "prime"/"gagner_prime" (signe > 0) ci-dessous ET
+   * par la clé "envahir"/"envahir_corrompu" plus bas (jetonPrime gagné en
+   * cas de victoire) — un seul point d'entrée pour ne jamais dupliquer
+   * cette logique. "Annuler" sur N'IMPORTE LEQUEL des jetons bloque TOUT
+   * (même règle que choice_repeat) : le compteur jetonPrime déjà incrémenté
+   * pour ce jeton EST DÉFAIT (la Promise renvoie false, donc
+   * resoudreJsonInterne_ écarte tout l'état muté par resoudreJson_ — voir
+   * son en-tête, "ne retourne ses mutations à l'appelant QUE si la
+   * résolution complète a réussi").
+   */
+  function resoudreGainJetonsPrime_(n, source, etat, journal, demanderChoix) {
+    var labels = TOKENS_PRIME_.map(function (t) { return t.label; });
+    var promise = Promise.resolve(true);
+    var _boucle = function (numero) {
+      promise = promise.then(function (succesPrecedent) {
+        if (succesPrecedent === false) return false;
+        return Promise.resolve(demanderChoix({
+          type: 'option_exclusive',
+          options: labels,
+          source: source + (n > 1 ? ' (jeton Prime ' + numero + '/' + n + ')' : ' (jeton Prime)')
+        })).then(function (reponse) {
+          if (reponseAnnulee_(reponse)) return false;
+          etat.jetonPrime = (etat.jetonPrime || 0) + 1;
+          var token = TOKENS_PRIME_[reponse.indexChoisi];
+          var sourceToken = source + ' (' + token.label + ')';
+          return resoudreJsonInterne_(token.effet, 1, sourceToken, token.inclusif ? 'et/ou' : '', etat, journal, demanderChoix);
+        });
+      });
+    };
+    for (var i = 1; i <= n; i++) { _boucle(i); }
+    return promise;
+  }
+
   // ------------------------------------------------------------
   // Résolution d'une clé Coût/Effet — cœur du moteur.
   // Retourne une Promise<boolean> : true (ou undefined traité comme true)
@@ -337,8 +427,26 @@ var FocusEngine = (function () {
       });
     }
 
+    // --- Gagner un/des jeton(s) Prime : "prime" (bare, CLES_SIMPLES) et
+    // "gagner_prime" (alias rencontré tel quel dans pistesCivilisation.json
+    // "Gagnez un/deux jeton(s) Prime." et dans BONUS_COMMERCE ci-dessus,
+    // cle gagner_commerce -> popup Bonus Commerce -> resoudreJsonInterne_
+    // récursif sur { gagner_prime: 1 }) partagent désormais le MÊME cas
+    // dédié — Effet UNIQUEMENT (signe > 0 : un COÛT en jetons Prime,
+    // jamais rencontré dans le catalogue, resterait un simple décompte via
+    // CLES_SIMPLES ci-dessous). Chantier "gain de jeton Prime" (retour
+    // utilisateur, todo.md) : voir resoudreGainJetonsPrime_ ci-dessus pour
+    // le détail (incrémente le compteur ET fait choisir une récompense par
+    // jeton, parmi les 11 faces réelles du jeu). ---
+    if ((cle === 'prime' || cle === 'gagner_prime') && typeof valeur === 'number' && signe > 0) {
+      return resoudreGainJetonsPrime_(valeur, source, etat, journal, demanderChoix);
+    }
+
     // --- Ressources/jetons simples (nourriture, energie, materiel,
-    // credit, science, influence, prime, liberation) ---
+    // credit, science, influence, prime, liberation) — "prime" en signe > 0
+    // est déjà intercepté ci-dessus ; ce repli ne le concerne donc plus que
+    // pour un éventuel COÛT (signe < 0, jamais rencontré au catalogue à ce
+    // jour). ---
     if (CLES_SIMPLES.indexOf(cle) !== -1 && typeof valeur === 'number') {
       var champ = CHAMP_PAR_CLE[cle];
       etat[champ] = Math.max(0, etat[champ] + signe * valeur);
@@ -346,15 +454,9 @@ var FocusEngine = (function () {
       return Promise.resolve(true);
     }
 
-    // --- gagner_prime : alias de la clé simple "prime" (jetonPrime) —
-    // rencontré tel quel dans pistesCivilisation.json ("Gagnez un/deux
-    // jeton(s) Prime.") et dans BONUS_COMMERCE ci-dessous ("Gagnez un
-    // jeton Prime.", cle gagner_commerce -> popup Bonus Commerce ->
-    // resoudreJsonInterne_ récursif sur { gagner_prime: 1 }) — cas dédié
-    // nécessaire car "gagner_prime" diffère de "prime" (bare), déjà couvert
-    // par CLES_SIMPLES ci-dessus. Contrairement à gagner_technologie/
-    // gagner_programme, pas de choix utilisateur requis ici : automatisable
-    // à l'identique de "prime". ---
+    // --- gagner_prime en COÛT (signe < 0, jamais rencontré au catalogue à
+    // ce jour, conservé par prudence) : simple décompte, aucune récompense
+    // (dépenser un jeton Prime n'en fait pas gagner un). ---
     if (cle === 'gagner_prime' && typeof valeur === 'number') {
       etat.jetonPrime = Math.max(0, etat.jetonPrime + signe * valeur);
       journal.push(source + ' : ' + (signe > 0 ? '+' : '−') + valeur + ' prime.');
@@ -924,12 +1026,11 @@ var FocusEngine = (function () {
     // là-bas et simplement relayée ici en scalaire. HORS PÉRIMÈTRE
     // (journalisé en avertissement le cas échéant, à traiter
     // manuellement) : défausse d'un jeton Gloire pour un secteur source
-    // abandonné (repris par le Néant). PAS hors périmètre en revanche :
-    // les jetons Prime/Libération gagnés restent de simples compteurs
-    // (jetonPrime/jetonLiberation), cohérent avec le reste du moteur où
-    // ce sont déjà des clés simples (CLES_SIMPLES) — leur résolution
-    // immédiate (dépense) n'est pas automatisée, comme n'importe quelle
-    // autre carte à jouer plus tard.
+    // abandonné (repris par le Néant). jetonLiberation gagné reste un
+    // simple compteur (CLES_SIMPLES), sa résolution immédiate (dépense)
+    // n'est pas automatisée. jetonPrime gagné, LUI, délègue désormais à
+    // resoudreGainJetonsPrime_ (chantier "gain de jeton Prime", todo.md) —
+    // plus un simple compteur, voir plus bas.
     //
     // EVOLUTION 16 (todo.md, docs-rules-flottes.md §1.5 : "subir des
     // Dégâts au Combat" = rappeler 1 cube vers la zone active) :
@@ -949,16 +1050,26 @@ var FocusEngine = (function () {
         partieId: etat.partieId
       })).then(function (reponse) {
         if (reponseAnnulee_(reponse)) return false;
-        if (reponse.victoire) {
-          etat.jetonPrime = (etat.jetonPrime || 0) + (reponse.jetonPrime || 0);
-          etat.jetonLiberation = (etat.jetonLiberation || 0) + (reponse.jetonLiberation || 0);
-          etat.influence = (etat.influence || 0) + (reponse.influenceGagnee || 0);
-        }
-        var cubesPerdus = reponse.victoire ? (reponse.cubesPerdus || 0) : (reponse.totalEngage || 0);
-        etat.cubeActif = Math.min(NB_CUBES_TOTAL, etat.cubeActif + cubesPerdus);
-        journal.push(source + ' : ' + reponse.detail);
-        if (reponse.avertissement) journal.push(source + ' : ⚠️ ' + reponse.avertissement);
-        return true;
+        // jetonPrime gagné en victoire : chantier "gain de jeton Prime"
+        // (todo.md) — délègue à resoudreGainJetonsPrime_ (ci-dessus),
+        // MÊME mécanisme que la clé "prime"/"gagner_prime", pour ne jamais
+        // dupliquer le choix de récompense par jeton.
+        var nbPrimeGagnes = reponse.victoire ? (reponse.jetonPrime || 0) : 0;
+        var suitePrime = nbPrimeGagnes > 0
+          ? resoudreGainJetonsPrime_(nbPrimeGagnes, source, etat, journal, demanderChoix)
+          : Promise.resolve(true);
+        return suitePrime.then(function (succesPrime) {
+          if (succesPrime === false) return false;
+          if (reponse.victoire) {
+            etat.jetonLiberation = (etat.jetonLiberation || 0) + (reponse.jetonLiberation || 0);
+            etat.influence = (etat.influence || 0) + (reponse.influenceGagnee || 0);
+          }
+          var cubesPerdus = reponse.victoire ? (reponse.cubesPerdus || 0) : (reponse.totalEngage || 0);
+          etat.cubeActif = Math.min(NB_CUBES_TOTAL, etat.cubeActif + cubesPerdus);
+          journal.push(source + ' : ' + reponse.detail);
+          if (reponse.avertissement) journal.push(source + ' : ⚠️ ' + reponse.avertissement);
+          return true;
+        });
       });
     }
 
@@ -1157,6 +1268,54 @@ var FocusEngine = (function () {
   }
 
   /**
+   * Variante de resoudreAction ci-dessus pour un Effet+Coût INDÉPENDANT
+   * d'une action Focus (ex. `immediat.cost`+`immediat.activate`/`remove_
+   * corruption` d'une Technologie — gameService.js/EFFET_TECHNOLOGIE_
+   * IMMEDIAT_AVEC_COUT_) : MÊME règle métier Effet-puis-Coût (le Coût
+   * n'est débité qu'après résolution réussie de l'Effet, un Coût annulé
+   * après un Effet déjà réussi laisse un avertissement plutôt que de tout
+   * annuler) que resoudreAction, mais SANS le suivi `actionsFocusUtilisees`
+   * (EVOLUTION 12, todo.md — propre aux actions Focus/limite par cycle,
+   * hors de propos pour l'acquisition d'une Technologie) et sans exiger de
+   * `carte`/`action` (juste les 2 JSON Effet/Coût directement, `source`
+   * déjà complet). `effetJson`/`coutJson` peuvent être `{}` (ex. Cuirassés/
+   * Porte-Vaisseaux : le "vrai" Effet — un déploiement à destination fixe
+   * Secteur-Mère — est résolu à PART, hors du vocabulaire FocusEngine,
+   * voir TECHNOLOGIES_DEPLOIEMENT_SECTEUR_MERE_/TECHNOLOGIES_CHOIX_
+   * DEPLOIEMENT_SECTEUR_MERE_ ; cette fonction ne sert alors qu'à débiter
+   * le Coût, avec la même popup 'paiement_ressource' que n'importe quel
+   * autre coût substituable).
+   * Retourne `{succes, journal, mutations, etatResultat}` — même contrat
+   * que FocusEngine.resoudreEffet (champ `etatResultat`, PAS
+   * `plateauMaisonApres`).
+   */
+  function resoudreEffetEtCout(plateauMaison, effetJson, coutJson, source, demanderChoix) {
+    return resoudreJson_(effetJson, 1, source + ' (effet)', '', plateauMaison, demanderChoix).then(function (resultatEffet) {
+      if (!resultatEffet.succes) {
+        return { succes: false, journal: [source + ' : action annulée — aucun coût prélevé, aucune donnée modifiée.'], mutations: [], etatResultat: plateauMaison };
+      }
+
+      var sourceCout = source + ' (coût)';
+      return resoudreJson_(coutJson, -1, sourceCout, '', resultatEffet.etatResultat, demanderChoix).then(function (resultatCout) {
+        var etatFinal = resultatCout.succes ? resultatCout.etatResultat : resultatEffet.etatResultat;
+        var journalFinal = resultatEffet.journal.slice();
+        if (resultatCout.succes) {
+          journalFinal = journalFinal.concat(resultatCout.journal);
+        } else {
+          journalFinal.push(sourceCout + ' : ⚠️ coût annulé après application de l’effet — vérifiez le suivi de ressources manuellement.');
+        }
+
+        return {
+          succes: true,
+          journal: journalFinal,
+          mutations: diffChamps_(plateauMaison, etatFinal),
+          etatResultat: etatFinal
+        };
+      });
+    });
+  }
+
+  /**
    * Orchestrateur : lit le plateau maison, résout l'action, écrit le
    * résultat via GameService.majPlateauMaison et empile l'annulation via
    * AnnulationService.empiler — le point d'entrée que l'écran Stratégie
@@ -1246,6 +1405,7 @@ var FocusEngine = (function () {
   return {
     resoudreAction: resoudreAction,
     resoudreEffet: resoudreEffet,
+    resoudreEffetEtCout: resoudreEffetEtCout,
     jouerActionEtPersister: jouerActionEtPersister,
     // Exposés pour les tests / debug uniquement :
     BONUS_COMMERCE: BONUS_COMMERCE,

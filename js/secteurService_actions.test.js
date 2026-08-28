@@ -430,6 +430,36 @@ test('envahirResoudre : victoire -> dépose les survivants, retire Installations
   });
 });
 
+// Chantier "effets permanents" des Technologies — Réplicateurs de combat
+// (Novaris) : `garderInstallations` (posé par strategieService.js, via
+// confirmerReplicateursDeCombat_) préserve les Installations au lieu de
+// les remettre à zéro ; le reste (Gardien/jetons Prime-Libération-Gloire)
+// est retiré comme d'habitude, le texte de la carte ne concernant QUE
+// les Installations.
+test('envahirResoudre : garderInstallations=true préserve les Installations, retire le reste comme d\'habitude', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'type_a' };
+  db._stores.scenarioSecteurs['s1|9'] = { scenarioId: 's1', numero: 9, type: 'type_a' };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 3 });
+  db._stores.secteursPartie['p1|9'] = secteurDeBase_({
+    numero: 9, pnCorvette: 0, pnNeant: 2, installationChantierNaval: 1, installationDefenseSecteur: 1,
+    installationBaseStellaire: 1, nombreGardien: 1, jetonPrime: 1
+  });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.envahirResoudre('p1', 9, [{ type: 'corvette', secteur: 1, quantite: 2 }], true, { corvette: 2 }, true).then(function (resultat) {
+    assert.strictEqual(resultat.jetonPrime, 1, 'jeton retiré renvoyé à l\'appelant, comme sans garderInstallations');
+    var cible = db._stores.secteursPartie['p1|9'];
+    assert.strictEqual(cible.pnCorvette, 2, 'survivants déposés, inchangé');
+    assert.strictEqual(cible.installationChantierNaval, 1, 'Installation préservée');
+    assert.strictEqual(cible.installationDefenseSecteur, 1, 'Installation préservée');
+    assert.strictEqual(cible.installationBaseStellaire, 1, 'Installation préservée');
+    assert.strictEqual(cible.nombreGardien, 0, 'Gardien retiré comme d\'habitude (pas une Installation)');
+    assert.strictEqual(cible.jetonPrime, 0, 'jeton Prime retiré du secteur comme d\'habitude');
+  });
+});
+
 test('envahirResoudre : Secteur-Mère jamais repris par le Néant même vidé', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };

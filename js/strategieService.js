@@ -187,6 +187,27 @@ var StrategieService = (function () {
     return table[niveau];
   }
 
+  /**
+   * Chantier "effets permanents" (technologies.json, champ `permanent`) —
+   * Matrice neuronale (Thegwyn) : `bonus.credit_before_production` = +2
+   * Crédit gagnés EN PLUS du résultat normal de la table PRODUCTION_CREDIT,
+   * à chaque résolution d'une production de Crédit (texte : "gagner 2
+   * Crédits supplémentaires AVANT de produire des Crédits"). DIFFÉRENT de
+   * Collecte de données/Quais orbitaux amélioré (calculerNiveauxProduction_
+   * ci-dessous) qui, eux, augmentent le NIVEAU (avant passage dans la
+   * table, non-linéaire) plutôt que d'ajouter un montant fixe après coup —
+   * vérifié sur le texte exact de chaque carte, pas une supposition.
+   * `partie` : objet assemblé (GameService.assemblerPartie_), pas la ligne
+   * plateauMaison brute — voir technologieJoueurParNom_.
+   */
+  function calculerProductionAvecBonusTechnologie_(cle, niveau, partie) {
+    var montant = calculerProduction_(cle, niveau);
+    if (cle === 'credit' && technologieJoueurParNom_(partie, 'Matrice neuronale')) {
+      montant += 2;
+    }
+    return montant;
+  }
+
   // Guilde -> ressource produite, clés alignées sur secteurService.js
   // (guildeFermiers etc., camelCase côté store secteursPartie).
   var GUILDE_VERS_RESSOURCE = {
@@ -340,17 +361,108 @@ var StrategieService = (function () {
    * l'un des 5 emplacements obtenus — .amelioree porté par chacun, voir
    * GameService.definirTechnologieAmelioree/
    * definirTechnologieAvanceeAmelioree) pour en déduire la capacité
-   * réelle : voir docs-rules-corruption-gardiens-refuges-technoConsume.md
-   * §1 (la carte accueille 2 marqueurs de Corruption, 3 si améliorée).
-   * `null` si le joueur ne possède pas cette Technologie.
+   * réelle. `null` si le joueur ne possède pas cette Technologie.
+   * Chantier "effets permanents" (technologies.json, champ `permanent`/
+   * `ameliore`) : point d'entrée générique pour toute Technologie dont le
+   * bonus dépend de son état Amélioré — voir technologieChambreDecontamination_
+   * ci-dessous (1er usage, conservé tel quel) et calculerNiveauxProduction_
+   * plus bas (Collecte de données/Matrice neuronale/Quais orbitaux).
    */
-  function technologieChambreDecontamination_(partie) {
+  function technologieJoueurParNom_(partie, nomRecherche) {
+    var norm = (nomRecherche || '').trim().toLowerCase();
     var candidats = [];
     if (partie.joueur && partie.joueur.technologieDepart && partie.joueur.technologieDepart.nom) {
       candidats.push(partie.joueur.technologieDepart);
     }
     (partie.technologiesObtenues || []).forEach(function (t) { if (t && t.nom) candidats.push(t); });
-    return candidats.filter(function (t) { return (t.nom || '').trim().toLowerCase() === 'chambres de décontamination'; })[0] || null;
+    return candidats.filter(function (t) { return (t.nom || '').trim().toLowerCase() === norm; })[0] || null;
+  }
+
+  /**
+   * Voir docs-rules-corruption-gardiens-refuges-technoConsume.md §1 (la
+   * carte accueille 2 marqueurs de Corruption, 3 si améliorée).
+   */
+  function technologieChambreDecontamination_(partie) {
+    return technologieJoueurParNom_(partie, 'Chambres de décontamination');
+  }
+
+  /**
+   * Chantier "effets permanents" (technologies.json, champ `permanent`) —
+   * Réplicateurs de combat (Novaris) : "Après une invasion réussie, vous
+   * pouvez gagner un jeton Prime et conserver les Installations du
+   * secteur." Un SEUL choix combiné (pas 2 choix séparés) — popup
+   * 'confirmation' générique (déjà existante, Valider/Annuler + message),
+   * posée uniquement si `victoire` ET la Technologie possédée. Utilisée
+   * par les 2 copies de la résolution 'envahir' ci-dessous (Feuille +
+   * repli #modal-choix) — un seul point d'entrée pour ne jamais dupliquer
+   * ce texte/cette règle. Retourne une Promise<boolean> (garderInstallations,
+   * à la fois passé à SecteurService.envahirResoudre ET utilisé par
+   * l'appelant pour ajouter +1 au jetonPrime reçu en retour). La version
+   * Améliorée (déployer un cube après un Combat gagné OU égalité en tant
+   * qu'Envahisseur) reste hors périmètre de cette fonction pour l'instant.
+   */
+  function confirmerReplicateursDeCombat_(partie, victoire) {
+    if (!victoire || !technologieJoueurParNom_(partie, 'Réplicateurs de combat')) {
+      return Promise.resolve(false);
+    }
+    return Promise.resolve(demanderChoix({
+      type: 'confirmation',
+      titre: 'Réplicateurs de combat',
+      message: 'Invasion réussie — vous pouvez garder les Installations de ce secteur et gagner 1 jeton Prime supplémentaire.',
+      texteValider: 'Garder les Installations + gagner 1 Prime'
+    })).then(function (reponse) { return !!(reponse && reponse.confirme); });
+  }
+
+  /**
+   * Chantier "effets permanents" — Missiles longue portée (Astoran) :
+   * "Lorsque vous envahissez un secteur, vous pouvez dépenser 1 Énergie
+   * pour infliger 1 Dégât d'Approche supplémentaire si vous avez un
+   * Chantier Naval ou une Base Stellaire adjacent." `eligible` (calculé
+   * par l'appelant — un secteur ADJACENT à la cible, possédé par le
+   * joueur, avec au moins une des 2 structures) et le stock d'Énergie
+   * sont vérifiés AVANT de proposer le choix (popup 'confirmation'
+   * uniquement si les 2 conditions sont réunies). Version Améliorée
+   * (jusqu'à 2 fois, 1 par structure adjacente) PAS encore faite — cette
+   * fonction ne couvre que le permanent de base (1 fois, 1 Énergie).
+   * Retourne une Promise<boolean> (le joueur a-t-il choisi de dépenser) —
+   * à l'appelant de débiter réellement l'Énergie si vrai (voir les 2
+   * copies de la résolution 'envahir' ci-dessous).
+   */
+  function confirmerMissilesLonguePortee_(partie, eligible) {
+    if (!eligible || !technologieJoueurParNom_(partie, 'Missiles longue portée')) {
+      return Promise.resolve(false);
+    }
+    var stockEnergie = (partie.plateauMaison && partie.plateauMaison.ressources && partie.plateauMaison.ressources.energie) || 0;
+    if (stockEnergie < 1) return Promise.resolve(false);
+    return Promise.resolve(demanderChoix({
+      type: 'confirmation',
+      titre: 'Missiles longue portée',
+      message: 'Un secteur adjacent possède un Chantier Naval ou une Base Stellaire — vous pouvez dépenser 1 Énergie pour infliger 1 Dégât d’Approche supplémentaire.',
+      texteValider: 'Dépenser 1 Énergie (+1 Dégât d’Approche)'
+    })).then(function (reponse) { return !!(reponse && reponse.confirme); });
+  }
+
+  /**
+   * Chantier "effets permanents" — Drones autonomes (Marqualos) :
+   * "Lorsque vous envahissez un secteur, vous pouvez remettre un jeton
+   * Commerce pour gagner 1 Absorption d'Approche et 1 Absorption de
+   * Salve." Aucune condition de secteur (contrairement à Missiles longue
+   * portée) — seul le stock de jetons Commerce (`jetonCommerce`, tableau)
+   * est vérifié. Version Améliorée (valeurs augmentées + réussite
+   * automatique des défenses d'Escarmouche en Évaluation) PAS encore
+   * faite. Retourne une Promise<boolean> — à l'appelant de retirer
+   * réellement 1 jeton Commerce si vrai.
+   */
+  function confirmerDronesAutonomes_(partie) {
+    if (!technologieJoueurParNom_(partie, 'Drones autonomes')) return Promise.resolve(false);
+    var nbCommerce = Array.isArray(partie.plateauMaison && partie.plateauMaison.jetonCommerce) ? partie.plateauMaison.jetonCommerce.length : 0;
+    if (nbCommerce < 1) return Promise.resolve(false);
+    return Promise.resolve(demanderChoix({
+      type: 'confirmation',
+      titre: 'Drones autonomes',
+      message: 'Vous pouvez remettre 1 jeton Commerce pour gagner 1 Absorption d’Approche et 1 Absorption de Salve pendant cette invasion.',
+      texteValider: 'Remettre 1 jeton Commerce (+absorptions)'
+    })).then(function (reponse) { return !!(reponse && reponse.confirme); });
   }
 
   // Clé Guilde du catalogue ("scientifique_pur", "banquier_pur"...),
@@ -410,6 +522,14 @@ var StrategieService = (function () {
     construire_installation: 'Construire une Installation',
     guilde: 'Établir une Guilde',
     etablir_guilde: 'Établir une Guilde',
+    // Chantier Technologies (gameService.js/EFFET_TECHNOLOGIE_IMMEDIAT_) :
+    // clés à type forcé de la popup 'construire' — n'apparaissent QUE dans
+    // un `choice` de Technologie affichant ces options AVANT résolution
+    // (ex. Missiles longue portée), le reste (Quais orbitaux/Bases
+    // Stellaires, hors choice) n'en a jamais besoin.
+    construire_chantier_naval: 'Construire un Chantier Naval',
+    construire_base_stellaire: 'Construire une Base Stellaire',
+    construire_defense_secteur: 'Construire une Défense de Secteur',
     retirer_corruption: 'Retirer une Corruption',
     // EVOLUTION 14 (todo.md) : "augmenter_population" (pistesCivilisation.json/
     // focus.json) et "augmenter_population_pure" (evenements.json) sont la
@@ -509,7 +629,7 @@ var StrategieService = (function () {
    */
   function champRessourceHTML_(cle, ressources) {
     var niveau = niveauxProduction[cle] || 0;
-    var revenu = calculerProduction_(cle, niveau);
+    var revenu = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
     var valeur = ressources[cle] || 0;
     var delta = valeur - (soldeDebutCycle[cle] || 0);
     var deltaTexte = delta > 0 ? ('+' + delta) : String(delta);
@@ -728,6 +848,8 @@ var StrategieService = (function () {
 
       var totaux = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
       var totalDeploye = 0;
+      var nbGuildesBanquiersPossedees = 0;
+      var nbChantiersNavalPossedes = 0;
       secteurs.forEach(function (s) {
         totalDeploye += (Number(s.pnCorvette) || 0) + (Number(s.pnSentinelle) || 0) +
           (Number(s.pnDestroyer) || 0) + (Number(s.pnCuirasse) || 0) + (Number(s.pnPorteVaisseau) || 0);
@@ -742,19 +864,166 @@ var StrategieService = (function () {
         Object.keys(GUILDE_VERS_RESSOURCE).forEach(function (cleGuilde) {
           totaux[GUILDE_VERS_RESSOURCE[cleGuilde]] += population * (Number(s[cleGuilde]) || 0);
         });
+        nbGuildesBanquiersPossedees += Number(s.guildeBanquiers) || 0;
+        nbChantiersNavalPossedes += Number(s.installationChantierNaval) || 0;
       });
 
       if (origine && origine.bonusProd && totaux.hasOwnProperty(origine.bonusProd)) {
         totaux[origine.bonusProd] += 1;
       }
       // EVOLUTION 8 : bonus secondaire (ex. Belitan/Collecte de données :
-      // +1 Crédit en plus du +1 Nourriture de bonusProd).
+      // +1 Crédit en plus du +1 Nourriture de bonusProd) — bonus D'ORIGINE
+      // (mise en place, flat), DISTINCT du bonus permanent de la
+      // Technologie "Collecte de données" ci-dessous (dépend du nombre de
+      // Guildes de Banquiers réellement construites) : les deux
+      // s'additionnent légitimement, ce n'est pas un doublon.
       if (origine && origine.bonusProdSecondaire && totaux.hasOwnProperty(origine.bonusProdSecondaire)) {
         totaux[origine.bonusProdSecondaire] += 1;
       }
 
+      // Chantier "effets permanents" (technologies.json, champ
+      // `permanent`) — Collecte de données (Belitan) :
+      // `production.science_per_banker_guild` = +2 au Niveau de
+      // Production de Science par Guilde de Banquiers possédée (même
+      // filtre "secteur possédé" que la boucle ci-dessus, accumulé au
+      // passage). Pas de version Améliorée pour cette Technologie
+      // (`ameliore.evaluation.maintenance_credit_ratio`, une mécanique
+      // d'Évaluation différente, hors de cette fonction).
+      if (nbGuildesBanquiersPossedees > 0 && technologieJoueurParNom_(partie, 'Collecte de données')) {
+        totaux.science += 2 * nbGuildesBanquiersPossedees;
+      }
+
+      // Quais orbitaux amélioré (Dunlork) —
+      // `ameliore.production.credit_per_shipyard` : "Chaque Chantier
+      // Naval augmente votre Niveau de Production de Crédits de 2" — même
+      // formulation "Niveau" que Collecte de données ci-dessus (contraste
+      // avec Matrice neuronale, un montant FLAT après coup — voir
+      // calculerProductionAvecBonusTechnologie_) : +2 au Niveau par
+      // Chantier Naval possédé, UNIQUEMENT si la case Améliorée est
+      // cochée (le permanent DE BASE de Quais orbitaux, `deployment.
+      // extra_shipyard`, ne concerne que le déploiement, pas la
+      // production — hors périmètre de cette fonction).
+      var techQuaisOrbitaux = technologieJoueurParNom_(partie, 'Quais orbitaux');
+      if (nbChantiersNavalPossedes > 0 && techQuaisOrbitaux && techQuaisOrbitaux.amelioree) {
+        totaux.credit += 2 * nbChantiersNavalPossedes;
+      }
+
       return { niveaux: totaux, totalDeploye: totalDeploye };
     });
+  }
+
+  /**
+   * Chantier "Points de victoire des Programmes" : assemble en UNE fois
+   * l'`etat` attendu par `ProgrammeScoreService.calculerPointsProgramme`
+   * (module pur, js/programmeScoreService.js) — aucune règle de Programme
+   * ici, seulement de la collecte de faits déjà suivis par l'app (mêmes
+   * sources que le reste de l'écran Plat. maison, rien de nouveau) :
+   * - secteursPurs/nombreSecteurTotal : SecteurService.obtenirDetailSecteursProgrammes.
+   * - civilisation : reformatée depuis partie.civilisation (plat :
+   *   societe/gouvernement/economie + corrompues) vers la forme attendue
+   *   par le module pur ({niveaux:{...}, corrompues:{...}}).
+   * - revenu : calculerNiveauxProduction_ (niveaux) passé dans
+   *   calculerProductionAvecBonusTechnologie_ (montant réel produit) pour
+   *   chacune des 5 ressources — c'est le sens de "Revenu de X" dans les
+   *   objectifs de Programme (M1/M2/M4/M6/M7/M8).
+   * - entretienTotal : SecteurService.getEntretien + 2 par emplacement
+   *   Programme "Entretien actif" — même formule EXACTE que la popup
+   *   Phase Évaluation (voir plus bas), volontairement BRUTE (pas
+   *   ajustée par Cellules énergétiques amélioré, qui exempte le
+   *   paiement, pas la définition du terme de jeu).
+   * - jetonCommerce : LONGUEUR du tableau (pas le tableau lui-même).
+   * - gloire : valeurs réellement posées uniquement (null filtrés).
+   * - nbTechBase/nbTechAmelioree : technologie de départ + les 5
+   *   emplacements obtenus, comptées selon leur `.amelioree`.
+   */
+  function obtenirEtatProgrammes_(partie) {
+    var pm = partie.plateauMaison || {};
+    var civ = partie.civilisation || { societe: 0, gouvernement: 0, economie: 0, corrompues: {} };
+
+    var technologies = [];
+    if (partie.joueur && partie.joueur.technologieDepart) technologies.push(partie.joueur.technologieDepart);
+    (partie.technologiesObtenues || []).forEach(function (t) { if (t) technologies.push(t); });
+    var nbTechAmelioree = technologies.filter(function (t) { return !!t.amelioree; }).length;
+    var nbTechBase = technologies.length - nbTechAmelioree;
+
+    var slotsProgramme = Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : [];
+    var entretienProgrammes = slotsProgramme.filter(function (s) { return s && s.entretienActif; }).length * 2;
+
+    return Promise.all([
+      SecteurService.obtenirDetailSecteursProgrammes(partie.id),
+      SecteurService.getEntretien(partie.id),
+      calculerNiveauxProduction_(partie)
+    ]).then(function (resultats) {
+      var detailSecteurs = resultats[0];
+      var entretienSecteurs = resultats[1];
+      var niveaux = resultats[2].niveaux;
+
+      var revenu = {};
+      RESSOURCES_PRODUCTION.forEach(function (cle) {
+        revenu[cle] = calculerProductionAvecBonusTechnologie_(cle, niveaux[cle], partie);
+      });
+
+      return {
+        secteursPurs: detailSecteurs.secteursPurs,
+        nombreSecteurTotal: detailSecteurs.nombreSecteurTotal,
+        civilisation: {
+          niveaux: { societe: civ.societe || 0, gouvernement: civ.gouvernement || 0, economie: civ.economie || 0 },
+          corrompues: civ.corrompues || {}
+        },
+        ressources: {
+          nourriture: pm.ressources ? (pm.ressources.nourriture || 0) : 0,
+          energie: pm.ressources ? (pm.ressources.energie || 0) : 0,
+          materiel: pm.ressources ? (pm.ressources.materiel || 0) : 0,
+          credit: pm.ressources ? (pm.ressources.credit || 0) : 0,
+          science: pm.ressources ? (pm.ressources.science || 0) : 0
+        },
+        revenu: revenu,
+        entretienTotal: entretienSecteurs + entretienProgrammes,
+        jetonPrime: pm.jetonPrime || 0,
+        jetonLiberation: pm.jetonLiberation || 0,
+        jetonCommerce: Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0,
+        gloire: (Array.isArray(pm.gloire) ? pm.gloire : []).filter(function (v) { return v !== null && v !== undefined; }),
+        corruptionSecteurs: detailSecteurs.corruptionSecteurs || 0,
+        corruptionMaison: pm.corruptionMaison || 0,
+        nbTechBase: nbTechBase,
+        nbTechAmelioree: nbTechAmelioree
+      };
+    });
+  }
+
+  /**
+   * Calcule les points d'Influence des Programmes ACTIFS (emplacements
+   * 1/2/3 du plateau Programme — l'emplacement 0 "Programme de départ"
+   * est hors périmètre, forme de donnée différente, voir
+   * programmeScoreService.js). Retourne `{ [numeroEmplacement]:
+   * {objectif1, objectif2, total, code} }`, un seul aller catalogue +
+   * un seul assemblage d'état pour les 3 emplacements. Consommée par
+   * index.html/renderProgrammesPlateauMaison_ (affichage temps réel) et
+   * par la popup 'phase_evaluation' ci-dessous (section "Objectifs de
+   * Programme").
+   */
+  function calculerPointsProgrammesActifs_(partie) {
+    var pm = partie.plateauMaison || {};
+    var slots = Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : [];
+
+    return Promise.all([DB.getAll('programmes'), obtenirEtatProgrammes_(partie)])
+      .then(function (resultats) {
+        var catalogue = resultats[0];
+        var etat = resultats[1];
+
+        var parNom = {};
+        catalogue.forEach(function (p) { parNom[p.nom] = p; });
+
+        var resultat = {};
+        [1, 2, 3].forEach(function (index) {
+          var slot = slots[index];
+          var carte = slot && slot.nom ? parNom[slot.nom] : null;
+          if (!carte || !carte.code) return;
+          var points = ProgrammeScoreService.calculerPointsProgramme(carte.code, etat);
+          resultat[index] = { objectif1: points.objectif1, objectif2: points.objectif2, total: points.total, code: carte.code, nom: carte.nom };
+        });
+        return resultat;
+      });
   }
 
   function renderCubes_(partie) {
@@ -819,7 +1088,7 @@ var StrategieService = (function () {
   function majNiveauxAffiches_() {
     RESSOURCES_PRODUCTION.forEach(function (cle) {
       var niveau = niveauxProduction[cle] || 0;
-      var revenu = calculerProduction_(cle, niveau);
+      var revenu = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
       var elNiveau = document.getElementById('niveau-' + cle);
       var elRevenu = document.getElementById('revenu-' + cle);
       if (elNiveau) elNiveau.textContent = niveau;
@@ -1609,7 +1878,105 @@ var StrategieService = (function () {
   var CARTES_ELIGIBLES_FEUILLE_ = [
     { focus: 'Conquête', type: 'Standard' },
     { focus: 'Développement', type: 'Standard' },
-    { focus: 'Innovation', type: 'Standard' }
+    { focus: 'Innovation', type: 'Standard' },
+    // Focus Politique — les 4 variantes du catalogue (Standard + 3
+    // maisons/héroïque), toutes leurs clés Effet/Coût sont désormais
+    // couvertes par un feuilleFlow* (avancer_civilisation/ameliorer_
+    // gloire/bonus_commerce, nouveaux ci-dessous ; envahir/envahir_
+    // corrompu/deplacer_corruption/augmenter_population/activer_cube,
+    // déjà supportés) — les quelques clés SANS AUCUNE résolution
+    // automatisée au catalogue (gain_corruption en coût, produire_
+    // ressource, retirer_cube_neant_secteur_adjacent, destroy — déjà
+    // hors périmètre AVANT cette migration, journalisées "non
+    // automatisé" sans jamais bloquer l'action) ne régressent pas.
+    { focus: 'Politique', type: 'Standard' },
+    { focus: 'Politique', type: 'Shiveus' },
+    { focus: 'Politique', type: 'Zenor' },
+    { focus: 'Politique', type: 'Héroïque' },
+    // Focus Production — les 5 variantes du catalogue (Standard +
+    // Kradmor/Nervo/Thegwyn/Héroïque). Contrairement à Politique, AUCUN
+    // nouveau contexte.type nécessaire ici : toutes ses clés Effet/Coût
+    // (avancer_civilisation_*, produire_<ressource>, influence_par_
+    // guilde/guilde_pure, retirer_corruption, regrouper, guilde) sont
+    // déjà couvertes par des feuilleFlow* existants — les quelques clés
+    // sans résolution automatisée (gain_corruption en coût, augmenter_
+    // population_up_to, retirer_gardien, remettre_commerce en coût)
+    // retombent sur le repli générique "non automatisé", déjà le cas
+    // AVANT cette migration, jamais bloquant.
+    { focus: 'Production', type: 'Standard' },
+    { focus: 'Production', type: 'Kradmor' },
+    { focus: 'Production', type: 'Nervo' },
+    { focus: 'Production', type: 'Thegwyn' },
+    { focus: 'Production', type: 'Héroïque' },
+    // Focus Progrès — les 3 variantes du catalogue (Standard/Novaris/
+    // Héroïque). Un seul nouveau contexte.type nécessaire :
+    // 'defausser_gloire' (Héroïque "Restaurer", feuilleFlowDefausserGloire_
+    // ci-dessus). Le reste retombe soit sur des flows déjà existants
+    // (gagner_technologie, retirer_corruption, regrouper, produire_
+    // science, deployer_cube, paiement_ressource), soit sur des clés
+    // SANS résolution automatisée dans focusEngine.js (gain_corruption en
+    // coût, la forme "gain:{technologie:...}" de Novaris "Embrasser",
+    // "programme"/"invade_corrupted_sector"/"retirer_crise"/
+    // "etablir_guilde_scientifique" — vocabulaire non reconnu par le
+    // moteur, hors périmètre AVANT cette migration comme après : le
+    // repli générique "effet non chiffré" ne bloque jamais).
+    { focus: 'Progrès', type: 'Standard' },
+    { focus: 'Progrès', type: 'Novaris' },
+    { focus: 'Progrès', type: 'Héroïque' },
+    // Focus Prospérité — les 3 variantes du catalogue (Standard/Astoran/
+    // Héroïque). Un seul nouveau contexte.type nécessaire :
+    // 'ressource_choix' (feuilleFlowRessourceChoix_ ci-dessus — "N
+    // ressources au choix", Effet OU Coût). "programme_force"/
+    // "programme_richesse" (Astoran "Réguler") déjà couverts
+    // (CLE_PROGRAMME_VERS_TYPE_ -> 'gagner_programme'). Le reste retombe
+    // sur des clés SANS résolution automatisée (detruire/destroy en coût,
+    // etablir_guilde_meme_secteur, retirer_gardien — hors périmètre AVANT
+    // cette migration comme après, repli générique non bloquant).
+    { focus: 'Prospérité', type: 'Standard' },
+    { focus: 'Prospérité', type: 'Astoran' },
+    { focus: 'Prospérité', type: 'Héroïque' },
+    // Focus Renfort — les 3 variantes du catalogue (Standard/Novaris/
+    // Héroïque). Un seul nouveau contexte.type nécessaire :
+    // 'deployer_cube' (feuilleFlowDeployerCube_ ci-dessus — les 3 modes
+    // 'libre'/'par_chantier'/'secteur_mere', signature mécanique de ce
+    // Focus via "Rassembler"/"Adapter"). "avancer_civilisation" (bare,
+    // piste au choix) et "avancer_civilisation_moins_avancee" (Héroïque
+    // "Accélérer", avec tie_break:"au_choix") exercent pour la première
+    // fois les 2 branches de feuilleFlowAvancerCivilisation_ jusqu'ici
+    // jamais utilisées par une carte migrée (seule la piste imposée,
+    // via Politique/Production, l'était). Le reste retombe sur des clés
+    // SANS résolution automatisée ("defense_secteur" bare,
+    // "retirer_corruption_fiche", "construire_installation_up_to",
+    // "defausser_crise", gain_corruption en coût — hors périmètre AVANT
+    // cette migration comme après, repli générique non bloquant).
+    { focus: 'Renfort', type: 'Standard' },
+    { focus: 'Renfort', type: 'Novaris' },
+    { focus: 'Renfort', type: 'Héroïque' },
+    // Focus Tentation — les 3 variantes du catalogue (Standard/Kradmor/
+    // Héroïque). AUCUN nouveau contexte.type nécessaire : les 9 actions
+    // n'utilisent que des clés déjà couvertes par un feuilleFlow* existant
+    // (activer_cube, deployer_cube_secteur_mere -> 'deployer_cube',
+    // augmenter_population, avancer_civilisation bare et
+    // avancer_civilisation_moins_avancee, ressource_choix — tous les
+    // "choice" du catalogue contiennent "et/ou", donc toujours résolus en
+    // options_inclusives, déjà supporté). Vérifié explicitement AVANT
+    // d'écrire du code : "gain_corruption" (coût de Conspirer/Exercer/
+    // Surmonter/Prévoir) n'apparaît QUE dans des `cout` sur l'ENSEMBLE du
+    // catalogue (jamais un `effet`) — resoudreAction résout tout `cout`
+    // avec signe=-1, or la seule branche focusEngine.js qui ouvre une
+    // popup dédiée pour cette clé exige signe>0 (`gagner_corruption`,
+    // utilisée UNIQUEMENT par GameService.appliquerCadreGainCorruption
+    // pour un Cadre d'Événement, hors du chemin Focus/Feuille) — ce coût
+    // retombe donc toujours sur le repli générique "non automatisé",
+    // confirmé par un harnais Node direct sur FocusEngine.resoudreAction
+    // avant migration (aucun demanderChoix 'gagner_corruption' déclenché).
+    // Les autres clés non reconnues (action_focus_prefere, copy_action,
+    // consulter_evenements, corruption_piste_civilisation, retirer_
+    // programme, avancer_piste_corrompue) suivent le même repli, comme
+    // pour toutes les cartes précédentes.
+    { focus: 'Tentation', type: 'Standard' },
+    { focus: 'Tentation', type: 'Kradmor' },
+    { focus: 'Tentation', type: 'Héroïque' }
   ];
   function carteEligibleFeuille_(carte) {
     return !!carte && CARTES_ELIGIBLES_FEUILLE_.some(function (c) { return c.focus === carte.focus && c.type === carte.type; });
@@ -1624,7 +1991,15 @@ var StrategieService = (function () {
     // feuilleFlowProduireRevenu_) :
     'influence_secteur', 'produire_revenu',
     // Focus Innovation Standard (Inventer) :
-    'gagner_technologie'
+    'gagner_technologie',
+    // Focus Politique (toutes variantes) :
+    'avancer_civilisation', 'ameliorer_gloire', 'bonus_commerce',
+    // Focus Progrès Héroïque "Restaurer" :
+    'defausser_gloire',
+    // Focus Prospérité (Standard "Stocker"/Héroïque "Prospérer") :
+    'ressource_choix',
+    // Focus Renfort (Standard/Novaris "Rassembler"/"Adapter") :
+    'deployer_cube'
   ];
 
   var feuillePile_ = [];
@@ -2372,7 +2747,7 @@ var StrategieService = (function () {
 
     calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
       var niveauProduit = resultat.niveaux[contexte.ressource] || 0;
-      var montantProduit = calculerProduction_(contexte.ressource, niveauProduit);
+      var montantProduit = calculerProductionAvecBonusTechnologie_(contexte.ressource, niveauProduit, partieAffichee);
       feuilleRejetCourant_ = null;
       resolve({
         montant: montantProduit,
@@ -2380,6 +2755,302 @@ var StrategieService = (function () {
       });
     }).catch(function (erreur) {
       window.alert('Échec du calcul de production : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Chantier "Focus Politique sur la Feuille" (dernier pattern de
+   * migration en date). Améliorer un jeton Gloire (clé focusEngine.js
+   * "ameliorer_gloire", ex. Focus Politique Standard "S'imposer") : AUCUN
+   * choix utilisateur — cible toujours le jeton Gloire de plus petite
+   * valeur (+1, plafonné à 5), même calcul déterministe que
+   * feuilleFlowInfluenceSecteur_ ci-dessus (résolution automatique, pas
+   * d'interaction). Port direct de la branche #modal-choix
+   * 'ameliorer_gloire' — lit/écrit `etatGloire` (PAS
+   * `partieAffichee.plateauMaison.gloire`, voir le commentaire "IMPORTANT"
+   * de cette branche pour la raison : `etatGloire` est la seule source
+   * à jour en permanence pour ce champ, un clic manuel sur un
+   * emplacement Gloire ne réassigne jamais `plateauMaison.gloire`).
+   */
+  function feuilleFlowAmeliorerGloire_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    feuillePousserEtape_({
+      titre: etiquette + 'Améliorer un jeton Gloire', nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Calcul en cours…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    var partieGloireAmelioration = partieAffichee;
+    var gloireAvantAmelioration = etatGloire.slice(0, 5);
+    while (gloireAvantAmelioration.length < 5) gloireAvantAmelioration.push(null);
+
+    var indexGloireMin = -1, valeurGloireMin = null;
+    gloireAvantAmelioration.forEach(function (v, i) {
+      if (v === null || v === undefined || v >= 5) return;
+      if (valeurGloireMin === null || v < valeurGloireMin) { valeurGloireMin = v; indexGloireMin = i; }
+    });
+
+    if (indexGloireMin === -1) {
+      window.alert('Aucun jeton Gloire à améliorer (aucun jeton posé, ou tous déjà à la valeur maximale 5).');
+      resolve({ annule: true });
+      return promise;
+    }
+
+    var gloireApresAmelioration = gloireAvantAmelioration.slice();
+    gloireApresAmelioration[indexGloireMin] = valeurGloireMin + 1;
+    GameService.majPlateauMaison(partieGloireAmelioration.id, { gloire: gloireApresAmelioration })
+      .then(function () {
+        partieGloireAmelioration.plateauMaison.gloire = gloireApresAmelioration;
+        etatGloire = gloireApresAmelioration;
+        renderGloireDOM_(partieGloireAmelioration);
+        feuilleRejetCourant_ = null;
+        resolve({ detail: 'jeton Gloire ' + valeurGloireMin + ' → ' + (valeurGloireMin + 1) + '.' });
+      })
+      .catch(function (erreur) {
+        window.alert('Échec de l’amélioration du jeton Gloire : ' + erreur.message);
+      });
+
+    return promise;
+  }
+
+  /**
+   * Chantier "Focus Progrès sur la Feuille". Défausser un jeton Gloire
+   * (clé focusEngine.js "defausser_gloire", Coût UNIQUEMENT — ex. Focus
+   * Progrès Héroïque "Restaurer") : miroir de feuilleFlowAmeliorerGloire_
+   * ci-dessus (même détermination automatique du jeton Gloire de plus
+   * petite valeur, mêmes précautions sur `etatGloire`), mais RETIRE le
+   * jeton (case remise à null) plutôt que d'incrémenter sa valeur —
+   * aucun plafond à 5 ici, un jeton déjà au maximum reste éligible à la
+   * défausse. Port direct de la branche #modal-choix 'defausser_gloire'.
+   */
+  function feuilleFlowDefausserGloire_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    feuillePousserEtape_({
+      titre: etiquette + 'Défausser un jeton Gloire', nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Calcul en cours…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    var partieGloireDefausse = partieAffichee;
+    var gloireAvantDefausse = etatGloire.slice(0, 5);
+    while (gloireAvantDefausse.length < 5) gloireAvantDefausse.push(null);
+
+    var indexGloireMinDefausse = -1, valeurGloireMinDefausse = null;
+    gloireAvantDefausse.forEach(function (v, i) {
+      if (v === null || v === undefined) return;
+      if (valeurGloireMinDefausse === null || v < valeurGloireMinDefausse) { valeurGloireMinDefausse = v; indexGloireMinDefausse = i; }
+    });
+
+    if (indexGloireMinDefausse === -1) {
+      window.alert('Aucun jeton Gloire à défausser (aucun jeton posé sur la fiche Maison).');
+      resolve({ annule: true });
+      return promise;
+    }
+
+    var gloireApresDefausse = gloireAvantDefausse.slice();
+    gloireApresDefausse[indexGloireMinDefausse] = null;
+    GameService.majPlateauMaison(partieGloireDefausse.id, { gloire: gloireApresDefausse })
+      .then(function () {
+        partieGloireDefausse.plateauMaison.gloire = gloireApresDefausse;
+        etatGloire = gloireApresDefausse;
+        renderGloireDOM_(partieGloireDefausse);
+        feuilleRejetCourant_ = null;
+        resolve({ detail: 'jeton Gloire ' + valeurGloireMinDefausse + ' défaussé.' });
+      })
+      .catch(function (erreur) {
+        window.alert('Échec de la défausse du jeton Gloire : ' + erreur.message);
+      });
+
+    return promise;
+  }
+
+  /**
+   * Chantier "Focus Prospérité sur la Feuille". "N ressources de votre
+   * choix" (clé focusEngine.js "ressource_choix", Effet OU Coût selon
+   * `contexte.signe` — ex. Focus Prospérité Standard "Stocker"/Héroïque
+   * "Prospérer") : le joueur clique librement sur les 5 boutons de
+   * ressource (un clic = 1 unité choisie, répétable sur la MÊME
+   * ressource) jusqu'à épuiser `contexte.nombre`, ou valide plus tôt —
+   * "Valider" reste TOUJOURS disponible, cette clé NE BLOQUE JAMAIS
+   * (aucun bouton Annuler côté #modal-choix, voir focusEngine.js). Port
+   * direct de cette branche : MÊME contrat de résolution, la réponse est
+   * un TABLEAU de clés ressource (jamais {annule:true}) — y compris si
+   * la Feuille est fermée prématurément (scrim/swipe), qui résout donc
+   * avec les ressources déjà choisies plutôt que d'annuler tout le
+   * Coût/Effet en cours.
+   */
+  function feuilleFlowRessourceChoix_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    var choisies = [];
+    feuilleRejetCourant_ = function () { resolve(choisies); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var titre = etiquette + (contexte.signe > 0 ? 'Gagner ' : 'Dépenser ') + contexte.nombre + ' ressource(s) au choix';
+
+    function compteurChoisi_(cle) {
+      return choisies.filter(function (c) { return c === cle; }).length;
+    }
+    function html_() {
+      var restant = contexte.nombre - choisies.length;
+      return '<p class="hint">Il reste ' + restant + ' à choisir (ou "Valider" pour arrêter avant).</p>' +
+        '<div class="modal-choix-boutons">' + RESSOURCES_PRODUCTION.map(function (cle) {
+          var n = compteurChoisi_(cle);
+          return '<button type="button" class="btn btn-secondary btn-choix-ressource" data-ressource="' + cle + '">' + CHAMP_RESSOURCE[cle].label +
+            (n > 0 ? ' <span class="choix-ressource-compteur">+' + n + '</span>' : '') + '</button>';
+        }).join('') + '</div>';
+    }
+    function brancher_(el) {
+      Array.prototype.forEach.call(el.querySelectorAll('.btn-choix-ressource'), function (btn) {
+        btn.addEventListener('click', function () {
+          choisies.push(btn.dataset.ressource);
+          if (choisies.length >= contexte.nombre) {
+            feuilleRejetCourant_ = null;
+            resolve(choisies);
+            return;
+          }
+          etape.html = html_();
+          el.innerHTML = etape.html;
+          brancher_(el);
+          feuilleAjusterHauteur_();
+        });
+      });
+    }
+
+    var etape = {
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
+      html: html_(),
+      brancher: brancher_,
+      onValider: function () { feuilleRejetCourant_ = null; resolve(choisies); }
+    };
+    feuillePousserEtape_(etape, feuillePile_.length > 1 ? 'avant' : null);
+
+    return promise;
+  }
+
+  /**
+   * Avancer sur une piste de Civilisation (clés focusEngine.js
+   * "avancer_civilisation"/"_societe"/"_gouvernement"/"_economie", ex.
+   * Focus Politique "Inspirer" → Gouvernement) : port direct de la
+   * branche #modal-choix 'avancer_civilisation' — MÊME 3 cas (piste
+   * imposée `contexte.piste`, piste au choix, "moins avancée" avec
+   * tie-break éventuel), même aperçu de la prochaine case
+   * (obtenirDetailPistesCache_/apercuProchaineCase_) et même délégation
+   * à CivilisationService.avancerPiste (persistance ET enchaînement des
+   * effets imbriqués de la nouvelle case — choix "et/ou", rappel manuel,
+   * retirer_corruption, avance_rapide — `demanderChoix` relayé tel quel,
+   * déjà géré par avancerPiste elle-même). Comme côté #modal-choix, un
+   * refus sur un effet imbriqué N'ANNULE PAS l'avancement déjà acquis
+   * (avancerPiste ne rejette jamais) : cette étape n'est annulable
+   * qu'AVANT validation.
+   */
+  function feuilleFlowAvancerCivilisation_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var titre = etiquette + (contexte.moinsAvancee
+      ? 'Avancer sur votre piste la moins avancée'
+      : (contexte.piste ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste] : 'Avancer sur une piste de Civilisation'));
+
+    feuillePousserEtape_({
+      titre: titre, nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Chargement…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    var partieCivilisation = partieAffichee;
+    var nomMaisonCivilisation = partieCivilisation.joueur ? partieCivilisation.joueur.nom : null;
+    var civActuelle = partieCivilisation.civilisation || {};
+
+    function apercuProchaineCase_(detail, piste) {
+      var niveau = civActuelle[piste] || 0;
+      if (niveau >= CivilisationService.NIVEAU_MAX) return 'Piste déjà au niveau maximum.';
+      if (civActuelle.corrompues && civActuelle.corrompues[piste]) return 'Piste Corrompue — avancera sans bénéfice de case.';
+      var cases = (detail && detail[piste]) || [];
+      var entree = cases[niveau];
+      return entree ? ('Case ' + entree.case + ' — ' + (entree.texte || '(aucun texte)')) : '';
+    }
+
+    function validerAvancementPiste_(piste) {
+      feuilleEls_.btnValider.disabled = true;
+      CivilisationService.avancerPiste(partieCivilisation.id, nomMaisonCivilisation, piste, demanderChoix)
+        .then(function (resultat) {
+          feuilleRejetCourant_ = null;
+          if (resultat.dejaMaximum) {
+            resolve({ detail: 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : déjà au maximum.', piste: piste });
+            return;
+          }
+          var detail = 'Piste ' + CivilisationService.NOM_PISTE[piste] + ' : niveau ' + resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau +
+            (resultat.texte ? ' — ' + resultat.texte : '');
+          resolve({ detail: detail, piste: piste });
+        })
+        .catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec de l’avancement : ' + erreur.message);
+        });
+    }
+
+    obtenirDetailPistesCache_(nomMaisonCivilisation).then(function (detail) {
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+
+      if (contexte.moinsAvancee) {
+        var niveauMin = Math.min.apply(null, CivilisationService.PISTES.map(function (p) { return civActuelle[p] || 0; }));
+        var pistesAEgalite = CivilisationService.PISTES.filter(function (p) { return (civActuelle[p] || 0) === niveauMin; });
+
+        if (contexte.tieBreakAuChoix && pistesAEgalite.length > 1) {
+          etapeCourante.html = '<p class="hint">' + pistesAEgalite.length + ' pistes sont à égalité pour la moins avancée (niveau ' +
+            niveauMin + '/' + CivilisationService.NIVEAU_MAX + ') — choisissez laquelle avancer.</p>' +
+            feuilleRangeeChoixHTML_('civ', pistesAEgalite.map(function (p) {
+              return CivilisationService.NOM_PISTE[p] + '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, p) + '</span>';
+            }), false);
+          etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); };
+          etapeCourante.onValider = function () {
+            var sel = feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee');
+            if (!sel) return;
+            validerAvancementPiste_(pistesAEgalite[Number(sel.dataset.i)]);
+          };
+          feuilleRendreEtape_(etapeCourante, null);
+          return;
+        }
+
+        var pisteMoinsAvancee = pistesAEgalite[0];
+        etapeCourante.html = '<p class="hint">Piste la moins avancée : ' + CivilisationService.NOM_PISTE[pisteMoinsAvancee] +
+          ' (niveau ' + niveauMin + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
+          '<p class="hint">' + apercuProchaineCase_(detail, pisteMoinsAvancee) + '</p>';
+        etapeCourante.onValider = niveauMin >= CivilisationService.NIVEAU_MAX ? null : function () { validerAvancementPiste_(pisteMoinsAvancee); };
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+
+      if (contexte.piste) {
+        var piste = contexte.piste;
+        var niveau = civActuelle[piste] || 0;
+        etapeCourante.html = '<p class="hint">Niveau actuel : ' + niveau + '/' + CivilisationService.NIVEAU_MAX + '</p>' +
+          '<p class="hint">' + apercuProchaineCase_(detail, piste) + '</p>';
+        etapeCourante.onValider = niveau >= CivilisationService.NIVEAU_MAX ? null : function () { validerAvancementPiste_(piste); };
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+
+      etapeCourante.html = feuilleRangeeChoixHTML_('civ', CivilisationService.PISTES.map(function (p) {
+        var niveau = civActuelle[p] || 0;
+        return CivilisationService.NOM_PISTE[p] + ' — niveau ' + niveau + '/' + CivilisationService.NIVEAU_MAX +
+          '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, p) + '</span>';
+      }), false);
+      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); };
+      etapeCourante.onValider = function () {
+        var sel = feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee');
+        if (!sel) return;
+        validerAvancementPiste_(CivilisationService.PISTES[Number(sel.dataset.i)]);
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des pistes de Civilisation : ' + erreur.message);
     });
 
     return promise;
@@ -3093,30 +3764,72 @@ var StrategieService = (function () {
             unitesAttaquant[champ] = (unitesAttaquant[champ] || 0) + c.quantite;
           });
 
-          var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible);
-          var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
-
-          var totalSurvivantsAttaquant = Object.keys(resultatCombat.survivantsAttaquant || {})
-            .reduce(function (s, k) { return s + (resultatCombat.survivantsAttaquant[k] || 0); }, 0);
-          var cubesPerdus = Math.max(0, totalEngage - totalSurvivantsAttaquant);
-
-          var detailContributions = contributions.map(function (c) { return c.quantite + '× ' + labelVaisseau_(c.type) + ' (secteur ' + c.secteur + ')'; }).join(', ');
-          var maisonCible = maisonDechue_(secteurCible);
+          // Chantier "effets permanents" — Missiles longue portée :
+          // éligible si un secteur ADJACENT à la cible, possédé par le
+          // joueur, a un Chantier Naval ou une Base Stellaire.
+          var eligibleMissiles = (adjacenceMap[cibleFinale] || []).some(function (n) {
+            var s = secteurParNumero_(n);
+            return vousAppartientEnvahir_(n) && s && ((s.installationChantierNaval || 0) > 0 || (s.installationBaseStellaire || 0) > 0);
+          });
 
           feuilleEls_.btnValider.disabled = true;
 
-          var sourcesPayload = contributions.map(function (c) { return { type: c.type, secteur: c.secteur, quantite: c.quantite }; });
-          var survivantsPayload = {};
-          if (victoire && resultatCombat.survivantsAttaquant) {
-            Object.keys(resultatCombat.survivantsAttaquant).forEach(function (champCombat) {
-              var cleColonne = champCombat === 'portevaisseau' ? 'porte_vaisseau' : champCombat;
-              survivantsPayload[cleColonne] = resultatCombat.survivantsAttaquant[champCombat];
+          // SÉQUENTIEL, pas Promise.all : les 2 popups de confirmation
+          // partagent la MÊME modale singleton (#modal-choix/la Feuille) —
+          // les lancer en parallèle ferait la 2e écraser la 1re avant même
+          // que le joueur ait pu répondre (bug détecté à la vérification,
+          // jamais livré).
+          confirmerMissilesLonguePortee_(partieEnvahir, eligibleMissiles).then(function (bonusMissiles) {
+            return confirmerDronesAutonomes_(partieEnvahir).then(function (bonusDrones) {
+              return [bonusMissiles, bonusDrones];
             });
-          }
+          }).then(function (bonusResultats) {
+            var bonusMissiles = bonusResultats[0];
+            var bonusDrones = bonusResultats[1];
 
-          SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload)
+            var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible, bonusMissiles, bonusDrones);
+            var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
+
+            var totalSurvivantsAttaquant = Object.keys(resultatCombat.survivantsAttaquant || {})
+              .reduce(function (s, k) { return s + (resultatCombat.survivantsAttaquant[k] || 0); }, 0);
+            var cubesPerdus = Math.max(0, totalEngage - totalSurvivantsAttaquant);
+
+            var detailContributions = contributions.map(function (c) { return c.quantite + '× ' + labelVaisseau_(c.type) + ' (secteur ' + c.secteur + ')'; }).join(', ');
+            var maisonCible = maisonDechue_(secteurCible);
+
+            var sourcesPayload = contributions.map(function (c) { return { type: c.type, secteur: c.secteur, quantite: c.quantite }; });
+            var survivantsPayload = {};
+            if (victoire && resultatCombat.survivantsAttaquant) {
+              Object.keys(resultatCombat.survivantsAttaquant).forEach(function (champCombat) {
+                var cleColonne = champCombat === 'portevaisseau' ? 'porte_vaisseau' : champCombat;
+                survivantsPayload[cleColonne] = resultatCombat.survivantsAttaquant[champCombat];
+              });
+            }
+
+            // Débite le coût réel des bonus utilisés (choisi AVANT combat,
+            // débité qu'il y ait victoire ou non — même principe que
+            // n'importe quel Coût de Focus payé avant de connaître l'issue).
+            var champsCout = {};
+            if (bonusMissiles) {
+              champsCout.ressourceEnergie = Math.max(0, (partieEnvahir.plateauMaison.ressources.energie || 0) - 1);
+            }
+            if (bonusDrones) {
+              champsCout.jetonCommerce = (partieEnvahir.plateauMaison.jetonCommerce || []).slice(0, -1);
+            }
+            var suiteCouts = Object.keys(champsCout).length
+              ? GameService.majPlateauMaison(partieEnvahir.id, champsCout).then(function () {
+                  if (champsCout.ressourceEnergie !== undefined) partieEnvahir.plateauMaison.ressources.energie = champsCout.ressourceEnergie;
+                  if (champsCout.jetonCommerce !== undefined) partieEnvahir.plateauMaison.jetonCommerce = champsCout.jetonCommerce;
+                })
+              : Promise.resolve();
+
+            return suiteCouts.then(function () {
+              return confirmerReplicateursDeCombat_(partieEnvahir, victoire);
+            }).then(function (garderInstallations) {
+            return SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload, garderInstallations)
             .then(function (jetonsRetires) {
               jetonsRetires = jetonsRetires || {};
+              if (garderInstallations) jetonsRetires.jetonPrime = (jetonsRetires.jetonPrime || 0) + 1;
               var influenceGagnee = 0;
               if (victoire) {
                 var jetonsGloireGagnes = Array.isArray(jetonsRetires.jetonGloire)
@@ -3164,11 +3877,12 @@ var StrategieService = (function () {
                 detail: detail,
                 avertissement: avertissement
               });
-            })
-            .catch(function (erreur) {
-              feuilleEls_.btnValider.disabled = false;
-              window.alert('Échec de la résolution : ' + erreur.message);
             });
+            });
+          }).catch(function (erreur) {
+            feuilleEls_.btnValider.disabled = false;
+            window.alert('Échec de la résolution : ' + erreur.message);
+          });
         };
       }
 
@@ -3185,6 +3899,231 @@ var StrategieService = (function () {
       feuilleEls_.corpsInner.innerHTML = '<p class="hint">Erreur de chargement.</p>';
       window.alert('Échec du chargement des secteurs : ' + erreur.message);
     });
+
+    return promise;
+  }
+
+  /**
+   * Chantier "Focus Renfort sur la Feuille". Déployer des cubes de
+   * Puissance Navale (clés focusEngine.js "deployer_cube"/"deploy_cube"
+   * mode 'libre', "deployer_cube_par_chantier" mode 'par_chantier',
+   * "deployer_cube_secteur_mere" mode 'secteur_mere' — ex. Focus Renfort
+   * "Rassembler") : port direct de la branche #modal-choix
+   * 'deployer_cube' plus bas — MÊMES 3 modes (secteurs éligibles/
+   * quantité max selon le mode), même formulaire (type/secteur/quantité,
+   * liste engagée modifiable) et mêmes validations (Cube actif
+   * suffisant, coût Matériel/Nourriture par type de vaisseau via
+   * COUT_DEPLOIEMENT_PAR_TYPE) — même pattern que
+   * feuilleFlowRegrouper_/feuilleFlowEnvahir_ ci-dessus (liste vivante,
+   * re-rendue en place à chaque ajout/retrait).
+   */
+  function feuilleFlowDeployerCube_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partieDeploiement = partieAffichee;
+    var typesDeployables = typesVaisseauDeployables_(partieDeploiement);
+    var etatRessourcesLocal = {
+      cubeActif: contexte.cubeActif,
+      materiel: contexte.ressourceMateriel,
+      nourriture: contexte.ressourceNourriture
+    };
+
+    var etape = { titre: etiquette + 'Déployer des cubes', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length > 1 ? 'avant' : null);
+
+    function vousAppartientDeploiement_(secteurs, numeroSecteurMere) {
+      var parNumero = creerSecteurParNumero_(secteurs);
+      return function (numero) { return secteurEstPossede_(parNumero(numero)) || numero === numeroSecteurMere; };
+    }
+
+    function demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale) {
+      var deploiements = []; // {numero, type, quantite}
+
+      function totalEngage_() { return deploiements.reduce(function (s, d) { return s + d.quantite; }, 0); }
+
+      function html_() {
+        var engage = totalEngage_();
+        var restant = quantiteMaxGlobale - engage;
+        var listeHTML = deploiements.length
+          ? '<ul class="regrouper-liste">' + deploiements.map(function (d, i) {
+              var label = typesDeployables.filter(function (t) { return t.cle === d.type; })[0].label;
+              return '<li>' + d.quantite + '× ' + label + ' → Secteur ' + d.numero +
+                ' <button type="button" class="btn-lien deployer-retirer" data-index="' + i + '">retirer</button></li>';
+            }).join('') + '</ul>'
+          : '<p class="hint">Aucun cube engagé.</p>';
+
+        return '<p class="hint">' + engage + ' / ' + quantiteMaxGlobale + ' cube(s) engagé(s)' +
+          (restant > 0 ? ' (' + restant + ' au choix, si Cube actif suffisant)' : '') + '</p>' +
+          listeHTML +
+          '<div class="regrouper-form">' +
+          '<select id="feuille-deployer-type">' + typesDeployables.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>' +
+          (cibles.length > 1
+            ? '<select id="feuille-deployer-secteur" style="margin-top:6px;">' +
+              cibles.map(function (c) { return '<option value="' + c.numero + '">Secteur ' + c.numero + (c.maxCubes < Infinity ? ' (' + c.maxCubes + ' max)' : '') + '</option>'; }).join('') +
+              '</select>'
+            : '') +
+          '<input type="number" min="1" step="1" value="1" id="feuille-deployer-quantite" style="margin-top:6px;">' +
+          '<button type="button" class="btn btn-secondary" id="feuille-deployer-btn-ajouter" style="width:100%;margin:16px 0;">Ajouter ce déploiement</button>' +
+          '</div>';
+      }
+
+      function brancher_(el) {
+        Array.prototype.forEach.call(el.querySelectorAll('.deployer-retirer'), function (btn) {
+          btn.addEventListener('click', function () { deploiements.splice(Number(btn.dataset.index), 1); rerender_(); });
+        });
+
+        var selectType = document.getElementById('feuille-deployer-type');
+        var selectSecteur = document.getElementById('feuille-deployer-secteur');
+        var champQuantite = document.getElementById('feuille-deployer-quantite');
+        var btnAjouter = document.getElementById('feuille-deployer-btn-ajouter');
+
+        btnAjouter.addEventListener('click', function () {
+          var type = selectType.value;
+          var numero = selectSecteur ? Number(selectSecteur.value) : cibles[0].numero;
+          var quantite = Math.max(1, Math.floor(Number(champQuantite.value) || 1));
+
+          var restantGlobal = quantiteMaxGlobale - totalEngage_();
+          if (quantite > restantGlobal) {
+            window.alert('Cet effet permet de déployer au maximum ' + quantiteMaxGlobale + ' cube(s) au total (indépendamment de ton stock de Cube actif).' +
+              (totalEngage_() > 0 ? ' Tu as déjà engagé ' + totalEngage_() + ' cube(s) — il en reste ' + restantGlobal + '.' : ''));
+            return;
+          }
+
+          var cible = cibles.filter(function (c) { return c.numero === numero; })[0];
+          if (cible && cible.maxCubes < Infinity) {
+            var dejaSurCeSecteur = deploiements.filter(function (d) { return d.numero === numero; }).reduce(function (s, d) { return s + d.quantite; }, 0);
+            if (dejaSurCeSecteur + quantite > cible.maxCubes) {
+              window.alert('Ce secteur ne peut recevoir que ' + cible.maxCubes + ' cube(s) via cet effet.');
+              return;
+            }
+          }
+
+          var dejaEngageTotal = totalEngage_();
+          if (dejaEngageTotal + quantite > etatRessourcesLocal.cubeActif) {
+            window.alert('Pas assez de Cube actif : ' + etatRessourcesLocal.cubeActif + ' disponible(s), ' + dejaEngageTotal + ' déjà prévu(s).');
+            return;
+          }
+
+          var cout = COUT_DEPLOIEMENT_PAR_TYPE[type];
+          if (cout) {
+            var dejaEngageCoutant = deploiements.filter(function (d) { return d.type === type; }).reduce(function (s, d) { return s + d.quantite; }, 0);
+            var coutTotal = (dejaEngageCoutant + quantite) * cout.parCube;
+            if (coutTotal > etatRessourcesLocal[cout.ressource]) {
+              window.alert('Pas assez de ' + cout.label + ' (' + cout.parCube + ' par cube) : ' + etatRessourcesLocal[cout.ressource] + ' disponible(s).');
+              return;
+            }
+          }
+
+          deploiements.push({ numero: numero, type: type, quantite: quantite });
+          rerender_();
+        });
+
+        feuilleEls_.btnValider.hidden = deploiements.length === 0;
+        feuilleEls_.btnValider.onclick = deploiements.length === 0 ? null : function () {
+          var coutParRessource = {};
+          deploiements.forEach(function (d) {
+            var cout = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
+            if (cout) coutParRessource[cout.ressource] = (coutParRessource[cout.ressource] || 0) + cout.parCube * d.quantite;
+          });
+          var ressourceInsuffisante = Object.keys(coutParRessource).some(function (r) { return coutParRessource[r] > etatRessourcesLocal[r]; });
+          var totalCubes = totalEngage_();
+          if (ressourceInsuffisante || totalCubes > etatRessourcesLocal.cubeActif) {
+            window.alert('Ressources ou Cube actif insuffisant(s) pour ce déploiement.');
+            return;
+          }
+
+          feuilleEls_.btnValider.disabled = true;
+          Promise.all(deploiements.map(function (d) {
+            return SecteurService.deployerCube(partieDeploiement.id, d.numero, d.type, d.quantite);
+          })).then(function () {
+            var detail = deploiements.map(function (d) {
+              var label = typesDeployables.filter(function (t) { return t.cle === d.type; })[0].label;
+              return d.quantite + '× ' + label + ' → secteur ' + d.numero;
+            }).join(', ');
+            feuilleRejetCourant_ = null;
+            feuilleEls_.btnValider.disabled = false;
+            resolve({ totalCubes: totalCubes, coutParRessource: coutParRessource, detail: detail, mouvements: deploiements });
+          }).catch(function (erreur) {
+            feuilleEls_.btnValider.disabled = false;
+            window.alert('Échec du déploiement : ' + erreur.message);
+          });
+        };
+      }
+
+      function rerender_() {
+        feuilleEls_.corpsInner.innerHTML = html_();
+        brancher_(feuilleEls_.corpsInner);
+        feuilleAjusterHauteur_();
+      }
+
+      etape.html = html_();
+      etape.brancher = brancher_;
+      rerender_();
+    }
+
+    if (contexte.mode === 'par_chantier') {
+      Promise.all([
+        SecteurService.obtenirSecteurs(partieDeploiement.id),
+        SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var vousAppartient = vousAppartientDeploiement_(secteurs, resultats[1]);
+        var cibles = secteurs
+          .filter(function (s) { return vousAppartient(s.numero) && (s.installationChantierNaval || 0) > 0; })
+          .map(function (s) { return { numero: s.numero, maxCubes: (s.installationChantierNaval || 0) * contexte.quantiteDemandee }; });
+
+        if (!cibles.length) {
+          etape.html = '<p class="hint">Aucun Chantier Naval en votre possession.</p>';
+          feuilleRendreEtape_(etape, null);
+          return;
+        }
+        var quantiteMaxGlobale = cibles.reduce(function (s, c) { return s + c.maxCubes; }, 0);
+        demarrerAvecCiblesDeploiement_(cibles, quantiteMaxGlobale);
+      }).catch(function (erreur) {
+        etape.html = '<p class="hint">Erreur de chargement.</p>';
+        feuilleRendreEtape_(etape, null);
+        window.alert('Échec du chargement des secteurs : ' + erreur.message);
+      });
+
+    } else if (contexte.mode === 'secteur_mere') {
+      SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId).then(function (numeroMere) {
+        if (!numeroMere) {
+          etape.html = '<p class="hint">Secteur-Mère introuvable.</p>';
+          feuilleRendreEtape_(etape, null);
+          return;
+        }
+        demarrerAvecCiblesDeploiement_([{ numero: numeroMere, maxCubes: Infinity }], contexte.quantiteDemandee);
+      }).catch(function (erreur) {
+        etape.html = '<p class="hint">Erreur de chargement.</p>';
+        feuilleRendreEtape_(etape, null);
+        window.alert('Échec du chargement du Secteur-Mère : ' + erreur.message);
+      });
+
+    } else { // 'libre'
+      Promise.all([
+        SecteurService.obtenirSecteurs(partieDeploiement.id),
+        SecteurService.obtenirSecteurMere(partieDeploiement.scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var vousAppartient = vousAppartientDeploiement_(secteurs, resultats[1]);
+        var cibles = secteurs
+          .filter(function (s) { return vousAppartient(s.numero); })
+          .map(function (s) { return { numero: s.numero, maxCubes: Infinity }; });
+
+        if (!cibles.length) {
+          etape.html = '<p class="hint">Aucun secteur vous appartenant.</p>';
+          feuilleRendreEtape_(etape, null);
+          return;
+        }
+        demarrerAvecCiblesDeploiement_(cibles, contexte.quantiteDemandee);
+      }).catch(function (erreur) {
+        etape.html = '<p class="hint">Erreur de chargement.</p>';
+        feuilleRendreEtape_(etape, null);
+        window.alert('Échec du chargement des secteurs : ' + erreur.message);
+      });
+    }
 
     return promise;
   }
@@ -3621,13 +4560,23 @@ var StrategieService = (function () {
     if (contexte.type === 'deplacer_corruption') return feuilleFlowDeplacerCorruption_();
     if (contexte.type === 'regrouper') return feuilleFlowRegrouper_();
     if (contexte.type === 'envahir') return feuilleFlowEnvahir_(contexte);
+    if (contexte.type === 'deployer_cube') return feuilleFlowDeployerCube_(contexte);
     if (contexte.type === 'retirer_corruption') return feuilleFlowRetirerCorruption_();
     if (contexte.type === 'construire') return feuilleFlowConstruire_(contexte);
     if (contexte.type === 'augmenter_population_pure') return feuilleFlowAugmenterPopulationPure_();
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
     if (contexte.type === 'influence_secteur') return feuilleFlowInfluenceSecteur_(contexte);
     if (contexte.type === 'produire_revenu') return feuilleFlowProduireRevenu_(contexte);
+    // Chantier "Focus Politique sur la Feuille" : 'bonus_commerce' a le
+    // MÊME contrat que 'option_exclusive' (options = tableau de libellés
+    // déjà formés, résolution {indexChoisi}) — aucune fonction dédiée,
+    // juste ce routage (jamais migrée jusqu'ici, voir gameService.js).
+    if (contexte.type === 'bonus_commerce') return feuilleFlowOptionExclusive_(contexte);
+    if (contexte.type === 'ameliorer_gloire') return feuilleFlowAmeliorerGloire_();
+    if (contexte.type === 'defausser_gloire') return feuilleFlowDefausserGloire_();
+    if (contexte.type === 'avancer_civilisation') return feuilleFlowAvancerCivilisation_(contexte);
     if (contexte.type === 'gagner_technologie') return feuilleFlowGagnerTechnologie_(contexte);
+    if (contexte.type === 'ressource_choix') return feuilleFlowRessourceChoix_(contexte);
     return Promise.resolve({ annule: true }); // ne devrait pas arriver, voir FEUILLE_TYPES_SUPPORTES_
   }
 
@@ -4367,7 +5316,30 @@ var StrategieService = (function () {
                 unitesAttaquant[champ] = (unitesAttaquant[champ] || 0) + c.quantite;
               });
 
-              var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible);
+              // Chantier "effets permanents" — Missiles longue portée :
+              // éligible si un secteur ADJACENT à la cible, possédé par le
+              // joueur, a un Chantier Naval ou une Base Stellaire.
+              var eligibleMissiles = (adjacenceMap[cibleFinale] || []).some(function (n) {
+                var s = secteurParNumero_(n);
+                return vousAppartientEnvahir_(n) && s && ((s.installationChantierNaval || 0) > 0 || (s.installationBaseStellaire || 0) > 0);
+              });
+
+              btnValider.disabled = true;
+              btnValider.textContent = 'Résolution en cours…';
+
+              // SÉQUENTIEL, pas Promise.all : les 2 popups de confirmation
+              // partagent la MÊME modale singleton #modal-choix — les
+              // lancer en parallèle ferait la 2e écraser la 1re avant même
+              // que le joueur ait pu répondre.
+              confirmerMissilesLonguePortee_(partieEnvahir, eligibleMissiles).then(function (bonusMissiles) {
+                return confirmerDronesAutonomes_(partieEnvahir).then(function (bonusDrones) {
+                  return [bonusMissiles, bonusDrones];
+                });
+              }).then(function (bonusResultats) {
+              var bonusMissiles = bonusResultats[0];
+              var bonusDrones = bonusResultats[1];
+
+              var resultatCombat = CombatService.resoudreInvasion(partieEnvahir, unitesAttaquant, secteurCible, bonusMissiles, bonusDrones);
               var victoire = !!(resultatCombat.vainqueur && resultatCombat.vainqueur.nom === partieEnvahir.joueur.nom);
 
               // EVOLUTION 16 (todo.md, docs-rules-flottes.md §1.5 : "subir
@@ -4387,9 +5359,6 @@ var StrategieService = (function () {
               }).join(', ');
               var maisonCible = maisonDechue_(secteurCible);
 
-              btnValider.disabled = true;
-              btnValider.textContent = 'Résolution en cours…';
-
               var sourcesPayload = contributions.map(function (c) {
                 return { type: c.type, secteur: c.secteur, quantite: c.quantite };
               });
@@ -4401,9 +5370,27 @@ var StrategieService = (function () {
                 });
               }
 
-              SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload)
+              var champsCout = {};
+              if (bonusMissiles) {
+                champsCout.ressourceEnergie = Math.max(0, (partieEnvahir.plateauMaison.ressources.energie || 0) - 1);
+              }
+              if (bonusDrones) {
+                champsCout.jetonCommerce = (partieEnvahir.plateauMaison.jetonCommerce || []).slice(0, -1);
+              }
+              var suiteCouts = Object.keys(champsCout).length
+                ? GameService.majPlateauMaison(partieEnvahir.id, champsCout).then(function () {
+                    if (champsCout.ressourceEnergie !== undefined) partieEnvahir.plateauMaison.ressources.energie = champsCout.ressourceEnergie;
+                    if (champsCout.jetonCommerce !== undefined) partieEnvahir.plateauMaison.jetonCommerce = champsCout.jetonCommerce;
+                  })
+                : Promise.resolve();
+
+              suiteCouts.then(function () {
+                return confirmerReplicateursDeCombat_(partieEnvahir, victoire);
+              }).then(function (garderInstallations) {
+                return SecteurService.envahirResoudre(partieEnvahir.id, cibleFinale, sourcesPayload, victoire, survivantsPayload, garderInstallations)
                 .then(function (jetonsRetires) {
                   jetonsRetires = jetonsRetires || {};
+                  if (garderInstallations) jetonsRetires.jetonPrime = (jetonsRetires.jetonPrime || 0) + 1;
 
                   // Jeton(s) Gloire (array côté secteursPartie ET côté
                   // plateauMaison, non diffable par focusEngine.js) :
@@ -4465,12 +5452,14 @@ var StrategieService = (function () {
                     detail: detail,
                     avertissement: avertissement
                   });
-                })
+                });
+              })
                 .catch(function (erreur) {
                   btnValider.disabled = false;
                   btnValider.textContent = 'Valider';
                   window.alert('Échec de la résolution : ' + erreur.message);
                 });
+              });
             };
           }
 
@@ -5868,7 +6857,7 @@ var StrategieService = (function () {
 
         calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
           var niveauProduit = resultat.niveaux[contexte.ressource] || 0;
-          var montantProduit = calculerProduction_(contexte.ressource, niveauProduit);
+          var montantProduit = calculerProductionAvecBonusTechnologie_(contexte.ressource, niveauProduit, partieAffichee);
           fermerModale_();
           resolve({
             montant: montantProduit,
@@ -6196,18 +7185,28 @@ var StrategieService = (function () {
 
       } else if (contexte.type === 'phase_evaluation') {
         // Popup "Phase Évaluation" (bouton "Fin du cycle"/"Terminer la
-        // partie", index.html) — voir docs-rules-cycle-de-jeu.md §3. Seule
-        // la section Entretien (§3.2) est réellement automatisée pour
-        // l'instant ; les 4 autres (Plateau Crise §3.1, Refuge §3.2.3,
-        // Objectifs galactiques §3.3, Objectifs de Programme §3.4, cette
-        // dernière correspondant à la Phase 4 de l'implémentation des
-        // Programmes) ne sont que des rappels textuels — à automatiser
-        // plus tard, chacune indépendamment. "Annuler" ferme la popup sans
-        // rien persister ni avancer de cycle (aucune écriture DB n'a lieu
-        // avant Valider, le paiement d'Entretien ne vit qu'en variables
-        // locales le temps de la popup) — utile pour revenir en arrière si
-        // "Fin du cycle" a été cliqué trop tôt (actions Focus pas encore
-        // toutes jouées).
+        // partie", index.html) — voir docs-rules-cycle-de-jeu.md §3.
+        // Entretien (§3.2) ET Objectifs de Programme (§3.4, chantier
+        // "Points de victoire des Programmes") sont réellement
+        // automatisés ; les 3 autres sections (Plateau Crise §3.1,
+        // Refuge §3.2.3, Objectifs galactiques §3.3) restent de simples
+        // rappels textuels — à automatiser plus tard, chacune
+        // indépendamment. "Annuler" ferme la popup sans rien persister ni
+        // avancer de cycle (aucune écriture DB n'a lieu avant Valider, le
+        // paiement d'Entretien ne vit qu'en variables locales le temps de
+        // la popup) — utile pour revenir en arrière si "Fin du cycle" a
+        // été cliqué trop tôt (actions Focus pas encore toutes jouées).
+        //
+        // Objectifs de Programme (§3.4) : calculerPointsProgrammesActifs_
+        // (ci-dessus) donne le détail chiffré par Programme actif.
+        // Retour utilisateur (28/08/2026) : "Il faut que l'influence
+        // soit ajoutee au compteur lorsque je valide la fin de cycle" —
+        // gainInfluenceProgrammesEval (somme des `.total`) est ajouté à
+        // l'Influence dans le MÊME GameService.majPlateauMaison que
+        // l'Entretien, au clic sur "Valider" (variable locale jusque-là,
+        // comme le reste de cette popup — "Annuler" ne l'applique donc
+        // jamais, cohérent avec le principe "aucune écriture avant
+        // Valider" ci-dessus).
         //
         // Entretien (§3.2.1/3.2.2) : total = SecteurService.getEntretien
         // (emplacements Installation/Guilde occupés) + 2 par emplacement
@@ -6249,8 +7248,43 @@ var StrategieService = (function () {
           ? partieEval.plateauMaison.programmesUtilises : [];
         var entretienProgrammesEval = slotsProgrammeEval.filter(function (s) { return s && s.entretienActif; }).length * 2;
 
-        SecteurService.getEntretien(partieEval.id).then(function (unitesSecteursEval) {
-          var entretienTotal = unitesSecteursEval + entretienProgrammesEval;
+        // Chantier "effets permanents" (technologies.json, champ
+        // `ameliore`) — Cellules énergétiques amélioré (Dunlork) :
+        // `evaluation.free_sector_maintenance` = "l'Entretien de vos
+        // secteurs est satisfait gratuitement" lors de l'Évaluation.
+        // Uniquement l'Entretien des SECTEURS (unitesSecteursEval,
+        // SecteurService.getEntretien) — celui des Programmes actifs
+        // (entretienProgrammesEval ci-dessus) reste dû normalement, le
+        // texte de la carte ne le concerne pas.
+        var techCellulesEnergetiques = technologieJoueurParNom_(partieEval, 'Cellules énergétiques');
+        var entretienSecteursGratuit = !!(techCellulesEnergetiques && techCellulesEnergetiques.amelioree);
+
+        Promise.all([SecteurService.getEntretien(partieEval.id), calculerPointsProgrammesActifs_(partieEval)]).then(function (resultatsEval) {
+          var unitesSecteursEval = resultatsEval[0];
+          var pointsProgrammesEval = resultatsEval[1];
+          var entretienSecteursDu = entretienSecteursGratuit ? 0 : unitesSecteursEval;
+          var entretienTotal = entretienSecteursDu + entretienProgrammesEval;
+
+          // Chantier "Points de victoire des Programmes" : détail chiffré
+          // par Programme actif (emplacements 1/2/3 — le Programme de
+          // départ n'a pas d'objectif1/objectif2 structuré, voir
+          // programmeScoreService.js) au lieu du rappel "Non automatisé"
+          // affiché jusqu'ici pour cette section (§3.4). Retour
+          // utilisateur (28/08/2026) : "Il faut que l'influence soit
+          // ajoutee au compteur lorsque je valide la fin de cycle" —
+          // gainInfluenceProgrammesEval est ajouté à `influence` dans le
+          // même GameService.majPlateauMaison que l'Entretien, au clic
+          // sur "Valider" ci-dessous (plus un simple affichage).
+          var gainInfluenceProgrammesEval = Object.keys(pointsProgrammesEval).reduce(function (total, index) {
+            return total + pointsProgrammesEval[index].total;
+          }, 0);
+          var texteObjectifsProgramme = Object.keys(pointsProgrammesEval).length
+            ? Object.keys(pointsProgrammesEval).sort().map(function (index) {
+                var p = pointsProgrammesEval[index];
+                return '<p><strong>' + p.nom + '</strong> — Objectif 1 : +' + p.objectif1 + ' · Objectif 2 : +' + p.objectif2 +
+                  ' · <strong>Total : +' + p.total + ' Influence</strong></p>';
+              }).join('') + '<p><strong>+' + gainInfluenceProgrammesEval + ' Influence</strong> au total — ajoutée à la validation.</p>'
+            : '<p class="hint">Aucun Programme actif (hors Programme de départ) sur le Plat. maison.</p>';
 
           function renderPhaseEvaluation_() {
             var restant = entretienTotal - entretienPaye;
@@ -6259,13 +7293,16 @@ var StrategieService = (function () {
             var peutPayerMateriel = restant > 0 && stockEval.materiel >= 2;
             var peutEncorePayer = peutPayerNourriture || peutPayerEnergie || peutPayerMateriel;
 
+            var texteGratuiteSecteurs = (entretienSecteursGratuit && unitesSecteursEval > 0)
+              ? '<p class="hint">Entretien des secteurs (' + unitesSecteursEval + ') offert — Cellules énergétiques (Améliorée).</p>'
+              : '';
             var texteEntretien;
             if (!entretienTotal) {
-              texteEntretien = '<p>Aucun Entretien dû.</p>';
+              texteEntretien = texteGratuiteSecteurs || '<p>Aucun Entretien dû.</p>';
             } else if (!restant) {
-              texteEntretien = '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — intégralement payé.</p>';
+              texteEntretien = texteGratuiteSecteurs + '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — intégralement payé.</p>';
             } else {
-              texteEntretien = '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — reste <strong>' + restant + '</strong> à payer.</p>' +
+              texteEntretien = texteGratuiteSecteurs + '<p>Entretien dû : <strong>' + entretienTotal + '</strong> — reste <strong>' + restant + '</strong> à payer.</p>' +
                 '<div class="modal-choix-boutons">' +
                 '<button type="button" class="btn btn-secondary" id="phase-eval-payer-nourriture"' + (peutPayerNourriture ? '' : ' disabled') + '>Payer 1 unité — 1 Nourriture (stock ' + stockEval.nourriture + ')</button>' +
                 '<button type="button" class="btn btn-secondary" id="phase-eval-payer-energie"' + (peutPayerEnergie ? '' : ' disabled') + '>Payer 1 unité — 2 Énergie (stock ' + stockEval.energie + ')</button>' +
@@ -6295,7 +7332,7 @@ var StrategieService = (function () {
               '</div>' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Objectifs de Programme</h4>' +
-              '<p class="hint">Non automatisé — à détailler plus tard (§3.4, Phase 4 des Programmes).</p>' +
+              texteObjectifsProgramme +
               '</div>';
 
             var btnPayerNourriture = document.getElementById('phase-eval-payer-nourriture');
@@ -6314,7 +7351,7 @@ var StrategieService = (function () {
             btnValider.disabled = true;
             var restant = entretienTotal - entretienPaye;
             var perteInfluence = restant * 3;
-            var nouvelleInfluence = Math.max(0, influenceInitiale - perteInfluence);
+            var nouvelleInfluence = Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval;
 
             GameService.majPlateauMaison(partieEval.id, {
               ressourceNourriture: stockEval.nourriture,
@@ -6327,7 +7364,7 @@ var StrategieService = (function () {
               partieEval.plateauMaison.ressources.materiel = stockEval.materiel;
               partieEval.plateauMaison.ressources.influence = nouvelleInfluence;
               fermerModale_();
-              resolve({ confirme: true, entretienNonPaye: restant, influencePerdue: perteInfluence });
+              resolve({ confirme: true, entretienNonPaye: restant, influencePerdue: perteInfluence, influenceGagneeProgrammes: gainInfluenceProgrammesEval });
             }).catch(function (erreur) {
               btnValider.disabled = false;
               window.alert('Échec de l\'enregistrement de l\'Entretien : ' + erreur.message);
@@ -6428,6 +7465,11 @@ var StrategieService = (function () {
     // texte FR — exposé pour index.html/renderEcranMiseEnPlace_ (rappel
     // "Effet immédiat" au clic sur un badge Technologie, écran Mise en
     // place), même fonction que la popup 'gagner_technologie' ci-dessus.
-    texteEffetImmediatTechnologie: texteEffetImmediatDepuisJson_
+    texteEffetImmediatTechnologie: texteEffetImmediatDepuisJson_,
+    // Chantier "Points de victoire des Programmes" — exposée pour
+    // index.html/renderProgrammesPlateauMaison_ (affichage temps réel
+    // "+N" sur chaque ligne Programme) ; réutilisée aussi par la popup
+    // 'phase_evaluation' ci-dessus (section "Objectifs de Programme").
+    calculerPointsProgrammesActifs: calculerPointsProgrammesActifs_
   };
 })();

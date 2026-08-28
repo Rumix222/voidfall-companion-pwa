@@ -306,15 +306,47 @@ test('gagner_commerce : bonus choisi résolu récursivement (choice_repeat)', fu
   });
 });
 
-test('gagner_prime : crédite jetonPrime directement (case "Gagnez un jeton Prime.")', function () {
+// Chantier "gain de jeton Prime" (todo.md, retour utilisateur) : gagner_prime
+// incrémente jetonPrime ET fait choisir une récompense parmi les 11 faces
+// réelles (TOKENS_PRIME_) — popup 'option_exclusive' (laquelle des 11
+// faces), puis un 2e 'option_exclusive' pour la face choisie si elle a
+// elle-même un choix interne (ex. "2 Nourriture ou 1 Influence").
+test('gagner_prime : incrémente jetonPrime ET fait choisir une récompense (11 faces réelles)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Prime', effet: { gagner_prime: 1 }, cout: {}, texte: '' };
 
-  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+  var appelsOptionExclusive = 0;
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'option_exclusive');
+    appelsOptionExclusive++;
+    if (appelsOptionExclusive === 1) {
+      assert.strictEqual(contexte.options.length, 11);
+      assert.strictEqual(contexte.options[0], 'Gagnez 2 Nourriture ou 1 Influence.');
+      return { indexChoisi: 0 }; // "Gagnez 2 Nourriture ou 1 Influence."
+    }
+    return { indexChoisi: 0 }; // sous-choix : "2 Nourriture" (plutôt que "1 Influence")
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(appelsOptionExclusive, 2);
     assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
-    assert.ok(resultat.journal.some(function (l) { return l.indexOf('prime') !== -1 && l.indexOf('non automatisé') === -1; }));
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceNourriture, 7); // 5 + 2
+  });
+});
+
+// "Annuler" sur le choix de récompense bloque TOUTE l'action (même règle
+// que n'importe quel autre choix exclusif) — jetonPrime N'EST PAS
+// incrémenté (mutation défaite avec le reste, voir resoudreJson_).
+test('gagner_prime : "Annuler" sur le choix de récompense bloque tout, jetonPrime inchangé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Prime', effet: { gagner_prime: 1 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, function () { return { annule: true }; }).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 0);
   });
 });
 
@@ -323,14 +355,19 @@ test('gagner_prime : crédite jetonPrime directement (case "Gagnez un jeton Prim
 // Bonus Commerce "Gagnez un jeton Prime." (index 4 de BONUS_COMMERCE)
 // doit réellement créditer jetonPrime, pas juste journaliser un rappel
 // manuel.
-test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonPrime', function () {
+test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonPrime et fait choisir une récompense', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Commerce', effet: { gagner_commerce: 1 }, cout: {}, texte: '' };
 
+  var appelsOptionExclusive = 0;
   var demanderChoix = function (contexte) {
-    assert.strictEqual(contexte.type, 'bonus_commerce');
-    return { indexChoisi: 4 }; // "Gagnez un jeton Prime."
+    if (contexte.type === 'bonus_commerce') return { indexChoisi: 4 }; // "Gagnez un jeton Prime."
+    assert.strictEqual(contexte.type, 'option_exclusive');
+    appelsOptionExclusive++;
+    // 1er appel : laquelle des 11 faces ("Gagnez 1 ressource.", index 9) ;
+    // 2e appel : sous-choix parmi les 4 ressources (peu importe laquelle).
+    return { indexChoisi: appelsOptionExclusive === 1 ? 9 : 0 };
   };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
@@ -440,11 +477,15 @@ test('envahir : victoire — jetonPrime/jetonLiberation/influence crédités, jo
   var carte = { focus: 'Test' };
   var action = { action: 'Envahir', effet: { envahir: 1 }, cout: { energie: 2 }, texte: '' };
 
-  // Le même demanderChoix est réutilisé pour l'Effet ('envahir') ET le
-  // Coût en Énergie (popup 'paiement_ressource', comportement systématique
-  // — voir tests dédiés plus haut) : dispatche sur contexte.type.
+  // Le même demanderChoix est réutilisé pour l'Effet ('envahir'), le choix
+  // de récompense du jeton Prime gagné (chantier "gain de jeton Prime",
+  // 'option_exclusive'/'options_inclusives') ET le Coût en Énergie (popup
+  // 'paiement_ressource', comportement systématique — voir tests dédiés
+  // plus haut) : dispatche sur contexte.type.
   var demanderChoix = function (contexte) {
     if (contexte.type === 'paiement_ressource') return { utiliseRessource: contexte.montant };
+    if (contexte.type === 'option_exclusive') return { indexChoisi: 10 }; // "Gagnez 1 Science et/ou 1 Influence."
+    if (contexte.type === 'options_inclusives') return [0, 1]; // Science ET Influence
     assert.strictEqual(contexte.type, 'envahir');
     assert.strictEqual(contexte.corrompu, false);
     assert.strictEqual(contexte.partieId, 'partie-test');
@@ -458,7 +499,9 @@ test('envahir : victoire — jetonPrime/jetonLiberation/influence crédités, jo
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
     assert.strictEqual(resultat.plateauMaisonApres.jetonLiberation, 1);
-    assert.strictEqual(resultat.plateauMaisonApres.influence, 13); // 10 + 3
+    // 10 (base) + 3 (influenceGagnee, invasion) + 1 (récompense jeton Prime, "et/ou" Science+Influence)
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 14);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, 3); // 2 + 1 (récompense jeton Prime)
     assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 3); // coût quand même débité
     assert.ok(resultat.journal.some(function (l) { return l.indexOf('VICTOIRE') !== -1; }));
   });

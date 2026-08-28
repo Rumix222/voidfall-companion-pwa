@@ -1,9 +1,723 @@
 /**
  * version.js
- * Version 108 — 2026-08-26
+ * Version 125 — 2026-08-28
  * Source de vérité unique pour la version de l'application.
  *
- * 26/08/2026, dernière fois (chantier Technologies — 5 Technologies
+ * 28/08/2026, dernière fois (retour utilisateur : "Il faut que
+ * l'influence soit ajoutee au compteur lorsque je valide la fin de
+ * cycle") : suite directe du chantier "Points de victoire des
+ * Programmes" (juste ci-dessous) — l'Influence calculée par
+ * ProgrammeScoreService n'était jusqu'ici qu'AFFICHÉE dans la popup
+ * Phase Évaluation, jamais créditée. `js/strategieService.js`, popup
+ * 'phase_evaluation' : `gainInfluenceProgrammesEval` (somme des
+ * `.total` de tous les Programmes actifs) calculé une fois, ajouté à
+ * `nouvelleInfluence` dans le MÊME `GameService.majPlateauMaison` que
+ * l'Entretien, au clic sur "Valider" (jamais sur "Annuler", cohérent
+ * avec le principe existant "aucune écriture avant Valider" de cette
+ * popup). Texte de la section "Objectifs de Programme" complété d'une
+ * ligne "+N Influence au total — ajoutée à la validation." Vérifié par
+ * harnais Node bout-en-bout (vm, vraie popup 'phase_evaluation' pilotée
+ * de bout en bout — ouverture, clic réel sur "Valider" — avec Influence
+ * initiale 50 et un Programme D1 valant +17 : confirme `GameService.
+ * majPlateauMaison` appelé avec `influence:67` et `resolve(...)` portant
+ * `influenceGagneeProgrammes:17`). 178 tests toujours au vert (aucun
+ * nouveau test unitaire — strategieService.js n'a pas de suite dédiée,
+ * comme le reste de ce fichier).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 28/08/2026, avant (chantier "Points de victoire des
+ * Programmes", retour utilisateur : "Analyse l'implémentation du calcul
+ * des points de victoire générés par les programme du plat maison en
+ * fin de cycle" puis "Oui lance le chantier. Voir aussi pour afficher
+ * l'influence que rapporte un programme en temps réel sur le plateau
+ * maison.") : les 32 cartes Programme (data/catalogue/programmes.json,
+ * objectif1/objectif2) étaient jusqu'ici du texte affiché, jamais
+ * évalué (constaté : popup 'phase_evaluation', section "Objectifs de
+ * Programme" §3.4, simple rappel "Non automatisé"). Calcul réel ajouté :
+ * - `js/programmeScoreService.js` (NOUVEAU, module pur, style
+ *   combatService.js) : `PROGRAMME_OBJECTIFS_`, table des 32 cartes
+ *   (traçable 1:1 contre le texte du catalogue), `calculerPointsProgramme
+ *   (code, etat)` -> `{objectif1, objectif2, total}`. 3 décisions de
+ *   scope actées avec l'utilisateur avant codage : (1) Vaisseaux-Arches
+ *   (S1, objectif 2) simplifié sans la nuance — mécanique non modélisée
+ *   dans l'app (5 types de vaisseaux suivis, pas de 6e type) ; (2) la
+ *   popup Phase Évaluation affiche aussi les totaux (pas seulement le
+ *   Plat. maison) ; (3) W8 objectif 2, formulation ambiguë DANS LE
+ *   CATALOGUE LUI-MÊME ("jetons Commerce et/ou jetons Prime (selon la
+ *   formulation retenue)") — lecture retenue : les deux additionnés.
+ * - `js/secteurService.js` : nouvelle fonction sœur
+ *   `obtenirDetailSecteursProgrammes` (FAITS bruts par secteur Pur —
+ *   population/entretien 0-1-2/guildes/installations/cubes PN/
+ *   emplacement Guilde vacant — aucune règle de Programme dedans,
+ *   volontairement séparée de `obtenirAgregatsInfluenceSecteursPurs`
+ *   existante pour ne pas risquer de régression sur le mécanisme Focus
+ *   qu'elle sert déjà).
+ * - `js/strategieService.js` : `obtenirEtatProgrammes_` (assemble
+ *   l'`etat` complet — secteurs, Civilisation, Revenu via
+ *   calculerNiveauxProduction_/calculerProductionAvecBonusTechnologie_
+ *   déjà existantes, Entretien total BRUT — volontairement pas ajusté
+ *   par Cellules énergétiques amélioré, qui exempte le paiement, pas la
+ *   définition du terme de jeu —, jetons, Gloire, Technologies base/
+ *   améliorées) + `calculerPointsProgrammesActifs_` (exposée
+ *   publiquement, un seul assemblage pour les 3 emplacements actifs,
+ *   Programme de départ exclu — forme de donnée différente,
+ *   programmesDepart.json sans objectif1/objectif2 structurés) ;
+ *   popup 'phase_evaluation' mise à jour : la section "Objectifs de
+ *   Programme" affiche désormais le détail chiffré par Programme actif
+ *   au lieu du rappel "Non automatisé" (affichage seul, aucune écriture
+ *   DB — l'Influence reste à ajouter manuellement, comme le reste de
+ *   cette popup pour l'instant, seul l'Entretien débite réellement).
+ * - `index.html`/`renderProgrammesPlateauMaison_` : affichage temps réel
+ *   demandé — un badge "+N" (classe `.badge` existante, aucun nouveau
+ *   CSS) à côté de chaque texte d'objectif sur les lignes Programme 1/2/3
+ *   du Plat. maison.
+ * `js/programmeScoreService.js` ajouté à `service-worker.js`
+ * (FICHIERS_A_METTRE_EN_CACHE) et à l'ordre des `<script>` d'index.html
+ * (après combatService.js, avant strategieService.js).
+ * Vérifié : `js/programmeScoreService.test.js` (NOUVEAU, 28 tests,
+ * couvre les 32 codes — au moins objectif1 OU objectif2 par carte,
+ * chaque forme de règle récurrente testée avec condition remplie/non
+ * remplie) + harnais Node bout-en-bout (vm, vraie IndexedDB factice,
+ * secteurService.js + programmeScoreService.js + strategieService.js
+ * réellement chargés et enchaînés) confirmant D1 (secteur Pur pop=6 +
+ * niveau Civilisation Société Pure=3) -> {objectif1:5, objectif2:12,
+ * total:17}, valeur vérifiée à la main avant d'être figée. 178 tests au
+ * vert (`node --test js/*.test.js`, 150 précédents + 28 nouveaux). Pas
+ * de vérification navigateur réel (extension Chrome non connectée dans
+ * cette session).
+ * Fichiers touchés : js/programmeScoreService.js (NOUVEAU),
+ * js/programmeScoreService.test.js (NOUVEAU), js/secteurService.js,
+ * js/strategieService.js, index.html, service-worker.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Tentation, retour utilisateur : "La dernière un peu plus compliqué peu
+ * être : tentation") : 9e carte migrée, ses 3 variantes en une fois
+ * (Standard/Kradmor/Héroïque, 9 actions) — AUCUN nouveau code, seulement
+ * l'ajout à `CARTES_ELIGIBLES_FEUILLE_` (strategieService.js), comme
+ * Production en son temps.
+ * - Recherche menée AVANT tout code (le catalogue laissait présager plus
+ *   compliqué à cause de "gain_corruption", coût de Conspirer/Exercer/
+ *   Surmonter/Prévoir) : implémenté d'abord un nouveau `contexte.type`
+ *   'gagner_corruption' (feuilleFlowGagnerCorruption_, port direct de la
+ *   branche #modal-choix homonyme), avant de vérifier par un harnais Node
+ *   direct sur `FocusEngine.resoudreAction` que cette popup n'est
+ *   JAMAIS déclenchée pour ce coût : "gain_corruption" n'apparaît QUE
+ *   dans des `cout` sur l'ENSEMBLE du catalogue (jamais un `effet`),
+ *   resoudreAction résout tout `cout` avec signe=-1, et la seule branche
+ *   focusEngine.js qui ouvre cette popup exige signe>0 (elle n'est
+ *   utilisée en pratique que par GameService.appliquerCadreGainCorruption
+ *   pour un Cadre d'Événement, hors du chemin Focus/Feuille). Ce coût
+ *   retombe donc toujours sur le repli générique "non automatisé" —
+ *   IDENTIQUE au comportement déjà en place pour Politique/Production/
+ *   Progrès, qui ont ce même coût. `feuilleFlowGagnerCorruption_` a donc
+ *   été RETIRÉ avant livraison (code mort pour cette migration, aucune
+ *   carte du catalogue ne l'aurait jamais atteint) — enseignement
+ *   méthodologique pour la suite : quand une carte semble nécessiter un
+ *   nouveau `contexte.type`, VÉRIFIER D'ABORD par un harnais direct sur
+ *   FocusEngine (avec un `demanderChoix` qui trace les types appelés)
+ *   plutôt que de porter la branche #modal-choix par précaution — le
+ *   signe (+1 Effet/-1 Coût) peut rendre une branche entièrement
+ *   inatteignable pour un vocabulaire de catalogue donné.
+ * - Toutes les clés effectivement recontrées (activer_cube, deployer_
+ *   cube_secteur_mere -> 'deployer_cube' mode 'secteur_mere' déjà
+ *   supporté depuis Renfort, augmenter_population, avancer_civilisation
+ *   bare et avancer_civilisation_moins_avancee, ressource_choix en Coût
+ *   ET en Effet) étaient déjà couvertes par un feuilleFlow* existant —
+ *   tous les "choice" du catalogue Tentation contiennent "et/ou", donc
+ *   toujours résolus en `options_inclusives`, déjà supporté.
+ * - Vérifié par harnais Node direct sur FocusEngine.resoudreAction (3
+ *   scénarios) : Standard "Exercer" (options_inclusives -> deployer_cube
+ *   mode secteur_mere confirmé, annulation nichée bloque bien TOUTE
+ *   l'action) ; Standard "Conspirer" (gain_corruption jamais déclenché,
+ *   coût non-bloquant) ; Héroïque "Exploiter" (ressource_choix réutilisé
+ *   en Coût ET Effet sans passerelle). 150 tests au vert (aucun nouveau
+ *   test unitaire nécessaire).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Renfort, retour utilisateur : "On continu avec renfort") : 8e carte
+ * migrée, ses 3 variantes en une fois (Standard/Novaris/Héroïque, 9
+ * actions).
+ * - `feuilleFlowDeployerCube_` (NOUVELLE, juste après
+ *   `feuilleFlowEnvahir_`) : port direct de la branche #modal-choix
+ *   'deployer_cube' — les 3 modes ('libre'/'par_chantier'/'secteur_mere',
+ *   selon quel secteur peut recevoir des cubes et la quantité max
+ *   autorisée), même formulaire type/secteur/quantité avec liste
+ *   d'engagements modifiable, mêmes validations (Cube actif, coût
+ *   Matériel/Nourriture par type via COUT_DEPLOIEMENT_PAR_TYPE). Seul
+ *   nouveau `contexte.type` nécessaire — mécanique signature de ce
+ *   Focus ("Rassembler"/"Adapter", `deployer_cube_par_chantier`), même
+ *   pattern "liste vivante" que `feuilleFlowRegrouper_`/
+ *   `feuilleFlowEnvahir_` (re-rendu en place via `rerender_()`, pas de
+ *   transition à chaque ajout/retrait).
+ * - Bonus inattendu de cette migration : Héroïque "Accélérer"
+ *   (`avancer_civilisation` bare + `avancer_civilisation_moins_avancee`
+ *   avec `tie_break:"au_choix"`) exerce pour la PREMIÈRE fois les 2
+ *   branches "piste au choix"/"moins avancée avec tie-break" de
+ *   `feuilleFlowAvancerCivilisation_` (porté pour Politique, mais
+ *   seule la branche "piste imposée" avait été réellement exercée
+ *   jusqu'ici, par Politique/Production) — aucun changement de code
+ *   nécessaire, la fonction couvrait déjà ces 2 cas fidèlement.
+ * - Vocabulaire non reconnu par focusEngine.js ("defense_secteur" bare,
+ *   "retirer_corruption_fiche", "construire_installation_up_to",
+ *   "defausser_crise", gain_corruption en coût) : repli générique non
+ *   bloquant, comportement identique en Feuille et en #modal-choix,
+ *   aucune régression.
+ * `CARTES_ELIGIBLES_FEUILLE_`/`FEUILLE_TYPES_SUPPORTES_`
+ * (strategieService.js) : 3 nouvelles entrées Renfort + 'deployer_cube'.
+ * 150 tests au vert (aucun nouveau test unitaire, strategieService.js
+ * n'a pas de suite dédiée). Vérifié par harnais Node ad hoc (vm, vrai
+ * `StrategieService.demanderChoix({type:'deployer_cube', mode:
+ * 'par_chantier'})` appelé, formulaire rempli et validé) : mode
+ * "par_chantier" calcule bien le max par secteur (installationChantierNaval
+ * × quantiteDemandee — 1 et 2 respectivement pour 2 secteurs, 3e secteur
+ * sans Chantier Naval exclu), compteur mis à jour après ajout (0/3 ->
+ * 1/3), `SecteurService.deployerCube` appelé avec les bons arguments à
+ * la validation. Pas de vérification navigateur réel (extension Chrome
+ * non connectée dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Prospérité, retour utilisateur : "Faisons Prospérité") : 7e carte
+ * migrée, ses 3 variantes en une fois (Standard/Astoran/Héroïque, 9
+ * actions).
+ * - `feuilleFlowRessourceChoix_` (NOUVELLE, juste après
+ *   `feuilleFlowDefausserGloire_`) : port direct de la branche
+ *   #modal-choix 'ressource_choix' ("N ressources de votre choix", Effet
+ *   OU Coût selon `contexte.signe` — Standard "Stocker"/Héroïque
+ *   "Prospérer") — le joueur clique librement sur les 5 boutons de
+ *   ressource (un clic = 1 unité, répétable) jusqu'à épuiser le nombre
+ *   demandé ou valide plus tôt ("Valider" toujours disponible, cette clé
+ *   ne bloque JAMAIS — pas de bouton Annuler côté #modal-choix). Seul
+ *   nouveau `contexte.type` nécessaire pour cette carte — mécanique de
+ *   rendu "en place" inédite dans la Feuille (re-render du contenu +
+ *   ré-attache des listeners à chaque clic, plutôt qu'une rangée-choix
+ *   figée), mais aucune nouvelle mécanique de résolution côté
+ *   focusEngine.js.
+ * - Astoran "Réguler" (`choice:["programme_force","programme_richesse"]`)
+ *   déjà couvert (CLE_PROGRAMME_VERS_TYPE_ -> 'gagner_programme',
+ *   'gagner_technologie'/'gagner_programme' déjà portés).
+ * - Coûts combinés (Astoran "Parader",
+ *   `cout:{nourriture:1,rappeler_cube:1}`) : aucune passerelle
+ *   spécifique nécessaire — focusEngine.js résout les 2 clés
+ *   SÉQUENTIELLEMENT, chacune déclenchant SON PROPRE `demanderChoix`
+ *   ('paiement_ressource' puis 'rappeler_cube_cout'), tous deux déjà
+ *   supportés indépendamment.
+ * - Vocabulaire non reconnu par focusEngine.js (Astoran/Héroïque :
+ *   "detruire"/"destroy" en coût, "etablir_guilde_meme_secteur",
+ *   "retirer_gardien") : repli générique non bloquant, comportement
+ *   identique en Feuille et en #modal-choix, aucune régression.
+ * `CARTES_ELIGIBLES_FEUILLE_`/`FEUILLE_TYPES_SUPPORTES_`
+ * (strategieService.js) : 3 nouvelles entrées Prospérité +
+ * 'ressource_choix'.
+ * 150 tests au vert (aucun nouveau test unitaire, strategieService.js
+ * n'a pas de suite dédiée). Vérifié par harnais Node ad hoc (vm, vrai
+ * `StrategieService.demanderChoix({type:'ressource_choix'})` appelé,
+ * simulation de clics répétés sur les boutons ressource) : 2 clics sur
+ * "Énergie" (nombre=2) auto-résout avec `["energie","energie"]` ;
+ * "Valider" cliqué après 1 seul choix sur 3 demandés résout bien avec
+ * `["materiel"]` (arrêt anticipé). Pas de vérification navigateur réel
+ * (extension Chrome non connectée dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Progrès, retour utilisateur : "Progrès") : 6e carte migrée, ses 3
+ * variantes en une fois (Standard/Novaris/Héroïque, 9 actions).
+ * - `feuilleFlowDefausserGloire_` (NOUVELLE, juste après
+ *   `feuilleFlowAmeliorerGloire_`) : port direct de la branche
+ *   #modal-choix 'defausser_gloire' (Coût, Focus Progrès Héroïque
+ *   "Restaurer") — miroir exact d'`ameliorer_gloire` mais retire le
+ *   jeton Gloire le plus bas au lieu de l'incrémenter, sans plafond.
+ *   Seul nouveau `contexte.type` nécessaire pour cette carte.
+ * - Standard "Restaurer" (`cout:{rappeler_cube:1}, effet:{effet_secteur:
+ *   [...]}`) : déjà entièrement couvert par `feuilleFlowRappelerCubeCout_`
+ *   existante (même mécanisme que Développement "Installer") — vérifié
+ *   qu'elle ne gère QUE les catégories 'guilde'/'installation' dans le
+ *   tableau `effet_secteur` (via `veutGuilde`/`veutInstallation`) ; pour
+ *   "retirer_corruption"/"regrouper" (valeurs de CE tableau ici), le
+ *   Coût (rappel de cube) se résout normalement et l'Effet journalise
+ *   "non automatisé" SANS section "Effet" affichée — EXACTEMENT le même
+ *   comportement qu'aujourd'hui côté #modal-choix (`effet_secteur` est
+ *   hors périmètre de focusEngine.js quel que soit le tableau), donc
+ *   aucune régression à migrer cette carte telle quelle.
+ * - Novaris ("gain:{technologie:[...]}", "programme" bare,
+ *   "invade_corrupted_sector") et Héroïque ("etablir_guilde_scientifique",
+ *   "retirer_crise") : vocabulaire NON reconnu par focusEngine.js (aucune
+ *   des clés `CLES_SIMPLES`/cas dédiés/`CLES_*_HORS_PERIMETRE`) — retombe
+ *   sur le repli générique final de `resoudreCle_` ("effet non chiffré...
+ *   à appliquer manuellement"), qui NE BLOQUE JAMAIS et ne déclenche
+ *   AUCUN `demanderChoix` — comportement identique en Feuille et en
+ *   #modal-choix, aucune régression.
+ * `CARTES_ELIGIBLES_FEUILLE_`/`FEUILLE_TYPES_SUPPORTES_`
+ * (strategieService.js) : 3 nouvelles entrées Progrès + 'defausser_
+ * gloire'.
+ * 150 tests au vert (aucun nouveau test unitaire, strategieService.js
+ * n'a pas de suite dédiée). Vérifié par harnais Node ad hoc (vm, vrai
+ * `StrategieService.demanderChoix({type:'defausser_gloire'})` appelé) :
+ * cible bien le jeton Gloire le plus bas (1, pas 3 ni 4) et le retire ;
+ * cas "aucun jeton posé" correctement annulé avec message explicite. Pas
+ * de vérification navigateur réel (extension Chrome non connectée dans
+ * cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Production, retour utilisateur : "Continue avec focus production") :
+ * 5e carte migrée, TOUTES ses variantes en une fois (Standard + Kradmor +
+ * Nervo + Thegwyn + Héroïque, 14 actions). Contrairement à Focus
+ * Politique (juste avant), AUCUN nouveau code : `CARTES_ELIGIBLES_
+ * FEUILLE_` gagne les 5 entrées, c'est tout — chaque clé Effet/Coût du
+ * catalogue Production (avancer_civilisation_societe/_economie/
+ * _gouvernement, produire_energie/materiel/nourriture/science,
+ * influence_par_guilde/guilde_pure, retirer_corruption, regrouper,
+ * guilde) était déjà couverte par un feuilleFlow* existant (avancer_
+ * civilisation venant d'être porté pour Politique ; le reste hérité des
+ * migrations Conquête/Développement/Innovation). Les quelques clés sans
+ * résolution automatisée (gain_corruption en coût, augmenter_population_
+ * up_to, retirer_gardien, remettre_commerce en coût) retombent sur le
+ * repli générique "non automatisé", déjà le cas AVANT cette migration.
+ * 150 tests au vert (inchangé, aucun code testable ajouté). Vérifié par
+ * harnais Node ad hoc (vm) : `carteEligibleFeuille_` reconnaît les 5
+ * variantes Production ; 'avancer_civilisation' avec la piste "societe"
+ * (Standard/Nervo/Thegwyn "S'épanouir") affiche le bon niveau/la bonne
+ * case et appelle CivilisationService.avancerPiste correctement —
+ * confirme au passage que le port fait pour Politique généralise
+ * correctement au-delà de la seule piste "gouvernement". Pas de
+ * vérification navigateur réel (extension Chrome non connectée dans
+ * cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (Plan de migration Feuille d'action — Focus
+ * Politique, retour utilisateur : "Implémente les actions du focus
+ * politique selon le dernier pattern") : 4e carte migrée vers la Feuille
+ * (après Conquête/Développement/Innovation Standard), TOUTES ses variantes
+ * en une fois (Standard + Shiveus + Zenor + Héroïque, 12 actions) — même
+ * texte "Effet"/"Coût" partout, seules leurs clés Effet diffèrent, aucune
+ * n'a nécessité un feuilleFlow* spécifique à une maison.
+ * - `CARTES_ELIGIBLES_FEUILLE_`/`FEUILLE_TYPES_SUPPORTES_`
+ *   (strategieService.js) : 4 nouvelles entrées `{focus:'Politique',
+ *   type:...}` + 3 nouveaux `contexte.type` ('avancer_civilisation',
+ *   'ameliorer_gloire', 'bonus_commerce' — les seuls que Focus Politique
+ *   déclenche et qui manquaient encore ; envahir/envahir_corrompu/
+ *   deplacer_corruption/augmenter_population/activer_cube étaient déjà
+ *   couverts par d'autres cartes).
+ * - `feuilleFlowAmeliorerGloire_` (NOUVELLE) : port direct de la branche
+ *   #modal-choix 'ameliorer_gloire' — auto-résolutive (aucun choix,
+ *   cible toujours le jeton Gloire le plus bas), même précaution sur
+ *   `etatGloire` (pas `partieAffichee.plateauMaison.gloire`, voir son
+ *   commentaire "IMPORTANT").
+ * - `feuilleFlowAvancerCivilisation_` (NOUVELLE) : port direct de la
+ *   branche #modal-choix 'avancer_civilisation' — les 3 cas (piste
+ *   imposée, piste au choix, "moins avancée" + tie-break), même aperçu
+ *   de la prochaine case et délégation à CivilisationService.avancerPiste
+ *   (l'enchaînement d'effets imbriqués de la nouvelle case reste géré
+ *   par avancerPiste elle-même, aucun code supplémentaire ici). Seul le
+ *   cas "piste imposée" (Focus Politique "Inspirer" → Gouvernement) est
+ *   RÉELLEMENT exercé par Politique aujourd'hui ; les 2 autres portés
+ *   par cohérence/réutilisabilité future.
+ * - `bonus_commerce` (Nacelles/Nexus de commerce, JAMAIS migrée jusqu'ici
+ *   malgré le chantier Technologies) : AUCUNE fonction dédiée — son
+ *   contrat (options = tableau de libellés déjà formés, résolution
+ *   {indexChoisi}) est identique à 'option_exclusive', simple routage
+ *   vers `feuilleFlowOptionExclusive_` déjà existante.
+ * - Quelques clés du catalogue Politique restent SANS résolution
+ *   automatisée (gain_corruption en Coût, produire_ressource,
+ *   retirer_cube_neant_secteur_adjacent, destroy) — déjà le cas AVANT
+ *   cette migration (repli générique "non automatisé", jamais bloquant),
+ *   aucune régression introduite.
+ * 150 tests au vert (aucun nouveau test unitaire — strategieService.js
+ * n'a pas de suite dédiée). Vérifié par harnais Node ad hoc (vm, vrai
+ * `StrategieService.demanderChoix(...)` appelé pour les 3 nouveaux types,
+ * export de test temporaire pour ouvrir la Feuille/positionner l'état) :
+ * `carteEligibleFeuille_` reconnaît les 4 variantes Politique ;
+ * 'ameliorer_gloire' cible et incrémente le bon jeton (2→3) ;
+ * 'avancer_civilisation' (piste imposée Gouvernement) affiche le bon
+ * niveau/la bonne prochaine case ET appelle CivilisationService.
+ * avancerPiste avec les bons arguments ; 'bonus_commerce' route
+ * effectivement vers l'écran option_exclusive avec les bonnes options.
+ * Pas de vérification navigateur réel (extension Chrome non connectée
+ * dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier "effets permanents" des
+ * Technologies — Lot 3 "Combat" COMPLET, Missiles longue portée + Drones
+ * autonomes, les 2 dernières Technologies du chantier permanent/ameliore) :
+ * - `combatService.js` (module pur) : `construireCamp` gagne 2 nouveaux
+ *   champs `bonusMissilesLonguePortee`/`bonusDronesAutonomes` (`false` par
+ *   défaut, JAMAIS déduits de `partie` — contrairement aux `techs.hasXxx`
+ *   permanents, ce sont des choix DÉCIDÉS PAR LE JOUEUR à CE combat
+ *   précis). `resoudreCombat` les applique à l'étape d'Approche/aux
+ *   Absorptions de Salve (Missiles longue portée : +1 Dégât d'Approche ;
+ *   Drones autonomes : +1 Absorption d'Approche ET +1 Absorption de
+ *   Salve, tous deux côté attaquant uniquement). `resoudreInvasion` gagne
+ *   2 paramètres optionnels (5e/6e) pour les transmettre — le débit réel
+ *   de la ressource (1 Énergie/1 jeton Commerce) reste hors de ce module
+ *   pur, à la charge de l'appelant. 4 nouveaux tests
+ *   `combatService.test.js`.
+ * - `strategieService.js` : `confirmerMissilesLonguePortee_`/
+ *   `confirmerDronesAutonomes_` (NOUVELLES, juste après
+ *   `confirmerReplicateursDeCombat_`) — posent la question via la popup
+ *   'confirmation' UNIQUEMENT si éligible (Missiles longue portée : un
+ *   secteur ADJACENT à la cible, possédé, avec Chantier Naval/Base
+ *   Stellaire — calculé avec `adjacenceMap`/`secteurParNumero_` déjà en
+ *   place dans la résolution 'envahir') ET assez de la ressource requise.
+ *   Appelées SÉQUENTIELLEMENT (PAS `Promise.all`) avant `CombatService.
+ *   resoudreInvasion`, dans les 2 copies de la résolution 'envahir'
+ *   (Feuille + #modal-choix) — puis le coût réel est débité (Énergie -1
+ *   et/ou dernier jeton Commerce retiré) via `GameService.
+ *   majPlateauMaison`, AVANT `confirmerReplicateursDeCombat_`/
+ *   `envahirResoudre`, qu'il y ait victoire ou non (le joueur commet la
+ *   ressource avant de connaître l'issue, comme n'importe quel Coût de
+ *   Focus).
+ * - ⚠️ BUG DÉTECTÉ ET CORRIGÉ PENDANT LA VÉRIFICATION (jamais livré) :
+ *   la première version utilisait `Promise.all([confirmerMissilesLongue
+ *   Portee_(...), confirmerDronesAutonomes_(...)])` — les 2 popups
+ *   partagent la MÊME modale singleton (#modal-choix), les lancer en
+ *   PARALLÈLE aurait fait la 2e écraser le rendu de la 1re avant même que
+ *   le joueur ait pu répondre (1re popup jamais interactive, sa Promise
+ *   jamais résolue -> `Promise.all` bloqué indéfiniment). Repéré par un
+ *   harnais Node bout-en-bout qui pilote RÉELLEMENT la popup #modal-choix
+ *   'envahir' (remplissage du formulaire, clic Ajouter/Valider, clic sur
+ *   CHAQUE popup de confirmation dans l'ordre) — corrigé en séquençant
+ *   les 2 confirmations (`.then()` imbriqués) avant même de livrer.
+ * Chantier "effets permanents" des Technologies (Production/Évaluation/
+ * Combat) TERMINÉ pour son périmètre initial — 7 Technologies portées
+ * (Collecte de données, Matrice neuronale, Quais orbitaux amélioré,
+ * Cellules énergétiques amélioré, Réplicateurs de combat, Missiles longue
+ * portée, Drones autonomes). Reste HORS périmètre
+ * (décisions actées avec l'utilisateur en lançant ce chantier) : options
+ * Focus conditionnelles à une Technologie, limites numériques non
+ * bloquantes, versions Améliorées de Réplicateurs de combat/Missiles
+ * longue portée/Drones autonomes, et les Technologies non rattachées à
+ * aucun des 3 lots (Sentinelles, Cybernétique, Scanner de récupération,
+ * Clonage amélioré, Nexus de commerce).
+ * 150 tests au vert (146+4). Vérifié par harnais Node bout-en-bout (vm,
+ * vrai `StrategieService.demanderChoix({type:'envahir'})`, formulaire
+ * rempli et validé, 2 popups de confirmation acceptées dans l'ordre) :
+ * bonus Missiles longue portée visible dans le log de combat, Énergie
+ * débitée (5->4), jeton Commerce retiré, `envahirResoudre` appelé avec
+ * les bons paramètres. Pas de vérification navigateur réel (extension
+ * Chrome non connectée dans cette session).
+ * Fichiers touchés : js/combatService.js, js/combatService.test.js,
+ * js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier "effets permanents" des
+ * Technologies — reprise du Lot 3 "Combat", retour utilisateur "Oui") :
+ * Réplicateurs de combat (Novaris) livré, PREMIÈRE Technologie de ce Lot :
+ * - `secteurService.js`/`envahirResoudre` : nouveau paramètre
+ *   `garderInstallations` (6e, optionnel) — quand vrai, les 3 champs
+ *   Installation (Chantier Naval/Défense de Secteur/Base Stellaire) ne
+ *   sont PAS remis à zéro après une invasion réussie (comportement
+ *   AUPARAVANT inconditionnel) ; Gardien/jetons Prime-Libération-Gloire
+ *   restent retirés comme avant (le texte de la carte ne concerne QUE
+ *   les Installations).
+ * - `strategieService.js`/`confirmerReplicateursDeCombat_` (NOUVELLE,
+ *   juste après `technologieChambreDecontamination_`) : pose la question
+ *   ("garder les Installations + gagner 1 Prime ?") via la popup
+ *   'confirmation' déjà existante, UNIQUEMENT si victoire ET Technologie
+ *   possédée — un seul point d'entrée, appelé par les 2 copies de la
+ *   résolution 'envahir' (Feuille + repli #modal-choix) AVANT d'appeler
+ *   `envahirResoudre`. Si confirmé : +1 ajouté au `jetonPrime` reçu en
+ *   retour, qui passe ensuite par le mécanisme "gain de jeton Prime" du
+ *   chantier précédent (`FocusEngine.resoudreGainJetonsPrime_`) EXACTEMENT
+ *   comme n'importe quel autre jeton Prime — aucun code supplémentaire
+ *   pour la récompense elle-même, confirmant que ce prérequis était le
+ *   bon choix.
+ * - Version Améliorée (déployer un cube après un Combat gagné OU égalité
+ *   en tant qu'Envahisseur) volontairement PAS encore faite — cette
+ *   livraison couvre seulement le `permanent` de base.
+ * - 1 nouveau test `secteurService_actions.test.js`
+ *   (`garderInstallations=true` préserve les 3 Installations, retire le
+ *   reste comme d'habitude). 147 tests au vert au total.
+ * Vérifié aussi par un harnais Node ad hoc (vm, `document` factice) sur
+ * `confirmerReplicateursDeCombat_` directement (appelée via un export de
+ * test temporaire) : les 4 cas (victoire=false, techno absente, Valider,
+ * Annuler) se comportent correctement, titre/message de la popup
+ * corrects. Pas de vérification navigateur réel (extension Chrome non
+ * connectée dans cette session).
+ * Fichiers touchés : js/secteurService.js, js/strategieService.js,
+ * js/secteurService_actions.test.js, version.js.
+ *
+ * 27/08/2026, avant (NOUVEAU chantier "gain de jeton Prime",
+ * prérequis posé par l'utilisateur avant de continuer le chantier "effets
+ * permanents" — retour utilisateur détaillé + capture des 11 jetons Prime
+ * réels du jeu physique, "le nombre en bleu est le nombre de jeton de
+ * chaque type dans la boîte, ne pas prendre en compte") :
+ * - `focusEngine.js`/`TOKENS_PRIME_` (NOUVELLE, juste après BONUS_COMMERCE) :
+ *   les 11 faces RÉELLES du jeton Prime physique portées en dur (3 faces
+ *   "2 même ressource ou 1 Influence" — Nourriture/Matériel/Énergie
+ *   seulement, jamais Science ; 6 faces "1+1 de 2 ressources différentes
+ *   ou 1 Influence" — les 6 paires possibles parmi les 4 ressources ; 1
+ *   face "1 ressource au choix" sans alternative Influence ; 1 face
+ *   "1 Science et/ou 1 Influence", SEULE inclusive). Chaque face est un
+ *   `choice` FocusEngine ordinaire (`inclusif:true` force le mode
+ *   "et/ou" via texteAction, les 10 autres restent exclusives).
+ * - `resoudreGainJetonsPrime_` (NOUVELLE) : pour CHAQUE jeton Prime gagné,
+ *   incrémente `jetonPrime` (compteur physique, inchangé) PUIS fait
+ *   choisir au joueur laquelle des 11 faces il a tirée (popup
+ *   'option_exclusive' listant TOKENS_PRIME_) et résout sa récompense.
+ *   Un seul point d'entrée, appelé par LES DEUX sources de gain de jeton
+ *   Prime déjà automatisées :
+ *   - Clé "prime"/"gagner_prime" (Effet, signe > 0) — fusion des 2 cas
+ *     jusqu'ici séparés (CLES_SIMPLES générique pour "prime", cas dédié
+ *     pour "gagner_prime") ; un COÛT en jetons Prime (signe < 0, jamais
+ *     rencontré au catalogue) reste un simple décompte, sans récompense.
+ *   - Clé "envahir"/"envahir_corrompu" : le `jetonPrime` gagné en victoire
+ *     (secteur envahi qui en portait un) délègue désormais à la MÊME
+ *     fonction plutôt que d'incrémenter directement le compteur.
+ * - 3 tests de `focusEngine.test.js` mis à jour (gagner_prime direct,
+ *   gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime.", envahir
+ *   victoire) pour répondre à la nouvelle popup 'option_exclusive'
+ *   intercalée ; 1 nouveau test ajouté ("Annuler" sur le choix de
+ *   récompense bloque tout, jetonPrime inchangé — même règle que
+ *   n'importe quel autre choix exclusif du moteur).
+ * Prépare directement Réplicateurs de combat (Lot 3 du chantier "effets
+ * permanents", en pause avant ce prérequis) : son "+1 jeton Prime" après
+ * invasion réussie passera par ce même mécanisme, sans code
+ * supplémentaire à écrire pour la récompense elle-même.
+ * 146 tests au vert (145 + 1 nouveau). Vérifié aussi par un harnais Node
+ * ad hoc appelant `FocusEngine.resoudreEffet` directement (Hyperpropulsion
+ * `{prime:3}`) : 3 jetons résolus séquentiellement, journal détaillé par
+ * jeton, compteur et ressources corrects. Pas de vérification navigateur
+ * réel (extension Chrome non connectée dans cette session).
+ * Fichiers touchés : js/focusEngine.js, js/focusEngine.test.js,
+ * version.js.
+ *
+ * 27/08/2026, avant (chantier "effets permanents" des
+ * Technologies — suite, retour utilisateur : "Continue") : Lot 2
+ * "Évaluation" livré (popup `phase_evaluation`, strategieService.js
+ * ~ligne 6273) :
+ * - Cellules énergétiques amélioré (Dunlork) —
+ *   `evaluation.free_sector_maintenance` : l'Entretien des SECTEURS
+ *   (`SecteurService.getEntretien`) est satisfait gratuitement — celui
+ *   des Programmes actifs (`entretienProgrammesEval`) reste dû
+ *   normalement, le texte de la carte ne concerne QUE les secteurs.
+ *   Nouvelle variable `entretienSecteursGratuit` (via
+ *   `technologieJoueurParNom_`, réutilisée du Lot 1) qui met à 0
+ *   `entretienSecteursDu` avant de calculer `entretienTotal`. Un
+ *   nouveau rappel visible ("Entretien des secteurs (N) offert —
+ *   Cellules énergétiques (Améliorée).") s'affiche dans la popup
+ *   plutôt que de faire disparaître silencieusement ce montant — le
+ *   joueur voit POURQUOI il ne doit rien pour ses secteurs.
+ * 145 tests au vert. Vérifié par un harnais Node ad hoc bout-en-bout
+ * (vm, `StrategieService.demanderChoix({type:'phase_evaluation'})`
+ * RÉELLEMENT appelée — pas une copie de la logique — avec un
+ * `document`/`GameService.majPlateauMaison` factices, clic sur Valider
+ * simulé en invoquant `.onclick()` directement) : sans la Technologie,
+ * Entretien 5 non payé -> -15 Influence ; avec Cellules énergétiques
+ * Améliorée (même Entretien secteurs 5, 0 Programme), le rappel
+ * "offert" s'affiche, Entretien total 0, Influence inchangée à la
+ * validation. Pas de vérification navigateur réel (extension Chrome
+ * non connectée dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier "effets permanents" des
+ * Technologies — suite, retour utilisateur : "Continue") : termine le
+ * Lot 1 "Production" (Matrice neuronale + Quais orbitaux amélioré, après
+ * Collecte de données livrée juste avant) :
+ * - `calculerProductionAvecBonusTechnologie_` (NOUVELLE,
+ *   strategieService.js, juste après `calculerProduction_`) : Matrice
+ *   neuronale (Thegwyn) — `bonus.credit_before_production` = +2 Crédit
+ *   ajoutés APRÈS la table PRODUCTION_CREDIT (montant FLAT), pas un
+ *   modificateur de "Niveau" comme Collecte de données/Quais orbitaux
+ *   amélioré — confirmé en retrouvant où la production de Crédit est
+ *   réellement résolue en ressource (`feuilleFlowProduireRevenu_` +
+ *   sa branche #modal-choix 'produire_revenu', seul chemin automatisé
+ *   aujourd'hui, via l'effet "produire_credit" d'une carte Focus comme
+ *   Production "Ravitailler") plutôt que de deviner. Remplace
+ *   `calculerProduction_` aux 4 points d'appel concernés (le calcul lui
+ *   n'est jamais dupliqué) : `champRessourceHTML_`/`majNiveauxAffiches_`
+ *   (affichage "Revenu" du Plat. maison, les 2 mis à jour pour rester
+ *   cohérents entre le rendu initial et la correction asynchrone) et les
+ *   2 résolutions réelles (Feuille + #modal-choix de 'produire_revenu').
+ * - `calculerNiveauxProduction_` : Quais orbitaux amélioré (Dunlork) —
+ *   `ameliore.production.credit_per_shipyard` = +2 au Niveau de
+ *   Production de Crédits par Chantier Naval possédé (même principe que
+ *   Collecte de données, UNIQUEMENT si la case Améliorée est cochée — le
+ *   permanent de base de cette Technologie concerne le déploiement, pas
+ *   la production).
+ * Lot 1 "Production" COMPLET (3/3). Prochain lot du plan : Évaluation
+ * (Cellules énergétiques amélioré), puis Combat (Missiles longue
+ * portée/Drones autonomes/Réplicateurs de combat).
+ * 145 tests au vert. Vérifié par harnais Node ad hoc (vm, même méthode
+ * que Collecte de données) : Quais orbitaux amélioré +6 Niveau Crédit
+ * (3 Chantiers Navals), 0 si pas Améliorée ; Matrice neuronale +2 Crédit
+ * flat sur la résolution (2->4 au niveau 5), jamais sur Science (isolé
+ * à `cle === 'credit'`). Pas de vérification navigateur réel (extension
+ * Chrome non connectée dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (NOUVEAU chantier "effets permanents" des
+ * Technologies, lancement — retour utilisateur : "on va tenter
+ * d'implémenter les effets permanent des technologies... appliqué les
+ * effets pour les technologies présent sur le plat. maison") : distinct
+ * du chantier précédent (effet `immediat` à l'acquisition, terminé) —
+ * s'attaque cette fois aux champs `permanent`/`ameliore` (bonus passifs
+ * tant qu'une Technologie est possédée). Plan complet dans la mémoire de
+ * session `voidfall-technologies-permanentes-plan.md` (2 décisions de
+ * scope actées avec l'utilisateur : les options Focus conditionnelles à
+ * une Technologie sont reportées à un chantier séparé ; les limites
+ * numériques restent du rappel informatif, jamais bloquantes).
+ * Recherche préalable : Combat (`combatService.js`) couvre déjà 5
+ * Technologies (Boucliers/Ciblage/Torpilles/Cellules énergétiques/
+ * Destroyers) + le déploiement des 4 types de vaisseaux est déjà gaté
+ * par Technologie + la phase Évaluation est déjà fonctionnelle — donc
+ * moins de travail neuf que prévu au départ.
+ * 1er lot livré (Lot "Production", sur 3 prévus — Collecte de données
+ * seule pour l'instant, une Technologie à la fois) :
+ * - `strategieService.js`/`technologieJoueurParNom_` (NOUVELLE,
+ *   généralisation de `technologieChambreDecontamination_`, refactorée
+ *   pour la réutiliser) : trouve l'objet Technologie complet (départ OU
+ *   un des 5 emplacements obtenus, avec son état Amélioré) par nom —
+ *   point d'entrée commun pour toute Technologie du chantier "effets
+ *   permanents".
+ * - `calculerNiveauxProduction_` (strategieService.js) : Collecte de
+ *   données (Belitan) — `production.science_per_banker_guild` = +2 au
+ *   Niveau de Production de Science par Guilde de Banquiers réellement
+ *   possédée (comptée dans la même boucle secteurs que la formule de
+ *   base, même filtre "secteur possédé"). DISTINCT du bonus D'ORIGINE
+ *   `bonusProdSecondaire` (EVOLUTION 8, flat +1 Crédit de mise en place
+ *   pour Belitan, même nom de carte cité dans son commentaire par
+ *   coïncidence de flavor) — les deux s'additionnent légitimement,
+ *   vérifié aucun doublon.
+ * Matrice neuronale (`bonus.credit_before_production`) et Quais
+ * orbitaux amélioré (`production.credit_per_shipyard`) restent DE CE
+ * LOT mais pas encore livrés : leur texte ("gagner 2 Crédits
+ * supplémentaires AVANT de produire des Crédits") suggère un gain FLAT
+ * ajouté autour du résultat final de production plutôt qu'un modificateur
+ * du "Niveau" comme Collecte de données — nécessite de comprendre
+ * D'ABORD où/quand la production de Crédit est réellement résolue en
+ * ressource (Focus Production "Ravitailler" ?) avant d'implémenter, pour
+ * ne pas deviner le mauvais point d'accroche.
+ * 145 tests au vert (aucun test dédié existant pour
+ * `calculerNiveauxProduction_`, fonction privée) — vérifié par un
+ * harnais Node ad hoc (vm, copie du fichier avec un export de test
+ * temporaire, `document` factice en Proxy pour charger le fichier
+ * DOM-lourd sans navigateur) : +6 Science avec 3 Guildes de Banquiers
+ * possédées (2+1 sur 2 secteurs), 0 sans la Technologie, Crédit
+ * inchangé — conforme. Pas de vérification navigateur réel (extension
+ * Chrome non connectée dans cette session).
+ * Fichiers touchés : js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier Technologies — les 6 DERNIÈRES
+ * Technologies portées, retour utilisateur : "implémente le reste") —
+ * chantier COMPLET, 28/28 Technologies :
+ * - Cellules énergétiques (Dunlork) / Purificateur (Kradmor) : `cost` +
+ *   un Effet exprimable en JSON FocusEngine (`activate`/`remove_
+ *   corruption` -> `activer_cube`/`retirer_corruption`). Nouvelle
+ *   fonction publique `FocusEngine.resoudreEffetEtCout` (focusEngine.js)
+ *   — même règle métier Effet-puis-Coût que `resoudreAction` (une action
+ *   Focus), mais SANS le suivi `actionsFocusUtilisees` (EVOLUTION 12,
+ *   propre aux actions Focus/cycle, hors sujet pour l'acquisition d'une
+ *   Technologie) : 1ère fois que ce chantier débite un vrai Coût plutôt
+ *   que d'accorder un simple gain. Nouvelle table gameService.js
+ *   `EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_`.
+ * - Cuirassés (Shiveus) : `cost`+`deploy` fixe Secteur-Mère (comme
+ *   Boucliers/Destroyers/Torpilles/Ciblage, TECHNOLOGIES_DEPLOIEMENT_
+ *   SECTEUR_MERE_) — le déploiement reste inconditionnel (direct
+ *   SecteurService.deployerCube), le `cost` débité APRÈS via la même
+ *   `EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_` avec un effet `{}` vide.
+ * - Porte-Vaisseaux (Fenrax) / Sentinelles (Astoran) : `choice` dont une
+ *   alternative est un déploiement FIXE Secteur-Mère — hors vocabulaire
+ *   FocusEngine (comme le cas Cuirassés ci-dessus, mais CETTE FOIS dans
+ *   un choice, donc pas de résolution inconditionnelle possible).
+ *   Nouvelle table `TECHNOLOGIES_CHOIX_DEPLOIEMENT_SECTEUR_MERE_` :
+ *   gagnerTechnologieEtResoudreEffet pose LUI-MÊME le choix (popup
+ *   'option_exclusive', 2 libellés FR bruts) puis dispatche à la main
+ *   vers SecteurService.deployerCube (option Déploiement) ou
+ *   FocusEngine.resoudreEffet (option alternative — `activer_cube` pour
+ *   Porte-Vaisseaux, nouvelle clé à type forcé `construire_defense_
+ *   secteur` — 3e du genre après construire_chantier_naval/construire_
+ *   base_stellaire — pour Sentinelles). Porte-Vaisseaux a en plus un
+ *   `cost` (nourriture) hors du choice, débité après quelle que soit
+ *   l'option choisie (EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_, effet `{}`).
+ * - Drones autonomes (Marqualos) : `{gain:{commerce_token:1},
+ *   choice:{deploy_cube:1}}` — un `choice` à UNE SEULE clé (pas d'ambiguïté
+ *   en fin de compte : un tableau à 1 élément est un cas normal du
+ *   `choice` déjà en place, la popup affiche juste cette unique
+ *   alternative + Annuler) -> `{gagner_commerce:1, choice:[{deployer_cube:1}]}`.
+ * - Bug cosmétique corrigé au passage (découvert en vérifiant Missiles
+ *   longue portée, lot précédent) : `construire_chantier_naval`/
+ *   `construire_base_stellaire` n'avaient aucune entrée dans
+ *   `LIBELLES_OPTIONS` (strategieService.js) — un `choice` les affichant
+ *   AVANT résolution (ex. Missiles longue portée) montrait la clé brute
+ *   ("construire_chantier_naval (1)") au lieu d'un libellé FR. Ajoutées,
+ *   plus `construire_defense_secteur` (nouvelle celle-ci) par anticipation.
+ * TOUTES les 28 Technologies du catalogue ont désormais un effet immédiat
+ * résolu automatiquement — chantier complet (seuls `permanent`/`ameliore`
+ * restent hors périmètre, jamais modélisés, texte informatif uniquement).
+ * 145 tests au vert. Vérifié par un test d'intégration Node (harnais vm,
+ * SecteurService factice pour observer les appels deployerCube) : les 6
+ * dernières technologies + Drones autonomes, 9 scénarios au total
+ * (Cuirassés, Porte-Vaisseaux ×2, Sentinelles ×2, Cellules énergétiques,
+ * Purificateur, Drones autonomes) — coûts débités correctement (avec
+ * substitution Crédit proposée pour nourriture/énergie/matériel),
+ * dispatch correct du choix Secteur-Mère vs FocusEngine selon l'option,
+ * aucune erreur. Pas de vérification navigateur réel cette fois
+ * (extension Chrome non connectée dans cette session).
+ * Fichiers touchés : js/focusEngine.js, js/gameService.js,
+ * js/strategieService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier Technologies — 6 Technologies
+ * supplémentaires portées, retour utilisateur : "implémente 6 de plus") :
+ * - Cybernétique (Novaris) : `immediat.build.structure === "guilde"`
+ *   (type de Guilde au LIBRE choix, contrairement à Matrice neuronale) —
+ *   clé `etablir_guilde` déjà existante (catégorie 'guilde', sans
+ *   typeForce), aucune modification focusEngine.js.
+ * - Terraformation (Thegwyn) / Transports tactiques (Yarvek) /
+ *   Vaisseaux-Arches (Nervo) / Scanner de récupération (Kradmor) /
+ *   Missiles longue portée (Astoran) : `immediat.choice` dont au moins
+ *   une alternative retombe elle-même sur une popup à choix de secteur
+ *   (augmenter_population_pure/deployer_cube/etablir_guilde/construire_
+ *   chantier_naval) — enchaînement choice -> option choisie ->
+ *   résolution récursive déjà ÉPROUVÉ par focusEngine.js (même mécanisme
+ *   que 'choice': ['augmenter_population', 'augmenter_population_pure'],
+ *   déjà couvert par focusEngine.test.js) : aucune nouvelle mécanique de
+ *   choix construite, seulement des clés déjà connues combinées dans un
+ *   tableau. Traductions catalogue Technologies -> FocusEngine :
+ *   `population_pure` -> `augmenter_population_pure`, `deploy_cube` ->
+ *   `deployer_cube` (forme "mode libre" déjà exercée par focus.json/
+ *   pistesCivilisation.json plutôt que l'alias jamais rencontré ailleurs),
+ *   `build_chantier_naval` -> `construire_chantier_naval` (déjà créée au
+ *   lot précédent pour Quais orbitaux).
+ * 22 Technologies portées au total désormais (liste à jour dans la
+ * mémoire de session voidfall-technologies-resolution-plan.md).
+ * 145 tests au vert. Vérifié par un test d'intégration Node (harnais vm,
+ * gagnerTechnologieEtResoudreEffet appelée pour les 6, chaque `choice`
+ * testée sur SES 2 branches — 11 scénarios au total) : aucune erreur,
+ * journal correct pour chaque branche. Pas de vérification navigateur
+ * réel cette fois (extension Chrome non connectée dans cette session).
+ * Fichiers touchés : js/gameService.js, version.js.
+ *
+ * 27/08/2026, avant (chantier Technologies — 5 Technologies
+ * supplémentaires portées, retour utilisateur : "implémente 5 effets
+ * immédiats de technologie de plus") :
+ * - Surveillance centrale (Fenrax) / Chambres de décontamination
+ *   (Shiveus) : `immediat.upgrade.gloire`/`immediat.move.corruption` —
+ *   mécaniques déterministes SANS choix ni secteur, déjà entièrement
+ *   outillées côté FocusEngine pour d'autres usages (clés
+ *   'ameliorer_gloire'/'deplacer_corruption') : simple ajout à
+ *   EFFET_TECHNOLOGIE_IMMEDIAT_ (gameService.js), aucun nouveau code
+ *   moteur.
+ * - Quais orbitaux (Dunlork) / Bases Stellaires (Cortozaar) / Matrice
+ *   neuronale (Thegwyn) : `immediat.build` sur un secteur au CHOIX du
+ *   joueur — la popup 'construire' de FocusEngine gérait déjà nativement
+ *   ce choix de secteur (CLES_CONSTRUIRE), simplement pas encore de clé à
+ *   TYPE FORCÉ pour "Chantier Naval"/"Base Stellaire" (seule
+ *   etablir_guilde_banquier existait pour "Banquiers"). 2 nouvelles
+ *   entrées CATEGORIE_PAR_CLE_CONSTRUIRE_/TYPE_FORCE_PAR_CLE_CONSTRUIRE_
+ *   (focusEngine.js) — construire_chantier_naval/construire_base_stellaire
+ *   — sur le même principe ; Matrice neuronale réutilise directement
+ *   etablir_guilde_banquier, déjà existante (aucune modification
+ *   focusEngine.js pour celle-ci).
+ * 16 Technologies portées au total désormais (liste à jour dans la
+ * mémoire de session voidfall-technologies-resolution-plan.md).
+ * 145 tests au vert (focusEngine.test.js notamment, popup 'construire'
+ * déjà couverte génériquement — pas de test dédié aux 2 nouvelles clés à
+ * type forcé, comportement identique à etablir_guilde_banquier déjà
+ * testée indirectement).
+ * Fichiers touchés : js/focusEngine.js, js/gameService.js, version.js.
+ *
+ * 26/08/2026, avant (chantier Technologies — 5 Technologies
  * supplémentaires portées, retour utilisateur : "déploie 5 nouvelles") :
  * - Torpilles (Cortozaar) / Ciblage (Belitan) : gain simple + `deploy`
  *   Corvette → Secteur-Mère, même mécanique que Boucliers/Destroyers
@@ -3630,4 +4344,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260826.6';
+var APP_VERSION = '20260828.2';

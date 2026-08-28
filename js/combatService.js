@@ -11,8 +11,11 @@
  * le reste des actions secteur non automatisées, voir focusEngine.js).
  *
  * Simplifications connues, non couvertes :
- * - Aucun bonus nécessitant une dépense de ressource en cours de combat
- *   (Missiles longue portée, Drones autonomes, Focus Exaltation "Bombarder").
+ * - Missiles longue portée/Drones autonomes (Technologies) : PORTÉS —
+ *   voir resoudreInvasion, paramètres bonusMissilesLonguePortee/
+ *   bonusDronesAutonomes (décidés par l'appelant, ce module reste pur).
+ *   Focus Exaltation "Bombarder" (bonus à coût de ressource en cours de
+ *   combat, hors Technologies) reste lui hors périmètre.
  * - Le choix du cube rappelé est automatisé selon une priorité fixe
  *   (Corvette > Sentinelle > Destroyer > Porte-Vaisseaux > Cuirassé)
  *   plutôt que laissé au joueur.
@@ -85,6 +88,13 @@ var CombatService = (function () {
   /**
    * Construit un camp de combat. estJoueur : true si ce camp représente
    * le joueur (bénéficie de ses Technologies) ; false pour le Néant.
+   * `bonusMissilesLonguePortee`/`bonusDronesAutonomes` (chantier "effets
+   * permanents" des Technologies) : contrairement aux `techs.hasXxx`
+   * ci-dessus (permanents tant que la Technologie est possédée), CES 2
+   * bonus dépendent d'une dépense de ressource DÉCIDÉE PAR LE JOUEUR à
+   * CE combat précis (1 Énergie / 1 jeton Commerce, hors de portée de ce
+   * module pur — voir resoudreInvasion ci-dessous, seul appelant à les
+   * transmettre) : `false` par défaut, jamais déduits de `partie`.
    */
   function construireCamp(nom, corvette, destroyer, cuirasse, sentinelle, portevaisseau, defenseSecteur, estJoueur, partie) {
     return {
@@ -102,7 +112,9 @@ var CombatService = (function () {
       sentinelle: sentinelle || 0,
       portevaisseau: portevaisseau || 0,
       defenseSecteur: defenseSecteur || 0,
-      absorptionSalveDisponible: 0
+      absorptionSalveDisponible: 0,
+      bonusMissilesLonguePortee: false,
+      bonusDronesAutonomes: false
     };
   }
 
@@ -222,13 +234,18 @@ var CombatService = (function () {
       log.push(defenseur.nom + ' inflige 1 Dégât d\'Approche supplémentaire (Cellules énergétiques).');
     }
     var absorptionAttaquant = attaquant.cuirasse +
-      (attaquant.estJoueur && attaquant.techs.hasBouclersAmeliore && attaquant.corvette > 0 ? 1 : 0);
+      (attaquant.estJoueur && attaquant.techs.hasBouclersAmeliore && attaquant.corvette > 0 ? 1 : 0) +
+      (attaquant.bonusDronesAutonomes ? 1 : 0);
     resoudreApproche_(defenseur, attaquant, degatsDefenseur, absorptionAttaquant, log);
 
     var degatsAttaquant = 0;
     if (attaquant.estJoueur && attaquant.techs.hasDestroyersAmeliore && attaquant.destroyer > 0) {
       degatsAttaquant += 1;
       log.push(attaquant.nom + ' inflige 1 Dégât d\'Approche (Destroyers améliorés).');
+    }
+    if (attaquant.bonusMissilesLonguePortee) {
+      degatsAttaquant += 1;
+      log.push(attaquant.nom + ' inflige 1 Dégât d\'Approche supplémentaire (Missiles longue portée, 1 Énergie dépensée).');
     }
     var absorptionDefenseur =
       (defenseur.estJoueur && defenseur.techs.hasBouclersAmeliore && defenseur.corvette > 0 ? 1 : 0);
@@ -240,6 +257,7 @@ var CombatService = (function () {
 
     // --- Absorptions de Salve disponibles pour tout le combat ---
     if (attaquant.techs.hasBoucliers) attaquant.absorptionSalveDisponible += 1;
+    if (attaquant.bonusDronesAutonomes) attaquant.absorptionSalveDisponible += 1;
     if (defenseur.techs.hasBoucliers && defenseur.corvette > 0) defenseur.absorptionSalveDisponible += 1;
     defenseur.absorptionSalveDisponible += defenseur.cuirasse;
     defenseur.absorptionSalveDisponible += defenseur.portevaisseau;
@@ -331,9 +349,21 @@ var CombatService = (function () {
    * responsable de la validation d'adjacence/appartenance/stock avant
    * d'arriver ici, et de l'application manuelle des conséquences sur le
    * plateau des secteurs (hors périmètre, voir en-tête de fichier).
+   *
+   * `bonusMissilesLonguePortee`/`bonusDronesAutonomes` (chantier "effets
+   * permanents" des Technologies — Missiles longue portée/Drones
+   * autonomes) : booléens optionnels, DÉJÀ décidés par l'appelant AVANT
+   * cet appel (éligibilité — secteur adjacent avec Chantier Naval/Base
+   * Stellaire pour le premier, rien de spécial pour le second — ET choix
+   * du joueur de dépenser la ressource, 1 Énergie/1 jeton Commerce —
+   * tous deux hors de portée de ce module pur, voir strategieService.js/
+   * confirmerMissilesLonguePortee_/confirmerDronesAutonomes_). Le débit
+   * réel de la ressource N'EST PAS fait ici (comme le reste de ce
+   * module, aucun accès DB) — c'est à l'appelant de le faire APRÈS coup,
+   * une fois la victoire confirmée.
    * Retourne { vainqueur, cubesRestants, log, survivantsAttaquant }.
    */
-  function resoudreInvasion(partie, unitesAttaquant, secteurCible) {
+  function resoudreInvasion(partie, unitesAttaquant, secteurCible, bonusMissilesLonguePortee, bonusDronesAutonomes) {
     unitesAttaquant = unitesAttaquant || {};
     secteurCible = secteurCible || {};
 
@@ -347,6 +377,8 @@ var CombatService = (function () {
       0,
       true, partie
     );
+    attaquant.bonusMissilesLonguePortee = !!bonusMissilesLonguePortee;
+    attaquant.bonusDronesAutonomes = !!bonusDronesAutonomes;
 
     var defenseSecteur = (secteurCible.installationDefenseSecteur || 0) + (secteurCible.installationBaseStellaire || 0);
     var defenseur = construireCamp(

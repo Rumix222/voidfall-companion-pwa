@@ -33,6 +33,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/annulationService.js',
   './js/civilisationService.js',
   './js/combatService.js',
+  './js/programmeScoreService.js',
   './js/scoreService.js',
   './js/gameService.js',
   './js/setupService.js',

@@ -452,6 +452,79 @@ var SecteurService = (function () {
   }
 
   /**
+   * Détail FACTUEL (aucune règle de Programme ici — ça reste dans
+   * js/programmeScoreService.js, module pur) par secteur "Pur" du
+   * joueur, pour le calcul des points de victoire des Programmes
+   * (chantier "Points de victoire des Programmes"). Même définition de
+   * "Pur" que `obtenirAgregatsInfluenceSecteursPurs` ci-dessus
+   * (appartientAuJoueur_ ET !corrompu). `entretien` (0, 1 ou 2) reprend
+   * EXACTEMENT le calcul par secteur de `getEntretien` ci-dessus (1 par
+   * emplacement Installation/Guilde totalement occupé), simplement non
+   * sommé — nécessaire pour les objectifs Programme D5 ("secteur Pur
+   * avec au moins 2 Entretien")/W1 ("secteur Pur sans aucun Entretien").
+   * `guildeVacante` : au moins un emplacement de Guilde encore libre sur
+   * ce secteur (nombreGuildeMax - guildesUtilisees > 0) — utilisé par
+   * S1 ("secteurs Purs sans emplacement de Guilde vide"), simplifié SANS
+   * la nuance Vaisseaux-Arches (mécanique non modélisée dans l'app,
+   * décision actée avec l'utilisateur). `corruptionSecteurs` : nombre de
+   * secteurs possédés ET Corrompus (utilisé par S6, combiné à
+   * corruptionMaison côté strategieService.js).
+   */
+  function obtenirDetailSecteursProgrammes(partieId) {
+    return DB.get('parties', partieId).then(function (ligneP) {
+      if (!ligneP || !ligneP.scenarioId) return { secteursPurs: [], nombreSecteurTotal: 0, corruptionSecteurs: 0 };
+
+      return Promise.all([obtenirSecteurs(partieId), DB.getAll('scenarioSecteurs'), DB.getAll('typesSecteur')])
+        .then(function (resultats) {
+          var secteurs = resultats[0];
+          var scenarioSecteurs = resultats[1].filter(function (l) { return l.scenarioId === ligneP.scenarioId; });
+          var typesParId = {};
+          resultats[2].forEach(function (t) { typesParId[t.id] = t; });
+
+          var possedes = secteurs.filter(appartientAuJoueur_);
+          var corruptionSecteurs = possedes.filter(function (s) { return s.corrompu; }).length;
+          var secteursPurs = possedes
+            .filter(function (s) { return !s.corrompu; })
+            .map(function (s) {
+              var ligneScenario = scenarioSecteurs.filter(function (l) { return l.numero === s.numero; })[0];
+              var typeSecteur = ligneScenario ? typesParId[ligneScenario.type] : null;
+              var maxGuilde = typeSecteur ? (typeSecteur.nombreGuildeMax || 0) : 0;
+              var maxInstallation = typeSecteur ? (typeSecteur.nombreInstallationMax || 0) : 0;
+              var guildesUtilisees = guildesUtilisees_(s);
+              var installationsUtilisees = installationsUtilisees_(s);
+
+              var entretien = 0;
+              if (maxGuilde > 0 && guildesUtilisees >= maxGuilde) entretien += 1;
+              if (maxInstallation > 0 && installationsUtilisees >= maxInstallation) entretien += 1;
+
+              return {
+                population: s.population || 0,
+                entretien: entretien,
+                guildeFermiers: s.guildeFermiers || 0,
+                guildeIngenieurs: s.guildeIngenieurs || 0,
+                guildeMineurs: s.guildeMineurs || 0,
+                guildeBanquiers: s.guildeBanquiers || 0,
+                guildeScientifiques: s.guildeScientifiques || 0,
+                installationChantierNaval: s.installationChantierNaval || 0,
+                installationDefenseSecteur: s.installationDefenseSecteur || 0,
+                installationBaseStellaire: s.installationBaseStellaire || 0,
+                pn: {
+                  corvette: s.pnCorvette || 0,
+                  sentinelle: s.pnSentinelle || 0,
+                  destroyer: s.pnDestroyer || 0,
+                  cuirasse: s.pnCuirasse || 0,
+                  porteVaisseau: s.pnPorteVaisseau || 0
+                },
+                guildeVacante: maxGuilde > guildesUtilisees
+              };
+            });
+
+          return { secteursPurs: secteursPurs, nombreSecteurTotal: possedes.length, corruptionSecteurs: corruptionSecteurs };
+        });
+    });
+  }
+
+  /**
    * Déplacement de Puissance Navale entre secteurs ADJACENTS qui
    * appartiennent tous deux au joueur, 5 déplacements maximum au total.
    * Deux passes de validation AVANT toute écriture (adjacence/
@@ -575,8 +648,21 @@ var SecteurService = (function () {
    * Prime-Libération-Gloire du secteur cible (les jetons retirés sont
    * renvoyés à l'appelant, qui les reporte sur le plateau maison côté
    * client).
+   *
+   * `garderInstallations` (chantier "effets permanents" des Technologies,
+   * Réplicateurs de combat — Novaris, `permanent.after.successful_
+   * invasion.keep_installations`) : quand vrai, les 3 champs Installation
+   * (Chantier Naval/Défense de Secteur/Base Stellaire) ne sont PAS remis à
+   * zéro — tout le reste (Gardien, jetons Prime/Libération/Gloire retirés
+   * et renvoyés à l'appelant) reste inchangé, le texte de la carte ne
+   * concernant QUE les Installations. Le "+1 jeton Prime" de cette même
+   * Technologie n'est PAS géré ici (c'est l'appelant, strategieService.js,
+   * qui pose la question au joueur ET ajoute ce +1 au `jetonPrime` qu'il
+   * reçoit en retour, avant de le faire passer par FocusEngine.
+   * resoudreGainJetonsPrime_ comme n'importe quel autre gain de jeton
+   * Prime).
    */
-  function envahirResoudre(partieId, cible, sources, victoire, survivants) {
+  function envahirResoudre(partieId, cible, sources, victoire, survivants, garderInstallations) {
     survivants = survivants || {};
     sources = sources || [];
 
@@ -638,9 +724,11 @@ var SecteurService = (function () {
           secteurCible.pnCuirasse = (secteurCible.pnCuirasse || 0) + (Number(survivants.cuirasse) || 0);
           secteurCible.pnSentinelle = (secteurCible.pnSentinelle || 0) + (Number(survivants.sentinelle) || 0);
           secteurCible.pnPorteVaisseau = (secteurCible.pnPorteVaisseau || 0) + (Number(survivants.porte_vaisseau) || 0);
-          secteurCible.installationChantierNaval = 0;
-          secteurCible.installationDefenseSecteur = 0;
-          secteurCible.installationBaseStellaire = 0;
+          if (!garderInstallations) {
+            secteurCible.installationChantierNaval = 0;
+            secteurCible.installationDefenseSecteur = 0;
+            secteurCible.installationBaseStellaire = 0;
+          }
           secteurCible.nombreGardien = 0;
           secteurCible.jetonPrime = 0;
           secteurCible.jetonLiberation = 0;
@@ -1040,6 +1128,7 @@ var SecteurService = (function () {
     obtenirSecteursEligiblesGainCorruption: obtenirSecteursEligiblesGainCorruption,
     placerCorruption: placerCorruption,
     obtenirAgregatsInfluenceSecteursPurs: obtenirAgregatsInfluenceSecteursPurs,
+    obtenirDetailSecteursProgrammes: obtenirDetailSecteursProgrammes,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,

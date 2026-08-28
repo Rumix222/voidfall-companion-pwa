@@ -126,3 +126,8 @@ Effet par contre on en a déclenché, en plus de focus et programme en main, par
 L'effet d'un evenement n'a pas a etre annulé, car il n'est jamais pas déclenché par une action. il ne faut meme pas le tracer.
 Par contre les autres effets, consequence d'une action doivent s'annuler en meme temps qu'on annule l'action.
 Pour qua ca soit plus clair dans l'historique d'action, faire un cadre unique pour une action et des sous cadres pour les effets déclenché par cette action.
+
+#Evolution 19 : Implémenter le  gain jeton prime
+
+#Evolution 20 : Implémenter actions immédiate techno restante
+✅ Traité (27/08/2026) — 28/28 technologies portées (chantier complet), voir mémoire de session voidfall-technologies-resolution-plan.md pour le détail des 4 tables de traduction (gains simples/choice, deploy fixe Secteur-Mère, cost+effet via la nouvelle FocusEngine.resoudreEffetEtCout, choice avec une alternative en deploy fixe).

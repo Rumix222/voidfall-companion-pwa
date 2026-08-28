@@ -282,6 +282,47 @@ test('resoudreCombat : Boucliers (défenseur, joueur) n\'absorbe QUE si le défe
   assert.strictEqual(rSansCorvette.vainqueur, null);
 });
 
+// Chantier "effets permanents" des Technologies — Missiles longue portée/
+// Drones autonomes : bonus DÉCIDÉS PAR L'APPELANT (pas des `techs.hasXxx`
+// permanents), transmis via `construireCamp(...).bonusMissilesLonguePortee`/
+// `.bonusDronesAutonomes` (ou resoudreInvasion, testé plus bas).
+test('resoudreCombat : bonusMissilesLonguePortee (attaquant) -> +1 Dégât d\'Approche', function () {
+  var CS = creerContexte_().CombatService;
+  // Défenseur à SEULEMENT 1 Corvette (pas de Défense de Secteur) : le
+  // Dégât d'Approche du bonus l'élimine intégralement AVANT même la
+  // première étape de Salve, qui ne se déclenche donc jamais (totalNavale_
+  // du défenseur déjà à 0) — même principe que le test Cellules
+  // énergétiques ci-dessus, pour un résultat de combat déterministe.
+  var a = CS.construireCamp('Attaquant', 1, 0, 0, 0, 0, 0, true, {});
+  a.bonusMissilesLonguePortee = true;
+  var d = CS.construireCamp('Defenseur', 1, 0, 0, 0, 0, 0, false, {});
+  var r = CS.resoudreCombat(a, d);
+  assert.ok(r.log.indexOf('Attaquant inflige 1 Dégât d\'Approche supplémentaire (Missiles longue portée, 1 Énergie dépensée).') !== -1);
+  assert.strictEqual(d.corvette, 0, 'la seule Corvette du défenseur est rappelée par le Dégât d\'Approche du bonus');
+  assert.strictEqual(r.vainqueur, a);
+});
+
+test('resoudreCombat : bonusDronesAutonomes (attaquant) -> +1 Absorption d\'Approche et +1 Absorption de Salve', function () {
+  var CS = creerContexte_().CombatService;
+  // Absorption d'Approche : le défenseur inflige 1 Dégât d'Approche (Défense de Secteur=1),
+  // absorbé par le bonus au lieu de coûter une Corvette à l'attaquant.
+  var a1 = CS.construireCamp('Attaquant', 3, 0, 0, 0, 0, 0, true, {});
+  a1.bonusDronesAutonomes = true;
+  var d1 = CS.construireCamp('Defenseur', 0, 0, 0, 0, 0, 1, false, {});
+  var r1 = CS.resoudreCombat(a1, d1);
+  assert.ok(r1.log.indexOf('Defenseur inflige 1 Dégât(s) d\'Approche à Attaquant (1 absorbé(s)).') !== -1);
+  assert.strictEqual(a1.corvette, 3, 'aucune Corvette rappelée, Dégât d\'Approche absorbé');
+
+  // Absorption de Salve : 1 Cuirassé seul (Initiative=2) contre 2 Corvettes (Initiative=2) ->
+  // égalité -> Dégât simultané -> absorbé par le bonus au lieu de rappeler le Cuirassé.
+  var a2 = CS.construireCamp('Attaquant', 0, 0, 1, 0, 0, 0, true, {});
+  a2.bonusDronesAutonomes = true;
+  var d2 = CS.construireCamp('Defenseur', 2, 0, 0, 0, 0, 0, false, {});
+  var r2 = CS.resoudreCombat(a2, d2);
+  assert.ok(r2.log.indexOf('Attaquant absorbe le Dégât (Defenseur (simultané)).') !== -1);
+  assert.strictEqual(a2.cuirasse, 1, 'le Cuirassé ne doit pas avoir été rappelé, absorbé par Drones autonomes');
+});
+
 // ------------------------------------------------------------
 // resoudreInvasion
 // ------------------------------------------------------------
@@ -320,4 +361,21 @@ test('resoudreInvasion : victoire de l\'attaquant -> survivantsAttaquant reflèt
   assert.strictEqual(JSON.stringify(r.survivantsAttaquant), JSON.stringify({
     corvette: 2, destroyer: 0, cuirasse: 1, sentinelle: 0, portevaisseau: 0
   }));
+});
+
+test('resoudreInvasion : bonusMissilesLonguePortee/bonusDronesAutonomes (5e/6e paramètres) transmis au camp attaquant', function () {
+  var CS = creerContexte_().CombatService;
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: null }, technologiesObtenues: [] };
+  var secteur = { pnNeant: 2, installationDefenseSecteur: 1, installationBaseStellaire: 0 };
+
+  var rSans = CS.resoudreInvasion(partie, { corvette: 3 }, secteur, false, false);
+  var rAvec = CS.resoudreInvasion(partie, { corvette: 3 }, secteur, true, true);
+  assert.ok(rAvec.log.indexOf('Rumix inflige 1 Dégât d\'Approche supplémentaire (Missiles longue portée, 1 Énergie dépensée).') !== -1);
+  // Absorption d'Approche (Drones autonomes) : "Le Néant" inflige 1 Dégât
+  // d'Approche (Défense de Secteur=1) à "Rumix", absorbé par le bonus —
+  // message de resoudreApproche_ (PAS appliquerDegat_/"absorbe le Dégât",
+  // réservé à la phase Salve).
+  assert.ok(rAvec.log.indexOf('Le Néant inflige 1 Dégât(s) d\'Approche à Rumix (1 absorbé(s)).') !== -1,
+    'Absorption d\'Approche (Drones autonomes) doit apparaître dans le journal');
+  assert.strictEqual(rSans.log.indexOf('Rumix inflige 1 Dégât d\'Approche supplémentaire (Missiles longue portée, 1 Énergie dépensée).'), -1, 'aucun bonus sans les paramètres');
 });
