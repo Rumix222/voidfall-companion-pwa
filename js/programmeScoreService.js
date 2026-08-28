@@ -2,16 +2,19 @@
  * programmeScoreService.js
  * Points de victoire des Programmes — Voidfall Companion PWA
  *
- * Calcule l'Influence réellement rapportée par les 2 objectifs de
- * chaque carte Programme (data/catalogue/programmes.json), à partir de
- * l'état de partie déjà suivi par l'app. Chantier "Points de victoire
- * des Programmes" — avant ce module, objectif1/objectif2 n'étaient que
- * du texte affiché, jamais évalués.
+ * Calcule l'Influence réellement rapportée par les objectifs de chaque
+ * carte Programme, à partir de l'état de partie déjà suivi par l'app.
+ * Chantier "Points de victoire des Programmes" — avant ce module,
+ * ces objectifs n'étaient que du texte affiché, jamais évalués.
  *
- * Portée : les 32 cartes de programmes.json (emplacements 1/2/3 du
- * plateau Programme) — PAS le Programme de départ (emplacement 0,
- * programmesDepart.json, forme de donnée différente, sans objectif1/
- * objectif2 structurés).
+ * Portée : les 32 cartes de data/catalogue/programmes.json (emplacements
+ * 1/2/3 du plateau Programme, `calculerPointsProgramme`) ET les 28
+ * cartes pertinentes de data/catalogue/programmesDepart.json
+ * (emplacement 0 "Programme de départ", `calculerPointsProgrammeDepart`
+ * — forme de donnée différente, tableau `objectifs` de longueur
+ * variable au lieu d'objectif1/objectif2 fixes ; les 2 entrées
+ * `supplementaire:true` de Marqualos, H13-A2/H13-B2, sont EXCLUES —
+ * jamais câblées sur l'emplacement 0 par GameService.creerPartie).
  *
  * Simplifications actées avec l'utilisateur :
  * - S1 (objectif 2) : la nuance "les emplacements de Guilde apportés
@@ -85,6 +88,29 @@ var ProgrammeScoreService = (function () {
 
   var BAREME_NIVEAU_4_8_12_16 = [0, 4, 8, 12, 16];
   var BAREME_NIVEAU_0_2_4_6_8 = [0, 2, 4, 6, 8];
+  // Programme de départ (Purificateur H12-B/Matrice neuronale H6-B) —
+  // même principe que les barèmes ci-dessus, valeurs propres à ces 2 cartes.
+  var BAREME_NIVEAU_0_3_6_9_12 = [0, 3, 6, 9, 12];
+
+  var CLES_RESSOURCES_ = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+
+  // Programme de départ — "Gagnez N Influence pour chaque type de
+  // ressource dont vous avez au moins X unités en réserve" (H9-B/H6-B) :
+  // nombre de TYPES (parmi les 5) dont la réserve atteint le seuil.
+  function nombreTypesRessourceAvecReserveAuMoins_(etat, seuil) {
+    var r = etat.ressources || {};
+    return CLES_RESSOURCES_.filter(function (cle) { return (r[cle] || 0) >= seuil; }).length;
+  }
+
+  // Programme de départ — "Gagnez N Influence pour chaque ressource du
+  // type que vous possédez le moins. En cas d'égalité, ne marquez qu'un
+  // seul type." (H11-A/H13-B2) : littéralement la valeur du type le
+  // MOINS abondant (pas un compte de types à égalité — la phrase
+  // "un seul type" élimine explicitement ce doublage).
+  function reserveMinimale_(etat) {
+    var r = etat.ressources || {};
+    return CLES_RESSOURCES_.reduce(function (min, cle) { return Math.min(min, r[cle] || 0); }, Infinity);
+  }
 
   // --- Table des 32 cartes — traçable 1:1 contre data/catalogue/programmes.json ---
 
@@ -263,6 +289,157 @@ var ProgrammeScoreService = (function () {
     }
   };
 
+  // --- Table du Programme de DÉPART (data/catalogue/programmesDepart.json,
+  // emplacement 0) — 30 cartes au catalogue, 28 pertinentes ici (2
+  // "supplémentaire" : true, H13-A2/H13-B2, bonus de Marqualos JAMAIS
+  // câblées sur l'emplacement 0 par GameService.creerPartie — voir
+  // obtenirProgrammeDepart_, gameService.js — donc jamais atteintes en
+  // pratique, non incluses). Forme différente du catalogue principal :
+  // un tableau `objectifs` de longueur VARIABLE (2 à 4 lignes selon la
+  // carte), pas 2 champs fixes — chaque entrée ci-dessous est donc un
+  // TABLEAU de fonctions (une par ligne, dans le même ordre que le
+  // catalogue), pas un objectif1/objectif2. Contrairement à
+  // PROGRAMME_OBJECTIFS_ ci-dessus, certaines lignes sont un MALUS
+  // (perte d'Influence par Corruption sur la fiche Maison — H10-A/
+  // H10-B/H14-A/H14-B) : retournent un nombre NÉGATIF, jamais clampé à 0
+  // ligne par ligne (seul le total final d'Influence du joueur, toutes
+  // sources combinées, est plancher à 0 côté strategieService.js).
+  // "Corruption de votre fiche Maison" = `etat.corruptionMaison`
+  // UNIQUEMENT (texte du catalogue explicite : ignore les secteurs ET
+  // les Chambres de Décontamination) — DIFFÉRENT du S6 du catalogue
+  // principal, qui combine secteurs+fiche Maison.
+  var PROGRAMME_DEPART_OBJECTIFS_ = {
+    // --- Motif "A" (3 lignes, secteurs Purs) : H1-A/H3-A/H4-A/H13-A/H2-A ---
+    'H1-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function () { return true; }) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationDefenseSecteur >= 1; }) * 1; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationChantierNaval >= 1; }) * 2; }
+    ],
+    // --- Motif "B" (4 lignes, population/guildes) : H1-B/H3-B/H4-B/H13-B/H2-B ---
+    'H1-B': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population === 5; }) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population === 6; }) * 6; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeBanquiers; }) * 1; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques; }) * 1; }
+    ],
+    'H12-A': [
+      function (e) { return (e.entretienTotal || 0) * 2; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return (s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire) >= 1; }) * 1; }
+    ],
+    'H12-B': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population === 5; }) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population === 6; }) * 6; },
+      function (e) { return BAREME_NIVEAU_0_3_6_9_12[niveauPistePure_(e, 'economie')] || 0; }
+    ],
+    'H7-A': [
+      function (e) { return paire_(sommeSecteursPurs_(e, function (s) { return s.population; })) * 1; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationChantierNaval >= 1; }) * 3; }
+    ],
+    'H7-B': [
+      function (e) { return nombreSecteursPursAvec_(e, function () { return true; }) * 2; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques; }) * 1; }
+    ],
+    'H10-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationChantierNaval >= 1; }) * 4; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeIngenieurs; }) * 1; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeMineurs; }) * 1; },
+      function (e) { return -(e.corruptionMaison || 0) * 1; }
+    ],
+    'H10-B': [
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.population; }); },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.pn.sentinelle >= 1; }) * 2; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationDefenseSecteur >= 1; }) * 3; },
+      function (e) { return -(e.corruptionMaison || 0) * 2; }
+    ],
+    'H5-A': [
+      function (e) { return (e.nbTechBase || 0) * 1; },
+      function (e) { return (e.nbTechAmelioree || 0) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function () { return true; }) * 3; }
+    ],
+    'H5-B': [
+      function (e) { return (e.nbTechBase || 0) * 2; },
+      function (e) { return (e.nbTechAmelioree || 0) * 4; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques; }) * 1; }
+    ],
+    'H9-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return !s.guildeVacante; }) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return (s.installationChantierNaval + s.installationDefenseSecteur + s.installationBaseStellaire) >= 3; }) * 2; },
+      function (e) {
+        var pistes = ['societe', 'gouvernement', 'economie'];
+        return pistes.reduce(function (total, p) { return total + (BAREME_NIVEAU_0_2_4_6_8[niveauPistePure_(e, p)] || 0); }, 0);
+      }
+    ],
+    'H9-B': [
+      function (e) { return nombreTypesRessourceAvecReserveAuMoins_(e, 8) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return nombreTypesGuildeDistincts_(s) >= 3; }) * 5; }
+    ],
+    'H8-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function () { return true; }) * 3; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeIngenieurs; }) * 1; },
+      function (e) { return (e.jetonLiberation || 0) * 1; },
+      function (e) { return paire_(e.jetonPrime || 0) * 1; }
+    ],
+    'H8-B': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return pnTotalSecteur_(s) >= 2; }) * 3; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population >= 4; }) * 3; },
+      function (e) { return (e.jetonLiberation || 0) * 1; },
+      function (e) { return paire_(e.jetonPrime || 0) * 1; }
+    ],
+    'H11-A': [
+      function (e) { return reserveMinimale_(e) * 2; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.pn.porteVaisseau >= 1; }) * 3; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs + s.guildeBanquiers + s.guildeScientifiques; }) * 1; }
+    ],
+    'H11-B': [
+      function (e) { return (e.gloire || []).reduce(function (t, v) { return t + v; }, 0); },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return (s.installationChantierNaval + s.installationBaseStellaire) >= 1; }) * 1; },
+      function (e) { return Math.floor(sommeSecteursPurs_(e, pnTotalSecteur_) / 3) * 3; }
+    ],
+    'H14-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return pnTotalSecteur_(s) >= 2; }) * 4; },
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.installationChantierNaval >= 1; }) * 3; },
+      function (e) { return -(e.corruptionMaison || 0) * 2; }
+    ],
+    'H14-B': [
+      function (e) { return nombreSecteursPursAvec_(e, function (s) { return s.population >= 4; }) * 3; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers + s.guildeIngenieurs + s.guildeMineurs; }) * 1; },
+      function (e) { return -(e.corruptionMaison || 0) * 1; }
+    ],
+    'H6-A': [
+      function (e) { return nombreSecteursPursAvec_(e, function () { return true; }) * 2; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeFermiers; }) * 2; }
+    ],
+    'H6-B': [
+      function (e) { return nombreTypesRessourceAvecReserveAuMoins_(e, 8) * 3; },
+      function (e) { return BAREME_NIVEAU_0_3_6_9_12[niveauPistePure_(e, 'gouvernement')] || 0; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeBanquiers; }) * 1; },
+      function (e) { return sommeSecteursPurs_(e, function (s) { return s.guildeScientifiques; }) * 1; }
+    ]
+  };
+  // Motif "A"/"B" partagé tel quel (texte IDENTIQUE au catalogue) par
+  // plusieurs cartes — référence directe plutôt que dupliquer le tableau.
+  PROGRAMME_DEPART_OBJECTIFS_['H3-A'] = PROGRAMME_DEPART_OBJECTIFS_['H4-A'] = PROGRAMME_DEPART_OBJECTIFS_['H13-A'] = PROGRAMME_DEPART_OBJECTIFS_['H2-A'] = PROGRAMME_DEPART_OBJECTIFS_['H1-A'];
+  PROGRAMME_DEPART_OBJECTIFS_['H3-B'] = PROGRAMME_DEPART_OBJECTIFS_['H4-B'] = PROGRAMME_DEPART_OBJECTIFS_['H13-B'] = PROGRAMME_DEPART_OBJECTIFS_['H2-B'] = PROGRAMME_DEPART_OBJECTIFS_['H1-B'];
+
+  /**
+   * Calcule les points d'Influence du Programme de DÉPART (`code` type
+   * "H1-A", `etat` — même contrat que calculerPointsProgramme ci-dessous).
+   * Retourne `{lignes: [n1, n2, ...], total}` — `lignes` a la MÊME
+   * longueur que `objectifs` au catalogue (2 à 4), dans le même ordre ;
+   * `total` peut être négatif (malus Corruption), jamais clampé ici — le
+   * plancher à 0 s'applique au total d'Influence du joueur, pas ligne
+   * par ligne. `{lignes: [], total: 0}` si le code est inconnu (jamais
+   * d'exception).
+   */
+  function calculerPointsProgrammeDepart(code, etat) {
+    var lignes = PROGRAMME_DEPART_OBJECTIFS_[code];
+    if (!lignes) return { lignes: [], total: 0 };
+    var etatSur = etat || {};
+    var valeurs = lignes.map(function (fn) { return Math.round(fn(etatSur) || 0); });
+    var total = valeurs.reduce(function (t, v) { return t + v; }, 0);
+    return { lignes: valeurs, total: total };
+  }
+
   /**
    * Calcule les points d'Influence des 2 objectifs d'une carte Programme
    * (par son `code`, ex. "D1") pour un `etat` de partie donné. Retourne
@@ -289,6 +466,7 @@ var ProgrammeScoreService = (function () {
   }
 
   return {
-    calculerPointsProgramme: calculerPointsProgramme
+    calculerPointsProgramme: calculerPointsProgramme,
+    calculerPointsProgrammeDepart: calculerPointsProgrammeDepart
   };
 })();

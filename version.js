@@ -1,7 +1,234 @@
 /**
  * version.js
- * Version 125 — 2026-08-28
+ * Version 129 — 2026-08-28
  * Source de vérité unique pour la version de l'application.
+ *
+ * 28/08/2026, dernière fois (retour utilisateur : "j'ai terminé" — après
+ * avoir ajouté `focusPrefere` (2 familles Focus par maison) aux 14
+ * entrées de data/catalogue/maisons.json) : reprend le chantier "Focus
+ * préféré" reporté (voir mémoire de session
+ * voidfall-focus-prefere-report.md) — les clés "action_focus_prefere"/
+ * "copy_action" (2 noms différents au catalogue pour la MÊME mécanique,
+ * "Faites une action d'un Focus préféré de votre main ou défausse [...]",
+ * 4 occurrences : Tentation Standard/Kradmor/Héroïque "Exploiter"/
+ * "Surmonter", Commandement Héroïque "Utiliser") sont désormais
+ * automatisées, plus de repli générique "non automatisé".
+ * - `data/catalogue/maisons.json` : correction d'une coquille détectée
+ *   par validation croisée avec focus.json AVANT tout codage — Zenor
+ *   avait "Progès" au lieu de "Progrès" (aurait échoué silencieusement à
+ *   trouver la carte correspondante, sans jamais planter).
+ * - `js/focusEngine.js` : nouveau cas dans `resoudreCle_` (Effet
+ *   UNIQUEMENT, signe > 0 — jamais rencontré en Coût sur le catalogue).
+ *   Délègue le CHOIX au contexte 'action_focus_prefere' (nouveau,
+ *   strategieService.js) qui résout avec l'action COMPLÈTE choisie
+ *   ({carte, action, cout, effet, texte}), PAS un simple indexChoisi —
+ *   puis résout cette action nichée via `resoudreEffetEtCout` (déjà
+ *   existante, chantier Technologies) sur le MÊME `etat` en cours
+ *   (jamais un clone séparé) : choix de conception déterminant, qui
+ *   évite tout risque d'écrasement entre les mutations de l'action
+ *   nichée et le reste de la résolution englobante (coût de l'action
+ *   externe, options sœurs d'un "choice" et/ou) — contrairement à
+ *   `gagner_technologie`, dont les champs ne recoupent jamais le reste
+ *   du moteur, "action_focus_prefere" peut toucher n'importe quel champ.
+ *   "Vous devez tout de même payer le coût" (de l'action CHOISIE) :
+ *   satisfait nativement par resoudreEffetEtCout. "Ne compte pas comme
+ *   résoudre ce Focus" (pas de déclenchement Programme/jeton Commerce) :
+ *   satisfait par construction — cette délégation ne passe jamais par
+ *   `resoudreAction` (seul point qui alimente `actionsFocusUtilisees`),
+ *   et aucun mécanisme Programme/Commerce "déclenché par la résolution
+ *   d'un Focus" n'est modélisé par l'appli.
+ * - `js/strategieService.js` : nouveau contexte 'action_focus_prefere'
+ *   dans le #modal-choix `demanderChoix` (PAS ajouté à
+ *   FEUILLE_TYPES_SUPPORTES_/Feuille — scope volontairement limité au
+ *   repli #modal-choix pour cette 1ère livraison, la Feuille se masque
+ *   puis ressurgit automatiquement pour les popups nichées qu'elle sait
+ *   gérer, mécanisme déjà en place). Fetch `DB.get('maisons', nomMaison)`
+ *   pour `focusPrefere` + `FocusService.obtenirMiseEnPlace` (réutilisée
+ *   telle quelle — même résolution "carte spécifique Maison remplace
+ *   Standard" que la mise en place initiale, aucune duplication) pour
+ *   lister TOUTES les actions des cartes préférées, à plat, en boutons
+ *   (gabarit "modal-choix-boutons" déjà existant). "Main ou défausse"
+ *   n'a pas d'équivalent modélisé (aucune pioche/défausse de cartes
+ *   Focus dans l'appli, voir mémoire de session) : les 2 cartes
+ *   préférées sont toujours proposées en entier, sans distinction.
+ * Vérifié : 5 nouveaux tests `js/focusEngine.test.js` (effet+coût niché
+ * appliqués au même état, actionsFocusUtilisees ne cite que la carte
+ * englobante, copy_action strictement équivalent, annulation à 2
+ * niveaux différents bloque tout, option sœur d'un choice et/ou toujours
+ * résolue normalement) + harnais Node bout-en-bout (vm, vraie popup
+ * #modal-choix pilotée jusqu'au clic réel sur un bouton, catalogue
+ * focus.json/maisons.json factices avec variante Maison ET famille non
+ * préférée) confirmant l'exclusion correcte des familles non préférées
+ * et la priorité de la variante Maison sur la Standard. 197 tests au
+ * vert (`node --test js/*.test.js`, 192 précédents + 5 nouveaux) + tous
+ * les `*_test.js` individuels, aucune régression.
+ * Fichiers touchés : data/catalogue/maisons.json, js/focusEngine.js,
+ * js/focusEngine.test.js, js/strategieService.js, version.js.
+ *
+ * 28/08/2026, dernière fois (retour utilisateur : "Afficher le programme
+ * de départ comme les autres, pas dans un cadre, 0 - devant, l'entretien
+ * aligné avec les autres. Quand un programme arrive sur le plateau
+ * maison, par défaut la case entretien doit être cochée. Une fois qu'un
+ * programme est obtenu (dans onglet focus ou onglet maison) il ne peut
+ * plus etre selectionner dans la ddl offre programme") : 3 ajustements
+ * UI/règles sur l'écran Plat. maison/Plat. Galactique.
+ * - `index.html`/`renderProgrammesPlateauMaison_` : les 4 emplacements
+ *   Programme (0=départ, 1-3=obtenus) partagent désormais EXACTEMENT le
+ *   même gabarit `.programme-plateau-item` — le Programme de départ
+ *   n'est plus affiché dans son propre `<div class="card">` séparé,
+ *   préfixé "0. " comme "1. "/"2. "/"3. ", toggle "Entretien" au même
+ *   endroit. Seules différences réelles conservées pour l'emplacement 0 :
+ *   catalogue distinct (programmesDepart.json, identifié par `code`) et
+ *   AUCUNE case "Corrompu" (l'emplacement de départ ne peut jamais être
+ *   Corrompu, docs-rules-programmes-FocusPrefere-ConsulterEvenement.md
+ *   §1 — pas un oubli).
+ * - `js/gameService.js`/`utiliserProgramme` : un Programme placé sur un
+ *   emplacement 1-3 (bouton "Utiliser", écran Focus) démarre désormais
+ *   avec `entretienActif: true` (avant : `false`) — même défaut que
+ *   l'emplacement de départ, qui l'a toujours eu actif. Test
+ *   `gameService_utiliser_programme_test.js` mis à jour en conséquence
+ *   (un seul cas concerné — emplacement libre, placement direct ; les
+ *   scénarios de remplacement ne vérifiaient pas cette valeur).
+ * - `index.html`/`renderOffreProgrammes_` : la liste déroulante "offre de
+ *   Programme" (écran Plat. Galactique, par type) exclut désormais tout
+ *   Programme déjà présent dans `programmesEnMain` (onglet Focus) OU
+ *   dans un emplacement 1-3 de `programmesUtilises` (onglet Plat.
+ *   maison) — la même carte physique ne peut pas être à la fois dans
+ *   l'offre publique et déjà en possession du joueur. La sélection
+ *   ACTUELLE d'une ligne d'offre reste toujours visible même si elle
+ *   correspond entre-temps à un Programme obtenu par un autre biais
+ *   (jamais de perte silencieuse d'une valeur déjà enregistrée).
+ * 192 tests au vert (`node --test js/*.test.js`) + intégralité des
+ * fichiers `*_test.js` (non ramassés par ce glob) relancés
+ * individuellement, aucune régression.
+ * Fichiers touchés : index.html, js/gameService.js,
+ * js/gameService_utiliser_programme_test.js, version.js.
+ *
+ * 28/08/2026, dernière fois (retour utilisateur : "L'effet placer une
+ * corruption des événements peu maintenant être automatisé. Exemple
+ * événement À cycle 2") : automatise l'effet "Placer une Corruption sur
+ * l'offre de Programme" des Cadres d'Événement galactique (type "gain",
+ * cible "offre_programme"/"chaque_offre_programme_non_corrompue" — 5
+ * occurrences au catalogue : Événements B/Cycle1, A/Cycle2, B/Cycle2,
+ * C/Cycle2, F/Cycle3). Jusqu'ici ce cadre retombait systématiquement sur
+ * `GameService.appliquerCadreManuel` (aucun delta, sa propre JSDoc citait
+ * justement "l'offre de Programme Domination, non modélisée" comme
+ * exemple) — DEVENU automatisable car `plateauMaison.offresProgramme`
+ * ({type, nom, corrompu} par type de Programme, alimenté par un chantier
+ * antérieur) suit désormais réellement l'état Corrompu de chaque offre,
+ * avec un affichage (case "Corrompu", écran Plat. Galactique,
+ * renderOffreProgrammes_) déjà en place.
+ * - `js/gameService.js` : `resoudreTypesCadreCorruptionOffre_` (même
+ *   style conservateur que `resoudreCiblesCadreGainCorruption_` déjà
+ *   existante — retourne `null`, jamais d'automatisation approximative,
+ *   dès que l'effet a un `effet_conditionnel` ou porte sur autre chose
+ *   que `{corruption:1}` seul) reconnaît les 2 formes de cible :
+ *   "offre_programme"+`cible_detail` (1 type précis, via
+ *   `CIBLE_OFFRE_PROGRAMME_VERS_TYPE_`) et
+ *   "chaque_offre_programme_non_corrompue" (les 4 types — idempotent sur
+ *   une offre déjà Corrompue). `cadreCorruptionOffreProgrammeAutomatisable`/
+ *   `appliquerCadreCorruptionOffreProgramme` (nouvelles, exposées) :
+ *   AUCUN choix du joueur nécessaire (cible entièrement déterminée par
+ *   la carte, contrairement à `appliquerCadreGainCorruption` qui ouvre
+ *   la popup 'gagner_corruption') — écrit directement
+ *   `offresProgramme[i].corrompu = true` (`DB.put('plateauMaison', ...)`
+ *   + `sauvegarderPartie` en parallèle, même pattern que
+ *   `appliquerCadreEffet`), marque le cadre appliqué avec un `.resume`
+ *   texte (rendu par le mécanisme "✓ Appliqué (...)" déjà générique,
+ *   aucun nouveau branchement d'affichage nécessaire pour l'état
+ *   "déjà appliqué").
+ * - `index.html` : nouveau flag `estOffreProgrammeCorrompue`
+ *   (`renderCadresEvenement_`, sort du hors-périmètre "estManuel" comme
+ *   `estGainCorruption`) + `data-offre-programme="1"` + listener dédié
+ *   + `appliquerCadreCorruptionOffreProgrammeEtRafraichir_` (même UX que
+ *   le cas manuel — popup 'confirmation' générique — mais persistance
+ *   réelle cette fois). Piège n°2 (CLAUDE.md) : rappelle explicitement
+ *   `renderOffreProgrammes_` en plus de `renderEvenementCycle_` — la
+ *   case "Corrompu" vit dans un bloc DOM séparé du Cadre sur le même
+ *   écran Plat. Galactique, jamais rafraîchie automatiquement.
+ * Vérifié : nouveau `js/gameService_cadre_corruption_offre_programme_test.js`
+ * (7 tests — reconnaissance des 2 formes de cible, rejet des formes non
+ * reconnues, écriture correcte pour cible unique ET "toutes les offres",
+ * idempotence, garde-fou double-application) + suite existante
+ * (`gameService_cadre_gain_corruption_test.js`, notamment son test
+ * "cadre non automatisable (offre_programme) — rejette explicitement")
+ * toujours verte, confirmant qu'aucune régression n'a été introduite sur
+ * l'AUTRE mécanisme (gagner_corruption, qui continue de refuser
+ * explicitement "offre_programme" — les deux automatisations restent
+ * mutuellement exclusives). 192 tests au vert
+ * (`node --test js/*.test.js`) + les fichiers `*_test.js` (non ramassés
+ * par ce glob) lancés individuellement.
+ * Fichiers touchés : js/gameService.js,
+ * js/gameService_cadre_corruption_offre_programme_test.js (NOUVEAU),
+ * index.html, version.js.
+ *
+ * 28/08/2026, dernière fois (retour utilisateur : "Il faudrait
+ * maitenant de la même façon implémenter les objectif de programme de
+ * départ") : extension directe du chantier "Points de victoire des
+ * Programmes" (juste ci-dessous) au Programme de DÉPART (emplacement 0
+ * du plateau Programme, data/catalogue/programmesDepart.json — jusqu'ici
+ * hors périmètre, "forme de donnée différente").
+ * - `js/programmeScoreService.js` : `PROGRAMME_DEPART_OBJECTIFS_`, 28
+ *   cartes pertinentes (sur 30 au catalogue — les 2 `supplementaire:
+ *   true` de Marqualos, H13-A2/H13-B2, sont EXCLUES : jamais câblées sur
+ *   l'emplacement 0 par GameService.creerPartie/obtenirProgrammeDepart_,
+ *   donc jamais atteintes en pratique). Forme différente du catalogue
+ *   principal : un tableau `objectifs` de longueur VARIABLE (2 à 4
+ *   lignes selon la carte, pas 2 champs fixes) — chaque entrée de la
+ *   table est donc un TABLEAU de fonctions, une par ligne, dans le même
+ *   ordre que le catalogue. Nouveauté structurelle : certaines lignes
+ *   sont un MALUS ("Vous devez perdre N Influence pour chaque Corruption
+ *   de votre fiche Maison" — H10-A/H10-B/H14-A/H14-B, `etat.
+ *   corruptionMaison` UNIQUEMENT, secteurs et Chambres de Décontamination
+ *   explicitement ignorés par le texte) : retournent un nombre NÉGATIF,
+ *   jamais clampé à 0 ligne par ligne ni au niveau du total de la carte
+ *   (`calculerPointsProgrammeDepart` retourne `{lignes, total}`, `total`
+ *   pouvant être négatif). 2 nouveaux mécanismes rencontrés uniquement
+ *   ici : "pour chaque TYPE de ressource dont la réserve atteint N"
+ *   (compte de types, H9-B/H6-B) et "pour la réserve du type le MOINS
+ *   abondant" (valeur MINIMALE parmi les 5 types, PAS un compte — la
+ *   clause "ne marquez qu'un seul type" du catalogue élimine
+ *   explicitement toute ambiguïté de double-comptage en cas d'égalité,
+ *   H11-A). Barème Civilisation 0/3/6/9/12 (H12-B/H6-B), DISTINCT du
+ *   0/4/8/12/16 du catalogue principal — vérifié sur le texte exact, pas
+ *   supposé. Aucun nouvel état requis : tous les champs référencés
+ *   (secteursPurs, civilisation, ressources, jetonLiberation/Prime,
+ *   gloire, nbTechBase/Amelioree, corruptionMaison, entretienTotal)
+ *   étaient déjà dans `etat` (js/strategieService.js/
+ *   obtenirEtatProgrammes_, inchangée).
+ * - `js/strategieService.js` : `calculerPointsProgrammesActifs_` calcule
+ *   désormais aussi l'emplacement 0 (clé `'0'`, forme `{lignes, total,
+ *   code}` — distincte de `{objectif1, objectif2, total, code, nom}`
+ *   pour 1/2/3). Popup `phase_evaluation` : la somme utilisée pour
+ *   créditer l'Influence à la validation (chantier précédent, même
+ *   jour) inclut désormais l'emplacement 0 — AUCUN changement de code
+ *   nécessaire pour la somme elle-même (`Object.keys(...).reduce`
+ *   générique, incluait déjà toute clé présente), seulement l'affichage
+ *   (branche dédiée pour la clé `'0'`, lignes signées "+N"/"−N") et le
+ *   plancher final de l'Influence, désormais appliqué au résultat
+ *   COMBINÉ (Entretien impayé + Programmes, tous emplacements) plutôt
+ *   qu'seulement à l'Entretien seul — nécessaire depuis qu'un total de
+ *   Programme peut être négatif (le plancher intermédiaire existant sur
+ *   l'Entretien seul est conservé tel quel, un 2e plancher englobe
+ *   l'addition des Programmes par-dessus).
+ * - `index.html`/`renderProgrammesPlateauMaison_` : le bloc "Programme
+ *   de départ" affiche désormais aussi un badge "+N"/"−N" par ligne
+ *   d'objectif (même principe que les emplacements 1/2/3, chantier
+ *   précédent).
+ * Vérifié : 14 nouveaux tests dans `js/programmeScoreService.test.js`
+ * (28 cartes couvertes — motifs partagés "A"/"B" vérifiés référence-
+ * identique, les 4 cartes à malus, les 2 mécanismes réserve, le barème
+ * 0/3/6/9/12) + harnais Node bout-en-bout (vm, vraie popup
+ * 'phase_evaluation' pilotée jusqu'au clic réel sur "Valider") avec un
+ * Programme de départ à malus (Corruption fiche Maison = 5, H10-A,
+ * -5 Influence) ET un Programme actif (D1, +17) simultanés : confirme
+ * la section "Objectifs de Programme" affichée correctement ("+0 · +0 ·
+ * +0 · -5 · Total : -5 Influence" pour le départ) et l'Influence
+ * persistée à 62 (50 initiale + 17 - 5) au clic sur "Valider". 192 tests
+ * au vert (`node --test js/*.test.js`, 178 précédents + 14 nouveaux).
+ * Fichiers touchés : js/programmeScoreService.js,
+ * js/programmeScoreService.test.js, js/strategieService.js, index.html,
+ * version.js.
  *
  * 28/08/2026, dernière fois (retour utilisateur : "Il faut que
  * l'influence soit ajoutee au compteur lorsque je valide la fin de
@@ -4344,4 +4571,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260828.2';
+var APP_VERSION = '20260828.6';

@@ -874,6 +874,55 @@ var GameService = (function () {
     };
   }
 
+  // ------------------------------------------------------------
+  // Effet "Placer une Corruption sur l'offre de Programme" d'un Cadre
+  // d'Événement galactique — type "gain", cible "offre_programme"
+  // (cible fixe, ex. "programme_force", 4 occurrences au catalogue :
+  // Événements B/Cycle1, A/Cycle2, B/Cycle2, C/Cycle2) ou
+  // "chaque_offre_programme_non_corrompue" (les 4 offres à la fois,
+  // Événement F/Cycle3 — corrompre une offre DÉJÀ Corrompue est un
+  // no-op, aucune règle "double Corruption" sur une offre). Retour
+  // utilisateur (28/08/2026) : "L'effet placer une corruption des
+  // événements peu maintenant être automatisé" — jusqu'ici ce cadre
+  // retombait sur appliquerCadreManuel (aucun delta, voir sa JSDoc qui
+  // citait justement "l'offre de Programme Domination, non modélisée"
+  // comme exemple) ; DEVENU automatisable depuis que
+  // `plateauMaison.offresProgramme` (offresProgrammeParDefaut_ ci-dessus
+  // — {type, nom, corrompu} par TYPE de Programme, alimenté par le
+  // chantier Programme antérieur) suit réellement l'état "Corrompue" de
+  // chaque offre, avec un affichage/une remise à zéro déjà câblés (voir
+  // GameService.gagnerProgramme, commentaire "cette entrée est
+  // réinitialisée" plus bas, et strategieService.js/index.html pour la
+  // case à cocher "Cor." déjà existante sur l'écran Focus/offre publique).
+  //
+  // AUCUNE popup n'est nécessaire ici (contrairement à
+  // resoudreCiblesCadreGainCorruption_ ci-dessus) : la cible est
+  // ENTIÈREMENT déterminée par la carte elle-même, pas un choix du
+  // joueur — la persistance se fait directement, une seule confirmation
+  // générique (contexte 'confirmation', comme appliquerCadreManuel)
+  // suffit côté index.html.
+  // ------------------------------------------------------------
+  var CIBLE_OFFRE_PROGRAMME_VERS_TYPE_ = {
+    programme_domination: 'Domination', programme_force: 'Force',
+    programme_soutien: 'Soutien', programme_richesse: 'Richesse'
+  };
+
+  function resoudreTypesCadreCorruptionOffre_(effet) {
+    if (!effet || effet.type !== 'gain' || effet.effet_conditionnel) return null;
+    var elements = effet.elements || {};
+    var clesElements = Object.keys(elements);
+    if (clesElements.length !== 1 || clesElements[0] !== 'corruption' || elements.corruption !== 1) return null;
+
+    if (effet.cible === 'offre_programme') {
+      var type = CIBLE_OFFRE_PROGRAMME_VERS_TYPE_[effet.cible_detail];
+      return type ? [type] : null;
+    }
+    if (effet.cible === 'chaque_offre_programme_non_corrompue') {
+      return TYPES_PROGRAMME_OFFRE.slice();
+    }
+    return null;
+  }
+
   /**
    * Construit le texte "✓ Appliqué (...)" pour
    * GameService.appliquerCadreChoixPlacement ci-dessous — `elements` est
@@ -1664,12 +1713,13 @@ var GameService = (function () {
     /**
      * Applique un cadre de type "gain" (voir data/catalogue/evenements.
      * json) — hors périmètre d'actionsSimplesCadre_ (ne porte sur aucune
-     * des 5 ressources plateauMaison ; typiquement une ressource que
-     * l'app ne suit pas, comme l'offre de Programme Domination) : ne fait
-     * qu'enregistrer que le joueur a résolu l'effet à la main sur le
-     * plateau physique, même garde-fou anti-double-application que
-     * appliquerCadreEffet/appliquerCadrePlacement ci-dessus, mais sans
-     * toucher plateauMaison (aucun delta à appliquer).
+     * des 5 ressources plateauMaison) NI de
+     * appliquerCadreCorruptionOffreProgramme ci-dessous (offre_programme,
+     * désormais automatisée) : ne fait qu'enregistrer que le joueur a
+     * résolu l'effet à la main sur le plateau physique, même garde-fou
+     * anti-double-application que appliquerCadreEffet/appliquerCadrePlacement
+     * ci-dessus, mais sans toucher plateauMaison (aucun delta à
+     * appliquer).
      */
     appliquerCadreManuel: function (partieId, cycle, ordreCadre) {
       return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
@@ -1679,6 +1729,55 @@ var GameService = (function () {
         partie.evenements[cleCycle] = evenementCycle;
 
         return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+      }).then(function () {
+        return rechargerPartie_(partieId);
+      });
+    },
+
+    /**
+     * true si le Cadre est automatisable pour "Placer une Corruption sur
+     * l'offre de Programme" (voir resoudreTypesCadreCorruptionOffre_
+     * ci-dessus) — utilisée par index.html pour décider si ce Cadre
+     * "gain" doit passer par appliquerCadreCorruptionOffreProgramme
+     * (persistance réelle) ou rester sur appliquerCadreManuel (aucun
+     * delta).
+     */
+    cadreCorruptionOffreProgrammeAutomatisable: function (cadre) {
+      return !!resoudreTypesCadreCorruptionOffre_(cadre && cadre.effet);
+    },
+
+    /**
+     * Applique un cadre "Placer une Corruption sur l'offre de Programme"
+     * (voir resoudreTypesCadreCorruptionOffre_ ci-dessus) : marque
+     * `plateauMaison.offresProgramme[i].corrompu = true` pour chaque type
+     * ciblé (1 type pour "offre_programme"/cible_detail, les 4 pour
+     * "chaque_offre_programme_non_corrompue" — idempotent sur une offre
+     * déjà Corrompue, aucune règle de cumul). Aucun choix du joueur
+     * (contrairement à appliquerCadreGainCorruption ci-dessus) : pas de
+     * `demanderChoix` ici, l'appelant (index.html) n'a besoin que d'une
+     * confirmation générique avant d'appeler cette fonction.
+     */
+    appliquerCadreCorruptionOffreProgramme: function (partieId, cycle, ordreCadre) {
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, lignePlateauMaison = ctx.lignePlateauMaison, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
+
+        var types = resoudreTypesCadreCorruptionOffre_(cadre && cadre.effet);
+        if (!types) throw new Error('Ce cadre n’est pas automatisable pour la Corruption d’une offre de Programme.');
+
+        var offresActuelles = Array.isArray(lignePlateauMaison.offresProgramme) ? lignePlateauMaison.offresProgramme : offresProgrammeParDefaut_();
+        var offres = offresActuelles.map(function (o) { return types.indexOf(o.type) !== -1 ? Object.assign({}, o, { corrompu: true }) : o; });
+
+        var resume = types.length > 1
+          ? 'Corruption placée sur toutes les offres de Programme non Corrompues.'
+          : 'Corruption placée sur l’offre de Programme ' + types[0] + '.';
+        evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
+        partie.evenements[cleCycle] = evenementCycle;
+        lignePlateauMaison.offresProgramme = offres;
+
+        return Promise.all([
+          DB.put('plateauMaison', lignePlateauMaison),
+          GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
+        ]);
       }).then(function () {
         return rechargerPartie_(partieId);
       });
@@ -2601,8 +2700,10 @@ var GameService = (function () {
      * (case "Corrompu" cochable/décochable même à vide, voir
      * renderProgrammesPlateauMaison_) : placer un Programme dans un
      * emplacement déjà Corrompu conserve ce `corrompu:true` tel quel (et
-     * ne touche donc pas `corruptionMaison`) — seul `entretienActif`
-     * redémarre à `false` pour la carte entrante.
+     * ne touche donc pas `corruptionMaison`) — `entretienActif` redémarre
+     * à `true` pour la carte entrante (retour utilisateur, 28/08/2026 :
+     * "Quand un programme arrive sur le plateau maison, par défaut la
+     * case entretien doit être cochée" — avant cette date, à `false`).
      */
     utiliserProgramme: function (partieId, nomProgramme, demanderChoix) {
       // EVOLUTION 18 (todo.md) : "action de Programme en main" est, avec
@@ -2662,7 +2763,7 @@ var GameService = (function () {
               // Corruption liée à l'emplacement, pas à la carte : conserve
               // le `corrompu` déjà présent sur ce slot (voir JSDoc ci-dessus).
               var corrompuExistant = !!(slots[indexCible] && slots[indexCible].corrompu);
-              slots[indexCible] = { nom: nomProgramme, entretienActif: false, corrompu: corrompuExistant };
+              slots[indexCible] = { nom: nomProgramme, entretienActif: true, corrompu: corrompuExistant };
               ligneFraiche.programmesEnMain = enMainSansCarte;
               ligneFraiche.programmesUtilises = slots;
               return DB.put('plateauMaison', ligneFraiche).then(function () {

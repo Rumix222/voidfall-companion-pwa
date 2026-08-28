@@ -250,12 +250,14 @@
     </div>
 
     <!-- Plateau Programme (4 emplacements fixes de la fiche Maison) —
-         emplacement 0 réservé au Programme de départ (données Origine
-         Maison pas encore disponibles au catalogue, laissé en
-         placeholder), emplacements 1-3 remplis via le bouton "Utiliser"
-         d'un Programme "en main" (écran Focus) — voir
-         GameService.utiliserProgramme, renderProgrammesPlateauMaison_
-         ci-dessous. -->
+         emplacement 0 : Programme de départ (data/catalogue/
+         programmesDepart.json, identifié par `code`, jamais Corrompu),
+         emplacements 1-3 remplis via le bouton "Utiliser" d'un Programme
+         "en main" (écran Focus) — voir GameService.utiliserProgramme.
+         Les 4 lignes partagent le même gabarit visuel depuis le retour
+         utilisateur (28/08/2026) "Afficher le programme de départ comme
+         les autres, pas dans un cadre, 0 - devant" — voir
+         renderProgrammesPlateauMaison_ ci-dessous. -->
     <h2 class="section-title" style="margin-top:22px;">Programmes</h2>
     <div class="game-block" id="bloc-programmes-plateau">
       <div id="programmes-plateau-liste"></div>
@@ -967,7 +969,11 @@
     /**
      * Plateau Programme (Plat. maison, Phase 3+) — 4 emplacements fixes
      * (partie.plateauMaison.programmesUtilises, voir
-     * GameService.programmesUtilisesParDefaut_) :
+     * GameService.programmesUtilisesParDefaut_), rendus depuis le retour
+     * utilisateur (28/08/2026) "Afficher le programme de départ comme
+     * les autres, pas dans un cadre, 0 - devant, l'entretien aligné avec
+     * les autres" comme 4 lignes `.programme-plateau-item` IDENTIQUES
+     * (préfixe "N. ", toggle "Entretien" au même endroit) :
      * - Emplacement 0, Programme de départ — rempli à la création de
      *   partie par GameService.creerPartie (data/catalogue/
      *   programmesDepart.json, cherché par maison+technologie de départ,
@@ -975,18 +981,20 @@
      *   false, depart:true}` — identifié par `code` (pas de `nom`, ces
      *   Programmes n'en ont pas, décision utilisateur), jamais un
      *   <select> (jamais rechoisi manuellement). Affiche ses objectifs +
-     *   bonus de Production éventuel, un toggle "Entretien" (ACTIF par
-     *   défaut, contrairement aux emplacements 1-3), AUCUNE case
-     *   "Corrompu" (n'existe pas pour le Programme de départ). `null` si
-     *   la recherche catalogue a échoué à la création (catalogue non
-     *   synchronisé) ou pour une partie créée avant ce câblage —
-     *   placeholder, aucun contrôle.
+     *   bonus de Production éventuel, un toggle "Entretien", AUCUNE case
+     *   "Corrompu" (l'emplacement de départ ne peut jamais être
+     *   Corrompu — docs-rules-programmes-FocusPrefere-
+     *   ConsulterEvenement.md §1). `null`/désactivé si la recherche
+     *   catalogue a échoué à la création (catalogue non synchronisé) ou
+     *   pour une partie créée avant ce câblage.
      * - Emplacements 1-3, remplis via GameService.utiliserProgramme
      *   (bouton "Utiliser", écran Focus — jamais choisis ici, donc nom en
      *   texte fixe comme la Technologie de départ ci-dessus, PAS un
-     *   <select>) : nom + type, toggle "Entretien" (actif = +2 à
-     *   l'Entretien dû, voir chargerEntretien_) et case "Corrompu" (ajuste
-     *   corruptionMaison de ±1 au clic) — écriture directe via
+     *   <select>) : nom + type, toggle "Entretien" (ACTIF par défaut dès
+     *   l'arrivée du Programme sur le plateau depuis le même retour
+     *   utilisateur — voir GameService.utiliserProgramme ; actif = +2 à
+     *   l'Entretien dû, voir chargerEntretien_) et case "Corrompu"
+     *   (ajuste corruptionMaison de ±1 au clic) — écriture directe via
      *   GameService.majPlateauMaison (tableau entier reconstruit en
      *   mémoire, lecture-fusion-écriture côté client, même principe que
      *   #corruption-maison-input ci-dessus).
@@ -1002,39 +1010,55 @@
       Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart'), StrategieService.calculerPointsProgrammesActifs(partie)]).then(function (resultats) {
         var catalogue = resultats[0];
         var catalogueDepart = resultats[1];
-        // Chantier "Points de victoire des Programmes" : { [emplacement 1/2/3]:
-        // {objectif1, objectif2, total, code, nom} } — jamais l'emplacement 0
-        // (Programme de départ, forme de donnée différente, voir
-        // js/programmeScoreService.js). Affiché en "+N" à côté de chaque
-        // objectif ci-dessous (pointsProgrammes[index] peut être absent si
-        // l'emplacement est vide ou le code introuvable au catalogue).
+        // Chantier "Points de victoire des Programmes" : { [emplacement]:
+        // ... }. Emplacements 1/2/3 (32 cartes programmes.json) :
+        // {objectif1, objectif2, total, code, nom}. Emplacement 0
+        // (Programme de départ, 28 cartes programmesDepart.json pertinentes,
+        // forme différente — voir js/programmeScoreService.js) :
+        // {lignes:[...], total, code} — `lignes` même longueur/ordre que
+        // carteDepart.objectifs ci-dessous, `total` peut être NÉGATIF
+        // (malus Corruption sur certaines cartes). Affiché en "+N"/"−N" à
+        // côté de chaque objectif (pointsProgrammes[index] peut être
+        // absent si l'emplacement est vide ou le code introuvable).
         var pointsProgrammes = resultats[2] || {};
         var parNom = {};
         catalogue.forEach(function (p) { parNom[p.nom] = p; });
         var parCode = {};
         catalogueDepart.forEach(function (p) { parCode[p.code] = p; });
 
-        var slot0 = slots[0];
-        var carteDepart = slot0 && slot0.code ? parCode[slot0.code] : null;
-        var ligneDepart;
-        if (!carteDepart) {
-          ligneDepart = '<div class="card" style="margin-bottom:14px;">' +
-            '<h3>Programme de départ</h3>' +
-            '<p class="hint">Indisponible (catalogue Programmes de départ non synchronisé à la création de cette partie, ou partie créée avant cette fonctionnalité).</p>' +
-            '</div>';
-        } else {
-          ligneDepart = '<div class="card" style="margin-bottom:14px;">' +
-            '<h3 class="programme-nom-toggle" data-slot-detail="0">' + carteDepart.maison + ' - ' + carteDepart.origine + '</h3>' +
-            '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="0" hidden>' +
-            carteDepart.objectifs.map(function (o) { return '<p>' + o + '</p>'; }).join('') +
-            (carteDepart.bonusPermanent ? '<p>' + carteDepart.bonusPermanent + '</p>' : '') +
-            '</div>' +
-            '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
-            (slot0.entretienActif ? ' checked' : '') + '> Ent.</label>' +
-            '</div>';
-        }
+        // Retour utilisateur (28/08/2026) : "Afficher le programme de
+        // départ comme les autres, pas dans un cadre, 0 - devant,
+        // l'entretien aligné avec les autres" — les 4 emplacements
+        // (0 = départ, 1-3 = obtenus) partagent désormais EXACTEMENT le
+        // même gabarit `.programme-plateau-item`/`.techno-obtenue-ligne`.
+        // Seules différences réelles pour l'emplacement 0 : identifié par
+        // `code` (pas `nom`), catalogue programmesDepart.json (`objectifs`
+        // tableau + `pointsProgrammes[0].lignes`, pas objectif1/objectif2),
+        // et AUCUNE case "Corrompu" — l'emplacement de départ ne peut
+        // jamais être Corrompu (docs-rules-programmes-FocusPrefere-
+        // ConsulterEvenement.md §1 : "Votre emplacement de départ [...] ne
+        // peut pas être Corrompu."), contrairement aux emplacements 1-3.
+        var lignesProgrammes = [0, 1, 2, 3].map(function (index) {
+          if (index === 0) {
+            var slot0 = slots[0] || {};
+            var carteDepart = slot0.code ? parCode[slot0.code] : null;
+            var pointsDepart = pointsProgrammes[0];
+            var libelleDepart = '0. ' + (carteDepart ? (carteDepart.maison + ' - ' + carteDepart.origine) : '(Indisponible)');
+            var detailDepart = carteDepart ? carteDepart.objectifs.map(function (o, i) {
+              var ligne = pointsDepart && pointsDepart.lignes[i];
+              var badge = (ligne !== undefined) ? ' <span class="badge">' + (ligne >= 0 ? '+' : '') + ligne + '</span>' : '';
+              return '<p>' + o + badge + '</p>';
+            }).join('') + (carteDepart.bonusPermanent ? '<p>' + carteDepart.bonusPermanent + '</p>' : '') : '';
+            return '<div class="programme-plateau-item">' +
+              '<div class="techno-obtenue-ligne">' +
+              '<span class="champ-technologie-fixe' + (detailDepart ? ' programme-nom-toggle' : '') + '" data-slot-detail="0">' + libelleDepart + '</span>' +
+              '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
+              (slot0.entretienActif ? ' checked' : '') + (carteDepart ? '' : ' disabled') + '> Ent.</label>' +
+              '</div>' +
+              (detailDepart ? '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="0" hidden>' + detailDepart + '</div>' : '') +
+              '</div>';
+          }
 
-        var lignesUtilisees = [1, 2, 3].map(function (index) {
           var slot = slots[index] || { nom: null, entretienActif: false, corrompu: false };
           var carte = slot.nom ? parNom[slot.nom] : null;
           // Numéro d'emplacement (1/2/3, hors Programme de départ) en
@@ -1060,7 +1084,7 @@
             '</div>';
         }).join('');
 
-        container.innerHTML = ligneDepart + lignesUtilisees;
+        container.innerHTML = lignesProgrammes;
 
         Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
           nomEl.addEventListener('click', function () {
@@ -1145,8 +1169,30 @@
           ? partie.plateauMaison.offresProgramme
           : [];
 
+        // Retour utilisateur (28/08/2026) : "Une fois qu'un programme est
+        // obtenu (dans onglet focus ou onglet maison) il ne peut plus
+        // etre selectionner dans la ddl offre programme" — un Programme
+        // déjà en main (onglet Focus, programmesEnMain) ou déjà en jeu
+        // sur un emplacement 1-3 (onglet Plat. maison, programmesUtilises
+        // — jamais l'emplacement 0 "départ", identifié par `code` dans un
+        // catalogue distinct, aucun chevauchement de nom possible) ne
+        // peut physiquement plus être dans l'offre publique (la même
+        // carte ne peut pas être à 2 endroits). Exclu des <option>, SAUF
+        // s'il s'agit de la sélection ACTUELLE de cette ligne d'offre
+        // (reste visible/sélectionné même si obtenu entre-temps par un
+        // autre biais, pour ne jamais perdre silencieusement une valeur
+        // déjà enregistrée).
+        var pm = partie.plateauMaison || {};
+        var nomsDejaObtenus = (Array.isArray(pm.programmesEnMain) ? pm.programmesEnMain : []).slice();
+        [1, 2, 3].forEach(function (index) {
+          var slot = Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises[index] : null;
+          if (slot && slot.nom) nomsDejaObtenus.push(slot.nom);
+        });
+
         container.innerHTML = offres.map(function (offre, index) {
-          var options = catalogue.filter(function (p) { return p.type === offre.type; });
+          var options = catalogue.filter(function (p) {
+            return p.type === offre.type && (p.nom === offre.nom || nomsDejaObtenus.indexOf(p.nom) === -1);
+          });
           var optionsHtml = '<option value="">— Aucune —</option>' + options.map(function (p) {
             return '<option value="' + p.nom + '"' + (offre.nom === p.nom ? ' selected' : '') + '>' + p.nom + '</option>';
           }).join('');
@@ -1857,13 +1903,15 @@
     }
 
     /**
-     * Cadre de type "gain" sans ressource plateauMaison suivie par l'app
-     * (ex. l'offre de Programme Domination, non modélisée) — ouvre la même
-     * modale générique que les autres cadres, en réutilisant le contexte
-     * 'confirmation' de StrategieService.demanderChoix (message +
-     * Annuler/Valider), puis persiste juste "cadre résolu" via
-     * GameService.appliquerCadreManuel (aucun delta appliqué, contrairement
-     * à appliquerCadreEtRafraichir_ ci-dessus).
+     * Cadre de type "gain" sans ressource plateauMaison suivie par l'app,
+     * ET dont la cible n'est PAS non plus l'offre de Programme
+     * (appliquerCadreCorruptionOffreProgrammeEtRafraichir_ ci-dessous —
+     * désormais automatisée) — ouvre la même modale générique que les
+     * autres cadres, en réutilisant le contexte 'confirmation' de
+     * StrategieService.demanderChoix (message + Annuler/Valider), puis
+     * persiste juste "cadre résolu" via GameService.appliquerCadreManuel
+     * (aucun delta appliqué, contrairement à appliquerCadreEtRafraichir_
+     * ci-dessus).
      *
      * Principe à garder pour les événements : le message n'est jamais le
      * rappel verbatim de cadre.texte (déjà lisible sur la carte juste
@@ -1887,6 +1935,48 @@
           .then(function (partieMaj) {
             partieCourante = partieMaj;
             renderEvenementCycle_(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec de la validation du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Effet "Placer une Corruption sur l'offre de Programme" d'un Cadre
+     * d'Événement galactique (voir GameService.
+     * appliquerCadreCorruptionOffreProgramme/
+     * cadreCorruptionOffreProgrammeAutomatisable, gameService.js). Retour
+     * utilisateur (28/08/2026) : "L'effet placer une corruption des
+     * événements peu maintenant être automatisé. Exemple événement À
+     * cycle 2" — jusqu'ici ce cadre retombait sur
+     * appliquerCadreManuelEtRafraichir_ ci-dessus (aucun delta), devenu
+     * automatisable depuis que plateauMaison.offresProgramme suit
+     * réellement l'état Corrompu de chaque offre. AUCUN choix du joueur
+     * (la cible est entièrement déterminée par la carte) : même popup
+     * 'confirmation' que le cas manuel ci-dessus (cohérence visuelle),
+     * mais persiste réellement l'état cette fois.
+     */
+    function appliquerCadreCorruptionOffreProgrammeEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'confirmation',
+        titre: 'Corruption d’une offre de Programme',
+        message: '<em>' + (cadre.instruction || cadre.texte) + '</em>',
+        texteValider: 'Valider'
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreCorruptionOffreProgramme(partie.id, cycle, ordre)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            // offresProgramme touché (Piège n°2, CLAUDE.md) : la case
+            // "Corrompu" de l'écran Plat. Galactique (renderOffreProgrammes_,
+            // même écran que le Cadre mais un bloc DOM séparé) ne se
+            // rafraîchit jamais toute seule — rappel explicite ici.
+            renderOffreProgrammes_(partieMaj);
             StrategieService.afficher(partieMaj);
           });
       }).catch(function (erreur) {
@@ -2170,7 +2260,14 @@
           // si non automatisable.
           var estGainCorruption = !!(cadre.effet && cadre.effet.type === 'gain' &&
             typeof GameService !== 'undefined' && GameService.cadreGainCorruptionAutomatisable(cadre));
-          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain') && !estGainCorruption;
+          // "Placer une Corruption sur l'offre de Programme" (cible fixe,
+          // AUCUN choix du joueur — voir GameService.
+          // cadreCorruptionOffreProgrammeAutomatisable/
+          // appliquerCadreCorruptionOffreProgramme) : sort AUSSI du
+          // hors-périmètre "estManuel" ci-dessous, comme estGainCorruption.
+          var estOffreProgrammeCorrompue = !!(cadre.effet && cadre.effet.type === 'gain' && !estGainCorruption &&
+            typeof GameService !== 'undefined' && GameService.cadreCorruptionOffreProgrammeAutomatisable(cadre));
+          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain') && !estGainCorruption && !estOffreProgrammeCorrompue;
 
           var statutHtml = '';
           var actions = [];
@@ -2197,11 +2294,12 @@
             actions = actionsCadre_(cadre);
           }
 
-          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || estGainCorruption || actions.length);
+          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || estGainCorruption || estOffreProgrammeCorrompue || actions.length);
           var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
           var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' :
             (estPlacementMultiple ? ' data-placement-multiple="1"' :
-              (estGainCorruption ? ' data-gain-corruption="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"')));
+              (estGainCorruption ? ' data-gain-corruption="1"' :
+                (estOffreProgrammeCorrompue ? ' data-offre-programme="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"'))));
           var attributsCarte = cliquable
             ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
             : '';
@@ -2271,6 +2369,19 @@
         var declencher = function () {
           if (carteEl.classList.contains('cadre-carte-en-cours')) return;
           appliquerCadreGainCorruptionEtRafraichir_(partie, cycle, ordre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-offre-programme="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreCorruptionOffreProgrammeEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
         };
         carteEl.addEventListener('click', declencher);
         carteEl.addEventListener('keydown', function (evenement) {

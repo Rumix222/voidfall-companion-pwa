@@ -113,7 +113,9 @@ test('utiliserProgramme : succès, emplacement 1-3 vide -> placé directement, a
     var ligne = ctx.plateauMaison[PARTIE_ID];
     assert.strictEqual(JSON.stringify(ligne.programmesEnMain), JSON.stringify([]));
     assert.strictEqual(ligne.programmesUtilises[1].nom, 'Haute Société');
-    assert.strictEqual(ligne.programmesUtilises[1].entretienActif, false);
+    // Retour utilisateur (28/08/2026) : "Quand un programme arrive sur le
+    // plateau maison, par défaut la case entretien doit être cochée".
+    assert.strictEqual(ligne.programmesUtilises[1].entretienActif, true);
     assert.strictEqual(ligne.programmesUtilises[1].corrompu, false);
     assert.strictEqual(ligne.programmesUtilises[0], null, 'emplacement 0 (départ) jamais touché');
 

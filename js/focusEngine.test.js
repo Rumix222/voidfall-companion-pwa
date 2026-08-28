@@ -1603,3 +1603,119 @@ test('AnnulationService.restaurerMutations : ligne inexistante avant l’action 
     assert.strictEqual(secteur, null);
   });
 });
+
+// ------------------------------------------------------------
+// action_focus_prefere / copy_action — chantier "Focus préféré"
+// (docs-rules-programmes-FocusPrefere-ConsulterEvenement.md §2). La
+// popup 'action_focus_prefere' (strategieService.js) résout avec
+// l'action COMPLÈTE choisie ({carte, action, cout, effet, texte}) —
+// resoudreCle_ délègue ensuite sa résolution à resoudreEffetEtCout SUR
+// LE MÊME `etat` (jamais un clone séparé), pour que le reste de
+// l'action englobante (coût, options sœurs d'un "choice" inclusif)
+// voie les mutations nichées à jour.
+// ------------------------------------------------------------
+
+test('action_focus_prefere : effet ET coût de l’action nichée appliqués au MÊME état, actionsFocusUtilisees ne cite QUE la carte englobante', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Tentation' };
+  var action = {
+    action: 'Exploiter', texte: '', cout: {},
+    effet: { action_focus_prefere: { origine: 'focus_prefere', payer_cout: true, emplacement: ['main', 'defausse'] } }
+  };
+
+  var appelsDemanderChoix = [];
+  var demanderChoix = function (contexte) {
+    appelsDemanderChoix.push(contexte.type);
+    if (contexte.type === 'action_focus_prefere') {
+      return { carte: 'Production', action: 'Ravitailler', cout: { energie: 1 }, effet: { credit: 2 }, texte: 'x' };
+    }
+    // Énergie/Nourriture/Matériel ouvrent SYSTÉMATIQUEMENT 'paiement_ressource'
+    // (voir tests plus haut dans ce fichier), même quand la réserve suffit.
+    if (contexte.type === 'paiement_ressource') return { utiliseRessource: contexte.montant };
+    throw new Error('type de popup inattendu : ' + contexte.type);
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    // Effet nichée (+2 Crédit) ET coût niché (-1 Énergie, payé entièrement
+    // en réserve) tous deux appliqués.
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit + 2);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, PLATEAU_BASE.ressourceEnergie - 1);
+    assert.deepStrictEqual(appelsDemanderChoix, ['action_focus_prefere', 'paiement_ressource']);
+    assert.strictEqual(JSON.stringify(resultat.plateauMaisonApres.actionsFocusUtilisees), JSON.stringify(['Tentation — Exploiter'])); // JAMAIS "Production — Ravitailler"
+  });
+});
+
+test('copy_action : STRICTEMENT équivalent à action_focus_prefere (2 noms de clé différents au catalogue, même mécanique)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Tentation' };
+  var action = {
+    action: 'Exploiter', texte: '', cout: {},
+    effet: { copy_action: { source: 'focus_preferred', location: ['hand', 'discard'], pay_cost: true } }
+  };
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'action_focus_prefere');
+    return { carte: 'Développement', action: 'Installer', cout: {}, effet: { influence: 5 }, texte: 'x' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, PLATEAU_BASE.influence + 5);
+  });
+});
+
+test('action_focus_prefere : "Annuler" sur le choix de l’action nichée bloque TOUTE l’action englobante (aucune mutation)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Tentation' };
+  var action = { action: 'Exploiter', texte: '', cout: {}, effet: { action_focus_prefere: {} } };
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+  });
+});
+
+test('action_focus_prefere : "Annuler" NICHÉ (à l’intérieur de la résolution de l’action choisie) bloque aussi TOUTE l’action englobante', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Tentation' };
+  var action = { action: 'Exploiter', texte: '', cout: {}, effet: { action_focus_prefere: {} } };
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'action_focus_prefere') {
+      // Choisit une action dont le PROPRE effet ouvre encore une popup
+      // (ici gagner_technologie), refusée à son tour.
+      return { carte: 'Innovation', action: 'Inventer', cout: {}, effet: { gagner_technologie: 'base' }, texte: 'x' };
+    }
+    return { annule: true }; // refuse la popup nichée de l'action choisie
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+  });
+});
+
+test('action_focus_prefere : coût inclus dans un "choice" et/ou — les options sœurs restent résolues normalement', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Tentation' };
+  // Motif Kradmor "Surmonter" (choice et/ou), option sœur simplifiée à une
+  // clé simple (science:1) plutôt que augmenter_population (qui ouvrirait
+  // sa propre popup de sélection de secteur, hors du périmètre de CE test).
+  var action = {
+    action: 'Surmonter', texte: 'et/ou', cout: { credit: 1 },
+    effet: { choice: [{ science: 1 }, { action_focus_prefere: {} }] }
+  };
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'options_inclusives') return [0, 1]; // les 2 options
+    if (contexte.type === 'action_focus_prefere') return { carte: 'Production', action: 'Ravitailler', cout: {}, effet: { credit: 4 }, texte: 'x' };
+    throw new Error('type inattendu : ' + contexte.type);
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    // science:1 (option sœur) + action_focus_prefere (+4 Crédit) + coût de
+    // l'action englobante elle-même (-1 Crédit) = +3 Crédit net.
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, PLATEAU_BASE.ressourceScience + 1);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit + 3);
+  });
+});

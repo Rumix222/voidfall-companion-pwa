@@ -302,3 +302,118 @@ test('W8 : objectif1 vaut 0 sans Technologie améliorée (pas de plancher/plafon
   var PS = creerContexte_().ProgrammeScoreService;
   assert.strictEqual(PS.calculerPointsProgramme('W8', etatVide_()).objectif1, 0);
 });
+
+// ------------------------------------------------------------
+// Programme de DÉPART (programmesDepart.json, emplacement 0) —
+// calculerPointsProgrammeDepart, forme différente (tableau `lignes` de
+// longueur variable, total pouvant être négatif — malus Corruption).
+// ------------------------------------------------------------
+
+test('code inconnu (Programme de départ) -> {lignes:[], total:0}', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  assertPoints_(PS.calculerPointsProgrammeDepart('ZZZ', etatVide_()), { lignes: [], total: 0 });
+});
+
+test('H13-A2/H13-B2 (Marqualos, supplementaire) : codes volontairement absents de la table', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  assertPoints_(PS.calculerPointsProgrammeDepart('H13-A2', etatVide_()), { lignes: [], total: 0 });
+  assertPoints_(PS.calculerPointsProgrammeDepart('H13-B2', etatVide_()), { lignes: [], total: 0 });
+});
+
+test('H1-A (motif "A", 3 lignes) : secteurs Purs / avec Défense de Secteur / avec Chantier Naval', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.secteursPurs = [secteurPur_({ installationDefenseSecteur: 1 }), secteurPur_({ installationChantierNaval: 1 })];
+  assertPoints_(PS.calculerPointsProgrammeDepart('H1-A', etat), { lignes: [6, 1, 2], total: 9 }); // 2 secteurs*3, 1*1, 1*2
+});
+
+test('H3-A/H4-A/H13-A/H2-A partagent EXACTEMENT le motif "A" de H1-A (même texte au catalogue)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.secteursPurs = [secteurPur_({ installationDefenseSecteur: 1 })];
+  var attendu = PS.calculerPointsProgrammeDepart('H1-A', etat);
+  ['H3-A', 'H4-A', 'H13-A', 'H2-A'].forEach(function (code) {
+    assertPoints_(PS.calculerPointsProgrammeDepart(code, etat), attendu);
+  });
+});
+
+test('H1-B (motif "B", 4 lignes) : population EXACTEMENT 5 vs EXACTEMENT 6 (pas des seuils "au moins")', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.secteursPurs = [secteurPur_({ population: 5 }), secteurPur_({ population: 6 }), secteurPur_({ population: 4, guildeBanquiers: 2, guildeFermiers: 1 })];
+  // pop=4 ne compte dans AUCUNE des 2 premières lignes (ni 5 ni 6 pile)
+  assertPoints_(PS.calculerPointsProgrammeDepart('H1-B', etat), { lignes: [3, 6, 2, 3], total: 14 });
+});
+
+test('H12-A : Entretien total (pas par secteur) + secteur Pur avec au moins une Installation (les 3 types)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.entretienTotal = 4;
+  etat.secteursPurs = [secteurPur_({ installationBaseStellaire: 1 })];
+  assertPoints_(PS.calculerPointsProgrammeDepart('H12-A', etat), { lignes: [8, 1], total: 9 });
+});
+
+test('H12-B/H6-B : barème Niveau Civilisation Pure 0/3/6/9/12 (distinct du 0/4/8/12/16 du catalogue principal)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.civilisation.niveaux.economie = 4;
+  assert.strictEqual(PS.calculerPointsProgrammeDepart('H12-B', etat).lignes[2], 12);
+});
+
+test('H7-A : "1 Influence toutes les 2 Populations Pures" (floor global, pas par secteur)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.secteursPurs = [secteurPur_({ population: 3 }), secteurPur_({ population: 2 })]; // total 5 -> floor(5/2)=2
+  assert.strictEqual(PS.calculerPointsProgrammeDepart('H7-A', etat).lignes[0], 2);
+});
+
+test('H10-A : MALUS Corruption fiche Maison (négatif, jamais clampé à 0 ligne par ligne)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.corruptionMaison = 3;
+  var resultat = PS.calculerPointsProgrammeDepart('H10-A', etat);
+  assert.strictEqual(resultat.lignes[3], -3);
+  assert.strictEqual(resultat.total, -3); // aucune autre ligne active dans cet état vide
+});
+
+test('H10-B : malus Corruption à -2/Corruption (coefficient différent de H10-A) + passthrough Population Pure totale', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.corruptionMaison = 2;
+  etat.secteursPurs = [secteurPur_({ population: 4 })];
+  var resultat = PS.calculerPointsProgrammeDepart('H10-B', etat);
+  assert.strictEqual(resultat.lignes[0], 4); // passthrough population, pas un multiplicateur
+  assert.strictEqual(resultat.lignes[3], -4); // -2 * 2
+});
+
+test('H14-B : total peut être NÉGATIF si le malus dépasse les gains', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.corruptionMaison = 10; // malus -10, aucun secteur Pur/Guilde pour compenser
+  var resultat = PS.calculerPointsProgrammeDepart('H14-B', etat);
+  assert.strictEqual(resultat.total, -10);
+});
+
+test('H9-B/H6-A : nombre de TYPES de ressource en réserve >=8 (pas la quantité elle-même)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.ressources = { nourriture: 8, energie: 9, materiel: 3, credit: 0, science: 8 }; // 3 types >=8
+  assert.strictEqual(PS.calculerPointsProgrammeDepart('H9-B', etat).lignes[0], 9); // 3 types * 3
+});
+
+test('H11-A : réserve du type le MOINS abondant (pas un compte de types à égalité)', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.ressources = { nourriture: 5, energie: 2, materiel: 2, credit: 9, science: 7 }; // min = 2
+  assert.strictEqual(PS.calculerPointsProgrammeDepart('H11-A', etat).lignes[0], 4); // 2 * 2
+});
+
+test('H11-B : "série de 3 cubes" TOUS secteurs Purs confondus (pas par secteur) + valeur totale de Gloire', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.gloire = [3, 4];
+  etat.secteursPurs = [secteurPur_({ pn: { corvette: 5, sentinelle: 0, destroyer: 0, cuirasse: 0, porteVaisseau: 0 } }), secteurPur_({ pn: { corvette: 2, sentinelle: 0, destroyer: 0, cuirasse: 0, porteVaisseau: 0 } })];
+  var resultat = PS.calculerPointsProgrammeDepart('H11-B', etat);
+  assert.strictEqual(resultat.lignes[0], 7); // Gloire 3+4
+  assert.strictEqual(resultat.lignes[2], 6); // 7 cubes -> floor(7/3)=2 séries * 3
+});

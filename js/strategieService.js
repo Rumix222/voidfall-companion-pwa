@@ -992,12 +992,20 @@ var StrategieService = (function () {
   }
 
   /**
-   * Calcule les points d'Influence des Programmes ACTIFS (emplacements
-   * 1/2/3 du plateau Programme — l'emplacement 0 "Programme de départ"
-   * est hors périmètre, forme de donnée différente, voir
-   * programmeScoreService.js). Retourne `{ [numeroEmplacement]:
-   * {objectif1, objectif2, total, code} }`, un seul aller catalogue +
-   * un seul assemblage d'état pour les 3 emplacements. Consommée par
+   * Calcule les points d'Influence de TOUS les Programmes en jeu, y
+   * compris désormais l'emplacement 0 "Programme de départ" (retour
+   * utilisateur : "Il faudrait maintenant de la même façon implémenter
+   * les objectif de programme de départ"). Retourne `{ [numeroEmplacement]:
+   * {...} }` :
+   * - emplacements 1/2/3 (32 cartes de programmes.json) :
+   *   `{objectif1, objectif2, total, code, nom}`.
+   * - emplacement 0 (28 cartes pertinentes de programmesDepart.json,
+   *   forme différente — voir programmeScoreService.js) :
+   *   `{lignes: [...], total, code}` — `lignes` a la même longueur que
+   *   `objectifs` au catalogue (2 à 4), `total` PEUT être négatif (malus
+   *   Corruption sur certaines cartes).
+   * Un seul aller catalogue (programmes + programmesDepart) + un seul
+   * assemblage d'état pour les 4 emplacements. Consommée par
    * index.html/renderProgrammesPlateauMaison_ (affichage temps réel) et
    * par la popup 'phase_evaluation' ci-dessous (section "Objectifs de
    * Programme").
@@ -1006,15 +1014,26 @@ var StrategieService = (function () {
     var pm = partie.plateauMaison || {};
     var slots = Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises : [];
 
-    return Promise.all([DB.getAll('programmes'), obtenirEtatProgrammes_(partie)])
+    return Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart'), obtenirEtatProgrammes_(partie)])
       .then(function (resultats) {
         var catalogue = resultats[0];
-        var etat = resultats[1];
+        var catalogueDepart = resultats[1];
+        var etat = resultats[2];
 
         var parNom = {};
         catalogue.forEach(function (p) { parNom[p.nom] = p; });
+        var parCodeDepart = {};
+        catalogueDepart.forEach(function (p) { parCodeDepart[p.code] = p; });
 
         var resultat = {};
+
+        var slot0 = slots[0];
+        var carteDepart = slot0 && slot0.code ? parCodeDepart[slot0.code] : null;
+        if (carteDepart) {
+          var pointsDepart = ProgrammeScoreService.calculerPointsProgrammeDepart(carteDepart.code, etat);
+          resultat[0] = { lignes: pointsDepart.lignes, total: pointsDepart.total, code: carteDepart.code };
+        }
+
         [1, 2, 3].forEach(function (index) {
           var slot = slots[index];
           var carte = slot && slot.nom ? parNom[slot.nom] : null;
@@ -6082,6 +6101,84 @@ var StrategieService = (function () {
           });
         }
 
+      } else if (contexte.type === 'action_focus_prefere') {
+        // Effet "Focus préféré" (focusEngine.js, clés "action_focus_prefere"/
+        // "copy_action" — voir son en-tête pour le détail complet du
+        // mécanisme et docs-rules-programmes-FocusPrefere-
+        // ConsulterEvenement.md §2) : liste, à plat, TOUTES les actions
+        // des cartes Focus préférées du joueur (maisons.json/
+        // focusPrefere — 2 familles typiquement, jamais forcé par
+        // l'appli), la version spécifique à la Maison remplaçant la
+        // Standard si elle existe (FocusService.obtenirMiseEnPlace, même
+        // logique que la mise en place initiale — aucune duplication).
+        // "Main ou défausse" n'a pas d'équivalent modélisé (aucune pioche/
+        // défausse de cartes Focus dans l'appli) : les 2 cartes préférées
+        // sont TOUJOURS proposées en entier, sans distinction.
+        // Résout avec l'action COMPLÈTE choisie ({carte, action, cout,
+        // effet, texte}) — focusEngine.js délègue ensuite sa résolution
+        // (Effet + Coût, "vous devez tout de même payer le coût") à
+        // FocusEngine.resoudreEffetEtCout sur le MÊME état en cours,
+        // jamais ici : cette popup ne fait QUE le choix, aucune
+        // persistance propre (contrairement à 'gagner_technologie'
+        // ci-dessus, dont les champs ne recoupent jamais le reste du
+        // moteur — action_focus_prefere, elle, peut toucher n'importe
+        // quel champ, d'où ce choix de conception).
+        titre.textContent = 'Action d’un Focus préféré';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieFocusPref = partieAffichee;
+        var nomMaisonFocusPref = partieFocusPref.joueur ? partieFocusPref.joueur.nom : null;
+
+        Promise.all([
+          nomMaisonFocusPref ? DB.get('maisons', nomMaisonFocusPref) : Promise.resolve(null),
+          (nomMaisonFocusPref && typeof FocusService !== 'undefined') ? FocusService.obtenirMiseEnPlace(nomMaisonFocusPref) : Promise.resolve([])
+        ]).then(function (resultats) {
+          var maisonFocusPref = resultats[0];
+          var cartesJoueurFocusPref = resultats[1] || [];
+          var famillesPreferees = (maisonFocusPref && Array.isArray(maisonFocusPref.focusPrefere)) ? maisonFocusPref.focusPrefere : [];
+
+          var optionsFocusPref = [];
+          cartesJoueurFocusPref
+            .filter(function (c) { return famillesPreferees.indexOf(c.focus) !== -1; })
+            .forEach(function (c) {
+              (c.actions || []).forEach(function (a) {
+                optionsFocusPref.push({
+                  carte: c.focus, action: a.action, cout: a.cout, effet: a.effet, texte: a.texte,
+                  label: c.focus + ' — ' + (a.action || 'action'),
+                  sousTexte: a.texte
+                });
+              });
+            });
+
+          if (!optionsFocusPref.length) {
+            contenu.innerHTML = '<p class="hint">Aucun Focus préféré exploitable ' +
+              (famillesPreferees.length ? '(' + famillesPreferees.join(', ') + ')' : '(non configuré au catalogue Maisons)') +
+              ' — vérifiez data/catalogue/maisons.json (champ focusPrefere).</p>';
+            return;
+          }
+
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            optionsFocusPref.map(function (option, i) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' +
+                option.label + '<br><span class="cadre-action-sous-texte">' + option.sousTexte + '</span>' +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var option = optionsFocusPref[Number(btn.dataset.index)];
+              fermerModale_();
+              resolve({ carte: option.carte, action: option.action, cout: option.cout, effet: option.effet, texte: option.texte });
+            });
+          });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des Focus préférés : ' + erreur.message);
+        });
+
       } else if (contexte.type === 'utiliser_programme') {
         // Utiliser un Programme "en main" (Phase 3) — popup légère :
         // affiche l'action gratuite du Programme (règle fixe par type,
@@ -7198,10 +7295,16 @@ var StrategieService = (function () {
         // été cliqué trop tôt (actions Focus pas encore toutes jouées).
         //
         // Objectifs de Programme (§3.4) : calculerPointsProgrammesActifs_
-        // (ci-dessus) donne le détail chiffré par Programme actif.
-        // Retour utilisateur (28/08/2026) : "Il faut que l'influence
-        // soit ajoutee au compteur lorsque je valide la fin de cycle" —
-        // gainInfluenceProgrammesEval (somme des `.total`) est ajouté à
+        // (ci-dessus) donne le détail chiffré par Programme en jeu —
+        // emplacements 1/2/3 ET, depuis le retour utilisateur "Il
+        // faudrait maintenant de la même façon implémenter les objectif
+        // de programme de départ", l'emplacement 0 (Programme de départ,
+        // clé '0', forme `{lignes:[...], total}` — total pouvant être
+        // NÉGATIF, certaines cartes de départ ayant un malus lié à la
+        // Corruption sur la fiche Maison). Retour utilisateur (28/08/2026,
+        // même jour) : "Il faut que l'influence soit ajoutee au compteur
+        // lorsque je valide la fin de cycle" — gainInfluenceProgrammesEval
+        // (somme des `.total`, tous emplacements confondus) est ajouté à
         // l'Influence dans le MÊME GameService.majPlateauMaison que
         // l'Entretien, au clic sur "Valider" (variable locale jusque-là,
         // comme le reste de cette popup — "Annuler" ne l'applique donc
@@ -7281,10 +7384,18 @@ var StrategieService = (function () {
           var texteObjectifsProgramme = Object.keys(pointsProgrammesEval).length
             ? Object.keys(pointsProgrammesEval).sort().map(function (index) {
                 var p = pointsProgrammesEval[index];
+                // Programme de départ (emplacement 0, `lignes` au lieu
+                // d'objectif1/objectif2 — voir programmeScoreService.js) :
+                // total signé (peut être négatif, malus Corruption).
+                if (index === '0') {
+                  var detailLignes = p.lignes.map(function (v) { return (v >= 0 ? '+' : '') + v; }).join(' · ');
+                  return '<p><strong>Programme de départ</strong> — ' + detailLignes +
+                    ' · <strong>Total : ' + (p.total >= 0 ? '+' : '') + p.total + ' Influence</strong></p>';
+                }
                 return '<p><strong>' + p.nom + '</strong> — Objectif 1 : +' + p.objectif1 + ' · Objectif 2 : +' + p.objectif2 +
                   ' · <strong>Total : +' + p.total + ' Influence</strong></p>';
-              }).join('') + '<p><strong>+' + gainInfluenceProgrammesEval + ' Influence</strong> au total — ajoutée à la validation.</p>'
-            : '<p class="hint">Aucun Programme actif (hors Programme de départ) sur le Plat. maison.</p>';
+              }).join('') + '<p><strong>' + (gainInfluenceProgrammesEval >= 0 ? '+' : '') + gainInfluenceProgrammesEval + ' Influence</strong> au total — ajoutée à la validation.</p>'
+            : '<p class="hint">Aucun Programme en jeu sur le Plat. maison.</p>';
 
           function renderPhaseEvaluation_() {
             var restant = entretienTotal - entretienPaye;
@@ -7351,7 +7462,13 @@ var StrategieService = (function () {
             btnValider.disabled = true;
             var restant = entretienTotal - entretienPaye;
             var perteInfluence = restant * 3;
-            var nouvelleInfluence = Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval;
+            // Chantier "Programme de départ" (28/08/2026) : certaines
+            // cartes de départ ont un malus (Corruption fiche Maison,
+            // peut rendre gainInfluenceProgrammesEval négatif) — plancher
+            // final à 0 en plus de celui, déjà existant, sur l'Entretien
+            // seul (qui ne peut pas À LUI SEUL vider l'Influence sous 0
+            // avant l'ajout des Programmes).
+            var nouvelleInfluence = Math.max(0, Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval);
 
             GameService.majPlateauMaison(partieEval.id, {
               ressourceNourriture: stockEval.nourriture,

@@ -21,7 +21,8 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Production","Développement"]
   },
   {
     "nom": "Valnis",
@@ -45,7 +46,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Progrès","Politique"]
+
   },
   {
     "nom": "Zenor",
@@ -69,7 +72,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Renfort","Progrès"]
+
   },
   {
     "nom": "Yarvek",
@@ -93,7 +98,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Renfort","Politique"]
+
   },
   {
     "nom": "Astoran",
@@ -117,7 +124,8 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Conquête","Développement"]
   },
   {
     "nom": "Cortozaar",
@@ -141,7 +149,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Progrès","Développement"]
+
   },
   {
     "nom": "Fenrax",
@@ -165,7 +175,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Conquête","Développement"]
+
   },
   {
     "nom": "Shiveus",
@@ -189,7 +201,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Politique"]
+
   },
   {
     "nom": "Nervo",
@@ -213,7 +227,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Production","Prospérité"]
+
   },
   {
     "nom": "Novaris",
@@ -237,7 +253,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Production","Innovation"]
+
   },
   {
     "nom": "Belitan",
@@ -261,7 +279,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Progrès","Prospérité"]
+
   },
   {
     "nom": "Dunlork",
@@ -285,7 +305,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Renfort","Progrès"]
+
   },
   {
     "nom": "Kradmor",
@@ -309,7 +331,9 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+    "focusPrefere":["Conquête"]
+
   },
   {
     "nom": "Marqualos",
@@ -333,6 +357,8 @@
     "maisonDechueGuildeIngenieurs": 0,
     "maisonDechueGuildeMineurs": 0,
     "maisonDechueGuildeBanquiers": 0,
-    "maisonDechueGuildeScientifiques": 0
+    "maisonDechueGuildeScientifiques": 0,
+	"focusPrefere":["Politique","Ruse"]
+
   }
 ]

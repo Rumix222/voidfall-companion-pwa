@@ -889,6 +889,62 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Focus préféré : "action_focus_prefere"/"copy_action" (2 noms de
+    // clé DIFFÉRENTS au catalogue pour la MÊME mécanique — vérifié champ
+    // par champ, toujours {payer_cout/pay_cost:true, emplacement/
+    // location:["main"/"hand","defausse"/"discard"]}, jamais d'autre
+    // combinaison) : "Faites une action d'un Focus préféré de votre main
+    // ou défausse (en payant son coût et en résolvant ses effets)" — voir
+    // docs-rules-programmes-FocusPrefere-ConsulterEvenement.md §2. Effet
+    // UNIQUEMENT (signe > 0, jamais rencontré en Coût sur tout le
+    // catalogue). "Main ou défausse" n'a pas d'équivalent dans l'appli
+    // (aucune pioche/défausse de cartes Focus modélisée, voir mémoire de
+    // session voidfall-focus-prefere-report.md) — traité comme "n'importe
+    // laquelle des cartes Focus préférées du joueur", toujours la version
+    // spécifique à sa Maison si elle existe (règle explicite : "Si l'un
+    // de vos Focus préférés est aussi une carte spécifique à votre
+    // Maison, résolvez [...] comme indiqué sur votre carte Focus plutôt
+    // que sur la version standard").
+    //
+    // Popup dédiée (contexte 'action_focus_prefere', strategieService.js)
+    // qui fait TOUT le travail hors de portée de ce moteur pur (accès
+    // maisons.json/focusPrefere + FocusService.obtenirMiseEnPlace_, choix
+    // du joueur parmi les actions des 2 cartes préférées) et résout avec
+    // l'action COMPLÈTE choisie ({carte, action, cout, effet, texte}),
+    // PAS juste un indexChoisi — reste alors à résoudre cette action
+    // elle-même : delegue à resoudreEffetEtCout (même moteur, MÊME `etat`
+    // en cours plutôt qu'un clone séparé — ÉVITE tout risque d'écrasement
+    // avec le reste de CETTE résolution, contrairement à un aller-retour
+    // DB séparé comme gagner_technologie ci-dessus, dont les champs ne se
+    // recoupent jamais avec le reste du moteur ; ici n'importe quel champ
+    // peut être touché par l'action choisie). "Vous devez tout de même
+    // payer le coût" (de l'action CHOISIE) : resoudreEffetEtCout paie
+    // aussi bien l'Effet que le Coût de cette action nichée. "Faire une
+    // action de cette manière ne compte pas comme résoudre ce Focus" :
+    // automatiquement respecté — cette délégation ne passe PAS par
+    // resoudreAction (le seul endroit qui alimente actionsFocusUtilisees,
+    // EVOLUTION 12), et aucun mécanisme Programme/jeton Commerce
+    // "déclenché par la résolution d'un Focus" n'est modélisé par
+    // l'appli — rien à exclure explicitement. Un "Annuler" à N'IMPORTE
+    // quelle étape (choix de l'action, ou plus loin dans SA propre
+    // résolution) bloque TOUTE cette clé (même règle que "choice"
+    // ci-dessus), donc potentiellement toute l'action englobante. ---
+    if ((cle === 'action_focus_prefere' || cle === 'copy_action') && signe > 0) {
+      return Promise.resolve(demanderChoix({
+        type: 'action_focus_prefere',
+        source: source,
+        partieId: etat.partieId
+      })).then(function (reponse) {
+        if (reponseAnnulee_(reponse)) return false;
+        var sourceNichee = source + ' (Focus préféré — ' + reponse.carte + ' — ' + reponse.action + ')';
+        return resoudreEffetEtCout(etat, reponse.effet, reponse.cout, sourceNichee, demanderChoix).then(function (resultat) {
+          Object.assign(etat, resultat.etatResultat);
+          Array.prototype.push.apply(journal, resultat.journal);
+          return resultat.succes;
+        });
+      });
+    }
+
     // --- Toute autre clé contenant "cube" (ex. activer_cube, cube) :
     // n'agit QUE sur cubeActif (seul champ Cube persisté côté plateauMaison
     // PWA — cubeInactif/cubeDeploye sont dérivés des secteurs, non stockés
