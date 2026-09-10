@@ -1,7 +1,78 @@
 /**
  * version.js
- * Version 129 — 2026-08-28
+ * Version 131 — 2026-09-10
  * Source de vérité unique pour la version de l'application.
+ *
+ * 10/09/2026 (retour utilisateur : "Utilise les fichiers poc-rendu-secteurs
+ * html et note.md pour commencer l'implémentation de l'affichage des
+ * secteur visuel. Dans l'appli retire l'onglet test (plus besoin) et
+ * ajoute un onglet Galaxie à côté de l'onglet Secteurs existant.") :
+ * - Nouvel onglet "Galaxie" (nav-galaxie/#screen-galaxie) : rendu
+ *   hexagonal du plateau des secteurs, port de poc-rendu-secteurs.html/
+ *   poc-rendu-secteurs-notes.md (racine du repo, POC autonome non
+ *   intégré) vers les vraies données de partie (js/secteurVueService.js,
+ *   nouveau fichier — voir son en-tête pour le détail des écarts avec le
+ *   POC : compteurs réels au lieu des tableaux de démonstration, nombre de
+ *   slots = max(constructibles, occupés) pour couvrir le cas du Chantier
+ *   Naval fixe du Secteur-Mère, coordonnées (q,r) connues pour 'solo_1'
+ *   uniquement avec repli explicite sinon, orientation figée au réglage
+ *   validé en session POC). Lecture seule, comme l'onglet Secteurs
+ *   existant (les actions restent sur ce dernier) ; même mécanisme de
+ *   rafraîchissement au clic sur l'onglet (App.afficherEcran) que
+ *   Secteurs, pas de rappel supplémentaire aux points de mutation
+ *   existants.
+ * - Retrait de l'onglet "Test" (#screen-test, bac à sable "Feuille
+ *   d'action" branché sur FocusEngine.resoudreAction avec un
+ *   plateauMaison factice) : n'était utile que pendant la mise au point
+ *   tactile de la Feuille d'action, devenu inutile une fois le geste
+ *   validé sur les cartes déjà migrées (voir migration en cours,
+ *   CARTES_ELIGIBLES_FEUILLE_ dans js/strategieService.js).
+ *
+ * 28/08/2026, dernière fois (retour utilisateur, testé via Focus Tentation
+ * → "Exploiter" → Focus préféré Progrès Héroïque "Expérimenter" :
+ * "guilde_scientifique n'était pas implémenté", "afficher le coût des
+ * actions disponibles avec Tentation", "Renfort et Prospérité (Prospérer
+ * au moins) n'ont pas le bon pattern avec le choix du coût dès le début
+ * en haut de la popup comme pour les autres") : 3 corrections.
+ * - `js/focusEngine.js` : `etablir_guilde_scientifique` (Focus Progrès
+ *   Héroïque "Expérimenter") ajouté à CATEGORIE_PAR_CLE_CONSTRUIRE_/
+ *   TYPE_FORCE_PAR_CLE_CONSTRUIRE_ — même mécanique que
+ *   etablir_guilde_banquier (déjà existante), ouvre la popup 'construire'
+ *   (catégorie 'guilde') avec le type forcé sur "Scientifiques" (déjà une
+ *   entrée valide de TYPES_GUILDE côté strategieService.js). Vérifié par
+ *   un harnais Node direct (vm) sur FocusEngine.resoudreAction : le
+ *   contexte demanderChoix résultant est bien
+ *   {type:'construire', categorie:'guilde', typeForce:'scientifiques'}.
+ * - `js/strategieService.js` (popup #modal-choix 'action_focus_prefere',
+ *   Focus Tentation "Exploiter"/"Surmonter") : chaque bouton de la liste
+ *   d'actions des Focus préférés affiche désormais le coût de l'action
+ *   (`pastillesCoutHTML_`, déjà utilisée pour les cartes Focus de l'écran
+ *   Stratégie) — jusqu'ici seuls le nom et le texte d'effet étaient
+ *   affichés, sans aucune indication de coût avant de choisir.
+ * - `js/strategieService.js` (Feuille d'action) : le Coût combiné de
+ *   l'action (déjà affiché dès le premier écran pour feuilleFlowOption
+ *   Exclusive_/OptionsInclusives_/PaiementRessource_/GagnerTechnologie_)
+ *   manquait sur 2 autres premiers écrans possibles —
+ *   feuilleFlowAvancerCivilisation_ (Focus Prospérité Standard
+ *   "Prospérer", Renfort Héroïque "Accélérer") et feuilleFlowDeployerCube_
+ *   (Focus Renfort Standard/Novaris "Rassembler", à ne pas confondre avec
+ *   COUT_DEPLOIEMENT_PAR_TYPE — coût PAR CUBE déployé, déjà affiché dans
+ *   ce formulaire, complètement indépendant du coût de l'action Focus
+ *   elle-même) : les deux affichent maintenant la même section "Coût"
+ *   (steppers Nourriture/Énergie/Matériel substituables par du Crédit
+ *   inclus) que les autres flows, avec capture `feuillePrepaiement_`
+ *   identique. Au passage, corrige aussi le libellé du Coût "ressource_
+ *   choix" (Focus Prospérité Héroïque "Prospérer", cout:{ressource_
+ *   choix:2}) dans feuilleInfosCoutInitial_ : affichait "2 Choix" (repli
+ *   générique abregeCout_), affiche désormais "2 ressources au choix"
+ *   (même libellé que libelleOption_ pour le même cas en Effet).
+ * Vérifié : les 78 tests `js/focusEngine.test.js` toujours au vert (aucune
+ * régression sur le moteur pur, seul le mapping CONSTRUIRE a changé) +
+ * harnais Node ad hoc ci-dessus pour etablir_guilde_scientifique. Pas de
+ * nouveau test automatisé pour les écrans Feuille (DOM pur, hors périmètre
+ * des tests moteur — à vérifier manuellement dans le Browser pane, voir
+ * Piège n°1 du CLAUDE.md).
+ * Fichiers touchés : js/focusEngine.js, js/strategieService.js, version.js.
  *
  * 28/08/2026, dernière fois (retour utilisateur : "j'ai terminé" — après
  * avoir ajouté `focusPrefere` (2 familles Focus par maison) aux 14
@@ -4571,4 +4642,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260828.6';
+var APP_VERSION = '20260910.1';

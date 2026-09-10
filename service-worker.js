@@ -28,6 +28,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/db.js',
   './js/catalogueSync.js',
   './js/secteurService.js',
+  './js/secteurVueService.js',
   './js/focusService.js',
   './js/focusEngine.js',
   './js/annulationService.js',

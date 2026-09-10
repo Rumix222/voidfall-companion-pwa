@@ -599,6 +599,49 @@ input:disabled {
   color: var(--color-coral);
 }
 
+/* Écran Galaxie — rendu hexagonal du plateau des secteurs (port du POC
+   poc-rendu-secteurs.html/poc-rendu-secteurs-notes.md). Couleurs dédiées
+   plutôt que réutiliser --color-* : gamme distincte (orange Néant, jaune
+   récompense, violine standard/Secteur-Mère/Faille) calquée sur le POC,
+   validée par itérations sur photos de tuiles réelles. */
+:root {
+  --galaxie-standard: #3d2f66;
+  --galaxie-standard-bord: #6f5aa8;
+  --galaxie-mere: #14142b;
+  --galaxie-mere-bord: #3a3a5c;
+  --galaxie-faille: #451c40;
+  --galaxie-faille-bord: #7a3a70;
+  --galaxie-orange: #e08a2b;
+  --galaxie-jaune: #e0b23d;
+  --galaxie-bleu: #3a7bd5;
+  --galaxie-bleu-clair: #bcd8ff;
+}
+.galaxie-plateau {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  touch-action: pan-y pinch-zoom;
+}
+.galaxie-plateau .hex-secteur { cursor: pointer; }
+.galaxie-plateau .fond-hex { stroke-width: 3; transition: filter 0.15s; }
+.galaxie-plateau .hex-secteur:active .fond-hex { filter: brightness(1.25); }
+.galaxie-plateau text { font-family: inherit; }
+.galaxie-detail {
+  max-width: 640px;
+  margin: 16px auto 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.galaxie-detail h3 { font-size: 14px; margin: 0 0 6px; color: var(--color-text); }
+.galaxie-detail .ligne { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--color-border); padding: 3px 0; }
+.galaxie-detail .ligne:last-child { border-bottom: none; }
+.galaxie-detail .cle { color: var(--color-text-muted); }
+.galaxie-detail .vide { color: var(--color-text-muted); font-style: italic; }
+
 /* --- Nav Partie/Stratégie/Secteurs/Combat (visible seulement partie
    active) --- */
 .barre-navigation-partie {

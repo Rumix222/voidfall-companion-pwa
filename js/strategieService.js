@@ -1932,13 +1932,16 @@ var StrategieService = (function () {
     // 'defausser_gloire' (Héroïque "Restaurer", feuilleFlowDefausserGloire_
     // ci-dessus). Le reste retombe soit sur des flows déjà existants
     // (gagner_technologie, retirer_corruption, regrouper, produire_
-    // science, deployer_cube, paiement_ressource), soit sur des clés
-    // SANS résolution automatisée dans focusEngine.js (gain_corruption en
-    // coût, la forme "gain:{technologie:...}" de Novaris "Embrasser",
-    // "programme"/"invade_corrupted_sector"/"retirer_crise"/
-    // "etablir_guilde_scientifique" — vocabulaire non reconnu par le
-    // moteur, hors périmètre AVANT cette migration comme après : le
-    // repli générique "effet non chiffré" ne bloque jamais).
+    // science, deployer_cube, paiement_ressource, construire —
+    // "etablir_guilde_scientifique" (Héroïque "Expérimenter") en fait
+    // désormais partie, même mécanique que etablir_guilde_banquier, voir
+    // focusEngine.js), soit sur des clés SANS résolution automatisée dans
+    // focusEngine.js (gain_corruption en coût, la forme
+    // "gain:{technologie:...}" de Novaris "Embrasser",
+    // "programme"/"invade_corrupted_sector"/"retirer_crise" — vocabulaire
+    // non reconnu par le moteur, hors périmètre AVANT cette migration
+    // comme après : le repli générique "effet non chiffré" ne bloque
+    // jamais).
     { focus: 'Progrès', type: 'Standard' },
     { focus: 'Progrès', type: 'Novaris' },
     { focus: 'Progrès', type: 'Héroïque' },
@@ -2107,6 +2110,14 @@ var StrategieService = (function () {
           stockRessource: ressources[cle] || 0,
           stockCredit: ressources.credit || 0
         });
+      } else if (cle === 'ressource_choix') {
+        // Coût "N ressources au choix" (ex. Focus Prospérité Héroïque
+        // "Prospérer", cout:{ressource_choix:2}) — le choix précis se
+        // fait sur un écran séparé (feuilleFlowRessourceChoix_, APRÈS
+        // celui-ci), même libellé que libelleOption_ pour le même cas en
+        // Effet plutôt que le générique CHAMP_RESSOURCE/abregeCout_
+        // ("Choix"), qui affichait à tort "2 Choix".
+        texteFixeParts.push(cout[cle] + ' ressource' + (cout[cle] > 1 ? 's' : '') + ' au choix');
       } else {
         texteFixeParts.push(cout[cle] + ' ' + (CHAMP_RESSOURCE[cle] ? CHAMP_RESSOURCE[cle].label : abregeCout_(cle)));
       }
@@ -2973,9 +2984,20 @@ var StrategieService = (function () {
     var promise = new Promise(function (res) { resolve = res; });
     feuilleRejetCourant_ = function () { resolve({ annule: true }); };
     var etiquette = feuilleConsommerEtiquetteSequence_();
-    var titre = etiquette + (contexte.moinsAvancee
-      ? 'Avancer sur votre piste la moins avancée'
-      : (contexte.piste ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste] : 'Avancer sur une piste de Civilisation'));
+    // Coût combiné sur ce même écran UNIQUEMENT si c'est le tout premier
+    // (feuillePile_ encore vide) — même principe que feuilleFlowOption
+    // Exclusive_/OptionsInclusives_ (retour utilisateur, Focus Prospérité
+    // Standard "Prospérer"/Renfort Héroïque "Accélérer" : le Coût
+    // n'apparaissait sur AUCUN écran avant validation).
+    var estPremierEcran = feuillePile_.length === 0;
+    var infosCout = estPremierEcran ? feuilleInfosCoutInitial_() : null;
+    var estadosCout = infosCout ? infosCout.substituables.map(function () { return {}; }) : null;
+    var actionCivilisation = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var titre = (estPremierEcran && actionCivilisation)
+      ? (feuilleActionCourante_.carte.focus + ' — ' + (actionCivilisation.action || 'action'))
+      : etiquette + (contexte.moinsAvancee
+        ? 'Avancer sur votre piste la moins avancée'
+        : (contexte.piste ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste] : 'Avancer sur une piste de Civilisation'));
 
     feuillePousserEtape_({
       titre: titre, nbEtapes: 1, etapeIndex: 0,
@@ -2995,8 +3017,25 @@ var StrategieService = (function () {
       return entree ? ('Case ' + entree.case + ' — ' + (entree.texte || '(aucun texte)')) : '';
     }
 
+    // Préfixe la section Coût (si premier écran) devant l'Effet propre à
+    // cette étape, et branche son/ses stepper(s) — même gabarit que
+    // feuilleFlowOptionExclusive_ (sectionCout + <hr> + reste).
+    function avecCout_(htmlEffet) {
+      var sectionCout = feuilleSectionCoutHTML_(infosCout, 'civCombine');
+      return sectionCout + (sectionCout ? '<hr class="feuille-separateur">' : '') + htmlEffet;
+    }
+    function brancherCout_(el) {
+      if (infosCout) feuilleBrancherSectionCout_(el, infosCout, 'civCombine', estadosCout);
+    }
+
     function validerAvancementPiste_(piste) {
       feuilleEls_.btnValider.disabled = true;
+      if (infosCout && infosCout.substituables.length) {
+        feuillePrepaiement_ = {};
+        infosCout.substituables.forEach(function (s, idx) {
+          feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCout[idx].v };
+        });
+      }
       CivilisationService.avancerPiste(partieCivilisation.id, nomMaisonCivilisation, piste, demanderChoix)
         .then(function (resultat) {
           feuilleRejetCourant_ = null;
@@ -3022,12 +3061,12 @@ var StrategieService = (function () {
         var pistesAEgalite = CivilisationService.PISTES.filter(function (p) { return (civActuelle[p] || 0) === niveauMin; });
 
         if (contexte.tieBreakAuChoix && pistesAEgalite.length > 1) {
-          etapeCourante.html = '<p class="hint">' + pistesAEgalite.length + ' pistes sont à égalité pour la moins avancée (niveau ' +
+          etapeCourante.html = avecCout_('<p class="hint">' + pistesAEgalite.length + ' pistes sont à égalité pour la moins avancée (niveau ' +
             niveauMin + '/' + CivilisationService.NIVEAU_MAX + ') — choisissez laquelle avancer.</p>' +
             feuilleRangeeChoixHTML_('civ', pistesAEgalite.map(function (p) {
               return CivilisationService.NOM_PISTE[p] + '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, p) + '</span>';
-            }), false);
-          etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); };
+            }), false));
+          etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); brancherCout_(el); };
           etapeCourante.onValider = function () {
             var sel = feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee');
             if (!sel) return;
@@ -3038,9 +3077,10 @@ var StrategieService = (function () {
         }
 
         var pisteMoinsAvancee = pistesAEgalite[0];
-        etapeCourante.html = '<p class="hint">Piste la moins avancée : ' + CivilisationService.NOM_PISTE[pisteMoinsAvancee] +
+        etapeCourante.html = avecCout_('<p class="hint">Piste la moins avancée : ' + CivilisationService.NOM_PISTE[pisteMoinsAvancee] +
           ' (niveau ' + niveauMin + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
-          '<p class="hint">' + apercuProchaineCase_(detail, pisteMoinsAvancee) + '</p>';
+          '<p class="hint">' + apercuProchaineCase_(detail, pisteMoinsAvancee) + '</p>');
+        etapeCourante.brancher = brancherCout_;
         etapeCourante.onValider = niveauMin >= CivilisationService.NIVEAU_MAX ? null : function () { validerAvancementPiste_(pisteMoinsAvancee); };
         feuilleRendreEtape_(etapeCourante, null);
         return;
@@ -3049,19 +3089,20 @@ var StrategieService = (function () {
       if (contexte.piste) {
         var piste = contexte.piste;
         var niveau = civActuelle[piste] || 0;
-        etapeCourante.html = '<p class="hint">Niveau actuel : ' + niveau + '/' + CivilisationService.NIVEAU_MAX + '</p>' +
-          '<p class="hint">' + apercuProchaineCase_(detail, piste) + '</p>';
+        etapeCourante.html = avecCout_('<p class="hint">Niveau actuel : ' + niveau + '/' + CivilisationService.NIVEAU_MAX + '</p>' +
+          '<p class="hint">' + apercuProchaineCase_(detail, piste) + '</p>');
+        etapeCourante.brancher = brancherCout_;
         etapeCourante.onValider = niveau >= CivilisationService.NIVEAU_MAX ? null : function () { validerAvancementPiste_(piste); };
         feuilleRendreEtape_(etapeCourante, null);
         return;
       }
 
-      etapeCourante.html = feuilleRangeeChoixHTML_('civ', CivilisationService.PISTES.map(function (p) {
+      etapeCourante.html = avecCout_(feuilleRangeeChoixHTML_('civ', CivilisationService.PISTES.map(function (p) {
         var niveau = civActuelle[p] || 0;
         return CivilisationService.NOM_PISTE[p] + ' — niveau ' + niveau + '/' + CivilisationService.NIVEAU_MAX +
           '<br><span class="cadre-action-sous-texte">' + apercuProchaineCase_(detail, p) + '</span>';
-      }), false);
-      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); };
+      }), false));
+      etapeCourante.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'civ', false); brancherCout_(el); };
       etapeCourante.onValider = function () {
         var sel = feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee');
         if (!sel) return;
@@ -3949,7 +3990,22 @@ var StrategieService = (function () {
       nourriture: contexte.ressourceNourriture
     };
 
-    var etape = { titre: etiquette + 'Déployer des cubes', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement…</p>' };
+    // Coût combiné sur ce même écran UNIQUEMENT si c'est le tout premier
+    // (feuillePile_ encore vide) — même principe que feuilleFlowOption
+    // Exclusive_/OptionsInclusives_ (retour utilisateur, Focus Renfort
+    // Standard/Novaris "Rassembler" : le Coût de l'action Focus elle-même
+    // — ex. Matériel — n'apparaissait sur AUCUN écran avant validation,
+    // à ne pas confondre avec COUT_DEPLOIEMENT_PAR_TYPE ci-dessus, coût
+    // PAR CUBE déployé, déjà affiché/vérifié dans ce formulaire).
+    var estPremierEcranDeployer = feuillePile_.length === 0;
+    var infosCoutDeployer = estPremierEcranDeployer ? feuilleInfosCoutInitial_() : null;
+    var estadosCoutDeployer = infosCoutDeployer ? infosCoutDeployer.substituables.map(function () { return {}; }) : null;
+    var actionDeployer = feuilleActionCourante_ && feuilleActionCourante_.action;
+    var titreDeployer = (estPremierEcranDeployer && actionDeployer)
+      ? (feuilleActionCourante_.carte.focus + ' — ' + (actionDeployer.action || 'action'))
+      : etiquette + 'Déployer des cubes';
+
+    var etape = { titre: titreDeployer, nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement…</p>' };
     feuillePousserEtape_(etape, feuillePile_.length > 1 ? 'avant' : null);
 
     function vousAppartientDeploiement_(secteurs, numeroSecteurMere) {
@@ -3973,7 +4029,9 @@ var StrategieService = (function () {
             }).join('') + '</ul>'
           : '<p class="hint">Aucun cube engagé.</p>';
 
-        return '<p class="hint">' + engage + ' / ' + quantiteMaxGlobale + ' cube(s) engagé(s)' +
+        var sectionCoutDeployer = feuilleSectionCoutHTML_(infosCoutDeployer, 'deployerCombine');
+        return sectionCoutDeployer + (sectionCoutDeployer ? '<hr class="feuille-separateur">' : '') +
+          '<p class="hint">' + engage + ' / ' + quantiteMaxGlobale + ' cube(s) engagé(s)' +
           (restant > 0 ? ' (' + restant + ' au choix, si Cube actif suffisant)' : '') + '</p>' +
           listeHTML +
           '<div class="regrouper-form">' +
@@ -3989,6 +4047,7 @@ var StrategieService = (function () {
       }
 
       function brancher_(el) {
+        if (infosCoutDeployer) feuilleBrancherSectionCout_(el, infosCoutDeployer, 'deployerCombine', estadosCoutDeployer);
         Array.prototype.forEach.call(el.querySelectorAll('.deployer-retirer'), function (btn) {
           btn.addEventListener('click', function () { deploiements.splice(Number(btn.dataset.index), 1); rerender_(); });
         });
@@ -4053,6 +4112,12 @@ var StrategieService = (function () {
             return;
           }
 
+          if (infosCoutDeployer && infosCoutDeployer.substituables.length) {
+            feuillePrepaiement_ = {};
+            infosCoutDeployer.substituables.forEach(function (s, idx) {
+              feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCoutDeployer[idx].v };
+            });
+          }
           feuilleEls_.btnValider.disabled = true;
           Promise.all(deploiements.map(function (d) {
             return SecteurService.deployerCube(partieDeploiement.id, d.numero, d.type, d.quantite);
@@ -6163,7 +6228,7 @@ var StrategieService = (function () {
           contenu.innerHTML = '<div class="modal-choix-boutons">' +
             optionsFocusPref.map(function (option, i) {
               return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' +
-                option.label + '<br><span class="cadre-action-sous-texte">' + option.sousTexte + '</span>' +
+                option.label + pastillesCoutHTML_(option.cout) + '<br><span class="cadre-action-sous-texte">' + option.sousTexte + '</span>' +
                 '</button>';
             }).join('') + '</div>';
 

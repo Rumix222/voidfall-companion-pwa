@@ -127,14 +127,16 @@ var FocusEngine = (function () {
   // strategieService.js, contexte 'retirer_corruption') et "rappeler_cube"
   // (EVOLUTION 13, todo.md — cas dédié Coût uniquement, voir plus bas dans
   // resoudreCle_, testé avant le repli générique "cube") en sont exclues.
-  // Les VARIANTES du catalogue (etablir_guilde_meme_secteur/_up_to/
-  // _scientifique, construire_installation_meme_secteur/_autre_secteur/
-  // _up_to — contrainte de secteur croisée avec une autre clé du même
-  // JSON, répétition "jusqu'à N fois", ou type figé) restent hors
-  // périmètre : elles retombent sur le repli générique en bas de
-  // resoudreCle_ ("effet non chiffré — à appliquer manuellement"), portée
-  // volontairement limitée au pattern décrit (secteur libre + type au
-  // choix, quantité 1).
+  // Les VARIANTES du catalogue (etablir_guilde_meme_secteur/_up_to,
+  // construire_installation_meme_secteur/_autre_secteur/_up_to —
+  // contrainte de secteur croisée avec une autre clé du même JSON,
+  // répétition "jusqu'à N fois") restent hors périmètre : elles retombent
+  // sur le repli générique en bas de resoudreCle_ ("effet non chiffré — à
+  // appliquer manuellement"), portée volontairement limitée au pattern
+  // décrit (secteur libre + type au choix, quantité 1). "etablir_guilde_
+  // scientifique" (Focus Progrès Héroïque "Expérimenter") N'EST PAS dans
+  // ce cas : secteur libre + quantité 1, seul le TYPE est figé — même
+  // pattern que etablir_guilde_banquier ci-dessous, donc couvert.
   var CLES_SECTEUR_HORS_PERIMETRE = [
     'effet_secteur'
   ];
@@ -142,9 +144,10 @@ var FocusEngine = (function () {
     construire_installation: 'installation', installation: 'installation',
     etablir_guilde: 'guilde', guilde: 'guilde',
     // Même popup 'construire' (catégorie 'guilde') que etablir_guilde,
-    // avec le type forcé sur "Banquiers" (voir TYPE_FORCE_PAR_CLE_
-    // CONSTRUIRE_ ci-dessous).
+    // avec le type forcé sur "Banquiers"/"Scientifiques" (voir TYPE_FORCE_
+    // PAR_CLE_CONSTRUIRE_ ci-dessous).
     etablir_guilde_banquier: 'guilde',
+    etablir_guilde_scientifique: 'guilde',
     // Même popup 'construire' (catégorie 'installation') que
     // construire_installation, type forcé — utilisées par gameService.js/
     // EFFET_TECHNOLOGIE_IMMEDIAT_ (Quais orbitaux/Bases Stellaires,
@@ -163,6 +166,7 @@ var FocusEngine = (function () {
   // construire_installation).
   var TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = {
     etablir_guilde_banquier: 'banquiers',
+    etablir_guilde_scientifique: 'scientifiques',
     construire_chantier_naval: 'chantier_naval',
     construire_base_stellaire: 'base_stellaire',
     construire_defense_secteur: 'defense_secteur'
