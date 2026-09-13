@@ -757,12 +757,26 @@
      * (index.html), pas régénéré à chaque rendu — d'où l'usage de
      * .onchange plutôt que addEventListener (idempotent d'un appel à
      * l'autre, jamais de listener dupliqué), même pattern que
-     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas. Elle
-     * n'est déverrouillée que si la technologie de départ est référencée
-     * sur Plat. Galactique, dans le groupe actif du cycle en cours
-     * (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
-     * même règle, même source de vérité que renderTechnologiesObtenues_
-     * ci-dessous.
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
+     *
+     * Correctif (retour utilisateur : "la technologie de base de la
+     * maison n'est pas proposée dans la liste des technologies
+     * améliorées") : la case était jusqu'ici gatée par
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif — la
+     * MÊME source de vérité que renderTechnologiesObtenues_ ci-dessous.
+     * Or cette liste ne contient QUE les 8 Technologies des 4 maisons
+     * déchues (partie.adversaires, voir GameService.
+     * technologiesAdversesToutes_) : le nom de la Technologie de départ
+     * (l'une des 2 de la maison DU JOUEUR, jamais une maison déchue) n'y
+     * figure structurellement JAMAIS — la case restait donc verrouillée
+     * pour toute partie, quel que soit le cycle. La Technologie de départ
+     * ne fait pas partie du marché partagé des 8 (jamais bloquée par "la
+     * tuile de blocage" — elle est en possession du joueur depuis le
+     * début), donc pas de sous-ensemble de 4/8 à respecter pour elle :
+     * simple règle de cycle (docs-rules-cycle-de-jeu.md §1.2.1, "Au Cycle
+     * 2, retirez la tuile de blocage") — déverrouillée dès le Cycle 2,
+     * reverrouillée en fin de partie comme les Technologies obtenues
+     * (cohérence d'affichage uniquement, aucune donnée perdue).
      */
     function renderEcranPlateauMaison_(partie) {
       var joueur = partie.joueur || {};
@@ -827,9 +841,9 @@
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
-        var nomsAmeliorablesDepart = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
+        var departAmeliorableCeCycle = partie.cycleActuel === 2 || partie.cycleActuel === 3;
         checkboxDepart.checked = !!techDepart.amelioree;
-        checkboxDepart.disabled = !techDepart.nom || nomsAmeliorablesDepart.indexOf(techDepart.nom) === -1;
+        checkboxDepart.disabled = !techDepart.nom || !departAmeliorableCeCycle;
         checkboxDepart.onchange = function () {
           var etatDemande = checkboxDepart.checked;
           checkboxDepart.disabled = true;
@@ -1446,10 +1460,13 @@
     /**
      * Reconnaît l'option "dépenser N Science pour gagner une Technologie
      * de base" (cadre.effet.type === 'choix', voir
-     * data/catalogue/evenements.json) — coût 100% simple (Science), gain
-     * non automatisable (le choix de LA technologie reste manuel, sur
-     * Plat. maison) : seul le coût est appliqué en un clic (voir
-     * actionsCadre_/ouvrirPopupCadreEtRafraichir_), jamais le gain.
+     * data/catalogue/evenements.json). EVOLUTION 20 (suite) : cette forme
+     * est désormais entièrement automatisée via GameService.
+     * niveauxTechnologieOptionAvecCout/appliquerCadreOptionTechnologieAvecCout
+     * (actionsCadre_ ci-dessous) — cette fonction n'est conservée que pour
+     * estAppliqueViaTechnologieScience_ juste après, qui reconnaît un cadre
+     * déjà appliqué via l'ANCIEN chemin "coût automatisé, gain manuel"
+     * (parties commencées avant ce chantier).
      */
     function optionTechnologieViaScience_(option) {
       return !!(option && option.cout && Object.keys(option.cout).length === 1 && typeof option.cout.science === 'number' &&
@@ -1523,14 +1540,38 @@
       ameliorer_gloire: 'Améliorer un jeton Gloire'
     };
 
+    // Libellé de bouton pour une option de cadre "gagner une Technologie"
+    // (EVOLUTION 20 suite, option directe {cle:'technologie_base', valeur:1}
+    // — voir GameService.NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_) : le détail
+    // (LAQUELLE, choisie dans la popup 'gagner_technologie') n'apparaît
+    // qu'après résolution, dans le statut "✓ Appliqué (...)", comme les
+    // autres options LABEL_OPTION_FOCUSENGINE_ ci-dessus.
+    var LABEL_TECHNOLOGIE_NIVEAUX_CADRE_ = {
+      base: 'Gagner une Technologie de base',
+      amelioree: 'Gagner une Technologie améliorée'
+    };
+    function libelleOptionTechnologieFocusEngine_(niveaux, cout) {
+      var libelle = Array.isArray(niveaux)
+        ? 'Gagner une Technologie de base ou améliorée'
+        : (LABEL_TECHNOLOGIE_NIVEAUX_CADRE_[niveaux] || 'Gagner une Technologie');
+      var cles = Object.keys(cout || {});
+      if (!cles.length) return libelle;
+      var coutTexte = cles.map(function (cle) { return '-' + cout[cle] + ' ' + libelleRessourceCadre_(cle); }).join(', ');
+      return libelle + ' (' + coutTexte + ')';
+    }
+
     /**
      * Dispatche le libellé de bouton d'une option de cadre "choix"
      * automatisée via FocusEngine selon la clé reconnue par
      * cleFocusEnginePourOptionCadre_ — cube (libelleOptionCube_, déjà
-     * existant) ou LABEL_OPTION_FOCUSENGINE_ (toute autre mécanique
+     * existant), Technologie (libelleOptionTechnologieFocusEngine_
+     * ci-dessus) ou LABEL_OPTION_FOCUSENGINE_ (toute autre mécanique
      * automatisée : construction, Population Pure...).
      */
     function libelleOptionFocusEngine_(option, cleFocusEngine) {
+      if (cleFocusEngine === 'gagner_technologie') {
+        return libelleOptionTechnologieFocusEngine_(GameService.niveauxTechnologieOptionCadre(option.cle), null);
+      }
       if (LABEL_OPTION_FOCUSENGINE_[cleFocusEngine]) return LABEL_OPTION_FOCUSENGINE_[cleFocusEngine];
       return libelleOptionCube_(option, cleFocusEngine);
     }
@@ -1586,6 +1627,37 @@
           // re-rend rien tout seul (Piège n°2, voir CLAUDE.md), l'onglet
           // Secteurs resterait sinon affiché avec son dernier rendu, périmé.
           App.renderSecteurs(resultat);
+          // EVOLUTION 20 (suite) — sert aussi l'option "gagner_technologie"
+          // (Événement F Cycle 1 Cadre 1) : "Technologies obtenues" vit sur
+          // Plat. maison, jamais rafraîchi tout seul (même Piège n°2).
+          App.renderPlateauMaison(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * EVOLUTION 20 (suite) — option de cadre "gagner une Technologie",
+     * avec ou sans coût ressources simples accompagnateur (voir
+     * GameService.appliquerCadreOptionTechnologieAvecCout/
+     * niveauxTechnologieOptionAvecCout ci-dessus) : ouvre la popup dédiée
+     * 'gagner_technologie' (StrategieService.demanderChoix) puis persiste
+     * le choix ET débite le coût éventuel. Rappel explicite à
+     * App.renderPlateauMaison (Piège n°2, CLAUDE.md) — "Technologies
+     * obtenues" vit sur l'écran Plat. maison, jamais rafraîchi tout seul.
+     */
+    function appliquerCadreTechnologieFocusEngineEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreOptionTechnologieAvecCout(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderPlateauMaison(resultat);
           StrategieService.afficher(resultat);
         })
         .catch(function (erreur) {
@@ -1968,14 +2040,11 @@
      * carte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre une
      * seule popup listant les effets possibles (contexte
      * 'resoudre_cadre_evenement', voir strategieService.js), un clic sur
-     * une option = résolution immédiate (pas de double confirmation :
-     * l'option Technologie n'a pas de popup de confirmation dédiée, son
-     * rappel "-N Science, technologie à choisir sur Plat. maison" est
-     * directement le libellé de cette option dans la liste).
-     * `actionsCadre_` construit la liste normalisée (delta simple /
-     * proportionnel / technologie / cube) réutilisée à la fois pour savoir
-     * si le cadre est cliquable (renderCadresEvenement_) et pour résoudre
-     * le choix une fois la popup validée.
+     * une option = résolution immédiate. `actionsCadre_` construit la
+     * liste normalisée (delta simple / proportionnel / Technologie / cube)
+     * réutilisée à la fois pour savoir si le cadre est cliquable
+     * (renderCadresEvenement_) et pour résoudre le choix une fois la popup
+     * validée.
      *
      * Une option "cube" (activer_cube / deployer_cube_secteur_mere)
      * délègue à appliquerCadreFocusEngineEtRafraichir_ (GameService.
@@ -1988,19 +2057,24 @@
      * chemin que "cube" ci-dessus (même fonction générique,
      * cleFocusEnginePourOptionCadre_ les reconnaît aussi) — délègue à
      * appliquerCadreFocusEngineEtRafraichir_, qui ouvre la popup imbriquée
-     * 'construire' (secteur + type, voir strategieService.js). Le
-     * fallback "manuel" ci-dessous ne sert qu'à une option de cadre
-     * "choix" sans mécanique automatisée.
+     * 'construire' (secteur + type, voir strategieService.js).
+     *
+     * EVOLUTION 20 (suite) — une option "gagner une Technologie" suit
+     * elle aussi ce principe : `{cle:'technologie_base', valeur:1}`
+     * (option DIRECTE) passe par le MÊME chemin que "cube"/"construction"
+     * ci-dessus (cleFocusEnginePourOptionCadre_ la reconnaît aussi) ;
+     * `{cout:{...}, gain:{technologie_base:1}}` (option COMBO, coût
+     * séparé) délègue à appliquerCadreTechnologieFocusEngineEtRafraichir_
+     * (GameService.appliquerCadreOptionTechnologieAvecCout ->
+     * FocusEngine.resoudreEffetEtCout) — les 2 formes ouvrent la MÊME
+     * popup imbriquée 'gagner_technologie' que Focus Innovation
+     * "Inventer"/Piste de Civilisation. Le fallback "manuel" ci-dessous ne
+     * sert donc plus qu'à une option de cadre "choix" sans AUCUNE
+     * mécanique automatisée.
      *
      * Le libellé d'une option "delta simple" (ex. +3 Crédit) suit le
      * gabarit du jeu à l'infinitif ("Gagner 3 Crédits" —
      * libelleActionCadre_) plutôt que le brut "Appliquer : +3 Crédit".
-     * Une option qui nécessite un geste manuel complémentaire (ex.
-     * Technologie : coût automatisable mais choix de LA technologie hors
-     * périmètre) porte un `sousTexte` séparé (rendu en italique, plus
-     * petit, sous le libellé principal dans le bouton — voir
-     * strategieService.js) plutôt que noyé dans le même libellé entre
-     * parenthèses.
      */
     function actionsCadre_(cadre) {
       var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
@@ -2028,11 +2102,20 @@
             });
             return;
           }
-          if (optionTechnologieViaScience_(option)) {
+          // EVOLUTION 20 (suite) — option {cout?, gain:{technologie_...}}
+          // (ex. Événement A Cycle 1 Cadre 2, "Dépensez 1 Science pour
+          // gagner une Technologie de base") : entièrement automatisée via
+          // GameService.appliquerCadreOptionTechnologieAvecCout (popup
+          // 'gagner_technologie' dédiée + coût débité) — remplace l'ancien
+          // repli "coût automatisé, gain manuel" (optionTechnologieViaScience_,
+          // conservé UNIQUEMENT pour le rendu des cadres déjà appliqués
+          // ainsi avant ce chantier, voir estAppliqueViaTechnologieScience_
+          // ci-dessous).
+          var niveauxTechnologieCout = GameService.niveauxTechnologieOptionAvecCout(option);
+          if (niveauxTechnologieCout) {
             actions.push({
-              proportionnel: false, technologie: true, coutScience: option.cout.science,
-              label: 'Gagner une technologie (-' + option.cout.science + ' Science)',
-              sousTexte: 'Choisir la technologie manuellement sur Plat. maison'
+              proportionnel: false, technologieFocusEngine: true, indexOption: indexOption,
+              label: libelleOptionTechnologieFocusEngine_(niveauxTechnologieCout, option.cout)
             });
             return;
           }
@@ -2101,12 +2184,10 @@
         var choisie = actions[resultat.indexChoisi];
         if (!choisie) { bouton.disabled = false; return; }
 
-        if (choisie.technologie) {
-          var deltaTechnologie = {};
-          deltaTechnologie.science = -choisie.coutScience;
-          appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaTechnologie, bouton);
-        } else if (choisie.focusEngine) {
+        if (choisie.focusEngine) {
           appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.technologieFocusEngine) {
+          appliquerCadreTechnologieFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
         } else if (choisie.corruptionGloire) {
           appliquerCadreCorruptionGloireEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
         } else if (choisie.rappelCube) {

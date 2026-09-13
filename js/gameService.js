@@ -767,7 +767,77 @@ var GameService = (function () {
     // Même mécanisme générique — FocusEngine.resoudreCle_ reconnaît
     // nativement 'ameliorer_gloire', résolue sans popup (déterministe).
     if (option.cle === 'ameliorer_gloire') return option.cle;
+    // EVOLUTION 20 (suite) — Cadre "choix" avec option directe "gagnez une
+    // Technologie [de base/améliorée/de base ou améliorée]" (ex. Événement
+    // F Cycle 1 Cadre 1, evenements.json : {"cle":"technologie_base",
+    // "valeur":1}) : jusqu'ici laissée manuelle (LABEL_OPTION_CADRE_
+    // MANUELLE_), alors que FocusEngine.resoudreCle_ sait déjà tout faire
+    // (popup 'gagner_technologie' dédiée + persistance) pour Focus/Piste
+    // de Civilisation — voir NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_ ci-dessous
+    // pour la traduction de la `valeur` réellement transmise à FocusEngine
+    // (pas Number(option.valeur), qui n'a aucun sens ici).
+    if (NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_[option.cle]) return 'gagner_technologie';
     return null;
+  }
+
+  // Traduit une `cle` de cadre "gagner une Technologie" (evenements.json)
+  // vers le vocabulaire `niveaux` attendu par FocusEngine.resoudreCle_
+  // (cle==='gagner_technologie') — 'base' (chaîne, niveau imposé) ou
+  // ['base','amelioree'] (tableau, popup 'gagner_technologie' ouvre alors
+  // sa 2e rangée-choix de niveau, voir strategieService.js/
+  // feuilleFlowGagnerTechnologie_). Rencontrée sous 2 formes au catalogue
+  // (voir cleFocusEnginePourOptionCadre_/niveauxTechnologieOptionGainCadre_) :
+  // option directe `{cle:'technologie_base', valeur:1}` (Événement F) et
+  // combo `{cout:{...}, gain:{technologie_base:1}}` (Événement A) — les 2
+  // partagent ce même dictionnaire de traduction.
+  var NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_ = {
+    technologie_base: 'base',
+    technologie_amelioree: 'amelioree',
+    technologie_base_ou_amelioree: ['base', 'amelioree']
+  };
+
+  /**
+   * Détermine si un `option.gain` de cadre "choix" (élément SANS `cle`
+   * propre, ex. {cout:{science:1}, gain:{technologie_base:1}}, Événement A
+   * Cycle 1 Cadre 2) porte sur un gain de Technologie reconnu — retourne
+   * les `niveaux` FocusEngine (voir NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_
+   * ci-dessus) ou `null` si `gain` ne contient PAS exactement une seule
+   * clé Technologie reconnue (jamais de résolution partielle/approximative
+   * d'un gain composé).
+   */
+  function niveauxTechnologieOptionGainCadre_(gain) {
+    if (!gain) return null;
+    var cles = Object.keys(gain);
+    if (cles.length !== 1) return null;
+    return NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_[cles[0]] || null;
+  }
+
+  /**
+   * Variante de niveauxTechnologieOptionGainCadre_ ci-dessus pour une
+   * option `{cout:{...}, gain:{technologie_base:1}}` COMPLÈTE (pas
+   * seulement son `gain`) : ajoute la contrainte que le `cout`
+   * accompagnateur, s'il existe, porte UNIQUEMENT sur des ressources
+   * simples (deltaRessourcesSimple_, comme deltaOptionCadre_ ci-dessus) —
+   * sinon hors périmètre (aucun autre coût, ex. Corruption/secteur, n'est
+   * géré par FocusEngine.resoudreEffetEtCout via cette voie).
+   */
+  function niveauxTechnologieOptionAvecCout_(option) {
+    if (!option) return null;
+    var niveaux = niveauxTechnologieOptionGainCadre_(option.gain);
+    if (!niveaux) return null;
+    if (option.cout && !deltaRessourcesSimple_(option.cout)) return null;
+    return niveaux;
+  }
+
+  /**
+   * Variante de NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_ pour une option
+   * DIRECTE `{cle:'technologie_base', valeur:1}` (ex. Événement F Cycle 1
+   * Cadre 1) — utilisée par appliquerCadreChoixFocusEngine ci-dessous ET
+   * exposée pour le libellé de bouton côté index.html
+   * (libelleOptionFocusEngine_).
+   */
+  function niveauxTechnologieOptionCadre_(cleCadre) {
+    return NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_[cleCadre] || 'base';
   }
 
   // ------------------------------------------------------------
@@ -1146,6 +1216,48 @@ var GameService = (function () {
   }
 
   /**
+   * Finalise la résolution d'un Cadre "choix" via FocusEngine
+   * (resoudreEffet OU resoudreEffetEtCout, MÊME contrat de retour —
+   * {succes, journal, mutations, etatResultat}) : persiste cadresAppliques
+   * (resume dérivé du journal) + les mutations plateauMaison suivies par
+   * FocusEngine, puis recharge la partie. Factorisé entre
+   * appliquerCadreChoixFocusEngine (cube/construction/Population Pure/
+   * Technologie sans coût) et appliquerCadreOptionTechnologieAvecCout
+   * (Technologie avec un coût ressources simples) ci-dessous — même
+   * garde-fou "NE PAS réutiliser lignePlateauMaison" (périmée dès qu'une
+   * popup imbriquée a écrit directement en base pendant la résolution),
+   * voir le détail dans appliquerCadreChoixFocusEngine avant ce chantier.
+   */
+  function finaliserResolutionCadreFocusEngine_(partieId, ctx, ordreCadre, source, resultatEffet) {
+    if (!resultatEffet.succes) return Promise.resolve({ annule: true });
+
+    var champs = {};
+    resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+
+    var resume = resultatEffet.journal.map(function (ligne) {
+      var prefixe = source + ' : ';
+      return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
+    }).join(' ').replace(/\.\s*$/, '');
+
+    ctx.evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
+    ctx.partie.evenements[ctx.cleCycle] = ctx.evenementCycle;
+
+    var ecrirePlateauMaison = Object.keys(champs).length
+      ? DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+        Object.keys(champs).forEach(function (champ) { ligneFraiche[champ] = champs[champ]; });
+        return DB.put('plateauMaison', ligneFraiche);
+      })
+      : Promise.resolve();
+
+    return Promise.all([
+      ecrirePlateauMaison,
+      GameService.sauvegarderPartie(ctx.partie, 'cadre_evenement_applique', ctx.cleCycle + ' — cadre #' + ordreCadre)
+    ]).then(function () {
+      return rechargerPartie_(partieId);
+    });
+  }
+
+  /**
    * Retire de l'objet partie tout ce qui a une colonne/clé dédiée
    * ailleurs, avant persistance dans parties.etatJson (voir en-tête).
    */
@@ -1224,6 +1336,14 @@ var GameService = (function () {
      * source de vérité unique évite un désync entre les deux copies).
      */
     cleFocusEnginePourOptionCadre: cleFocusEnginePourOptionCadre_,
+    // Détecte une option de cadre "choix" {cout?, gain:{technologie_...}}
+    // (voir niveauxTechnologieOptionAvecCout_ ci-dessus) — exposée pour
+    // index.html/actionsCadre_ (libellé du bouton) et
+    // appliquerCadreOptionTechnologieAvecCout ci-dessous.
+    niveauxTechnologieOptionAvecCout: niveauxTechnologieOptionAvecCout_,
+    // Idem pour une option directe {cle:'technologie_base', valeur:1} —
+    // exposée pour le libellé de bouton (index.html/libelleOptionFocusEngine_).
+    niveauxTechnologieOptionCadre: niveauxTechnologieOptionCadre_,
 
     // Table de règles fixes "Actions de Programme" (voir sa déclaration
     // plus haut) — exposée pour index.html ("Programmes en main", écran
@@ -1991,7 +2111,7 @@ var GameService = (function () {
      */
     appliquerCadreChoixFocusEngine: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
       return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
-        var partie = ctx.partie, lignePlateauMaison = ctx.lignePlateauMaison, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
+        var lignePlateauMaison = ctx.lignePlateauMaison, cadre = ctx.cadre;
 
         var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
           ? cadre.effet.options[indexOption] : null;
@@ -2000,60 +2120,60 @@ var GameService = (function () {
         if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
 
         var effet = {};
-        effet[cleFocusEngine] = Number(option.valeur) || 1;
+        // "gagner_technologie" attend un niveau ('base') ou un tableau de
+        // niveaux (['base','amelioree']) en `valeur`, PAS un compte
+        // (Number(option.valeur) — toujours 1 au catalogue pour cette
+        // clé — n'a ici aucun sens) : voir NIVEAUX_TECHNOLOGIE_PAR_CLE_
+        // CADRE_/cleFocusEnginePourOptionCadre_ ci-dessus.
+        effet[cleFocusEngine] = cleFocusEngine === 'gagner_technologie'
+          ? niveauxTechnologieOptionCadre_(option.cle)
+          : (Number(option.valeur) || 1);
 
         var source = 'Cadre #' + ordreCadre;
         var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, lignePlateauMaison);
 
         return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effet, source, cadre.texte, demanderChoix)
           .then(function (resultatEffet) {
-            if (!resultatEffet.succes) {
-              return { annule: true };
-            }
+            return finaliserResolutionCadreFocusEngine_(partieId, ctx, ordreCadre, source, resultatEffet);
+          });
+      });
+    },
 
-            var champs = {};
-            resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+    /**
+     * Applique un cadre "choix" dont l'option retenue est un COMBO
+     * {cout:{...ressources simples}, gain:{technologie_base|amelioree|
+     * base_ou_amelioree:1}} (ex. Événement A Cycle 1 Cadre 2 : "Dépensez 1
+     * Science pour gagner une Technologie de base") — hors du chemin
+     * `appliquerCadreChoixFocusEngine` ci-dessus, qui ne sait résoudre
+     * qu'une option `{cle, valeur}` SANS coût séparé. Délègue à
+     * FocusEngine.resoudreEffetEtCout (Effet-puis-Coût, même moteur que
+     * l'acquisition immédiate d'une Technologie — voir
+     * GameService.gagnerTechnologieEtResoudreEffet) : ouvre la popup
+     * 'gagner_technologie' dédiée puis débite le coût, jamais l'inverse
+     * (une Technologie refusée — aucun emplacement/aucune Technologie
+     * disponible — ne débite alors aucun coût). AVANT ce chantier,
+     * cette option restait à moitié automatisée : le coût était débité en
+     * 1 clic mais le gain de Technologie laissé entièrement manuel (voir
+     * index.html/optionTechnologieViaScience_, conservé pour le rendu des
+     * cadres DÉJÀ appliqués ainsi avant ce chantier).
+     */
+    appliquerCadreOptionTechnologieAvecCout: function (partieId, cycle, ordreCadre, indexOption, demanderChoix) {
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var lignePlateauMaison = ctx.lignePlateauMaison, cadre = ctx.cadre;
 
-            var resume = resultatEffet.journal.map(function (ligne) {
-              var prefixe = source + ' : ';
-              return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
-            }).join(' ').replace(/\.\s*$/, '');
+        var option = cadre && cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)
+          ? cadre.effet.options[indexOption] : null;
+        var niveaux = niveauxTechnologieOptionAvecCout_(option);
+        if (!niveaux) throw new Error('Option Technologie introuvable pour ce cadre.');
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
 
-            evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };
-            partie.evenements[cleCycle] = evenementCycle;
+        var source = 'Cadre #' + ordreCadre;
+        var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, lignePlateauMaison);
+        var effet = { gagner_technologie: niveaux };
 
-            // NE PAS réutiliser `lignePlateauMaison` (capturée tout en
-            // haut, AVANT FocusEngine.resoudreEffet) pour l'écriture
-            // finale. Certaines options (avancer_civilisation ;
-            // retirer_corruption, option Technologie) écrivent
-            // DIRECTEMENT sur plateauMaison PENDANT la résolution, via
-            // une popup imbriquée qui appelle elle-même
-            // GameService.majPlateauMaison/majCivilisation (toutes deux
-            // lecture-fusion-écriture, sûres) — un DB.put bâti sur le
-            // snapshot périmé de `lignePlateauMaison` écraserait ces
-            // écritures avec les anciennes valeurs (violation de la
-            // règle #1 du projet, "lecture-fusion-écriture systématique :
-            // ne jamais écraser un champ non concerné par la modification
-            // en cours" — voir CLAUDE.md). On relit donc une ligne
-            // FRAÎCHE juste avant de fusionner uniquement `champs` (les
-            // mutations suivies par focusEngine.js pour L'ACTION DIRECTE
-            // du cadre — cube/ressources — jamais celles d'une popup
-            // imbriquée, qui persiste déjà elle-même). Si `champs` est
-            // vide (rien à écrire côté focusEngine, ex. avancer_civilisation
-            // seule sans coût), aucune écriture superflue.
-            var ecrirePlateauMaison = Object.keys(champs).length
-              ? DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
-                Object.keys(champs).forEach(function (champ) { ligneFraiche[champ] = champs[champ]; });
-                return DB.put('plateauMaison', ligneFraiche);
-              })
-              : Promise.resolve();
-
-            return Promise.all([
-              ecrirePlateauMaison,
-              GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre)
-            ]).then(function () {
-              return rechargerPartie_(partieId);
-            });
+        return FocusEngine.resoudreEffetEtCout(lignePlateauMaisonAvecId, effet, option.cout || {}, source, demanderChoix)
+          .then(function (resultatEffet) {
+            return finaliserResolutionCadreFocusEngine_(partieId, ctx, ordreCadre, source, resultatEffet);
           });
       });
     },

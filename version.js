@@ -1,7 +1,61 @@
 /**
  * version.js
- * Version 131 — 2026-09-10
+ * Version 132 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026 (retour utilisateur : "il faut implémenter les effets de
+ * gains de technologie via les événements galactique", "la technologie de
+ * base de la maison n'est pas proposé dans le liste des technologies
+ * améliorées") : 2 corrections indépendantes.
+ * - EVOLUTION 20 (suite) — un Cadre d'Événement galactique "choix" dont
+ *   une option gagne une Technologie (2 formes au catalogue,
+ *   data/catalogue/evenements.json) est désormais entièrement automatisé
+ *   via la MÊME popup dédiée 'gagner_technologie' que Focus Innovation
+ *   "Inventer"/Piste de Civilisation (FocusEngine.resoudreCle_), au lieu
+ *   de rester manuel :
+ *   - Option DIRECTE `{cle:'technologie_base'|'technologie_amelioree'|
+ *     'technologie_base_ou_amelioree', valeur:1}` (Événement F Cycle 1
+ *     Cadre 1) — `js/gameService.js`/`cleFocusEnginePourOptionCadre_`
+ *     reconnaît désormais ces 3 clés (-> 'gagner_technologie') ;
+ *     `appliquerCadreChoixFocusEngine` traduit la `valeur` réellement
+ *     transmise à FocusEngine via le nouveau
+ *     `niveauxTechnologieOptionCadre_` (niveau 'base'/'amelioree' ou
+ *     tableau, PAS `Number(option.valeur)`, qui n'aurait aucun sens ici).
+ *   - Option COMBO `{cout:{...ressources simples}, gain:{technologie_
+ *     base:1}}` (Événement A Cycle 1 Cadre 2, "Dépensez 1 Science pour
+ *     gagner une Technologie de base") — jusqu'ici seul le coût était
+ *     automatisé (1 clic), le gain restant manuel
+ *     ("Choisir la technologie manuellement sur Plat. maison",
+ *     `optionTechnologieViaScience_`, index.html — conservé UNIQUEMENT
+ *     pour le rendu des cadres déjà résolus ainsi avant ce correctif,
+ *     `estAppliqueViaTechnologieScience_`). Nouvelle fonction
+ *     `GameService.appliquerCadreOptionTechnologieAvecCout`, qui délègue
+ *     à `FocusEngine.resoudreEffetEtCout` (Effet-puis-Coût, même moteur
+ *     que l'acquisition immédiate d'une Technologie).
+ *   `js/gameService.js` : la queue commune de persistance des 2 chemins
+ *   ci-dessus (mutations plateauMaison + cadresAppliques + rechargement)
+ *   est désormais factorisée dans `finaliserResolutionCadreFocusEngine_`
+ *   (évite la duplication entre les 2 fonctions `appliquerCadreChoix
+ *   FocusEngine`/`appliquerCadreOptionTechnologieAvecCout`).
+ *   `index.html` : nouveau rappel explicite à `App.renderPlateauMaison`
+ *   après ces 2 chemins (et l'existant `appliquerCadreFocusEngineEtRafraichir_`,
+ *   qui sert aussi désormais l'option directe) — "Technologies obtenues"
+ *   vit sur l'écran Plat. maison, jamais rafraîchi tout seul (Piège n°2,
+ *   CLAUDE.md).
+ * - Case "Améliorée" de la Technologie de départ (Plat. maison) : restait
+ *   verrouillée EN PERMANENCE, quel que soit le cycle — gatée par erreur
+ *   sur `GameService.obtenirTechnologiesAvanceesGroupes(partie).actif`
+ *   (même source de vérité que les 5 "Technologies obtenues"), qui ne
+ *   liste QUE les 8 Technologies des 4 maisons déchues
+ *   (`partie.adversaires`) : le nom de la Technologie de départ (l'une
+ *   des 2 de la maison DU JOUEUR) n'y figure structurellement JAMAIS. La
+ *   Technologie de départ n'appartenant pas à ce marché partagé (jamais
+ *   bloquée par la tuile de blocage — en possession du joueur depuis le
+ *   début), elle suit sa propre règle, plus simple (une seule carte, pas
+ *   de sous-ensemble 4/8) : déverrouillée dès le Cycle 2
+ *   (docs-rules-cycle-de-jeu.md §1.2.1), reverrouillée en fin de partie
+ *   comme les Technologies obtenues (cohérence d'affichage, aucune donnée
+ *   perdue). `index.html`/`renderEcranPlateauMaison_`.
  *
  * 10/09/2026 (retour utilisateur : "Utilise les fichiers poc-rendu-secteurs
  * html et note.md pour commencer l'implémentation de l'affichage des
@@ -4642,4 +4696,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260910.1';
+var APP_VERSION = '20260913.1';
