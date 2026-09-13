@@ -685,16 +685,19 @@
     /**
      * Affiche ce que GameService.obtenirTechnologiesAvanceesGroupes
      * retourne (seule source de vérité pour le calcul du groupe actif) :
-     * cycle 1, 4 <select>, choix parmi les 8 technologies des maisons
-     * déchues (un même nom ne peut occuper 2 emplacements — filtré côté
-     * options, revalidé côté GameService) ; cycle 2, les 4 choisies, texte
-     * fixe ; cycle 3, les 4 AUTRES (complément, jamais choisi manuellement),
-     * texte fixe. Pas de case "Améliorée" ici (lecture seule) : elle vit
-     * sur la case "Améliorée" de la section "Technologies obtenues" (Plat.
-     * maison, 5 ddl) — voir renderTechnologiesObtenues_ plus bas, qui
-     * relit GameService.obtenirTechnologiesAvanceesGroupes(partie).actif
-     * (même source de vérité que cette fonction) pour savoir si la
-     * technologie choisie dans chaque ddl est actuellement améliorable.
+     * cycle 1, 4 <select>, choix parmi le pool complet (8 technologies
+     * des maisons déchues + la Technologie de départ du joueur — voir
+     * GameService.technologiesAdversesToutes_ ; un même nom ne peut
+     * occuper 2 emplacements — filtré côté options, revalidé côté
+     * GameService) ; cycle 2, les 4 choisies, texte fixe ; cycle 3, les
+     * AUTRES du pool (complément, jamais choisi manuellement), texte
+     * fixe. Pas de case "Améliorée" ici (lecture seule) : elle vit sur la
+     * case "Améliorée" de la section "Technologies obtenues" (Plat.
+     * maison, 5 ddl) ET sur celle de la Technologie de départ (même
+     * écran) — voir renderTechnologiesObtenues_/renderEcranPlateauMaison_
+     * plus bas, qui relisent GameService.obtenirTechnologiesAvanceesGroupes
+     * (partie).actif (même source de vérité que cette fonction) pour
+     * savoir si la technologie concernée est actuellement améliorable.
      */
     function renderTechnologiesAvancees_(partie) {
       var container = document.getElementById('technologies-avancees-liste');
@@ -757,26 +760,28 @@
      * (index.html), pas régénéré à chaque rendu — d'où l'usage de
      * .onchange plutôt que addEventListener (idempotent d'un appel à
      * l'autre, jamais de listener dupliqué), même pattern que
-     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas. Elle
+     * n'est déverrouillée que si la Technologie de départ est référencée
+     * sur Plat. Galactique, dans le groupe actif du cycle en cours
+     * (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
+     * même règle, même source de vérité que renderTechnologiesObtenues_
+     * ci-dessous.
      *
-     * Correctif (retour utilisateur : "la technologie de base de la
-     * maison n'est pas proposée dans la liste des technologies
-     * améliorées") : la case était jusqu'ici gatée par
-     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif — la
-     * MÊME source de vérité que renderTechnologiesObtenues_ ci-dessous.
-     * Or cette liste ne contient QUE les 8 Technologies des 4 maisons
-     * déchues (partie.adversaires, voir GameService.
-     * technologiesAdversesToutes_) : le nom de la Technologie de départ
-     * (l'une des 2 de la maison DU JOUEUR, jamais une maison déchue) n'y
-     * figure structurellement JAMAIS — la case restait donc verrouillée
-     * pour toute partie, quel que soit le cycle. La Technologie de départ
-     * ne fait pas partie du marché partagé des 8 (jamais bloquée par "la
-     * tuile de blocage" — elle est en possession du joueur depuis le
-     * début), donc pas de sous-ensemble de 4/8 à respecter pour elle :
-     * simple règle de cycle (docs-rules-cycle-de-jeu.md §1.2.1, "Au Cycle
-     * 2, retirez la tuile de blocage") — déverrouillée dès le Cycle 2,
-     * reverrouillée en fin de partie comme les Technologies obtenues
-     * (cohérence d'affichage uniquement, aucune donnée perdue).
+     * Retour utilisateur (13/09/2026, "la technologie de base de la
+     * maison n'est pas proposé dans le liste des technologies
+     * améliorées" — précisé ensuite : "les 8 techno des maisons déchue
+     * PLUS la [Technologie de départ]") : la case restait verrouillée en
+     * PERMANENCE, pas parce que cette règle de gating était fausse, mais
+     * parce que le pool sous-jacent (GameService.technologiesAdversesToutes_)
+     * ne contenait QUE les 8 Technologies des maisons déchues — le nom de
+     * la Technologie de départ n'y figurait jamais, donc ne pouvait jamais
+     * apparaître dans .actif. Corrigé À LA SOURCE (technologiesAdversesToutes_
+     * inclut désormais la Technologie de départ du joueur, sélectionnable
+     * comme n'importe quelle autre Technologie avancée sur Plat.
+     * Galactique, voir renderTechnologiesAvancees_ plus bas) — cette
+     * fonction-ci n'a PAS eu besoin de changer, la case se déverrouille
+     * maintenant normalement une fois la Technologie de départ choisie
+     * dans un des 4 emplacements.
      */
     function renderEcranPlateauMaison_(partie) {
       var joueur = partie.joueur || {};
@@ -841,9 +846,9 @@
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
-        var departAmeliorableCeCycle = partie.cycleActuel === 2 || partie.cycleActuel === 3;
+        var nomsAmeliorablesDepart = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
         checkboxDepart.checked = !!techDepart.amelioree;
-        checkboxDepart.disabled = !techDepart.nom || !departAmeliorableCeCycle;
+        checkboxDepart.disabled = !techDepart.nom || nomsAmeliorablesDepart.indexOf(techDepart.nom) === -1;
         checkboxDepart.onchange = function () {
           var etatDemande = checkboxDepart.checked;
           checkboxDepart.disabled = true;

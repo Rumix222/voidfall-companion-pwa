@@ -1,7 +1,47 @@
 /**
  * version.js
- * Version 132 — 2026-09-13
+ * Version 133 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Je ne vois toujours pas la
+ * techno avancé de ma maison dans la liste des techno avancé selectionable
+ * sur le plat. Galactique", précisé par exemple concret : "ma maison est
+ * shiveus avec techno cuirassée [...] je dois avoir les 8 techno des
+ * maisons déchue PLUS la techno cuirassé") — CORRIGE le lot précédent
+ * ci-dessous, qui avait mal diagnostiqué ce même signalement (pris pour
+ * un problème de verrouillage de case "Améliorée" sur Plat. maison, alors
+ * que le vrai problème était en amont : la Technologie de départ du
+ * joueur était totalement ABSENTE du pool de sélection des "Technologies
+ * avancées" sur Plat. Galactique) :
+ * - `js/gameService.js`/`technologiesAdversesToutes_` : inclut désormais
+ *   la Technologie de départ DU JOUEUR (`partie.joueur.technologieDepart`)
+ *   en plus des 8 technologies des 4 maisons déchues — ce pool alimente
+ *   à la fois `choisirTechnologieAvancee`/`obtenirTechnologiesAvancees
+ *   Groupes` (Plat. Galactique, 4 <select> de sélection Cycle 1) : la
+ *   Technologie de départ y apparaît désormais comme un choix possible,
+ *   au même titre que les 8 autres. ⚠️ NE modifie PAS le pool séparé des
+ *   "Technologies obtenues" (`choisirTechnologieObtenue`/
+ *   `renderTechnologiesObtenues_`/`feuilleFlowGagnerTechnologie_`, qui
+ *   construisent leur propre liste directement depuis `partie.adversaires`
+ *   sans passer par `technologiesAdversesToutes_`) : "obtenir" sa propre
+ *   Technologie de départ une 2e fois n'aurait aucun sens, elle est déjà
+ *   possédée depuis le début de partie.
+ * - `index.html`/`renderEcranPlateauMaison_` : le correctif du lot
+ *   précédent (case "Améliorée" de la Technologie de départ déverrouillée
+ *   sur simple base du cycle) est ANNULÉ — revient au gating d'origine
+ *   (`GameService.obtenirTechnologiesAvanceesGroupes(partie).actif`), qui
+ *   était en fait déjà correct : il ne pouvait simplement jamais matcher
+ *   tant que la Technologie de départ n'existait pas dans le pool
+ *   sous-jacent (corrigé ci-dessus). La case se déverrouille maintenant
+ *   normalement dès que le joueur choisit sa propre Technologie de départ
+ *   dans l'un des 4 emplacements "Technologies avancées" sur Plat.
+ *   Galactique, au cycle correspondant (2 si choisie au Cycle 1, 3 sinon).
+ * - `js/gameService_technologies_avancees_test.js` : commentaire
+ *   historique corrigé ("on prend toujours QUE les 8 technologies des
+ *   maisons déchues" ne s'appliquait qu'au pool "Technologies obtenues",
+ *   jamais vérifié pour celui des "Technologies avancées") + 2 nouveaux
+ *   tests (le pool "toutes" inclut la Technologie de départ ;
+ *   `choisirTechnologieAvancee` accepte son nom).
  *
  * 13/09/2026 (retour utilisateur : "il faut implémenter les effets de
  * gains de technologie via les événements galactique", "la technologie de
@@ -4696,4 +4736,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.1';
+var APP_VERSION = '20260913.2';

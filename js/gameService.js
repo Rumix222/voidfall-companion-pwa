@@ -572,12 +572,27 @@ var GameService = (function () {
   }
 
   /**
-   * Les 8 technologies des 4 maisons déchues (mise en place), toutes
-   * maisons confondues — même liste source que choisirTechnologieObtenue
-   * (slots "Technologies obtenues") et que toutesTechnologiesAdverses_
-   * (index.html/strategieService.js), exposée ici en fonction réutilisable
-   * pour les fonctions Technologies avancées ci-dessous (choix + calcul du
-   * groupe actif par cycle).
+   * Pool de sélection des "Technologies avancées" (Plat. Galactique,
+   * `choisirTechnologieAvancee`/`obtenirTechnologiesAvanceesGroupes`
+   * ci-dessous) : les 8 technologies des 4 maisons déchues (mise en
+   * place) PLUS la Technologie de départ DU JOUEUR — retour utilisateur
+   * (13/09/2026, exemple concret Shiveus/Cuirassés) : "Dans la liste des
+   * techno avancé sélectionnable je dois avoir les 8 techno des maisons
+   * déchue PLUS la techno cuirassé [sa Technologie de départ]". Corrige
+   * une confusion antérieure (voir js/gameService_technologies_avancees_
+   * test.js, commentaire historique "on prend toujours QUE les 8
+   * technologies des maisons déchues" — cette règle ne s'appliquait en
+   * fait qu'à `technologiesDisponibles_`/choisirTechnologieObtenue
+   * ci-dessous, jamais vérifiée pour ce pool-ci).
+   *
+   * ⚠️ NE PAS réutiliser cette fonction pour le pool "Technologies
+   * obtenues" (choisirTechnologieObtenue, `renderTechnologiesObtenues_`/
+   * `feuilleFlowGagnerTechnologie_` — qui construisent leur PROPRE liste
+   * directement depuis `partie.adversaires`, sans passer par ici) : la
+   * Technologie de départ est déjà possédée depuis le début de partie,
+   * "l'obtenir" une seconde fois dans un des 5 emplacements n'aurait
+   * aucun sens — elle n'appartient QU'au pool des Technologies avancées
+   * (choix de laquelle devient améliorable, jamais un gain).
    */
   function technologiesAdversesToutes_(partie) {
     var toutes = [];
@@ -586,21 +601,31 @@ var GameService = (function () {
         toutes.push({ nom: t.nom, maison: m.nom, type: t.type || '', sansPoint: !!t.sansPoint });
       });
     });
+    var techDepart = partie.joueur && partie.joueur.technologieDepart;
+    if (techDepart && techDepart.nom) {
+      // sansPoint toujours false ici : ce champ ne sert qu'à
+      // FocusEngine.resoudreCle_('gagner_technologie') pour décider du
+      // gain d'Influence à l'ACQUISITION — la Technologie de départ n'est
+      // jamais acquise via ce chemin (déjà possédée depuis le début).
+      toutes.push({ nom: techDepart.nom, maison: partie.joueur.nom, type: techDepart.type || '', sansPoint: false });
+    }
     return toutes;
   }
 
   /**
    * Règle du groupe actif : les 4 Technologies avancées choisies au
    * cycle 1 (partie.technologiesAvanceesChoisies) sont améliorables au
-   * cycle 2 ; au cycle 3, ce sont les 4 AUTRES parmi les 8 (le complément,
-   * calculé, jamais choisi manuellement) qui deviennent améliorables, à la
-   * place des 4 premières (pas en plus). Aucune amélioration possible au
-   * cycle 1 (rien
-   * n'est encore "actif"), ni une fois les 4 emplacements du cycle 1
-   * incomplets (retourne [] tant que les 4 ne sont pas tous remplis :
-   * le complément ne serait pas fiable). Retourne un tableau de noms
-   * (string[]), pas d'objets — suffisant pour un test d'appartenance
-   * (indexOf) côté définirTechnologieAvanceeAmelioree.
+   * cycle 2 ; au cycle 3, ce sont les AUTRES technologies du pool (le
+   * complément, calculé, jamais choisi manuellement — voir
+   * technologiesAdversesToutes_ ci-dessus pour la composition du pool,
+   * 8 des maisons déchues + la Technologie de départ du joueur) qui
+   * deviennent améliorables, à la place des 4 premières (pas en plus).
+   * Aucune amélioration possible au cycle 1 (rien n'est encore "actif"),
+   * ni une fois les 4 emplacements du cycle 1 incomplets (retourne []
+   * tant que les 4 ne sont pas tous remplis : le complément ne serait
+   * pas fiable). Retourne un tableau de noms (string[]), pas d'objets —
+   * suffisant pour un test d'appartenance (indexOf) côté
+   * définirTechnologieAvanceeAmelioree.
    */
   function groupeActifTechnologiesAvancees_(partie) {
     var choisies = (partie.technologiesAvanceesChoisies || []).filter(Boolean);
@@ -2939,10 +2964,12 @@ var GameService = (function () {
 
     /**
      * Enregistre (ou retire, si nomTechnologie est vide) le choix d'une
-     * des 4 Technologies avancées (parmi les 8 des maisons déchues) —
-     * même principe que choisirTechnologieObtenue (recherche dans
-     * partie.adversaires, écriture via majPlateauMaison), avec deux
-     * règles propres à cette mécanique :
+     * des 4 Technologies avancées, parmi le pool technologiesAdversesToutes_
+     * ci-dessus (8 des maisons déchues + la Technologie de départ du
+     * joueur) — même principe que choisirTechnologieObtenue (recherche
+     * dans partie.adversaires SEUL, sans la Technologie de départ — voir
+     * la mise en garde de technologiesAdversesToutes_), avec deux règles
+     * propres à cette mécanique :
      *   - le choix ne se fait qu'au cycle 1 (rejette sinon — les 4
      *     emplacements sont fixés pour le reste de la partie une fois le
      *     cycle 1 passé) ;
@@ -2971,7 +2998,7 @@ var GameService = (function () {
           choisies[slot] = null;
         } else {
           var trouvee = technologiesAdversesToutes_(partie).filter(function (t) { return t.nom === nomTechnologie; })[0];
-          if (!trouvee) throw new Error('Technologie avancée introuvable parmi les maisons déchues.');
+          if (!trouvee) throw new Error('Technologie avancée introuvable.');
           var dejaPriseAilleurs = choisies.some(function (t, i) { return i !== slot && t && t.nom === nomTechnologie; });
           if (dejaPriseAilleurs) throw new Error('Cette technologie est déjà choisie à un autre emplacement.');
           choisies[slot] = { nom: trouvee.nom, maison: trouvee.maison };
@@ -2987,16 +3014,18 @@ var GameService = (function () {
 
     /**
      * Fonction PURE (aucun accès DB) exposée pour l'IHM (index.html) —
-     * regroupe la logique d'affichage par cycle (quelles 4 technologies
+     * regroupe la logique d'affichage par cycle (quelles technologies
      * montrer, lesquelles sont améliorables) au même endroit que la
      * logique d'écriture ci-dessus (groupeActifTechnologiesAvancees_),
      * pour éviter toute divergence entre affichage et persistance.
-     *   - toutes : les 8 technologies des maisons déchues (mise en place).
+     *   - toutes : le pool complet (voir technologiesAdversesToutes_ —
+     *     8 des maisons déchues + la Technologie de départ du joueur).
      *   - groupeA : les 4 choisies au cycle 1 (partie.technologiesAvancees
      *     Choisies, dans l'ordre des emplacements — peut contenir des null
      *     tant que le choix du cycle 1 n'est pas terminé).
-     *   - groupeB : le complément des 4 autres parmi les 8 (calculé, jamais
-     *     stocké) — vide tant que groupeA n'a pas ses 4 emplacements remplis.
+     *   - groupeB : le complément (les AUTRES technologies du pool,
+     *     calculé, jamais stocké) — vide tant que groupeA n'a pas ses 4
+     *     emplacements remplis.
      *   - actif : les noms améliorables CE cycle-ci (voir
      *     groupeActifTechnologiesAvancees_) — [] aux cycles 1 et 'termine'.
      */
