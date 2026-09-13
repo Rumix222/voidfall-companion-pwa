@@ -264,7 +264,15 @@
        partie via setupService.js, jamais modifiable ensuite) — seule sa
        case "Améliorée" est interactive. -->
   <section id="screen-plateau-maison" class="screen" hidden>
-    <h2 class="section-title">Ressources</h2>
+    <!-- Compétence de Maison (retour utilisateur 14/09/2026, texte fourni
+         depuis le livret physique) — data/catalogue/maisons.json, champ
+         `effet` (GameService.formatMaison_) : AFFICHAGE SEULEMENT, aucune
+         des 10 compétences (sur 14 maisons — 4 "de base" n'en ont pas)
+         n'est automatisée. Voir renderMaisonEffet_, index.html. -->
+    <h2 class="section-title">Maison</h2>
+    <div class="game-block" id="bloc-maison-effet"></div>
+
+    <h2 class="section-title" style="margin-top:22px;">Ressources</h2>
     <div class="game-block" id="bloc-ressources">
       <div class="ressources-liste" id="ressources-principales"></div>
     </div>
@@ -862,6 +870,29 @@
     }
 
     /**
+     * Compétence de Maison (retour utilisateur 14/09/2026, texte exact
+     * fourni depuis le livret physique) — data/catalogue/maisons.json,
+     * champ `effet` (GameService.formatMaison_/joueur.effet) : AFFICHAGE
+     * SEULEMENT, aucune des 10 compétences (sur 14 maisons — 4 "de base"
+     * confirmées sans capacité spéciale) n'est automatisée à ce stade.
+     * Paragraphes séparés par "\n\n" dans le catalogue -> une balise
+     * &lt;p&gt; chacun (plusieurs compétences ont 2 effets distincts, ex.
+     * Shiveus désavantage Escarmouche + bonus Influence).
+     */
+    function renderMaisonEffet_(partie) {
+      var conteneur = document.getElementById('bloc-maison-effet');
+      if (!conteneur) return;
+      var joueur = partie.joueur || {};
+      var nomMaison = joueur.nom || '—';
+      if (!joueur.effet) {
+        conteneur.innerHTML = '<h3>' + nomMaison + '</h3><p class="hint" style="margin:0;">Aucune capacité spéciale (maison de base).</p>';
+        return;
+      }
+      var paragraphes = joueur.effet.split('\n\n').map(function (p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
+      conteneur.innerHTML = '<h3>' + nomMaison + '</h3>' + paragraphes;
+    }
+
+    /**
      * Écran "Plat. maison" : Technologie de départ (+ case Améliorée) et
      * Influence. #check-amelioree-depart est un élément STATIQUE du DOM
      * (index.html), pas régénéré à chaque rendu — d'où l'usage de
@@ -891,6 +922,8 @@
      * dans un des 4 emplacements.
      */
     function renderEcranPlateauMaison_(partie) {
+      renderMaisonEffet_(partie);
+
       var joueur = partie.joueur || {};
       var techDepart = joueur.technologieDepart || {};
       var infosTechDepart = (joueur.technologies || []).filter(function (t) { return t.nom === techDepart.nom; })[0] || null;

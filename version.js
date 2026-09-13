@@ -1,7 +1,64 @@
 /**
  * version.js
- * Version 134 — 2026-09-13
+ * Version 136 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : texte exact des Compétences de
+ * Maison fourni depuis le livret physique, pour 10 des 14 maisons — les 4
+ * restantes, Valnis/Cortozaar/Belitan/Dunlork, sont des maisons "de base"
+ * confirmées sans capacité spéciale ; "Ok pour juste afficher la
+ * capacité") : affichage seul, aucune des 10 compétences n'est
+ * automatisée à ce stade (chantier bien plus lourd, voir la discussion
+ * de session — Novaris/Fenrax/Thegwyn/Zenor touchent chacun plusieurs
+ * sous-systèmes).
+ * - `data/catalogue/maisons.json` : champ `effet` rempli pour les 10
+ *   maisons (texte intégral, paragraphes séparés par `\n\n` pour les
+ *   compétences à 2 effets distincts, ex. Shiveus) — restait `null` pour
+ *   toutes les 14 maisons avant ce lot.
+ * - `js/gameService.js` : `formatMaison_` (alimente `partie.joueur.effet`,
+ *   utilisé aussi pour `partie.adversaires[].effet` sans UI dédiée pour
+ *   l'instant) et `obtenirMaisonsCatalogue_` (setupService.js) recopient
+ *   désormais ce champ — jusqu'ici silencieusement perdu, jamais lu au
+ *   delà du JSON brut.
+ * - `index.html` : nouvelle section "Maison" en tête de l'écran Plat.
+ *   maison (`renderMaisonEffet_`, appelée depuis
+ *   `renderEcranPlateauMaison_`) — nom de la maison + texte intégral de
+ *   sa Compétence (un `<p>` par paragraphe), ou "Aucune capacité spéciale
+ *   (maison de base)." pour les 4 maisons sans `effet`.
+ *
+ * 13/09/2026, suite (retour utilisateur : inventaire des données/actions
+ * de secteur pas encore modélisées — "il y a pas mal de modification
+ * manuelle sur les secteurs qui manque" — puis "Le C peut être
+ * intéressant" + "Réutiliser le panneau dans galaxie, d'autant qu'à terme
+ * si ça fonctionne bien on supprimera certainement l'onglet secteurs qui
+ * est remplacé avantageusement") : le panneau détail de l'onglet Galaxie
+ * (`#galaxie-detail`, `js/secteurVueService.js`) devient le point d'entrée
+ * pour les corrections manuelles de secteur SANS validation de règle —
+ * intention déclarée de remplacer, à terme, l'onglet Secteurs.
+ * - Nouvelle fonction `SecteurService.majSecteur(partieId, numero,
+ *   champs)` (`js/secteurService.js`) : MàJ partielle liste-blanche
+ *   (`population`/`corrompu`/`pnNeant`/`jetonPrime`/`jetonLiberation`),
+ *   même principe lecture-fusion-écriture que `GameService.
+ *   majPlateauMaison` — AUCUNE validation de règle (même permissivité que
+ *   `placerCorruption`/`retirerCorruption`, déjà sans garde-fou).
+ * - `js/secteurVueService.js` : `afficherDetail_` affiche désormais ces 5
+ *   champs comme des `<input>` éditables (Corrompu en case à cocher, les 4
+ *   autres en compteurs numériques ≥0) au lieu de texte fixe — "Flotte"
+ *   (PN de vaisseaux) et "Cube du Néant" (pnNeant) sont maintenant 2
+ *   lignes séparées (avant ce chantier, l'une masquait l'autre). La
+ *   logique de chargement/dessin du plateau hexagonal est factorisée dans
+ *   `chargerEtDessiner_` (partagée entre `afficher`, appelée à l'ouverture/
+ *   au clic d'onglet, et la nouvelle `rafraichirApresEdition_`, appelée
+ *   après une écriture réussie — redessine le plateau ET rouvre le
+ *   panneau détail sur LE MÊME secteur, plusieurs champs édités changeant
+ *   aussi le dessin de l'hexagone). Le plateau hexagonal lui-même (les
+ *   actions guidées construire/déployer/regrouper/envahir) reste sur
+ *   l'onglet Secteurs, inchangé.
+ * - `css/style.css` : `.galaxie-detail-input` (nouveau, compteurs
+ *   compacts) + taille de la case à cocher Corrompu.
+ * - Tests : 4 nouveaux dans `js/secteurService_actions.test.js`
+ *   (`majSecteur` — écriture des 5 champs, liste blanche respectée,
+ *   rejet si aucun champ valide/secteur introuvable).
  *
  * 13/09/2026, suite (retour utilisateur : "Comme le jeu est de plus en
  * plus automatisé on va devoir implémenter certaines fonctions pour le
@@ -4770,4 +4827,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.3';
+var APP_VERSION = '20260913.5';

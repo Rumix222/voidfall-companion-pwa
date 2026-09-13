@@ -641,6 +641,23 @@ input:disabled {
 .galaxie-detail .ligne:last-child { border-bottom: none; }
 .galaxie-detail .cle { color: var(--color-text-muted); }
 .galaxie-detail .vide { color: var(--color-text-muted); font-style: italic; }
+/* Champs éditables du panneau détail (Population/Corrompu/cube du Néant/
+   jeton Prime/jeton Libération — SecteurService.majSecteur, aucune
+   validation de règle, voir js/secteurVueService.js). */
+.galaxie-detail-input {
+  width: 56px;
+  padding: 2px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  text-align: right;
+}
+.galaxie-detail .ligne input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
 
 /* --- Nav Partie/Stratégie/Secteurs/Combat (visible seulement partie
    active) --- */

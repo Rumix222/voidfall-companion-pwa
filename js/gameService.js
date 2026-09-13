@@ -485,6 +485,14 @@ var GameService = (function () {
     return {
       nom: maison.nom,
       complexite: maison.complexite,
+      // Compétence de Maison (retour utilisateur 14/09/2026, texte exact
+      // fourni par l'utilisateur depuis le livret physique) —
+      // data/catalogue/maisons.json, champ `effet` : null pour les 4
+      // maisons "de base" (Valnis/Cortozaar/Belitan/Dunlork, confirmé sans
+      // capacité spéciale), sinon le texte intégral (plusieurs paragraphes
+      // séparés par \n\n le cas échéant). AFFICHAGE SEULEMENT à ce stade
+      // (Plat. maison) — aucune des 10 compétences n'est automatisée.
+      effet: maison.effet || null,
       technologies: maison.technologies.map(function (t) {
         return { nom: t.nom, type: t.type || '', texte: t.texte || '', texteAmeliore: t.texteAmeliore || '' };
       })
@@ -550,7 +558,7 @@ var GameService = (function () {
           var t = techParNom[nomTech];
           return { nom: nomTech, type: t ? (t.type || '') : '', texte: t ? (t.texte || '') : '', texteAmeliore: t ? (t.texteAmeliore || '') : '' };
         });
-        return { nom: m.nom, complexite: m.complexite, technologies: technologiesMaison };
+        return { nom: m.nom, complexite: m.complexite, effet: m.effet || null, technologies: technologiesMaison };
       });
     });
   }

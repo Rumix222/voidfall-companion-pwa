@@ -399,6 +399,42 @@ var SecteurService = (function () {
     });
   }
 
+  // Correction manuelle libre d'un secteur (retour utilisateur 13-14/09/2026
+  // — panneau détail de l'onglet Galaxie) : Population, Corrompu, cube du
+  // Néant, jeton Prime, jeton Libération. Liste blanche volontaire, MÊME
+  // principe que GameService.CHAMPS_PLATEAU_MAISON_AUTORISES/majPlateauMaison
+  // — ne JAMAIS laisser un appelant écrire un champ arbitraire. Guildes/
+  // Installations/PN de vaisseaux restent réservés aux actions guidées
+  // (construire/déployer/rappeler/envahir, qui revalident les règles) —
+  // hors périmètre ici.
+  var CHAMPS_SECTEUR_MANUELS_AUTORISES_ = ['population', 'corrompu', 'pnNeant', 'jetonPrime', 'jetonLiberation'];
+
+  /**
+   * MàJ partielle liste-blanche d'un secteur (lecture-fusion-écriture,
+   * même principe que GameService.majPlateauMaison) — AUCUNE validation
+   * de règle (comme placerCorruption/retirerCorruption ci-dessus, MÊME
+   * permissivité, volontaire) : sert à appliquer manuellement des effets
+   * que l'app ne modélise pas encore (Plateau Crise, Escarmouche...) ou à
+   * corriger une saisie, jamais à rejouer une mécanique déjà automatisée
+   * ailleurs (qui, elle, revalide toujours — voir construire/envahir/
+   * augmenterPopulationPure).
+   */
+  function majSecteur(partieId, numero, champs) {
+    var filtre = {};
+    Object.keys(champs || {}).forEach(function (cle) {
+      if (CHAMPS_SECTEUR_MANUELS_AUTORISES_.indexOf(cle) !== -1) filtre[cle] = champs[cle];
+    });
+    if (!Object.keys(filtre).length) {
+      return Promise.reject(new Error('Aucun champ valide à mettre à jour.'));
+    }
+
+    return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+      if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
+      Object.keys(filtre).forEach(function (cle) { secteur[cle] = filtre[cle]; });
+      return DB.put('secteursPartie', secteur);
+    });
+  }
+
   /**
    * Agrège, sur tous les secteurs "Purs" du joueur (appartientAuJoueur_
    * ET !corrompu — même définition que "Pur" déjà utilisée par
@@ -1127,6 +1163,7 @@ var SecteurService = (function () {
     obtenirSecteursEligiblesRetraitCorruption: obtenirSecteursEligiblesRetraitCorruption,
     obtenirSecteursEligiblesGainCorruption: obtenirSecteursEligiblesGainCorruption,
     placerCorruption: placerCorruption,
+    majSecteur: majSecteur,
     obtenirAgregatsInfluenceSecteursPurs: obtenirAgregatsInfluenceSecteursPurs,
     obtenirDetailSecteursProgrammes: obtenirDetailSecteursProgrammes,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,

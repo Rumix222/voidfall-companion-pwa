@@ -211,6 +211,67 @@ test('placerCorruption : passe corrompu à true', function () {
   });
 });
 
+// ---------------------------------------------------------------
+// majSecteur — correction manuelle libre (retour utilisateur 13-14/09/2026,
+// panneau détail de l'onglet Galaxie) : liste blanche des 5 champs
+// autorisés, AUCUNE validation de règle (même permissivité que
+// placerCorruption/retirerCorruption ci-dessus).
+// ---------------------------------------------------------------
+
+test('majSecteur : écrit les 5 champs autorisés en une seule fois', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ population: 2, corrompu: false, pnNeant: 0, jetonPrime: 0, jetonLiberation: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.majSecteur('p1', 1, {
+    population: 5, corrompu: true, pnNeant: 3, jetonPrime: 2, jetonLiberation: 1
+  }).then(function () {
+    var secteur = db._stores.secteursPartie['p1|1'];
+    assert.strictEqual(secteur.population, 5);
+    assert.strictEqual(secteur.corrompu, true);
+    assert.strictEqual(secteur.pnNeant, 3);
+    assert.strictEqual(secteur.jetonPrime, 2);
+    assert.strictEqual(secteur.jetonLiberation, 1);
+  });
+});
+
+test('majSecteur : ignore tout champ hors liste blanche (ex. pnCorvette, guildeFermiers)', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ pnCorvette: 1, guildeFermiers: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.majSecteur('p1', 1, { pnCorvette: 99, guildeFermiers: 99, jetonPrime: 4 }).then(function () {
+    var secteur = db._stores.secteursPartie['p1|1'];
+    assert.strictEqual(secteur.pnCorvette, 1, 'pnCorvette hors liste blanche -> inchangé');
+    assert.strictEqual(secteur.guildeFermiers, 0, 'guildeFermiers hors liste blanche -> inchangé');
+    assert.strictEqual(secteur.jetonPrime, 4, 'jetonPrime whitelisté -> appliqué');
+  });
+});
+
+test('majSecteur : aucun champ valide -> rejette sans toucher la base', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ jetonPrime: 1 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.majSecteur('p1', 1, { pnCorvette: 5 }).then(function () {
+    assert.fail('aurait dû rejeter (aucun champ de la liste blanche)');
+  }, function (erreur) {
+    assert.match(erreur.message, /aucun champ valide/i);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].jetonPrime, 1);
+  });
+});
+
+test('majSecteur : secteur introuvable -> rejette', function () {
+  var db = creerDbFactice_();
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.majSecteur('p1', 99, { jetonPrime: 1 }).then(function () {
+    assert.fail('aurait dû rejeter');
+  }, function (erreur) {
+    assert.match(erreur.message, /introuvable/i);
+  });
+});
+
 // Miroir INVERSÉ d'obtenirSecteursEligiblesRetraitCorruption — secteurs
 // POSSÉDÉS ET PAS Corrompus, à l'exclusion du Secteur-Mère (immunisé à
 // la Corruption, voir docs-rules-corruption-gardiens-refuges-

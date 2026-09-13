@@ -210,7 +210,7 @@ dans `catalogueSync.js:31-44` (`TABLES`).
 
 | Fichier | Store | Entrées | Concept |
 |---|---|---|---|
-| `maisons.json` | `maisons` | 14 | Les 14 maisons jouables — technologies de départ, contenu fixe du Secteur-Mère/Maison déchue |
+| `maisons.json` | `maisons` | 14 | Les 14 maisons jouables — technologies de départ, contenu fixe du Secteur-Mère/Maison déchue, champ `effet` = texte intégral de la Compétence de Maison (`null` pour les 4 maisons "de base" Valnis/Cortozaar/Belitan/Dunlork ; **affichage seul** sur Plat. maison, `GameService.formatMaison_`/`index.html:renderMaisonEffet_` — les 10 compétences ne sont pas automatisées) |
 | `technologies.json` | `technologies` | 28 | Cartes Technologie (effet `permanent`/`immediat`/`ameliore`, chacun un opcode JSON) |
 | `focus.json` | `focus` | 111 | Cartes Focus (Standard/Héroïque/maison), 1 `cout` + 1 `effet` par action — consommées par `focusEngine.js` |
 | `evenements.json` | `evenements` | 30 | Événements galactiques — voir détail §3.1 |
@@ -377,6 +377,7 @@ d'Influence des secteurs Purs). Pas pur.
 | `obtenirSecteursEligiblesRetraitCorruption` | `(partieId)` | Secteurs possédés ET Corrompus |
 | `obtenirSecteursEligiblesGainCorruption` | `(partieId)` | Secteurs possédés, PAS Corrompus, hors Secteur-Mère |
 | `placerCorruption` | `(partieId, numero)` | `corrompu = true` |
+| `majSecteur` | `(partieId, numero, champs)` | MàJ partielle liste-blanche (`population`/`corrompu`/`pnNeant`/`jetonPrime`/`jetonLiberation`) — correction manuelle SANS validation de règle, panneau détail de l'onglet Galaxie (`secteurVueService.js`) |
 | `obtenirSecteursEligiblesAugmenterPopulationPure` | `(partieId)` | Secteurs Purs (0 Guilde/Installation) avec Population définie et < 6 |
 | `augmenterPopulationPure` | `(partieId, numero)` | +1 Population sur un secteur Pur éligible |
 | `obtenirAgregatsInfluenceSecteursPurs` | `(partieId)` | Agrège Guildes/Installations/cubes/secteurs sur les seuls secteurs Purs — alimente les formules `influence_par_*` |

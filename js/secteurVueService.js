@@ -4,14 +4,25 @@
  * (Voidfall Companion PWA)
  *
  * Port de poc-rendu-secteurs.html / poc-rendu-secteurs-notes.md (racine du
- * repo, POC autonome non intégré) vers de VRAIES données de partie —
- * lecture seule, aucune écriture IndexedDB ici (les actions restent sur
- * l'onglet Secteurs : SecteurService.construire/rappelerCube via
- * index.html). Dépend de js/db.js, js/secteurService.js (données +
- * SecteurService.CHAMP_PN_PAR_TYPE) et js/strategieService.js (libellés
+ * repo, POC autonome non intégré) vers de VRAIES données de partie.
+ * Dépend de js/db.js, js/secteurService.js (données + SecteurService.
+ * CHAMP_PN_PAR_TYPE/majSecteur) et js/strategieService.js (libellés
  * TYPES_INSTALLATION_CONSTRUIRE_/TYPES_GUILDE_CONSTRUIRE_/TYPES_VAISSEAU,
  * pour ne pas dupliquer une 3e fois les mêmes libellés déjà réutilisés par
  * index.html) — à charger APRÈS ces deux fichiers.
+ *
+ * Retour utilisateur (13-14/09/2026) : le plateau hexagonal reste lecture
+ * seule (les actions GUIDÉES — construire/rappeler un cube/regrouper/
+ * envahir — restent sur l'onglet Secteurs, qui revalide toujours les
+ * règles), mais le panneau détail (#galaxie-detail, afficherDetail_)
+ * expose désormais 5 champs éditables SANS validation de règle
+ * (Population, Corrompu, cube du Néant, jeton Prime, jeton Libération —
+ * voir SecteurService.majSecteur) : intention déclarée de l'utilisateur
+ * de faire de cet onglet le remplaçant, à terme, de l'onglet Secteurs —
+ * ce panneau est donc désormais le point d'entrée pour toute correction
+ * manuelle/effet non modélisé (Plateau Crise, Escarmouche...), pas un
+ * inventaire exhaustif : Guildes/Installations/PN de vaisseaux restent
+ * réservés aux actions guidées ci-dessus, jamais éditables ici.
  *
  * Écarts connus par rapport au POC (voir poc-rendu-secteurs-notes.md
  * "Questions ouvertes" pour le détail) :
@@ -48,6 +59,12 @@
 
 var SecteurVueService = (function () {
   'use strict';
+
+  // Partie affichée — mémorisée pour permettre à afficherDetail_/
+  // brancherEditionDetail_ ci-dessous d'appeler SecteurService.majSecteur
+  // (édition du panneau détail) sans threader `partie` à travers tous les
+  // appelants intermédiaires (onSelect passé à construireHexagone_).
+  var partieCourante_ = null;
 
   // ⚠️ Coordonnées axiales (q,r) reconstruites à la main à partir de
   // scenarioAdjacences.json (les 18 paires du scénario 'solo_1'), faute de
@@ -505,6 +522,60 @@ var SecteurVueService = (function () {
     return t ? t.label : cle;
   }
 
+  // Les 5 champs manuels sans validation de règle (SecteurService.
+  // majSecteur) — id DOM statique (un seul panneau détail affiché à la
+  // fois, contrairement au tableau Secteurs qui a besoin de data-numero
+  // pour distinguer N lignes simultanées) + nom du champ secteursPartie
+  // correspondant. `caseACocher` distingue le champ booléen `corrompu`
+  // (checkbox) des 4 compteurs numériques (input number, jamais négatif —
+  // même clamp que CHAMPS_CRISE_SIMPLES_, index.html).
+  var CHAMPS_DETAIL_EDITABLES_ = [
+    { id: 'galaxie-detail-population', champ: 'population', caseACocher: false },
+    { id: 'galaxie-detail-corrompu', champ: 'corrompu', caseACocher: true },
+    { id: 'galaxie-detail-cube-neant', champ: 'pnNeant', caseACocher: false },
+    { id: 'galaxie-detail-jeton-prime', champ: 'jetonPrime', caseACocher: false },
+    { id: 'galaxie-detail-jeton-liberation', champ: 'jetonLiberation', caseACocher: false }
+  ];
+
+  function ligneDetailHTML_(label, valeurHtml) {
+    return '<div class="ligne"><span class="cle">' + label + '</span><span>' + valeurHtml + '</span></div>';
+  }
+
+  function inputNumeriqueDetailHTML_(id, valeur) {
+    return '<input type="number" step="1" min="0" class="galaxie-detail-input" id="' + id + '" value="' + (valeur || 0) + '">';
+  }
+
+  /**
+   * Branche l'`onchange` des 5 champs éditables du panneau détail
+   * (CHAMPS_DETAIL_EDITABLES_ ci-dessus) sur SecteurService.majSecteur —
+   * même clamp manuel (jamais négatif) que CHAMPS_CRISE_SIMPLES_
+   * (index.html), AUCUNE autre validation (voir en-tête de majSecteur,
+   * secteurService.js). Après écriture réussie, rafraîchitApresEdition_
+   * recharge et redessine TOUT (plateau hexagonal + panneau détail lui-
+   * même) : plusieurs de ces champs changent le rendu de l'hexagone
+   * (Population/Corrompu/cube du Néant), pas seulement le panneau texte.
+   */
+  function brancherEditionDetail_(numero) {
+    CHAMPS_DETAIL_EDITABLES_.forEach(function (info) {
+      var input = document.getElementById(info.id);
+      if (!input) return;
+      input.addEventListener('change', function () {
+        if (!partieCourante_) return;
+        var valeur = info.caseACocher ? input.checked : Math.max(0, Math.floor(Number(input.value) || 0));
+        if (!info.caseACocher) input.value = valeur;
+        input.disabled = true;
+        var champs = {};
+        champs[info.champ] = valeur;
+        SecteurService.majSecteur(partieCourante_.id, numero, champs)
+          .then(function () { return rafraichirApresEdition_(numero); })
+          .catch(function (erreur) {
+            input.disabled = false;
+            window.alert('Échec de l\'enregistrement : ' + erreur.message);
+          });
+      });
+    });
+  }
+
   function afficherDetail_(item) {
     var secteur = item.secteur;
     var panneau = document.getElementById('galaxie-detail');
@@ -516,44 +587,48 @@ var SecteurVueService = (function () {
     var guildes = listeDepuisComptes_(secteur, CHAMP_GUILDE_)
       .map(function (cle) { return labelParCle_(StrategieService.TYPES_GUILDE_CONSTRUIRE_, cle); });
 
-    var flotteTexte;
-    if (secteur.pnNeant > 0) {
-      flotteTexte = secteur.pnNeant + '× Puissance du Néant';
-    } else {
-      flotteTexte = flottesDepuisSecteur_(secteur)
-        .map(function (f) { return f.nombre + ' ' + labelParCle_(StrategieService.TYPES_VAISSEAU, f.type); })
-        .join(', ');
-    }
+    // La Flotte (PN de vaisseaux) et le cube du Néant sont désormais 2
+    // lignes séparées (le second devient éditable ci-dessous) — avant ce
+    // chantier, "Flotte" affichait l'un OU l'autre (jamais les deux à la
+    // fois en jeu normal, mais un panneau de CORRECTION ne doit pas
+    // cacher un champ au prétexte que l'autre est renseigné).
+    var flotteTexte = flottesDepuisSecteur_(secteur)
+      .map(function (f) { return f.nombre + ' ' + labelParCle_(StrategieService.TYPES_VAISSEAU, f.type); })
+      .join(', ');
 
     var listeGloire = Array.isArray(secteur.jetonGloire) ? secteur.jetonGloire : (secteur.jetonGloire ? [secteur.jetonGloire] : []);
 
     var sousTypeTexte = item.sousType ? (NOM_SOUS_TYPE_[item.sousType] || item.sousType) : null;
     if (sousTypeTexte && secteur.maisonAssociee) { sousTypeTexte += ' (' + secteur.maisonAssociee + ')'; }
 
-    var lignes = [
-      ['Numéro', secteur.numero],
-      ['Type', typeNom],
-      ['Sous-type', sousTypeTexte || '—'],
-      ['Population', secteur.population == null ? '—' : secteur.population],
-      ['Corrompu', secteur.corrompu ? 'Oui' : 'Non'],
-      ['Gardiens', secteur.nombreGardien || 0],
-      ['Installations (emplacements)', installations.length ? installations.join(', ') : '—'],
-      ['Guildes (emplacements)', guildes.length ? guildes.join(', ') : '—'],
-      ['Flotte', flotteTexte || '—'],
-      ['Jeton Prime', secteur.jetonPrime || 0],
-      ['Jeton Gloire', listeGloire.length ? listeGloire.join(', ') : '—'],
-      ['Jeton Libération', secteur.jetonLiberation || 0]
-    ];
-
     var html = '<h3>Secteur #' + secteur.numero + ' — ' + typeNom + '</h3>';
     panneau.innerHTML = html;
     var svgRecompenses = construireSvgRecompenses_(secteur);
     if (svgRecompenses) { panneau.appendChild(svgRecompenses); }
+
     var suite = '';
-    lignes.forEach(function (l) {
-      suite += '<div class="ligne"><span class="cle">' + l[0] + '</span><span>' + l[1] + '</span></div>';
-    });
+    suite += ligneDetailHTML_('Numéro', secteur.numero);
+    suite += ligneDetailHTML_('Type', typeNom);
+    suite += ligneDetailHTML_('Sous-type', sousTypeTexte || '—');
+    // Population reste texte fixe pour un secteur où elle est structurel-
+    // lement absente (population === null, ex. certaines Failles) — même
+    // convention d'affichage qu'avant ce chantier (secteur.population ==
+    // null ? '—' : ...), la case "N/A" ne devient pas un 0 éditable.
+    suite += secteur.population == null
+      ? ligneDetailHTML_('Population', '—')
+      : ligneDetailHTML_('Population', inputNumeriqueDetailHTML_('galaxie-detail-population', secteur.population));
+    suite += ligneDetailHTML_('Corrompu', '<input type="checkbox" id="galaxie-detail-corrompu"' + (secteur.corrompu ? ' checked' : '') + '>');
+    suite += ligneDetailHTML_('Gardiens', secteur.nombreGardien || 0);
+    suite += ligneDetailHTML_('Installations (emplacements)', installations.length ? installations.join(', ') : '—');
+    suite += ligneDetailHTML_('Guildes (emplacements)', guildes.length ? guildes.join(', ') : '—');
+    suite += ligneDetailHTML_('Flotte', flotteTexte || '—');
+    suite += ligneDetailHTML_('Cube du Néant', inputNumeriqueDetailHTML_('galaxie-detail-cube-neant', secteur.pnNeant));
+    suite += ligneDetailHTML_('Jeton Prime', inputNumeriqueDetailHTML_('galaxie-detail-jeton-prime', secteur.jetonPrime));
+    suite += ligneDetailHTML_('Jeton Gloire', listeGloire.length ? listeGloire.join(', ') : '—');
+    suite += ligneDetailHTML_('Jeton Libération', inputNumeriqueDetailHTML_('galaxie-detail-jeton-liberation', secteur.jetonLiberation));
     panneau.insertAdjacentHTML('beforeend', suite);
+
+    brancherEditionDetail_(secteur.numero);
   }
 
   function rendrePlateau_(conteneur, items) {
@@ -574,24 +649,27 @@ var SecteurVueService = (function () {
   }
 
   /**
-   * Point d'entrée public — appelé à l'ouverture d'une partie (ouvrirPartie,
-   * index.html) et à chaque clic sur l'onglet Galaxie (afficherEcran,
-   * même principe que l'onglet Secteurs, voir CLAUDE.md Piège n°2).
+   * Charge secteursPartie + catalogue et redessine le plateau hexagonal —
+   * factorisé entre `afficher` (premier affichage/clic d'onglet, panneau
+   * détail remis au texte de repli) et `rafraichirApresEdition_` ci-dessous
+   * (après une écriture SecteurService.majSecteur, panneau détail rouvert
+   * sur LE MÊME secteur avec les valeurs fraîches — plusieurs des champs
+   * édités changent aussi le dessin de l'hexagone concerné, pas seulement
+   * le texte du panneau, d'où le redessin complet plutôt qu'une simple
+   * mise à jour du panneau seul).
    */
-  function afficher(partie) {
+  function chargerEtDessiner_(partie, numeroDetailAOuvrir) {
     var conteneur = document.getElementById('galaxie-conteneur');
     var panneau = document.getElementById('galaxie-detail');
-    if (!conteneur || !panneau || !partie) return;
+    if (!conteneur || !panneau || !partie) return Promise.resolve();
 
     var coords = COORDS_PAR_SCENARIO_[partie.scenarioId];
     if (!coords) {
       conteneur.innerHTML = '<p class="hint">Vue Galaxie indisponible pour ce scénario ("' + partie.scenarioId + '") — coordonnées non définies. Utilise l’onglet Secteurs.</p>';
-      return;
+      return Promise.resolve();
     }
 
-    conteneur.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
-
-    Promise.all([
+    return Promise.all([
       SecteurService.obtenirSecteurs(partie.id),
       DB.getAll('scenarioSecteurs'),
       DB.getAll('typesSecteur')
@@ -628,10 +706,43 @@ var SecteurVueService = (function () {
       }
 
       rendrePlateau_(conteneur, items);
-      panneau.innerHTML = '<h3>Détail</h3><div class="vide">Sélectionnez un secteur ci-dessus.</div>';
+
+      var itemAOuvrir = numeroDetailAOuvrir != null
+        ? items.filter(function (it) { return it.secteur.numero === numeroDetailAOuvrir; })[0]
+        : null;
+      if (itemAOuvrir) {
+        afficherDetail_(itemAOuvrir);
+      } else {
+        panneau.innerHTML = '<h3>Détail</h3><div class="vide">Sélectionnez un secteur ci-dessus.</div>';
+      }
     }).catch(function (erreur) {
       conteneur.innerHTML = '<p class="hint">Erreur de chargement des secteurs : ' + erreur.message + '</p>';
     });
+  }
+
+  /**
+   * Rappelée par brancherEditionDetail_ après une écriture réussie —
+   * `partieCourante_` (mémorisée par `afficher` ci-dessous) évite de
+   * threader `partie` à travers onSelect/construireHexagone_.
+   */
+  function rafraichirApresEdition_(numero) {
+    if (!partieCourante_) return Promise.resolve();
+    return chargerEtDessiner_(partieCourante_, numero);
+  }
+
+  /**
+   * Point d'entrée public — appelé à l'ouverture d'une partie (ouvrirPartie,
+   * index.html) et à chaque clic sur l'onglet Galaxie (afficherEcran,
+   * même principe que l'onglet Secteurs, voir CLAUDE.md Piège n°2).
+   */
+  function afficher(partie) {
+    var conteneur = document.getElementById('galaxie-conteneur');
+    var panneau = document.getElementById('galaxie-detail');
+    if (!conteneur || !panneau || !partie) return;
+
+    partieCourante_ = partie;
+    conteneur.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+    chargerEtDessiner_(partie, null);
   }
 
   return {
