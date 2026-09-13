@@ -1,7 +1,41 @@
 /**
  * version.js
- * Version 133 — 2026-09-13
+ * Version 134 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Comme le jeu est de plus en
+ * plus automatisé on va devoir implémenter certaines fonctions pour le
+ * plateau crise. Ajoute une section repliable dans l'onglet plat. Maison
+ * en haut de la section événement galactique, replié par défaut...") —
+ * emplacement clarifié avec l'utilisateur : Plat. Galactique (au-dessus
+ * d'Événement galactique, seul endroit où cette section existe
+ * réellement), pas Plat. maison. Première brique du Plateau Crise
+ * (light), voir docs/TODO.md EVOLUTION 21 pour le détail et la note de
+ * l'utilisateur sur la suite (bouton "Résoudre" hésité, périmètre des
+ * effets d'une Crise à établir avant d'aller plus loin) :
+ * - Nouvelle section `<details>` "Plateau Crise" (repliée par défaut,
+ *   aucun JS de toggle nécessaire) sur `screen-plateau-galactique`,
+ *   au-dessus d'"Événement galactique" — `index.html`/
+ *   `renderPlateauCrise_`, appelée depuis `renderEcranPlateauGalactique_`
+ *   (App.renderPlateauGalactique).
+ * - 7 nouveaux champs `plateauMaison` (`js/gameService.js`,
+ *   `CHAMPS_PLATEAU_MAISON_AUTORISES` + défauts dans `assemblerPartie_`) :
+ *   `criseModificateurEscarmouche` (0-4, rappel affiché seulement — pas
+ *   encore lu par `combatService.js`), `criseCoutMateriel`/
+ *   `criseCoutEnergie`/`criseCoutScience` (0-2 chacun), `criseCoutCredit`
+ *   (0-4), `criseCoutInfluence` (0-18, pas de 3), `crisePerpetuelle`
+ *   (non borné, pour la fin de partie — pas encore branché sur l'écran
+ *   Fin de partie/ScoreService).
+ * - Nouvelle fonction `GameService.payerCoutCrise` : décrémente les
+ *   VRAIES ressources (Matériel/Énergie/Science/Crédit) et l'Influence du
+ *   plateau maison des 5 montants `criseCout*` (jamais sous 0), puis les
+ *   remet à 0 — transaction lecture-fusion-écriture unique. Bouton
+ *   "Payer" (`#btn-crise-payer`) qui y délègue entièrement.
+ * - Les 6 champs simples (hors coût) sont persistés un par un à
+ *   l'`onchange`, clampés manuellement à leurs bornes (min/max HTML seuls
+ *   n'empêchent pas une saisie hors bornes au clavier) — même pattern que
+ *   `#corruption-maison-input`/`#influence-maison-input`
+ *   (`renderEcranPlateauMaison_`).
  *
  * 13/09/2026, suite (retour utilisateur : "Je ne vois toujours pas la
  * techno avancé de ma maison dans la liste des techno avancé selectionable
@@ -4736,4 +4770,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.2';
+var APP_VERSION = '20260913.3';

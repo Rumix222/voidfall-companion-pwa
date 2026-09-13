@@ -149,6 +149,49 @@
       <button id="btn-fin-cycle" class="btn btn-primary">Fin du cycle</button>
     </div>
 
+    <!-- Plateau Crise (light) — retour utilisateur (13/09/2026), voir
+         docs-rules-cycle-de-jeu.md §1.0.3 ("Plateau crise light à mettre
+         en place... pour avoir les données nécessaires à la résolution du
+         plateau crise, à la demande ou au début de la phase Évaluation").
+         Repliée par défaut (<details> sans `open`, zéro JS nécessaire) :
+         mécanique encore peu automatisée à ce stade (voir docs/TODO.md
+         EVOLUTION 21 — hésitation notée sur un futur bouton "Résoudre le
+         Plateau Crise"/un onglet dédié selon ce que les Crises impliquent
+         réellement). Rendu par App.renderPlateauGalactique_/
+         renderPlateauCrise_ (index.html), champs simples persistés
+         directement via GameService.majPlateauMaison/payerCoutCrise
+         (js/gameService.js). -->
+    <details id="bloc-plateau-crise" style="margin-bottom:22px;">
+      <summary class="section-title" style="cursor:pointer;">Plateau Crise</summary>
+      <div class="game-block">
+        <div class="plateau-influence">
+          <label for="crise-modificateur-escarmouche">Modificateur escarmouche (s'ajoute à la puissance du Néant)</label>
+          <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:16px;">Coût à payer (résolution du Plateau Crise)</h3>
+        <div class="plateau-influence-ligne">
+          <div class="plateau-influence"><label for="crise-cout-materiel">Matériel</label>
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-materiel" value="0"></div>
+          <div class="plateau-influence"><label for="crise-cout-energie">Énergie</label>
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-energie" value="0"></div>
+          <div class="plateau-influence"><label for="crise-cout-science">Science</label>
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-science" value="0"></div>
+          <div class="plateau-influence"><label for="crise-cout-credit">Crédit</label>
+            <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-cout-credit" value="0"></div>
+          <div class="plateau-influence"><label for="crise-cout-influence">Influence</label>
+            <input type="number" step="3" min="0" max="18" class="ressource-case-input" id="crise-cout-influence" value="0"></div>
+        </div>
+        <button id="btn-crise-payer" class="btn btn-secondary" style="margin-top:12px;">Payer</button>
+
+        <h3 class="subsection-title" style="margin-top:18px;">Crise perpétuelle</h3>
+        <div class="plateau-influence">
+          <label for="crise-perpetuelle">Crise perpétuelle (utilisée en fin de partie)</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="crise-perpetuelle" value="0">
+        </div>
+      </div>
+    </details>
+
     <!-- Sélection de l'événement galactique du cycle en cours
          (GameService.getEvenementsParCycle/choisirEvenement). Le détail
          (#evenement-cycle-detail) affiche les Cadres (moitié gauche de la
@@ -611,10 +654,74 @@
         var dernierCycle = (partie.cycleActuel === 3 || partie.cycleActuel === 'termine');
         btnFinCycle.textContent = dernierCycle ? 'Terminer la partie' : 'Fin du cycle';
       }
+      renderPlateauCrise_(partie);
       renderEvenementCycle_(partie);
       renderTechnologiesAvancees_(partie);
       renderOffreProgrammes_(partie);
       chargerEntretien_(partie);
+    }
+
+    /**
+     * Plateau Crise (light, retour utilisateur 13/09/2026) — 7 compteurs
+     * manuels simples (voir GameService.CHAMPS_PLATEAU_MAISON_AUTORISES
+     * pour le détail de chacun), persistés un par un à l'`onchange`
+     * (même pattern que #corruption-maison-input/#influence-maison-input,
+     * renderEcranPlateauMaison_ plus bas) — clamp manuel (min/max HTML
+     * seuls n'empêchent pas une saisie hors bornes au clavier). Le bouton
+     * "Payer" délègue entièrement à GameService.payerCoutCrise (décrémente
+     * les VRAIES ressources/Influence puis remet les 5 compteurs de coût
+     * à 0, transaction unique) — cette fonction se contente de rafraîchir
+     * l'affichage ensuite (#ressources-principales/le bandeau Focus vivent
+     * sur Plat. maison, StrategieService.afficher() les couvre).
+     */
+    var CHAMPS_CRISE_SIMPLES_ = [
+      { id: 'crise-modificateur-escarmouche', champ: 'criseModificateurEscarmouche', min: 0, max: 4 },
+      { id: 'crise-cout-materiel', champ: 'criseCoutMateriel', min: 0, max: 2 },
+      { id: 'crise-cout-energie', champ: 'criseCoutEnergie', min: 0, max: 2 },
+      { id: 'crise-cout-science', champ: 'criseCoutScience', min: 0, max: 2 },
+      { id: 'crise-cout-credit', champ: 'criseCoutCredit', min: 0, max: 4 },
+      { id: 'crise-cout-influence', champ: 'criseCoutInfluence', min: 0, max: 18 },
+      { id: 'crise-perpetuelle', champ: 'crisePerpetuelle', min: 0, max: null }
+    ];
+    function renderPlateauCrise_(partie) {
+      var pm = partie.plateauMaison || {};
+
+      CHAMPS_CRISE_SIMPLES_.forEach(function (info) {
+        var input = document.getElementById(info.id);
+        if (!input) return;
+        input.value = pm[info.champ] || 0;
+        input.onchange = function () {
+          var n = Math.max(info.min, Math.floor(Number(input.value) || 0));
+          if (info.max !== null) n = Math.min(info.max, n);
+          input.value = n;
+          var champs = {};
+          champs[info.champ] = n;
+          GameService.majPlateauMaison(partie.id, champs)
+            .then(function () { partie.plateauMaison[info.champ] = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              input.value = pm[info.champ] || 0;
+            });
+        };
+      });
+
+      var btnPayer = document.getElementById('btn-crise-payer');
+      if (btnPayer) {
+        btnPayer.onclick = function () {
+          btnPayer.disabled = true;
+          GameService.payerCoutCrise(partie.id)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              renderPlateauCrise_(partieMaj);
+              if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+              btnPayer.disabled = false;
+            })
+            .catch(function (erreur) {
+              btnPayer.disabled = false;
+              window.alert('Échec du paiement du Plateau Crise : ' + erreur.message);
+            });
+        };
+      }
     }
 
     /**

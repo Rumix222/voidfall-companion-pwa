@@ -438,7 +438,29 @@ var GameService = (function () {
     // strategieService.js pour griser le bouton d'une action déjà jouée
     // et signaler le Focus concerné. Réinitialisé à [] à chaque
     // changement de cycle par GameService.avancerCycle ci-dessous.
-    'actionsFocusUtilisees'
+    'actionsFocusUtilisees',
+    // Plateau Crise (light) — retour utilisateur (13/09/2026), voir
+    // docs-rules-cycle-de-jeu.md §1.0.3 ("Plateau crise light à mettre en
+    // place... pour avoir les données nécessaires à la résolution du
+    // plateau crise") et docs/TODO.md EVOLUTION 21 : mécanique encore peu
+    // automatisée, ces 7 champs ne sont que des compteurs manuels simples
+    // (jamais lus/écrits ailleurs dans ce fichier), saisis/persistés
+    // directement par index.html/renderPlateauCrise_ — même principe que
+    // corruptionMaison/corruptionChambreDecontamination ci-dessus.
+    // - criseModificateurEscarmouche (0-4) : s'ajoute à la puissance du
+    //   Néant lors des Escarmouches — RAPPEL SEULEMENT, pas encore lu par
+    //   combatService.js (voir EVOLUTION 21).
+    // - criseCoutMateriel/Energie/Science (0-2 chacun)/Credit (0-4)/
+    //   Influence (0-18, pas de 3) : coût à payer à la résolution du
+    //   Plateau Crise — voir GameService.payerCoutCrise ci-dessous, qui
+    //   décrémente les VRAIES ressources/Influence de ces montants puis
+    //   remet ces 5 compteurs à 0.
+    'criseModificateurEscarmouche',
+    'criseCoutMateriel', 'criseCoutEnergie', 'criseCoutScience', 'criseCoutCredit', 'criseCoutInfluence',
+    // - crisePerpetuelle : compteur non borné, utilisé en fin de partie
+    //   (ScoreService/écran Fin de partie) — AUCUN branchement automatique
+    //   à ce jour (voir EVOLUTION 21), saisie manuelle par le joueur.
+    'crisePerpetuelle'
   ];
 
   // ------------------------------------------------------------
@@ -1177,7 +1199,16 @@ var GameService = (function () {
       // EVOLUTION 12 — voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus.
       // Repli sur tableau vide pour toute partie créée avant l'ajout de
       // ce champ (même principe que programmesEnMain/offresProgramme).
-      actionsFocusUtilisees: Array.isArray(pm.actionsFocusUtilisees) ? pm.actionsFocusUtilisees : []
+      actionsFocusUtilisees: Array.isArray(pm.actionsFocusUtilisees) ? pm.actionsFocusUtilisees : [],
+      // Plateau Crise (light) — voir CHAMPS_PLATEAU_MAISON_AUTORISES
+      // ci-dessus pour le détail de chaque champ.
+      criseModificateurEscarmouche: pm.criseModificateurEscarmouche || 0,
+      criseCoutMateriel: pm.criseCoutMateriel || 0,
+      criseCoutEnergie: pm.criseCoutEnergie || 0,
+      criseCoutScience: pm.criseCoutScience || 0,
+      criseCoutCredit: pm.criseCoutCredit || 0,
+      criseCoutInfluence: pm.criseCoutInfluence || 0,
+      crisePerpetuelle: pm.crisePerpetuelle || 0
     };
 
     return partie;
@@ -1725,6 +1756,36 @@ var GameService = (function () {
         if (!ligne) throw new Error('Plateau maison introuvable pour mise à jour (partie ' + partieId + ').');
         Object.keys(filtre).forEach(function (cle) { ligne[cle] = filtre[cle]; });
         return DB.put('plateauMaison', ligne);
+      });
+    },
+
+    /**
+     * Plateau Crise (light) — "Payer" (retour utilisateur, 13/09/2026) :
+     * décrémente les VRAIES ressources (Matériel/Énergie/Science/Crédit)
+     * et l'Influence du montant indiqué par les 5 compteurs criseCout*
+     * (jamais sous 0, comme toute ressource de l'appli), PUIS remet ces 5
+     * compteurs à 0 (le coût vient d'être payé, rien à repayer tant qu'un
+     * nouveau Plateau Crise ne les repositionne pas) — même transaction
+     * lecture-fusion-écriture unique, jamais 2 écritures séparées.
+     * `criseModificateurEscarmouche`/`crisePerpetuelle` ne sont PAS
+     * concernés (pas un coût, voir CHAMPS_PLATEAU_MAISON_AUTORISES).
+     */
+    payerCoutCrise: function (partieId) {
+      return DB.get('plateauMaison', partieId).then(function (ligne) {
+        if (!ligne) throw new Error('Plateau maison introuvable pour mise à jour (partie ' + partieId + ').');
+        ligne.ressourceMateriel = Math.max(0, (ligne.ressourceMateriel || 0) - (ligne.criseCoutMateriel || 0));
+        ligne.ressourceEnergie = Math.max(0, (ligne.ressourceEnergie || 0) - (ligne.criseCoutEnergie || 0));
+        ligne.ressourceScience = Math.max(0, (ligne.ressourceScience || 0) - (ligne.criseCoutScience || 0));
+        ligne.ressourceCredit = Math.max(0, (ligne.ressourceCredit || 0) - (ligne.criseCoutCredit || 0));
+        ligne.influence = Math.max(0, (ligne.influence || 0) - (ligne.criseCoutInfluence || 0));
+        ligne.criseCoutMateriel = 0;
+        ligne.criseCoutEnergie = 0;
+        ligne.criseCoutScience = 0;
+        ligne.criseCoutCredit = 0;
+        ligne.criseCoutInfluence = 0;
+        return DB.put('plateauMaison', ligne);
+      }).then(function () {
+        return rechargerPartie_(partieId);
       });
     },
 

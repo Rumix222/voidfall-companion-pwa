@@ -300,7 +300,8 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
 | `archiverPartie` | `(id, archivee)` | Bascule/fixe le flag `archivee` |
 | `supprimerPartie` | `(id)` | Suppression définitive (plateauMaison + secteursPartie + parties) |
 | `supprimerToutesPartiesNonArchivees` | — | Suppression en masse, retourne le nombre supprimé |
-| `majPlateauMaison` | `(partieId, champs)` | MàJ partielle liste-blanche (`CHAMPS_PLATEAU_MAISON_AUTORISES`) |
+| `majPlateauMaison` | `(partieId, champs)` | MàJ partielle liste-blanche (`CHAMPS_PLATEAU_MAISON_AUTORISES`) — inclut les 7 champs Plateau Crise (light, `crise*`) |
+| `payerCoutCrise` | `(partieId)` | Plateau Crise : décrémente Matériel/Énergie/Science/Crédit/Influence des 5 `criseCout*`, puis les remet à 0 |
 | `majCivilisation` | `(partieId, champs)` | MàJ partielle liste-blanche des 6 champs Civilisation |
 | `getEvenementsParCycle` | — | Catalogue événements, groupé `{cycle1,cycle2,cycle3}` |
 | `choisirEvenement` | `(partieId, cycle, nomEvenement)` | Enregistre l'événement choisi pour un cycle |
