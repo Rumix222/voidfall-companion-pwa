@@ -1,7 +1,81 @@
 /**
  * version.js
- * Version 138 — 2026-09-13
+ * Version 140 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Lot 3" — dernier lot du
+ * chantier "Objectifs galactiques", lignes "formule") :
+ * - `js/objectifsService.js` : nouvelles fonctions `resoudreFormule_`
+ *   (+ `FORMULES_SIMPLES_`/`TERMES_FORMULE_`)/`gainAutoFormule_` —
+ *   résolvent `gain.formule` (chaîne = calcul direct, ex. "égal à votre
+ *   Gloire totale" ; objet `{operation, termes}` = "somme"/"produit" de
+ *   plusieurs termes nommés ou de nombres littéraux). **Les 6/6 lignes
+ *   "formule" du catalogue sont désormais couvertes** (100 %).
+ * - En prime : `revenu_credit_min` (exploit, Événement D — seule clé
+ *   "exploit" hors périmètre du Lot 1 pour une raison technique plutôt
+ *   que "donnée jamais trackée") est désormais couverte aussi, car ce
+ *   lot avait de toute façon besoin du "Revenu" réel des ressources pour
+ *   la formule composée de l'Événement F — même donnée, 2 usages.
+ * - `js/strategieService.js`/`construireContexteObjectifs_` : nouveau
+ *   champ de contexte `revenus` — `calculerNiveauxProduction_` (async,
+ *   déjà utilisée ailleurs pour l'écran Plat. maison) + `calculerProduction
+ *   AvecBonusTechnologie_` (synchrone, tables + bonus Technologie) pour
+ *   les 5 ressources, ajoutés au `Promise.all` d'ouverture de la popup
+ *   'phase_evaluation' (une seule fois, comme les agrégats secteurs —
+ *   ne change pas pendant que la popup reste ouverte).
+ *   `libelleStatutObjectif_` gère désormais un badge dédié pour "formule"
+ *   ("Calculé"/"Non calculable automatiquement") au lieu du générique
+ *   "Non automatisé" hérité des Lots 1/2 (qui ne s'applique plus, ce type
+ *   est maintenant entièrement couvert).
+ * - Résultat cumulé des 3 lots : TOUTES les lignes "formule" (6/6) + 5
+ *   lignes "exploit" + 18 lignes "multiplicateur" s'appliquent
+ *   automatiquement à l'Influence, à la validation de la popup — les
+ *   Objectifs galactiques restant manuels sont ceux au gain non-Influence
+ *   ou à choix multiple (modes libre/groupe/exclusif/exclusif_repete),
+ *   pas ceux qu'on ne sait pas calculer.
+ * - Tests : 31 (+7 vs. le lot précédent) dans `js/objectifsService.test.js`
+ *   — validé aussi contre TOUT le catalogue réel (0 exception, 6/6
+ *   formules calculées, `revenu_credit_min` désormais évaluable — script
+ *   ad hoc, pas un fichier de test permanent).
+ *
+ * 13/09/2026, suite (retour utilisateur : "Go partie 2" — Lot 2 du
+ * chantier "Objectifs galactiques", lignes "multiplicateur" ; + retour
+ * utilisateur signalant un bug sur les jetons Gloire) :
+ * - `js/objectifsService.js` : nouvelle fonction `evaluerMultiplicateur_`
+ *   (+ `COMPTEURS_PAR_`, 15 clés `par` couvertes) — calcule le compteur
+ *   d'occurrences d'une ligne "multiplicateur" (19/24 lignes), plus le
+ *   cas "barème par niveau de piste" (Événement A). `evaluerObjectifs`
+ *   retourne désormais `{rempli, compte, gainAuto}` pour CHAQUE ligne
+ *   (exploit ET multiplicateur) — `gainAuto` centralise le calcul
+ *   "gain Influence unique/simple, tous types confondus" déplacé depuis
+ *   `strategieService.js` (auparavant dupliqué inline pour les exploits
+ *   seulement) : source de vérité unique, 75 % des lignes "exploit" +
+ *   "multiplicateur" (23/59) s'appliquent désormais automatiquement à la
+ *   validation.
+ * - `js/secteurService.js`/`secteursPurs[]` étendu avec
+ *   `guildeFermiers`/`guildeIngenieurs`/`guildeMineurs` par secteur
+ *   (nécessaire pour `secteur_pur_avec_guilde_fermier_ingenieur_ou_
+ *   mineur_min_1`).
+ * - `js/strategieService.js`/`construireContexteObjectifs_` : 2 nouveaux
+ *   champs de contexte, `cubeActif` (plateauMaison.cubeActif) et
+ *   `cubesSecteurPurTotal` (déjà calculé par SecteurService, juste pas
+ *   encore transmis) ; `libelleStatutObjectif_`/`texteObjectifsGalactiques_`
+ *   simplifiés pour consommer `r.gainAuto` directement au lieu de
+ *   recalculer la détection "Influence simple" en double.
+ * - 🐛 Bug corrigé (retour utilisateur, testé en partie réelle) :
+ *   `plateauMaison.gloire` est un tableau à 5 emplacements FIXES (`null`
+ *   = vide, jamais compacté — `GameService.GLOIRE_DEPART = [2, null,
+ *   null, null, null]`) — `jetons_gloire_min`/`jetons_gloire_exact`
+ *   utilisaient `.length` directement (TOUJOURS 5, quel que soit le
+ *   nombre réel de jetons possédés) : "au moins 3 jetons Gloire" se
+ *   déclarait rempli dès le tout début de partie (1 seul jeton réel).
+ *   Nouvelle fonction `valeursGloire_` (filtre les `null`) — seul point
+ *   de lecture correct de `contexte.gloire` dans le fichier. Test de
+ *   non-régression ajouté (`js/objectifsService.test.js`).
+ * - Tests : 24 (+8 vs. le lot précédent) dans `js/objectifsService.test.js`
+ *   ; test étendu de `obtenirAgregatsInfluenceSecteursPurs`
+ *   (`js/secteurService_actions.test.js`) pour les 3 nouveaux champs
+ *   Fermiers/Ingénieurs/Mineurs.
  *
  * 13/09/2026 (retour utilisateur : "Passons à l'implémentation des gains
  * des objectifs galactiques à résoudre / choisir à chaque fin de cycle" —
@@ -4905,4 +4979,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.8';
+var APP_VERSION = '20260913.10';

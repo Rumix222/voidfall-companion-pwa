@@ -497,6 +497,9 @@ var SecteurService = (function () {
         secteursPurs.push({
           population: s.population || 0,
           guildeBanquiers: s.guildeBanquiers || 0,
+          guildeFermiers: s.guildeFermiers || 0,
+          guildeIngenieurs: s.guildeIngenieurs || 0,
+          guildeMineurs: s.guildeMineurs || 0,
           guildesTotal: guildesSecteur,
           cubes: totalPn_(s)
         });

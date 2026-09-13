@@ -7411,29 +7411,44 @@ var StrategieService = (function () {
         Promise.all([
           SecteurService.getEntretien(partieEval.id),
           calculerPointsProgrammesActifs_(partieEval),
-          SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieEval.id)
+          SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieEval.id),
+          // Lot 3 (13/09/2026) — "Revenu" RÉEL (pas le niveau brut, ni le
+          // stock en réserve) : nécessaire pour `revenu_credit_min`
+          // (exploit, Événement D) et la formule composée de l'Événement F
+          // (ObjectifsService.TERMES_FORMULE_). Async (accès secteurs) —
+          // calculerProductionAvecBonusTechnologie_ est en revanche
+          // synchrone (tables + bonus Technologie), appliquée juste après.
+          calculerNiveauxProduction_(partieEval)
         ]).then(function (resultatsEval) {
           var unitesSecteursEval = resultatsEval[0];
           var pointsProgrammesEval = resultatsEval[1];
           var agregatsSecteursEval = resultatsEval[2];
+          var niveauxProductionEval = resultatsEval[3];
+          var revenusEval = {
+            nourriture: calculerProductionAvecBonusTechnologie_('nourriture', niveauxProductionEval.nourriture, partieEval),
+            energie: calculerProductionAvecBonusTechnologie_('energie', niveauxProductionEval.energie, partieEval),
+            materiel: calculerProductionAvecBonusTechnologie_('materiel', niveauxProductionEval.materiel, partieEval),
+            credit: calculerProductionAvecBonusTechnologie_('credit', niveauxProductionEval.credit, partieEval),
+            science: calculerProductionAvecBonusTechnologie_('science', niveauxProductionEval.science, partieEval)
+          };
           var entretienSecteursDu = entretienSecteursGratuit ? 0 : unitesSecteursEval;
           var entretienTotal = entretienSecteursDu + entretienProgrammesEval;
 
-          // Chantier "Objectifs galactiques" (§3.3, 13/09/2026) — Lot 1 :
-          // ObjectifsService.evaluerObjectifs (module pur) calcule si la
-          // CONDITION de chaque ligne "exploit" est remplie, à partir d'un
-          // `contexte` assemblé ICI (agrégats secteurs déjà chargés
-          // ci-dessus + reste de `partieEval`). Recalculé à chaque
-          // renderPhaseEvaluation_ (pas une seule fois à l'ouverture) car
-          // `entretien_integralement_satisfait` dépend de `restant`, qui
-          // change à chaque clic sur un bouton "Payer" ci-dessous.
-          // L'APPLICATION du gain reste manuelle (Lot 2, pas encore fait)
-          // SAUF le cas le plus simple et le plus fréquent (5 des 35
-          // lignes "exploit") : mode "unique" à un seul gain "influence"
-          // sans "par"/"formule" — l'Influence est alors directement
-          // ajoutée à gainInfluenceObjectifsEval, EXACTEMENT comme
-          // gainInfluenceProgrammesEval ci-dessous (même géométrie
-          // "calculé ici, appliqué à la validation").
+          // Chantier "Objectifs galactiques" (§3.3, 13/09/2026) —
+          // ObjectifsService.evaluerObjectifs (module pur) calcule, pour
+          // chaque ligne, sa condition (Lot 1, type "exploit") ou son
+          // compteur d'occurrences (Lot 2, type "multiplicateur"), à
+          // partir d'un `contexte` assemblé ICI (agrégats secteurs déjà
+          // chargés ci-dessus + reste de `partieEval`). Recalculé à
+          // chaque renderPhaseEvaluation_ (pas une seule fois à
+          // l'ouverture) car `entretien_integralement_satisfait` dépend
+          // de `restant`, qui change à chaque clic sur un bouton "Payer"
+          // ci-dessous. `r.gainAuto` (déjà résolu par le module pur, voir
+          // son en-tête) est directement sommé dans gainInfluenceObjectifsEval,
+          // EXACTEMENT comme gainInfluenceProgrammesEval ci-dessous (même
+          // géométrie "calculé ici, appliqué à la validation") — l'appelant
+          // n'a plus à connaître la mécanique interne (Influence simple
+          // Lot 1, "par"/plafond_occurrences Lot 2, barème...).
           var evenementCycleEval = (partieEval.evenements || {})['cycle' + partieEval.cycleNum];
           var objectifsCatalogueEval = evenementCycleEval ? evenementCycleEval.objectifs : null;
 
@@ -7446,6 +7461,9 @@ var StrategieService = (function () {
               entretienSecteurs: entretienSecteursDu,
               technologiesTotal: nomsTechnologiesJoueur_(partieEval).length,
               corruptionMaison: (partieEval.plateauMaison || {}).corruptionMaison || 0,
+              cubeActif: (partieEval.plateauMaison || {}).cubeActif || 0,
+              cubesSecteurPurTotal: agregatsSecteursEval.cubesSecteurPurTotal,
+              revenus: revenusEval,
               gloire: (partieEval.plateauMaison || {}).gloire || [],
               civilisation: civ,
               ressources: ressourcesPlateau,
@@ -7464,14 +7482,32 @@ var StrategieService = (function () {
             };
           }
 
+          /**
+           * Badge de statut, générique aux 3 types — "exploit" (Lot 1,
+           * booléen), "multiplicateur" (Lot 2, compteur — voir `r.compte`)
+           * et "formule" (Lot 3, une valeur directe, ni booléen ni
+           * compteur — le badge se contente donc de signaler si le calcul
+           * a pu aboutir, `r.gainAuto` lui-même est affiché séparément
+           * par l'appelant juste après, pas ici).
+           */
           function libelleStatutObjectif_(resultat) {
-            if (resultat.ligne.type !== 'exploit') {
-              return '<span class="hint">Non automatisé (' + resultat.ligne.type + ')</span>';
+            if (resultat.ligne.type === 'exploit') {
+              if (resultat.rempli === null) return '<span class="hint">Non calculable automatiquement</span>';
+              return resultat.rempli
+                ? '<strong style="color:var(--color-coral);">Condition remplie</strong>'
+                : '<span class="hint">Condition non remplie</span>';
             }
-            if (resultat.rempli === null) return '<span class="hint">Non calculable automatiquement</span>';
-            return resultat.rempli
-              ? '<strong style="color:var(--color-coral);">Condition remplie</strong>'
-              : '<span class="hint">Condition non remplie</span>';
+            if (resultat.ligne.type === 'multiplicateur') {
+              return resultat.compte === null
+                ? '<span class="hint">Non calculable automatiquement</span>'
+                : '<strong style="color:var(--color-coral);">×' + resultat.compte + '</strong>';
+            }
+            if (resultat.ligne.type === 'formule') {
+              return resultat.gainAuto === null
+                ? '<span class="hint">Non calculable automatiquement</span>'
+                : '<strong style="color:var(--color-coral);">Calculé</strong>';
+            }
+            return '<span class="hint">Non automatisé (' + resultat.ligne.type + ')</span>';
           }
 
           function texteObjectifsGalactiques_(entretienTotalCourant, entretienRestantCourant) {
@@ -7489,16 +7525,10 @@ var StrategieService = (function () {
                 var bloc = objectifsCatalogueEval.blocs[r.blocIndex];
                 prefixe = (bloc.separateur_avant ? '<p class="hint"><em>' + bloc.separateur_avant + '</em></p>' : '');
               }
-              // Auto-application : mode "unique", 1 seul gain, clé
-              // "influence", sans "par"/"formule" — voir commentaire
-              // au-dessus de construireContexteObjectifs_.
-              var gains = (r.ligne.recompense && r.ligne.recompense.gains) || [];
-              var estInfluenceSimple = r.ligne.recompense && r.ligne.recompense.mode === 'unique' &&
-                gains.length === 1 && gains[0].cle === 'influence' && !gains[0].par && !gains[0].formule;
               var noteAuto = '';
-              if (estInfluenceSimple && r.rempli === true) {
-                gainInfluence += Number(gains[0].valeur) || 0;
-                noteAuto = ' <strong>(+' + gains[0].valeur + ' Influence, ajoutée à la validation)</strong>';
+              if (r.gainAuto !== null && r.gainAuto !== 0) {
+                gainInfluence += r.gainAuto;
+                noteAuto = ' <strong>(+' + r.gainAuto + ' Influence, ajoutée à la validation)</strong>';
               }
               return prefixe + '<p>' + r.ligne.texte + ' — ' + libelleStatutObjectif_(r) + noteAuto + '</p>';
             }).join('');

@@ -341,8 +341,8 @@ test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes
     assert.strictEqual(agregats.guildeBanquierPureTotal, 0);
     assert.strictEqual(agregats.guildeScientifiquePureTotal, 1);
     assert.strictEqual(JSON.stringify(agregats.secteursPurs), JSON.stringify([
-      { population: 6, guildeBanquiers: 0, guildesTotal: 3, cubes: 2 },
-      { population: 3, guildeBanquiers: 0, guildesTotal: 0, cubes: 3 }
+      { population: 6, guildeBanquiers: 0, guildeFermiers: 2, guildeIngenieurs: 0, guildeMineurs: 0, guildesTotal: 3, cubes: 2 },
+      { population: 3, guildeBanquiers: 0, guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0, guildesTotal: 0, cubes: 3 }
     ]));
     // secteursPossedes : Purs ET Corrompus (secteurs 1/2/3), le secteur 4
     // (du Néant, non possédé) reste exclu.
