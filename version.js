@@ -1,7 +1,40 @@
 /**
  * version.js
- * Version 137 — 2026-09-13
+ * Version 138 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026 (retour utilisateur : "Passons à l'implémentation des gains
+ * des objectifs galactiques à résoudre / choisir à chaque fin de cycle" —
+ * décision actée avant de coder : "calcul automatique quand possible") :
+ * chantier "Objectifs galactiques" (§3.3 docs-rules-cycle-de-jeu.md), Lot
+ * 1 — voir docs/TODO.md EVOLUTION 22 pour le détail complet du périmètre
+ * couvert/hors périmètre (35 lignes "exploit" au catalogue, 30 couvertes
+ * ; les 24 "multiplicateur" et 6 "formule" restent pour un lot futur).
+ * - Nouveau fichier `js/objectifsService.js` (module PUR, ajouté au
+ *   Service Worker + à l'ordre de chargement `index.html`, juste avant
+ *   `strategieService.js`) : `evaluerCondition`/`evaluerObjectifs`
+ *   calculent si la condition d'un Objectif galactique "exploit" est
+ *   remplie, à partir d'un `contexte` fourni par l'appelant — 28 clés de
+ *   condition couvertes, `null` (jamais une approximation) pour les 5
+ *   restantes ou toute clé future inconnue. 16 tests
+ *   (`js/objectifsService.test.js`).
+ * - `js/secteurService.js`/`obtenirAgregatsInfluenceSecteursPurs` étendue
+ *   (champs existants inchangés) : `populationPureTotale`,
+ *   `defenseOuBaseStellairePureTotal`, `guildeBanquierPureTotal`,
+ *   `guildeScientifiquePureTotal`, `secteursPurs[]` (1 entrée par secteur
+ *   Pur), `secteursPossedes[]` (TOUS les secteurs du joueur, Purs ET
+ *   Corrompus). Test existant étendu en conséquence.
+ * - `js/strategieService.js` : la section "Objectifs galactiques" de la
+ *   popup 'phase_evaluation' (jusqu'ici un texte fixe "Non automatisé")
+ *   affiche désormais, pour chaque ligne de l'Événement galactique en
+ *   cours, son texte + un badge "Condition remplie"/"non remplie"/"non
+ *   calculable automatiquement" — recalculé à chaque re-rendu de la
+ *   popup (dépend de `restant`, qui change à chaque clic "Payer"
+ *   l'Entretien). Application du gain : reste manuelle, SAUF le cas
+ *   mode "unique" à 1 seul gain "influence" (5 lignes/35) — ajouté
+ *   automatiquement à l'Influence à la validation, même mécanisme que
+ *   les points de Programme déjà en place (chantier "Points de victoire
+ *   des Programmes").
  *
  * 13/09/2026, correctif (retour utilisateur, capture d'écran : "Fallait
  * pas toucher cette partie là, problème de chevauchement maintenant" —
@@ -4872,4 +4905,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.7';
+var APP_VERSION = '20260913.8';

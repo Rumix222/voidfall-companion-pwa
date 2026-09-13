@@ -399,7 +399,7 @@ var SecteurService = (function () {
     });
   }
 
-  // Correction manuelle libre d'un secteur (retour utilisateur 13-14/09/2026
+  // Correction manuelle libre d'un secteur (retour utilisateur 13-13/09/2026
   // — panneau détail de l'onglet Galaxie) : Population, Corrompu, cube du
   // Néant, jeton Prime, jeton Libération. Liste blanche volontaire, MÊME
   // principe que GameService.CHAMPS_PLATEAU_MAISON_AUTORISES/majPlateauMaison
@@ -450,6 +450,21 @@ var SecteurService = (function () {
    * tout le reste est un simple comptage en mémoire — appelée par le
    * contexte demanderChoix 'influence_secteur' (strategieService.js),
    * qui sait quelle formule appliquer à quel compteur.
+   *
+   * Étendue (chantier "Objectifs galactiques", 13/09/2026) avec les
+   * champs nécessaires à ObjectifsService.evaluerCondition
+   * (js/objectifsService.js, module pur — construireContexteObjectifs_
+   * dans strategieService.js assemble le `contexte` à partir de CE
+   * retour) : `populationPureTotale`, `defenseOuBaseStellairePureTotal`,
+   * `guildeBanquierPureTotal`/`guildeScientifiquePureTotal` (alias
+   * pratiques de guildesPures.banquiers/scientifiques — évite à l'appelant
+   * de connaître la forme interne de guildesPures), `secteursPurs[]`
+   * (1 entrée par secteur Pur — population/guildeBanquiers/guildesTotal/
+   * cubes, pour les conditions à SEUIL PAR SECTEUR comme
+   * secteur_pur_population_min) et `secteursPossedes[]` (TOUS les
+   * secteurs du joueur, Purs ET Corrompus — pour secteurs_min/
+   * cubes_secteurs_min, "purs_ou_corrompus" dans le catalogue). Champs
+   * existants inchangés (plusieurs appelants déjà en prod en dépendent).
    */
   function obtenirAgregatsInfluenceSecteursPurs(partieId) {
     return obtenirSecteurs(partieId).then(function (secteurs) {
@@ -460,6 +475,9 @@ var SecteurService = (function () {
       var cubesSecteurPurTotal = 0;
       var nombreSecteurPurAvecGuilde = 0;
       var nombreSecteurPurPopulation6 = 0;
+      var populationPureTotale = 0;
+      var defenseOuBaseStellairePureTotal = 0;
+      var secteursPurs = [];
 
       purs.forEach(function (s) {
         var guildesSecteur = (s.guildeFermiers || 0) + (s.guildeIngenieurs || 0) + (s.guildeMineurs || 0) +
@@ -474,7 +492,19 @@ var SecteurService = (function () {
         cubesSecteurPurTotal += totalPn_(s);
         if (guildesSecteur > 0) nombreSecteurPurAvecGuilde++;
         if (s.population === 6) nombreSecteurPurPopulation6++;
+        populationPureTotale += s.population || 0;
+        defenseOuBaseStellairePureTotal += (s.installationDefenseSecteur || 0) + (s.installationBaseStellaire || 0);
+        secteursPurs.push({
+          population: s.population || 0,
+          guildeBanquiers: s.guildeBanquiers || 0,
+          guildesTotal: guildesSecteur,
+          cubes: totalPn_(s)
+        });
       });
+
+      var secteursPossedes = secteurs
+        .filter(function (s) { return appartientAuJoueur_(s); })
+        .map(function (s) { return { corrompu: !!s.corrompu, cubes: totalPn_(s) }; });
 
       return {
         nombreSecteurPur: purs.length,
@@ -482,7 +512,13 @@ var SecteurService = (function () {
         nombreSecteurPurPopulation6: nombreSecteurPurPopulation6,
         guildesPures: guildesPures,
         installationsPuresTotal: installationsPuresTotal,
-        cubesSecteurPurTotal: cubesSecteurPurTotal
+        cubesSecteurPurTotal: cubesSecteurPurTotal,
+        populationPureTotale: populationPureTotale,
+        defenseOuBaseStellairePureTotal: defenseOuBaseStellairePureTotal,
+        guildeBanquierPureTotal: guildesPures.banquiers,
+        guildeScientifiquePureTotal: guildesPures.scientifiques,
+        secteursPurs: secteursPurs,
+        secteursPossedes: secteursPossedes
       };
     });
   }

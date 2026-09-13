@@ -73,6 +73,7 @@ js/
   civilisationService.js    # avancement des pistes de Civilisation (§4.7)
   combatService.js          # moteur de combat PUR (Envahir/Escarmouche) (§4.8)
   scoreService.js           # fin de partie + historique enrichi (§4.9)
+  objectifsService.js       # Objectifs galactiques PUR — évaluation des conditions (§4.10)
   setupService.js           # écran "Créer une partie" (DOM) (§5.6)
   strategieService.js       # écrans Plat. maison/Focus (DOM) + modale générique (§5.2, §6)
   combatVueService.js       # écran Combat (DOM) (§5.3)
@@ -88,7 +89,8 @@ icons/
 `js/secteurService.js` → `js/focusService.js` → `js/gameService.js` →
 `js/focusEngine.js` → `js/annulationService.js` → `js/civilisationService.js`
 → `js/combatService.js` → `js/scoreService.js` → `js/setupService.js` →
-`js/strategieService.js` → `js/combatVueService.js` → `js/scoreVueService.js`
+`js/objectifsService.js` → `js/strategieService.js` → `js/secteurVueService.js`
+→ `js/combatVueService.js` → `js/scoreVueService.js`
 → `js/historiqueVueService.js` → le `<script>` embarqué (`App` + le reste de
 `index.html`). Cet ordre reflète les dépendances croisées (voir schéma en fin
 de §4) : un module qui appelle `X.foo()` doit être chargé après `X`.
@@ -585,14 +587,54 @@ aussi pré-rempli, mais côté `scoreVueService.js` directement (pas
 `GameService.obtenirPartie`), l'Influence étant la seule mesure de score
 du jeu (`docs-rules-Influence-et-ressources.md` §1). Champ laissé
 modifiable. ⚠️ Ce total ne reflète que les gains d'Influence automatisés
-par l'app (Focus/Cadres/Gloire/formules `influence_par_*`) — l'évaluation
-des Objectifs galactiques/Programme en fin de Cycle
-(`docs-rules-cycle-de-jeu.md` §3.3/3.4) reste hors périmètre et doit être
-ajoutée à la main, via le cadran Influence désormais éditable sur Plat.
-maison (`#influence-maison-input`, index.html — même gabarit que
-Corruption, `GameService.majPlateauMaison`).
+par l'app (Focus/Cadres/Gloire/formules `influence_par_*`, et — depuis le
+chantier "Objectifs galactiques", §4.10 — les Objectifs galactiques
+"exploit" à gain Influence simple) — l'évaluation des Objectifs de
+Programme en fin de Cycle (`docs-rules-cycle-de-jeu.md` §3.4) reste
+automatisée séparément (popup 'phase_evaluation', voir §5.x
+`strategieService.js`) ; le reste des Objectifs galactiques
+(multiplicateurs/formules, et les exploits à gain non-Influence) reste
+hors périmètre et doit être ajouté à la main, via le cadran Influence
+désormais éditable sur Plat. maison (`#influence-maison-input`,
+index.html — même gabarit que Corruption, `GameService.majPlateauMaison`).
 
-### 4.10 Schéma de dépendances
+### 4.10 `js/objectifsService.js` — Objectifs galactiques (Lot 1 : exploits)
+
+**Rôle** : évalue si la CONDITION d'une ligne d'Objectif galactique
+"exploit" (moitié droite de la carte Événement galactique, catalogue
+`evenements.json`, `objectifs.blocs[].lignes[]`) est remplie. Module
+PUR (aucun DOM/DB) — `contexte` est assemblé par l'appelant
+(`strategieService.js`/`construireContexteObjectifs_`, popup
+'phase_evaluation') à partir de `partie` + `SecteurService.
+obtenirAgregatsInfluenceSecteursPurs` (étendue pour ce chantier avec
+`populationPureTotale`/`defenseOuBaseStellairePureTotal`/
+`guildeBanquierPureTotal`/`guildeScientifiquePureTotal`/`secteursPurs[]`/
+`secteursPossedes[]`).
+
+Chantier lancé le 13/09/2026 : sur 65 lignes d'Objectifs au catalogue (35
+"exploit", 24 "multiplicateur", 6 "formule"), ce Lot 1 couvre 30/35
+lignes "exploit" via 28 clés de condition (voir `CLES_NON_COUVERTES` pour
+les 5 lignes hors périmètre — donnée non trackée par l'app, ou calcul de
+Revenu asynchrone pas encore branché). "multiplicateur"/"formule" restent
+`rempli: null` (non automatisés) — Lots 2/3 futurs.
+
+| Export | Paramètres | Description |
+|---|---|---|
+| `evaluerCondition` | `(condition, contexte)` | **Pure.** `true`/`false` si évaluable, `null` sinon (clé non couverte — jamais une approximation). Récursif sur `{et:[...]}`/`{ou:[...]}` |
+| `evaluerObjectifs` | `(objectifs, contexte)` | **Pure.** Parcourt tous les blocs/lignes, retourne `[{blocIndex, ligneIndex, ligne, rempli}]` — `rempli` toujours `null` pour "multiplicateur"/"formule" |
+| `CLES_NON_COUVERTES` | (constante) | Les 5 clés de condition hors périmètre de ce lot |
+
+Application du gain (Lot 2, PAS encore fait) : reste manuelle, SAUF le
+cas le plus simple — mode `"unique"` à un seul gain `{cle:"influence"}`
+sans `par`/`formule` (5 des 35 lignes "exploit") — automatiquement ajouté
+à l'Influence à la validation de la popup 'phase_evaluation', même
+mécanisme que `gainInfluenceProgrammesEval` (§4.9 ci-dessus).
+
+Testé par `js/objectifsService.test.js` (16 tests) — voir aussi le test
+étendu d'`obtenirAgregatsInfluenceSecteursPurs` dans
+`js/secteurService_actions.test.js` pour les nouveaux champs.
+
+### 4.11 Schéma de dépendances
 
 ```
 db.js

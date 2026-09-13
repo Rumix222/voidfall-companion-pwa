@@ -7408,11 +7408,102 @@ var StrategieService = (function () {
         var techCellulesEnergetiques = technologieJoueurParNom_(partieEval, 'Cellules énergétiques');
         var entretienSecteursGratuit = !!(techCellulesEnergetiques && techCellulesEnergetiques.amelioree);
 
-        Promise.all([SecteurService.getEntretien(partieEval.id), calculerPointsProgrammesActifs_(partieEval)]).then(function (resultatsEval) {
+        Promise.all([
+          SecteurService.getEntretien(partieEval.id),
+          calculerPointsProgrammesActifs_(partieEval),
+          SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieEval.id)
+        ]).then(function (resultatsEval) {
           var unitesSecteursEval = resultatsEval[0];
           var pointsProgrammesEval = resultatsEval[1];
+          var agregatsSecteursEval = resultatsEval[2];
           var entretienSecteursDu = entretienSecteursGratuit ? 0 : unitesSecteursEval;
           var entretienTotal = entretienSecteursDu + entretienProgrammesEval;
+
+          // Chantier "Objectifs galactiques" (§3.3, 13/09/2026) — Lot 1 :
+          // ObjectifsService.evaluerObjectifs (module pur) calcule si la
+          // CONDITION de chaque ligne "exploit" est remplie, à partir d'un
+          // `contexte` assemblé ICI (agrégats secteurs déjà chargés
+          // ci-dessus + reste de `partieEval`). Recalculé à chaque
+          // renderPhaseEvaluation_ (pas une seule fois à l'ouverture) car
+          // `entretien_integralement_satisfait` dépend de `restant`, qui
+          // change à chaque clic sur un bouton "Payer" ci-dessous.
+          // L'APPLICATION du gain reste manuelle (Lot 2, pas encore fait)
+          // SAUF le cas le plus simple et le plus fréquent (5 des 35
+          // lignes "exploit") : mode "unique" à un seul gain "influence"
+          // sans "par"/"formule" — l'Influence est alors directement
+          // ajoutée à gainInfluenceObjectifsEval, EXACTEMENT comme
+          // gainInfluenceProgrammesEval ci-dessous (même géométrie
+          // "calculé ici, appliqué à la validation").
+          var evenementCycleEval = (partieEval.evenements || {})['cycle' + partieEval.cycleNum];
+          var objectifsCatalogueEval = evenementCycleEval ? evenementCycleEval.objectifs : null;
+
+          function construireContexteObjectifs_(entretienTotalCourant, entretienRestantCourant) {
+            var civ = partieEval.civilisation || {};
+            var ressourcesPlateau = (partieEval.plateauMaison || {}).ressources || {};
+            return {
+              entretienTotal: entretienTotalCourant,
+              entretienRestant: entretienRestantCourant,
+              entretienSecteurs: entretienSecteursDu,
+              technologiesTotal: nomsTechnologiesJoueur_(partieEval).length,
+              corruptionMaison: (partieEval.plateauMaison || {}).corruptionMaison || 0,
+              gloire: (partieEval.plateauMaison || {}).gloire || [],
+              civilisation: civ,
+              ressources: ressourcesPlateau,
+              secteursPurs: agregatsSecteursEval.secteursPurs,
+              secteursPossedes: agregatsSecteursEval.secteursPossedes,
+              installationsPuresTotal: agregatsSecteursEval.installationsPuresTotal,
+              defenseOuBaseStellairePureTotal: agregatsSecteursEval.defenseOuBaseStellairePureTotal,
+              guildesPuresTotal: agregatsSecteursEval.guildesPures.total,
+              guildeBanquierPureTotal: agregatsSecteursEval.guildeBanquierPureTotal,
+              guildeScientifiquePureTotal: agregatsSecteursEval.guildeScientifiquePureTotal,
+              populationPureTotale: agregatsSecteursEval.populationPureTotale,
+              // Emplacements 1-3 de programmesUtilises (l'emplacement 0,
+              // Programme de départ, n'est jamais concerné — "hors
+              // départ" dans le texte de tous les objectifs de ce type).
+              programmesNonDepart: slotsProgrammeEval.slice(1)
+            };
+          }
+
+          function libelleStatutObjectif_(resultat) {
+            if (resultat.ligne.type !== 'exploit') {
+              return '<span class="hint">Non automatisé (' + resultat.ligne.type + ')</span>';
+            }
+            if (resultat.rempli === null) return '<span class="hint">Non calculable automatiquement</span>';
+            return resultat.rempli
+              ? '<strong style="color:var(--color-coral);">Condition remplie</strong>'
+              : '<span class="hint">Condition non remplie</span>';
+          }
+
+          function texteObjectifsGalactiques_(entretienTotalCourant, entretienRestantCourant) {
+            if (!objectifsCatalogueEval) {
+              return { html: '<p class="hint">Aucun Événement galactique choisi pour ce cycle.</p>', gainInfluence: 0 };
+            }
+            var contexteObjectifs = construireContexteObjectifs_(entretienTotalCourant, entretienRestantCourant);
+            var resultats = ObjectifsService.evaluerObjectifs(objectifsCatalogueEval, contexteObjectifs);
+            var gainInfluence = 0;
+            var dernierBloc = null;
+            var html = resultats.map(function (r) {
+              var prefixe = '';
+              if (r.blocIndex !== dernierBloc) {
+                dernierBloc = r.blocIndex;
+                var bloc = objectifsCatalogueEval.blocs[r.blocIndex];
+                prefixe = (bloc.separateur_avant ? '<p class="hint"><em>' + bloc.separateur_avant + '</em></p>' : '');
+              }
+              // Auto-application : mode "unique", 1 seul gain, clé
+              // "influence", sans "par"/"formule" — voir commentaire
+              // au-dessus de construireContexteObjectifs_.
+              var gains = (r.ligne.recompense && r.ligne.recompense.gains) || [];
+              var estInfluenceSimple = r.ligne.recompense && r.ligne.recompense.mode === 'unique' &&
+                gains.length === 1 && gains[0].cle === 'influence' && !gains[0].par && !gains[0].formule;
+              var noteAuto = '';
+              if (estInfluenceSimple && r.rempli === true) {
+                gainInfluence += Number(gains[0].valeur) || 0;
+                noteAuto = ' <strong>(+' + gains[0].valeur + ' Influence, ajoutée à la validation)</strong>';
+              }
+              return prefixe + '<p>' + r.ligne.texte + ' — ' + libelleStatutObjectif_(r) + noteAuto + '</p>';
+            }).join('');
+            return { html: html, gainInfluence: gainInfluence };
+          }
 
           // Chantier "Points de victoire des Programmes" : détail chiffré
           // par Programme actif (emplacements 1/2/3 — le Programme de
@@ -7443,12 +7534,24 @@ var StrategieService = (function () {
               }).join('') + '<p><strong>' + (gainInfluenceProgrammesEval >= 0 ? '+' : '') + gainInfluenceProgrammesEval + ' Influence</strong> au total — ajoutée à la validation.</p>'
             : '<p class="hint">Aucun Programme en jeu sur le Plat. maison.</p>';
 
+          // Alimenté par renderPhaseEvaluation_/texteObjectifsGalactiques_
+          // à chaque rendu, lu par le handler "Valider" plus bas — même
+          // principe que gainInfluenceProgrammesEval ci-dessus (calculé
+          // hors DB tant que Valider n'a pas été cliqué).
+          var gainInfluenceObjectifsEval = 0;
+
           function renderPhaseEvaluation_() {
             var restant = entretienTotal - entretienPaye;
             var peutPayerNourriture = restant > 0 && stockEval.nourriture >= 1;
             var peutPayerEnergie = restant > 0 && stockEval.energie >= 2;
             var peutPayerMateriel = restant > 0 && stockEval.materiel >= 2;
             var peutEncorePayer = peutPayerNourriture || peutPayerEnergie || peutPayerMateriel;
+
+            // Recalculé à chaque appel : entretien_integralement_satisfait
+            // dépend de `restant`, qui change à chaque clic "Payer"
+            // ci-dessous — voir texteObjectifsGalactiques_ plus haut.
+            var resultatObjectifs = texteObjectifsGalactiques_(entretienTotal, restant);
+            gainInfluenceObjectifsEval = resultatObjectifs.gainInfluence;
 
             var texteGratuiteSecteurs = (entretienSecteursGratuit && unitesSecteursEval > 0)
               ? '<p class="hint">Entretien des secteurs (' + unitesSecteursEval + ') offert — Cellules énergétiques (Améliorée).</p>'
@@ -7485,7 +7588,7 @@ var StrategieService = (function () {
               '</div>' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Objectifs galactiques</h4>' +
-              '<p class="hint">Non automatisé — à détailler plus tard (§3.3).</p>' +
+              resultatObjectifs.html +
               '</div>' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Objectifs de Programme</h4>' +
@@ -7513,8 +7616,11 @@ var StrategieService = (function () {
             // peut rendre gainInfluenceProgrammesEval négatif) — plancher
             // final à 0 en plus de celui, déjà existant, sur l'Entretien
             // seul (qui ne peut pas À LUI SEUL vider l'Influence sous 0
-            // avant l'ajout des Programmes).
-            var nouvelleInfluence = Math.max(0, Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval);
+            // avant l'ajout des Programmes). gainInfluenceObjectifsEval
+            // (chantier "Objectifs galactiques", toujours positif ou nul —
+            // voir texteObjectifsGalactiques_ plus haut) s'ajoute de la
+            // même façon.
+            var nouvelleInfluence = Math.max(0, Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval + gainInfluenceObjectifsEval);
 
             GameService.majPlateauMaison(partieEval.id, {
               ressourceNourriture: stockEval.nourriture,

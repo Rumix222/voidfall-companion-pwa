@@ -38,6 +38,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './js/scoreService.js',
   './js/gameService.js',
   './js/setupService.js',
+  './js/objectifsService.js',
   './js/strategieService.js',
   './js/combatVueService.js',
   './js/scoreVueService.js',

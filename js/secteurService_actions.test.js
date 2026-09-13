@@ -212,7 +212,7 @@ test('placerCorruption : passe corrompu à true', function () {
 });
 
 // ---------------------------------------------------------------
-// majSecteur — correction manuelle libre (retour utilisateur 13-14/09/2026,
+// majSecteur — correction manuelle libre (retour utilisateur 13-13/09/2026,
 // panneau détail de l'onglet Galaxie) : liste blanche des 5 champs
 // autorisés, AUCUNE validation de règle (même permissivité que
 // placerCorruption/retirerCorruption ci-dessus).
@@ -334,6 +334,22 @@ test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes
     assert.strictEqual(agregats.guildesPures.total, 3);
     assert.strictEqual(agregats.installationsPuresTotal, 1);
     assert.strictEqual(agregats.cubesSecteurPurTotal, 5); // 2 (secteur 1) + 3 (secteur 2)
+
+    // Chantier "Objectifs galactiques" (13/09/2026) — champs étendus.
+    assert.strictEqual(agregats.populationPureTotale, 9); // 6 (secteur 1) + 3 (secteur 2)
+    assert.strictEqual(agregats.defenseOuBaseStellairePureTotal, 1); // secteur 1 seulement
+    assert.strictEqual(agregats.guildeBanquierPureTotal, 0);
+    assert.strictEqual(agregats.guildeScientifiquePureTotal, 1);
+    assert.strictEqual(JSON.stringify(agregats.secteursPurs), JSON.stringify([
+      { population: 6, guildeBanquiers: 0, guildesTotal: 3, cubes: 2 },
+      { population: 3, guildeBanquiers: 0, guildesTotal: 0, cubes: 3 }
+    ]));
+    // secteursPossedes : Purs ET Corrompus (secteurs 1/2/3), le secteur 4
+    // (du Néant, non possédé) reste exclu.
+    var numerosPossedes = agregats.secteursPossedes.map(function (s) { return s.cubes; }).sort(function (a, b) { return a - b; });
+    assert.strictEqual(agregats.secteursPossedes.length, 3);
+    assert.strictEqual(JSON.stringify(numerosPossedes), JSON.stringify([2, 3, 5]));
+    assert.strictEqual(agregats.secteursPossedes.filter(function (s) { return s.corrompu; }).length, 1);
   });
 });
 
