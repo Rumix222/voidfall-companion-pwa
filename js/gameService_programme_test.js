@@ -132,6 +132,102 @@ test('gagnerProgramme : Programme introuvable au catalogue -> rejette', function
   );
 });
 
+// Chantier "Corruption sur les Programmes" : offre Corrompue reprise ->
+// GameService.gagnerProgramme doit ouvrir la popup 'gagner_corruption'
+// (docs-rules-programmes-FocusPrefere-ConsulterEvenement.md §1, "vous
+// devez aussi gagner le marqueur Corruption de cette offre").
+
+test('gagnerProgramme : offre Corrompue reprise + demanderChoix -> popup ouverte, offre nettoyée après placement', function () {
+  var ctx = creerSandbox_(plateauBase_({
+    offresProgramme: [
+      { type: 'Domination', nom: null, corrompu: false },
+      { type: 'Force', nom: 'Poigne de Fer', corrompu: true },
+      { type: 'Soutien', nom: null, corrompu: false },
+      { type: 'Richesse', nom: null, corrompu: false }
+    ]
+  }));
+  var GameService = ctx.sandbox.GameService;
+
+  var appelsDemanderChoix = [];
+  function demanderChoix(contexte) {
+    appelsDemanderChoix.push(contexte);
+    return Promise.resolve({ detail: 'Corruption placée sur le Secteur 3.' });
+  }
+
+  return GameService.gagnerProgramme(PARTIE_ID, 'Poigne de Fer', demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.nom, 'Poigne de Fer');
+    assert.strictEqual(resultat.resume, 'Corruption placée sur le Secteur 3.');
+
+    assert.strictEqual(appelsDemanderChoix.length, 1);
+    assert.strictEqual(appelsDemanderChoix[0].type, 'gagner_corruption');
+    assert.strictEqual(JSON.stringify(appelsDemanderChoix[0].ciblesAutorisees), JSON.stringify(['secteur', 'piste', 'programme', 'techno']));
+
+    var ligne = ctx.plateauMaison[PARTIE_ID];
+    assert.strictEqual(JSON.stringify(ligne.programmesEnMain), JSON.stringify(['Poigne de Fer']));
+    var offreForce = ligne.offresProgramme.filter(function (o) { return o.type === 'Force'; })[0];
+    assert.strictEqual(offreForce.nom, null);
+    assert.strictEqual(offreForce.corrompu, false);
+  });
+});
+
+test('gagnerProgramme : offre Corrompue reprise + demanderChoix annulé -> rien persisté (aucune écriture)', function () {
+  var ligneDepart = plateauBase_({
+    offresProgramme: [
+      { type: 'Domination', nom: null, corrompu: false },
+      { type: 'Force', nom: 'Poigne de Fer', corrompu: true },
+      { type: 'Soutien', nom: null, corrompu: false },
+      { type: 'Richesse', nom: null, corrompu: false }
+    ]
+  });
+  var ctx = creerSandbox_(ligneDepart);
+  var GameService = ctx.sandbox.GameService;
+
+  function demanderChoixAnnule(contexte) { return Promise.resolve({ annule: true }); }
+
+  return GameService.gagnerProgramme(PARTIE_ID, 'Poigne de Fer', demanderChoixAnnule).then(function (resultat) {
+    assert.strictEqual(resultat.annule, true);
+
+    var ligne = ctx.plateauMaison[PARTIE_ID];
+    assert.strictEqual(JSON.stringify(ligne.programmesEnMain), JSON.stringify([]), 'Programme PAS ajouté en main');
+    var offreForce = ligne.offresProgramme.filter(function (o) { return o.type === 'Force'; })[0];
+    assert.strictEqual(offreForce.nom, 'Poigne de Fer', 'offre INCHANGÉE, toujours Corrompue');
+    assert.strictEqual(offreForce.corrompu, true);
+  });
+});
+
+test('gagnerProgramme : offre PAS Corrompue + demanderChoix fourni -> jamais appelé', function () {
+  var ctx = creerSandbox_(plateauBase_());
+  var GameService = ctx.sandbox.GameService;
+
+  var appele = false;
+  function demanderChoix(contexte) { appele = true; return Promise.resolve({ detail: 'x' }); }
+
+  return GameService.gagnerProgramme(PARTIE_ID, 'Poigne de Fer', demanderChoix).then(function (resultat) {
+    assert.strictEqual(appele, false);
+    assert.strictEqual(resultat.nom, 'Poigne de Fer');
+  });
+});
+
+test('gagnerProgramme : offre Corrompue reprise SANS demanderChoix -> repli, comme avant ce chantier', function () {
+  var ctx = creerSandbox_(plateauBase_({
+    offresProgramme: [
+      { type: 'Domination', nom: null, corrompu: false },
+      { type: 'Force', nom: 'Poigne de Fer', corrompu: true },
+      { type: 'Soutien', nom: null, corrompu: false },
+      { type: 'Richesse', nom: null, corrompu: false }
+    ]
+  }));
+  var GameService = ctx.sandbox.GameService;
+
+  return GameService.gagnerProgramme(PARTIE_ID, 'Poigne de Fer').then(function (resultat) {
+    assert.strictEqual(resultat.nom, 'Poigne de Fer');
+    var ligne = ctx.plateauMaison[PARTIE_ID];
+    assert.strictEqual(JSON.stringify(ligne.programmesEnMain), JSON.stringify(['Poigne de Fer']));
+    var offreForce = ligne.offresProgramme.filter(function (o) { return o.type === 'Force'; })[0];
+    assert.strictEqual(offreForce.corrompu, false);
+  });
+});
+
 test('gagnerProgramme : offresProgramme absent en base (partie créée avant ce champ) -> repli sur défaut, aucune erreur', function () {
   var ligneSansOffres = plateauBase_();
   delete ligneSansOffres.offresProgramme;

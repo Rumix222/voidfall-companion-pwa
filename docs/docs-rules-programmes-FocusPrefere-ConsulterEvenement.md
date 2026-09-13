@@ -26,9 +26,9 @@ Un Programme placé dans un emplacement de votre fiche Maison est en jeu. ✅
 Un Programme en jeu est Pur si aucun marqueur de Corruption ne se trouve sur son emplacement. ✅
 À l’inverse, un Programme en jeu est Corrompu si un marqueur se trouve sur son emplacement. ✅
 Votre emplacement de départ (àgauche) ne peut pas être Corrompu. ✅
-Vous ne pouvez pas gagner de l’Influence depuis des Programmes Corrompus. ❌
-Chacune des quatre offres de Programmes peut également être Corrompue. ❌
-Si vous gagnez un Programme depuis une offre Corrompue, vous devez aussi gagner le marqueur Corruption de cette offre (où vous voulez). L’offre redevient alors Pure. ❌
+Vous ne pouvez pas gagner de l’Influence depuis des Programmes Corrompus. ✅
+Chacune des quatre offres de Programmes peut également être Corrompue. ✅
+Si vous gagnez un Programme depuis une offre Corrompue, vous devez aussi gagner le marqueur Corruption de cette offre (où vous voulez). L’offre redevient alors Pure. ✅
 # 2. FOCUS PRÉFÉRÉS
 Certains effets de jeu vous permettent de résoudre une action de Focus préféré à partir de l’une de vos cartes Focus préférés, que cette carte soit dans votre main ou dans votre défausse. ❌
 Vos Focus préférés sont indiqués du côté droit de votre fiche Maison. ❌

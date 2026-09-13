@@ -2857,8 +2857,22 @@ var GameService = (function () {
      *   "prise" redevient à révéler. Si le joueur a pris un autre
      *   Programme du même type (pioche, "2 premiers", non suivis par
      *   l'app), l'offre reste inchangée.
+     * - Règle (docs-rules-programmes-FocusPrefere-ConsulterEvenement.md
+     *   §1) : "Si vous gagnez un Programme depuis une offre Corrompue,
+     *   vous devez aussi gagner le marqueur Corruption de cette offre (où
+     *   vous voulez)." Si l'offre reprise était `corrompu:true` ET qu'un
+     *   `demanderChoix` est fourni, ouvre la popup 'gagner_corruption'
+     *   existante (mêmes 4 cibles que GameService.appliquerCadreGainCorruption
+     *   ci-dessus — secteur/piste/programme/techno, aucune restreinte,
+     *   cohérent avec un gain "sans précision") AVANT toute écriture, même
+     *   principe que appliquerCadreChoixCorruptionGloire : un "Annuler" sur
+     *   cette popup annule tout le gain de Programme (rien n'est encore
+     *   persisté à ce stade) plutôt que de laisser un Programme gagné sans
+     *   que sa Corruption d'offre ait été placée quelque part. Sans
+     *   `demanderChoix` (repli, aucun appelant actuel dans ce cas) : offre
+     *   remise à `corrompu:false` sans popup, comme avant ce chantier.
      */
-    gagnerProgramme: function (partieId, nomProgramme) {
+    gagnerProgramme: function (partieId, nomProgramme, demanderChoix) {
       return Promise.all([DB.get('plateauMaison', partieId), DB.getAll('programmes')]).then(function (resultats) {
         var ligne = resultats[0];
         var catalogue = resultats[1];
@@ -2874,17 +2888,33 @@ var GameService = (function () {
           throw new Error('Ce Programme est déjà en jeu sur la fiche Maison.');
         }
 
-        enMain.push(nomProgramme);
-        ligne.programmesEnMain = enMain;
-
         var offres = Array.isArray(ligne.offresProgramme) ? ligne.offresProgramme.slice() : offresProgrammeParDefaut_();
-        ligne.offresProgramme = offres.map(function (o) {
-          return (o.type === carte.type && o.nom === nomProgramme) ? { type: o.type, nom: null, corrompu: false } : o;
-        });
+        var offreCorrompue = offres.some(function (o) { return o.type === carte.type && o.nom === nomProgramme && o.corrompu; });
 
-        return DB.put('plateauMaison', ligne).then(function () {
-          return { nom: carte.nom, type: carte.type };
-        });
+        function finaliser_(resume) {
+          enMain.push(nomProgramme);
+          ligne.programmesEnMain = enMain;
+          ligne.offresProgramme = offres.map(function (o) {
+            return (o.type === carte.type && o.nom === nomProgramme) ? { type: o.type, nom: null, corrompu: false } : o;
+          });
+          return DB.put('plateauMaison', ligne).then(function () {
+            return { nom: carte.nom, type: carte.type, resume: resume };
+          });
+        }
+
+        if (offreCorrompue && typeof demanderChoix === 'function') {
+          return Promise.resolve(demanderChoix({
+            type: 'gagner_corruption',
+            source: 'Programme "' + nomProgramme + '" (offre Corrompue)',
+            partieId: partieId,
+            ciblesAutorisees: ['secteur', 'piste', 'programme', 'techno']
+          })).then(function (reponse) {
+            if (!reponse || reponse.annule) return { annule: true };
+            return finaliser_(reponse.detail);
+          });
+        }
+
+        return finaliser_();
       });
     },
 

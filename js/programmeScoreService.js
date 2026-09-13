@@ -447,6 +447,17 @@ var ProgrammeScoreService = (function () {
    * jamais d'exception, cohérent avec le reste de l'app qui ne bloque
    * jamais sur du vocabulaire non reconnu).
    *
+   * `corrompu` (3e argument, optionnel — le slot du plateau Programme
+   * qui porte cette carte, pas la carte elle-même : voir
+   * GameService.utiliserProgramme, "la Corruption est liée à
+   * l'EMPLACEMENT") : si vrai, retourne `{objectif1:0, objectif2:0,
+   * total:0}` SANS même évaluer `regles` — règle docs-rules-programmes-
+   * FocusPrefere-ConsulterEvenement.md §1, "Vous ne pouvez pas gagner de
+   * l'Influence depuis des Programmes Corrompus." Ne s'applique jamais au
+   * Programme de départ (calculerPointsProgrammeDepart ci-dessous,
+   * emplacement 0) : cet emplacement ne peut pas être Corrompu (même
+   * doc, §1) — aucun paramètre `corrompu` sur cette fonction-là.
+   *
    * `etat` attendu : { secteursPurs[], nombreSecteurTotal, civilisation:
    * {niveaux:{societe,gouvernement,economie}, corrompues:{...}},
    * ressources: {nourriture,energie,materiel,credit,science}, revenu:
@@ -456,7 +467,8 @@ var ProgrammeScoreService = (function () {
    * nbTechBase, nbTechAmelioree } — assemblé par l'appelant
    * (js/strategieService.js), ce module reste pur (aucun accès DB/DOM).
    */
-  function calculerPointsProgramme(code, etat) {
+  function calculerPointsProgramme(code, etat, corrompu) {
+    if (corrompu) return { objectif1: 0, objectif2: 0, total: 0 };
     var regles = PROGRAMME_OBJECTIFS_[code];
     if (!regles) return { objectif1: 0, objectif2: 0, total: 0 };
     var etatSur = etat || {};

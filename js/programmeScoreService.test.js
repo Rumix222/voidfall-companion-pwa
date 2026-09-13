@@ -59,6 +59,25 @@ test('code inconnu -> {0,0,0}, jamais d\'exception', function () {
   assertPoints_(PS.calculerPointsProgramme('ZZZ', etatVide_()), { objectif1: 0, objectif2: 0, total: 0 });
 });
 
+// Chantier "Corruption sur les Programmes" : "Vous ne pouvez pas gagner
+// de l'Influence depuis des Programmes Corrompus" (docs-rules-programmes-
+// FocusPrefere-ConsulterEvenement.md §1) — 3e argument `corrompu`, jamais
+// évalué contre `regles` (même une carte dont les 2 objectifs sont
+// remplis rapporte 0 dès que son emplacement est Corrompu).
+test('corrompu:true -> {0,0,0} même si les 2 objectifs seraient remplis', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  var etat = etatVide_();
+  etat.revenu.materiel = 8; // M1, objectif1 : revenu materiel >= 8 -> 5
+  etat.secteursPurs = [secteurPur_({ pn: { corvette: 2, sentinelle: 0, destroyer: 0, cuirasse: 0, porteVaisseau: 0 } })]; // M1, objectif2
+  assertPoints_(PS.calculerPointsProgramme('M1', etat), { objectif1: 5, objectif2: 5, total: 10 });
+  assertPoints_(PS.calculerPointsProgramme('M1', etat, true), { objectif1: 0, objectif2: 0, total: 0 });
+});
+
+test('corrompu:false (ou omis) -> comportement inchangé', function () {
+  var PS = creerContexte_().ProgrammeScoreService;
+  assertPoints_(PS.calculerPointsProgramme('ZZZ', etatVide_(), false), { objectif1: 0, objectif2: 0, total: 0 });
+});
+
 // ------------------------------------------------------------
 // Domination
 // ------------------------------------------------------------

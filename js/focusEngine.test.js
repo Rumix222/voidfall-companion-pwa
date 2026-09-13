@@ -1163,6 +1163,66 @@ test('Ravitailler (produire_energie + produire_materiel + produire_nourriture en
   });
 });
 
+// Règle de surproduction (docs-rules-Influence-et-ressources.md §2/§3) :
+// réserve plafonnée à 15 par ressource, excédent produit perdu, +3
+// Influence "quel que soit l'excédent perdu" à chaque événement de
+// production qui dépasse ce plafond.
+test('surproduction : produire_energie dépasse 15 -> réserve plafonnée à 15, +3 influence', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = { action: 'Ravitailler', effet: { produire_energie: 1 }, cout: {}, texte: '' };
+  var plateau = Object.assign({}, PLATEAU_BASE, { ressourceEnergie: 12 });
+
+  var demanderChoix = function () { return { montant: 8, detail: '+8 Énergie (Production, Niveau 10).' }; };
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 15); // 12+8=20, plafonné à 15
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 13); // 10 + 3
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('surproduction') !== -1 && l.indexOf('excédent de 5') !== -1; }));
+  });
+});
+
+test('surproduction : atteindre exactement 15 -> pas de surproduction (pas de "dépassement")', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = { action: 'Ravitailler', effet: { produire_energie: 1 }, cout: {}, texte: '' };
+  var plateau = Object.assign({}, PLATEAU_BASE, { ressourceEnergie: 12 });
+
+  var demanderChoix = function () { return { montant: 3, detail: '+3 Énergie (Production, Niveau 4).' }; };
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 15);
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 10); // inchangé
+    assert.ok(!resultat.journal.some(function (l) { return l.indexOf('surproduction') !== -1; }));
+  });
+});
+
+test('surproduction : Ravitailler (3 clés produire_*) dépassant chacune 15 -> +3 influence PAR ressource surproduite', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = {
+    action: 'Ravitailler',
+    effet: { produire_energie: 1, produire_materiel: 1, produire_nourriture: 1 },
+    cout: {}, texte: ''
+  };
+  var plateau = Object.assign({}, PLATEAU_BASE, { ressourceEnergie: 14, ressourceMateriel: 14, ressourceNourriture: 5 });
+
+  var montantParRessource = { energie: 4, materiel: 4, nourriture: 2 };
+  var demanderChoix = function (contexte) {
+    var montant = montantParRessource[contexte.ressource];
+    return { montant: montant, detail: '+' + montant + ' ' + contexte.ressource + ' (Production).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(plateau, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 15); // 14+4=18 -> plafonné
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 15); // 14+4=18 -> plafonné
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceNourriture, 7); // 5+2=7, pas de dépassement
+    assert.strictEqual(resultat.plateauMaisonApres.influence, 16); // 10 + 3 + 3 (energie ET materiel surproduits, nourriture non)
+  });
+});
+
 test('produire_credit : annulé (popup "Annuler") — bloque toute l’action, coût jamais débité', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };

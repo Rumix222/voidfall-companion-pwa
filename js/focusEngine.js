@@ -108,6 +108,12 @@ var FocusEngine = (function () {
   // indépendants l'un de l'autre. Si l'une de ces 5 ressources change
   // ici, vérifier l'autre copie côté gameService.js.
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
+  // docs-rules-Influence-et-ressources.md §2/§3 : réserve plafonnée à 15
+  // par ressource ; au-delà, l'excédent produit est perdu ("surproduction")
+  // et rapporte 3 Influence, quel que soit l'excédent perdu — voir
+  // resoudreCle_ ("produire_<ressource>" ci-dessous, seule source de
+  // production automatisée à ce jour).
+  var RESERVE_MAX_RESSOURCE_ = 15;
   var NB_CUBES_TOTAL = 14;
   // todo.md (retour utilisateur) — docs-rules-Influence-et-ressources.md
   // §2 : les 3 SEULES ressources qu'un coût de Crédit peut substituer à 1
@@ -1158,7 +1164,22 @@ var FocusEngine = (function () {
     // dédiée (contexte 'produire_revenu', strategieService.js) qui
     // calcule le montant ET l'affiche brièvement, même principe que
     // influence_secteur ci-dessus (aucune interaction utilisateur, juste
-    // un calcul déterministe). ---
+    // un calcul déterministe).
+    //
+    // Règle de surproduction (docs-rules-Influence-et-ressources.md §2/§3,
+    // retour utilisateur) : la réserve de cette ressource est plafonnée à
+    // RESERVE_MAX_RESSOURCE_ (15) — l'excédent produit est perdu, ET vous
+    // gagnez 3 Influence "quel que soit l'excédent ainsi perdu". Chaque
+    // clé produire_<ressource> résolue ici est un événement de production
+    // indépendant : si Ravitailler produit 3 ressources dans la même
+    // action (3 appels de ce cas), une surproduction sur CHACUNE rapporte
+    // 3 Influence à chaque fois (§3, "si vous surproduisez plusieurs types
+    // de ressources... vous gagnez les 3 Influence pour chaque
+    // surproduction") — pas de déduplication ni de plafond sur ce cumul.
+    // Ne couvre PAS produire_ressource/produire_deux_ressources (choix du
+    // joueur, hors périmètre, voir juste en-dessous) ni les autres sources
+    // de production non automatisées (Technologies, secteurs spéciaux —
+    // en-tête de fichier). ---
     if (cle.indexOf('produire_') === 0 && cle !== 'produire_ressource' && cle !== 'produire_deux_ressources' && signe > 0) {
       var cleRessourceProduite = cle.slice('produire_'.length);
       if (RESSOURCES_PRODUCTION.indexOf(cleRessourceProduite) !== -1) {
@@ -1170,8 +1191,16 @@ var FocusEngine = (function () {
         })).then(function (reponse) {
           if (reponseAnnulee_(reponse)) return false;
           var champProduit = CHAMP_PAR_CLE[cleRessourceProduite];
-          etat[champProduit] = Math.max(0, etat[champProduit] + (Number(reponse.montant) || 0));
+          var montantProduit = Number(reponse.montant) || 0;
+          var totalAvantPlafond = etat[champProduit] + montantProduit;
+          var excedentSurproduction = Math.max(0, totalAvantPlafond - RESERVE_MAX_RESSOURCE_);
+          etat[champProduit] = Math.max(0, Math.min(RESERVE_MAX_RESSOURCE_, totalAvantPlafond));
           journal.push(source + ' : ' + reponse.detail);
+          if (excedentSurproduction > 0) {
+            etat.influence = Math.max(0, etat.influence + 3);
+            journal.push(source + ' : surproduction (' + cleRessourceProduite + ', réserve plafonnée à ' +
+              RESERVE_MAX_RESSOURCE_ + ', excédent de ' + excedentSurproduction + ' perdu) — +3 influence.');
+          }
           return true;
         });
       }

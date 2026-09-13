@@ -1019,8 +1019,12 @@ var StrategieService = (function () {
           var slot = slots[index];
           var carte = slot && slot.nom ? parNom[slot.nom] : null;
           if (!carte || !carte.code) return;
-          var points = ProgrammeScoreService.calculerPointsProgramme(carte.code, etat);
-          resultat[index] = { objectif1: points.objectif1, objectif2: points.objectif2, total: points.total, code: carte.code, nom: carte.nom };
+          // 3e argument `corrompu` (slot.corrompu — la Corruption est liée
+          // à l'EMPLACEMENT, pas à la carte, voir GameService.
+          // utiliserProgramme) : ProgrammeScoreService applique la règle
+          // "aucune Influence depuis un Programme Corrompu" elle-même.
+          var points = ProgrammeScoreService.calculerPointsProgramme(carte.code, etat, !!slot.corrompu);
+          resultat[index] = { objectif1: points.objectif1, objectif2: points.objectif2, total: points.total, code: carte.code, nom: carte.nom, corrompu: !!slot.corrompu };
         });
         return resultat;
       });
@@ -2643,10 +2647,16 @@ var StrategieService = (function () {
           });
         }
         feuilleEls_.btnValider.disabled = true;
-        GameService.gagnerProgramme(partieProgramme.id, nomChoisi).then(function (resultat) {
+        // demanderChoix transmis : si l'offre reprise est Corrompue, ouvre
+        // la popup 'gagner_corruption' AVANT toute écriture (voir JSDoc de
+        // GameService.gagnerProgramme) — un "Annuler" sur cette popup y
+        // résout {annule:true}, rien n'est persisté.
+        GameService.gagnerProgramme(partieProgramme.id, nomChoisi, demanderChoix).then(function (resultat) {
           feuilleEls_.btnValider.disabled = false;
+          if (resultat.annule) return;
           feuilleRejetCourant_ = null;
-          resolve({ detail: 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.', nom: resultat.nom, type: resultat.type });
+          var detail = 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.' + (resultat.resume ? ' ' + resultat.resume : '');
+          resolve({ detail: detail, nom: resultat.nom, type: resultat.type });
         }).catch(function (erreur) {
           feuilleEls_.btnValider.disabled = false;
           window.alert('Échec de l\'obtention du Programme : ' + erreur.message);
@@ -5997,11 +6007,18 @@ var StrategieService = (function () {
             var nomChoisi = selectProgramme.value;
             btnValider.disabled = true;
 
-            GameService.gagnerProgramme(partieProgramme.id, nomChoisi)
+            // demanderChoix transmis : si l'offre reprise est Corrompue,
+            // ouvre la popup 'gagner_corruption' AVANT toute écriture (voir
+            // JSDoc de GameService.gagnerProgramme) — elle ferme déjà la
+            // modale sur son propre "Annuler" (resultat.annule ci-dessous),
+            // qui annule alors tout le gain de Programme (rien persisté).
+            GameService.gagnerProgramme(partieProgramme.id, nomChoisi, demanderChoix)
               .then(function (resultat) {
-                fermerModale_();
                 btnValider.disabled = false;
-                resolve({ detail: 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.', nom: resultat.nom, type: resultat.type });
+                if (resultat.annule) { resolve({ annule: true }); return; }
+                fermerModale_();
+                var detail = 'Programme "' + resultat.nom + '" (' + resultat.type + ') obtenu.' + (resultat.resume ? ' ' + resultat.resume : '');
+                resolve({ detail: detail, nom: resultat.nom, type: resultat.type });
               })
               .catch(function (erreur) {
                 btnValider.disabled = false;

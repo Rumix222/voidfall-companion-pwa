@@ -1,7 +1,70 @@
 /**
  * version.js
- * Version 140 — 2026-09-13
+ * Version 142 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Implémente la règle de
+ * surproduction", docs-rules-Influence-et-ressources.md §2/§3) : la
+ * réserve d'une ressource (Nourriture/Énergie/Matériel/Crédit/Science)
+ * est plafonnée à 15 ; au-delà, l'excédent produit est perdu ET rapporte
+ * 3 Influence, quel que soit l'excédent perdu — cumulable plusieurs fois
+ * par tour (plusieurs ressources, ou la même plusieurs fois) :
+ * - `js/focusEngine.js`/`resoudreCle_` ("produire_<ressource>", seule
+ *   production automatisée à ce jour — ex. Focus Production
+ *   "Ravitailler") : nouvelle constante `RESERVE_MAX_RESSOURCE_` (15) ;
+ *   le montant renvoyé par la popup `produire_revenu` est désormais
+ *   plafonné avant écriture sur `etat[champProduit]`, et un dépassement
+ *   crédite +3 Influence et journalise "surproduction (...)".
+ * - Portée volontairement limitée à cette clé : `produire_ressource`/
+ *   `produire_deux_ressources` (choix du joueur, popup de sélection pas
+ *   construite) et les autres sources de production (Technologies,
+ *   secteurs spéciaux) restent hors périmètre, comme avant ce chantier.
+ *   Le plafond général de réserve (§2, "toutes les réserves") reste
+ *   partiel : un gain de ressource "à plat" (récompense de carte, Cadre
+ *   d'Événement) n'est pas encore plafonné — noté 💬 dans le doc de
+ *   règles.
+ * - Tests : `js/focusEngine.test.js` (+3 : dépassement plafonné + 3
+ *   Influence, exactement 15 = pas de surproduction, 3 productions dans
+ *   la même action dont 2 en dépassement = +6 Influence). 345 tests au
+ *   vert (`node --test js/*.test.js` + tous les `*_test.js` individuels).
+ *
+ * 13/09/2026, suite (chantier "Corruption sur les Programmes" — retour
+ * utilisateur, choisi parmi une liste de chantiers proposée après
+ * analyse du code/règles restant à automatiser) : jusqu'ici, un
+ * Programme en jeu sur un emplacement Corrompu rapportait quand même son
+ * Influence normalement, et gagner un Programme depuis une offre
+ * publique Corrompue faisait disparaître le marqueur de Corruption au
+ * lieu de le transférer au joueur (docs-rules-programmes-FocusPrefere-
+ * ConsulterEvenement.md §1, 2 règles marquées ❌) :
+ * - `js/programmeScoreService.js`/`calculerPointsProgramme` : nouveau 3e
+ *   argument `corrompu` (le slot du plateau Programme, pas la carte — la
+ *   Corruption est liée à l'EMPLACEMENT) — retourne `{0,0,0}` sans même
+ *   évaluer les règles de la carte dès que vrai. Ne s'applique jamais à
+ *   `calculerPointsProgrammeDepart` (emplacement 0, jamais Corrompu par
+ *   construction).
+ * - `js/strategieService.js`/`calculerPointsProgrammesActifs_` : transmet
+ *   `slot.corrompu` à `calculerPointsProgramme` pour les emplacements 1-3
+ *   — l'affichage temps réel (badges "+N" du Plat. maison) et la popup
+ *   `phase_evaluation` reflètent donc désormais "+0" pour un Programme
+ *   Corrompu, aucun changement de gabarit d'affichage nécessaire.
+ * - `js/gameService.js`/`gagnerProgramme` : nouveau 3e argument
+ *   `demanderChoix` (optionnel, même contrat que `utiliserProgramme`) —
+ *   si l'offre publique reprise était Corrompue, ouvre AVANT toute
+ *   écriture la popup `gagner_corruption` existante (mêmes 4 cibles que
+ *   `appliquerCadreGainCorruption` : secteur/piste/programme/techno,
+ *   aucune restriction) pour que le joueur place le marqueur transféré ;
+ *   un "Annuler" sur cette popup annule tout le gain de Programme (rien
+ *   n'est encore persisté à ce stade), même principe que
+ *   `appliquerCadreChoixCorruptionGloire`. Les 2 points d'appel
+ *   (`js/strategieService.js` — Feuille d'action ET repli `#modal-choix`)
+ *   transmettent désormais le `demanderChoix` du module.
+ * - Tests : `js/programmeScoreService.test.js` (+2, dont une carte aux 2
+ *   objectifs remplis qui rapporte quand même 0 une fois `corrompu`
+ *   passé) et `js/gameService_programme_test.js` (+4 : popup ouverte
+ *   puis offre nettoyée, annulation -> rien persisté, offre PAS Corrompue
+ *   -> popup jamais appelée, repli sans `demanderChoix` inchangé). 342
+ *   tests au vert (`node --test js/*.test.js` + fichiers `*_test.js`
+ *   individuels).
  *
  * 13/09/2026, suite (retour utilisateur : "Lot 3" — dernier lot du
  * chantier "Objectifs galactiques", lignes "formule") :
@@ -4979,4 +5042,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.10';
+var APP_VERSION = '20260913.12';
