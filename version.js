@@ -1,7 +1,52 @@
 /**
  * version.js
- * Version 136 — 2026-09-13
+ * Version 137 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, correctif (retour utilisateur, capture d'écran : "Fallait
+ * pas toucher cette partie là, problème de chevauchement maintenant" —
+ * bloc "Jetons et cubes de puissance navale", Plat. maison) : vérifié
+ * qu'AUCUN commit de cette session ne touche `.jeton-champ`/`.jeton-input`/
+ * `.ressources-jetons`/`js/strategieService.js` (dernière modif de ce
+ * fichier : commit `026de5a`, avant cette session) — c'est un bug
+ * préexistant, pas une régression de ce chantier. Cause réelle :
+ * `.ressources-jetons` (`flex-wrap: nowrap`, volontaire — "garde
+ * Commerce/Prime/Libération sur une seule ligne") + `.jeton-champ`
+ * (`min-width: 0`, autorise le rétrécissement sous la largeur naturelle)
+ * + `.jeton-champ label` (`white-space: nowrap`, SANS troncature) : dès
+ * qu'un 4e champ apparaît (Corr. Chambres décontamination — uniquement
+ * si le joueur possède cette Technologie, ex. Shiveus) et que la ligne
+ * est trop étroite pour les 4, chaque label se rétrécit sous sa largeur
+ * de contenu SANS troncature — le texte déborde visuellement par-dessus
+ * la case voisine au lieu de disparaître proprement.
+ * - `css/style.css`/`.jeton-champ label` : `overflow: hidden;
+ *   text-overflow: ellipsis; min-width: 0;` — un label trop long tronque
+ *   ("Corr. Chambres déc…") au lieu de chevaucher la case suivante,
+ *   conserve l'intention "une seule ligne, jamais de retour à la ligne".
+ *
+ * 13/09/2026, suite (retour utilisateur : "je préférerais que ce champ
+ * corruption chambre de décontamination apparaisse au niveau de la
+ * technologie concerné") : le champ manuel "Corruption (Chambres de
+ * décontamination)" quitte définitivement la grille "Jetons et cubes de
+ * puissance navale" (4e champ conditionnel, cause du chevauchement
+ * ci-dessus — le correctif CSS reste en place par prudence, mais ce champ
+ * ne peut plus s'y afficher) pour s'afficher directement à côté de la
+ * Technologie elle-même sur Plat. maison :
+ * - `js/strategieService.js`/`renderJetons_` : ne construit plus que 3
+ *   champs fixes (Commerce/Prime/Libération) — `persisterJeton_`,
+ *   branche `'chambreDecontamination'` retirée (plus aucun appelant).
+ * - `index.html` : nouvelle fonction partagée
+ *   `estTechnologieChambresDecontamination_(nom)` — le champ s'affiche
+ *   SOIT à côté de la Technologie de départ (`#bloc-technologie-depart`,
+ *   placeholder statique `#chambre-decontamination-depart-ligne`, masqué/
+ *   démasqué par `renderEcranPlateauMaison_` selon `techDepart.nom`), SOIT
+ *   à côté de l'emplacement "obtenues" concerné
+ *   (`renderTechnologiesObtenues_`, généré dans la boucle des 5
+ *   emplacements) — jamais les deux, une Technologie n'occupe qu'un seul
+ *   emplacement à la fois. Même champ `plateauMaison.
+ *   corruptionChambreDecontamination` qu'avant (aucune migration de
+ *   donnée nécessaire), toujours persisté via `GameService.
+ *   majPlateauMaison`.
  *
  * 13/09/2026, suite (retour utilisateur : texte exact des Compétences de
  * Maison fourni depuis le livret physique, pour 10 des 14 maisons — les 4
@@ -4827,4 +4872,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.5';
+var APP_VERSION = '20260913.7';

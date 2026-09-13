@@ -295,6 +295,19 @@
         <span class="champ-technologie-fixe" id="technologie-depart-plateau-maison">—</span>
         <label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"> Améliorée</label>
       </div>
+      <!-- Retour utilisateur (14/09/2026) : "je préférerais que ce champ
+           corruption chambre de décontamination apparaisse au niveau de la
+           technologie concernée" — remplace l'ancien 4e champ conditionnel
+           de la grille "Jetons et cubes de puissance navale". Affiché
+           seulement si la Technologie de départ EST Chambres de
+           décontamination (voir renderEcranPlateauMaison_) ; sinon
+           l'équivalent s'affiche à l'emplacement "obtenues" concerné (voir
+           renderTechnologiesObtenues_) — jamais les deux à la fois, une
+           Technologie n'occupe qu'un seul emplacement. -->
+      <div class="plateau-influence" id="chambre-decontamination-depart-ligne" style="margin-top:8px;" hidden>
+        <label>Corruption (Chambres de décontamination)</label>
+        <input type="number" step="1" min="0" class="ressource-case-input" id="chambre-decontamination-depart-input">
+      </div>
     </div>
     <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:10px;">
       <div id="technologies-obtenues-liste"></div>
@@ -921,6 +934,18 @@
      * maintenant normalement une fois la Technologie de départ choisie
      * dans un des 4 emplacements.
      */
+    // Retour utilisateur (14/09/2026) : le champ manuel "Corruption sur la
+    // Technologie Chambres de décontamination" (jeton simple,
+    // plateauMaison.corruptionChambreDecontamination) s'affiche désormais
+    // à l'emplacement de la Technologie elle-même (départ ou l'un des 5
+    // "obtenues") plutôt que dans la grille "Jetons et cubes de puissance
+    // navale" (ancien 4e champ conditionnel, retiré de renderJetons_,
+    // strategieService.js). Comparaison insensible à la casse/aux espaces,
+    // même principe que StrategieService.nomsTechnologiesJoueur_.
+    function estTechnologieChambresDecontamination_(nom) {
+      return (nom || '').trim().toLowerCase() === 'chambres de décontamination';
+    }
+
     function renderEcranPlateauMaison_(partie) {
       renderMaisonEffet_(partie);
 
@@ -935,6 +960,27 @@
         elTechDepart.textContent = techDepart.nom ?
           techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—';
         elTechDepart.title = titreTechnologie_(infosTechDepart, techDepart.amelioree);
+      }
+
+      var ligneChambreDepart = document.getElementById('chambre-decontamination-depart-ligne');
+      if (ligneChambreDepart) {
+        var estChambreDepart = estTechnologieChambresDecontamination_(techDepart.nom);
+        ligneChambreDepart.hidden = !estChambreDepart;
+        var inputChambreDepart = document.getElementById('chambre-decontamination-depart-input');
+        if (estChambreDepart && inputChambreDepart) {
+          var corruptionChambreDepart = (partie.plateauMaison || {}).corruptionChambreDecontamination || 0;
+          inputChambreDepart.value = corruptionChambreDepart;
+          inputChambreDepart.onchange = function () {
+            var n = Math.max(0, Math.floor(Number(inputChambreDepart.value) || 0));
+            inputChambreDepart.value = n;
+            GameService.majPlateauMaison(partie.id, { corruptionChambreDecontamination: n })
+              .then(function () { partie.plateauMaison.corruptionChambreDecontamination = n; })
+              .catch(function (erreur) {
+                window.alert('Échec de l\'enregistrement : ' + erreur.message);
+                inputChambreDepart.value = corruptionChambreDepart;
+              });
+          };
+        }
       }
 
       // Bloc "Corruption" (plateauMaison.corruptionMaison) à gauche
@@ -1053,19 +1099,43 @@
       var infosTechParNom = {};
       toutesLesTechs.forEach(function (t) { infosTechParNom[t.nom] = t; });
 
+      var corruptionChambre = (partie.plateauMaison || {}).corruptionChambreDecontamination || 0;
+
       container.innerHTML = obtenues.map(function (tech, slot) {
         var infosTech = tech ? (infosTechParNom[tech.nom] || null) : null;
         var texteDetail = infosTech ? titreTechnologie_(infosTech, tech.amelioree) : '';
         var libelle = tech ? (tech.nom + (tech.maison ? ' (' + tech.maison + ')' : '')) : '— Vide —';
         var verrouillee = !tech || nomsAmeliorables.indexOf(tech.nom) === -1;
         var titreAmelioree = texteDetail.replace(/"/g, '&quot;');
+        // Voir estTechnologieChambresDecontamination_ (renderEcranPlateauMaison_
+        // ci-dessus) — même champ manuel que la Technologie de départ,
+        // affiché ici si c'est CET emplacement qui la possède.
+        var estChambreObtenue = tech && estTechnologieChambresDecontamination_(tech.nom);
         return '<div class="techno-obtenue-ligne">' +
           '<span class="champ-technologie-fixe' + (texteDetail ? ' programme-nom-toggle' : '') + '" data-tech-detail="' + slot + '">' + libelle + '</span>' +
           '<label class="check-amelioree" title="' + titreAmelioree + '"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
           (tech && tech.amelioree ? ' checked' : '') + (verrouillee ? ' disabled' : '') + '> Améliorée</label>' +
           '</div>' +
-          (texteDetail ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + slot + '" hidden><p>' + texteDetail + '</p></div>' : '');
+          (texteDetail ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + slot + '" hidden><p>' + texteDetail + '</p></div>' : '') +
+          (estChambreObtenue
+            ? '<div class="plateau-influence" style="margin-top:4px;margin-bottom:8px;"><label>Corruption (Chambres de décontamination)</label>' +
+              '<input type="number" step="1" min="0" class="ressource-case-input chambre-decontamination-obtenue-input" value="' + corruptionChambre + '"></div>'
+            : '');
       }).join('');
+
+      var inputChambreObtenue = container.querySelector('.chambre-decontamination-obtenue-input');
+      if (inputChambreObtenue) {
+        inputChambreObtenue.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputChambreObtenue.value) || 0));
+          inputChambreObtenue.value = n;
+          GameService.majPlateauMaison(partie.id, { corruptionChambreDecontamination: n })
+            .then(function () { partie.plateauMaison.corruptionChambreDecontamination = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputChambreObtenue.value = corruptionChambre;
+            });
+        };
+      }
 
       Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
         nomEl.addEventListener('click', function () {

@@ -752,18 +752,6 @@ var StrategieService = (function () {
     } else if (cle === 'liberation') {
       champs.jetonLiberation = n;
       if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.jetonLiberation = n;
-    } else if (cle === 'chambreDecontamination') {
-      // Jeton manuel — l'AJOUT d'une Corruption sur cette case (au lieu
-      // d'un secteur/piste/Programme) reste incrémenté à la main par le
-      // joueur, comme Commerce/Prime/Libération ci-dessus (seul le RETRAIT
-      // est automatisé, voir contexte 'retirer_corruption' plus bas).
-      // Plafonné à 2 (3 si Technologie améliorée —
-      // ligne.ameliore.storage.corruption_max, voir data/catalogue/
-      // technologies.json) côté règle du jeu, non forcé ici (même
-      // principe que les autres jetons de cette grille, jamais plafonnés
-      // côté UI).
-      champs.corruptionChambreDecontamination = n;
-      if (partieAffichee && partieAffichee.plateauMaison) partieAffichee.plateauMaison.corruptionChambreDecontamination = n;
     } else {
       return;
     }
@@ -774,17 +762,10 @@ var StrategieService = (function () {
     var pm = partie.plateauMaison || {};
     var nbCommerce = Array.isArray(pm.jetonCommerce) ? pm.jetonCommerce.length : 0;
     var jetons = document.getElementById('ressources-jetons');
-    var possedeChambreDecontamination = nomsTechnologiesJoueur_(partie).indexOf('chambres de décontamination') !== -1;
     jetons.innerHTML =
       jetonInputHTML_('commerce', 'Commerce', nbCommerce) +
       jetonInputHTML_('prime', 'Prime', pm.jetonPrime || 0) +
-      jetonInputHTML_('liberation', 'Libération', pm.jetonLiberation || 0) +
-      // Jeton affiché seulement si le joueur possède la Technologie
-      // concernée (sinon aucune pertinence — grille jamais alourdie pour
-      // rien, même principe que le reste de cet écran).
-      (possedeChambreDecontamination
-        ? jetonInputHTML_('chambreDecontamination', 'Corr. Chambres déconta.', pm.corruptionChambreDecontamination || 0)
-        : '');
+      jetonInputHTML_('liberation', 'Libération', pm.jetonLiberation || 0);
 
     Array.prototype.forEach.call(jetons.querySelectorAll('.jeton-input'), function (input) {
       input.addEventListener('change', function () {

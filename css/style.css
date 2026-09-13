@@ -1566,6 +1566,9 @@ input[type="number"]:focus-visible {
   color: var(--color-text-muted);
   margin-bottom: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .jeton-champ .jeton-input {
   width: 34px;
