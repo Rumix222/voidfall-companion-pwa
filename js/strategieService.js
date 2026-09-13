@@ -7541,12 +7541,31 @@ var StrategieService = (function () {
             return '<span class="hint">Non automatisé (' + resultat.ligne.type + ')</span>';
           }
 
+          /**
+           * Chantier "Application automatique élargie des Objectifs
+           * galactiques — Lot 1" (retour utilisateur, 13/09/2026) : une
+           * ligne "exploit" REMPLIE dont le gain est automatisable par
+           * GameService.appliquerGainObjectif (voir gainObjectifAutomatisable
+           * — mode "unique", 1 seul gain non-Influence, sans `par`/
+           * `formule`/`bareme`) reçoit son propre bouton "Appliquer",
+           * MÊME principe que les Cadres d'Événement galactique
+           * (Plat. Galactique) — un clic par ligne, jamais groupé avec
+           * les autres, ni avec la validation générale de la popup. Une
+           * ligne déjà appliquée ce Cycle (`objectifsAppliques`,
+           * evenementCycleEval — clé "blocIndex:ligneIndex", RAZ au
+           * changement de cycle comme cadresAppliques) affiche "✓ Appliqué"
+           * à la place, jamais réactivable. Câblage des clics : voir
+           * renderPhaseEvaluation_ ci-dessous (rattache un listener par
+           * bouton à CHAQUE rendu, comme les boutons "Payer" de
+           * l'Entretien).
+           */
           function texteObjectifsGalactiques_(entretienTotalCourant, entretienRestantCourant) {
             if (!objectifsCatalogueEval) {
               return { html: '<p class="hint">Aucun Événement galactique choisi pour ce cycle.</p>', gainInfluence: 0 };
             }
             var contexteObjectifs = construireContexteObjectifs_(entretienTotalCourant, entretienRestantCourant);
             var resultats = ObjectifsService.evaluerObjectifs(objectifsCatalogueEval, contexteObjectifs);
+            var objectifsAppliquesEval = evenementCycleEval.objectifsAppliques || {};
             var gainInfluence = 0;
             var dernierBloc = null;
             var html = resultats.map(function (r) {
@@ -7561,7 +7580,15 @@ var StrategieService = (function () {
                 gainInfluence += r.gainAuto;
                 noteAuto = ' <strong>(+' + r.gainAuto + ' Influence, ajoutée à la validation)</strong>';
               }
-              return prefixe + '<p>' + r.ligne.texte + ' — ' + libelleStatutObjectif_(r) + noteAuto + '</p>';
+              var cleLigne = r.blocIndex + ':' + r.ligneIndex;
+              var dejaAppliquee = objectifsAppliquesEval[cleLigne];
+              var boutonAuto = '';
+              if (dejaAppliquee) {
+                boutonAuto = ' <strong style="color:var(--color-coral);">✓ Appliqué' + (dejaAppliquee.resume ? ' (' + dejaAppliquee.resume + ')' : '') + '</strong>';
+              } else if (r.rempli === true && GameService.gainObjectifAutomatisable(r.ligne)) {
+                boutonAuto = ' <button type="button" class="btn btn-secondary btn-objectif-appliquer" data-bloc="' + r.blocIndex + '" data-ligne="' + r.ligneIndex + '">Appliquer</button>';
+              }
+              return prefixe + '<p>' + r.ligne.texte + ' — ' + libelleStatutObjectif_(r) + noteAuto + boutonAuto + '</p>';
             }).join('');
             return { html: html, gainInfluence: gainInfluence };
           }
@@ -7662,6 +7689,62 @@ var StrategieService = (function () {
             if (btnPayerNourriture) btnPayerNourriture.addEventListener('click', function () { stockEval.nourriture -= 1; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerEnergie) btnPayerEnergie.addEventListener('click', function () { stockEval.energie -= 2; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerMateriel) btnPayerMateriel.addEventListener('click', function () { stockEval.materiel -= 2; entretienPaye++; renderPhaseEvaluation_(); });
+
+            // Boutons "Appliquer" (voir texteObjectifsGalactiques_ ci-dessus)
+            // — un listener par bouton à CHAQUE rendu, comme les 3 boutons
+            // "Payer" ci-dessus. GameService.appliquerGainObjectif ÉCRIT en
+            // base immédiatement (contrairement à un clic "Payer", suivi
+            // local jusqu'à Valider) : `partieEval` est donc remplacée par
+            // la partie rechargée, MAIS `ressourcesEval`/`stockEval`/
+            // `influenceInitiale` — captés une seule fois à l'ouverture de
+            // la popup, puis suivis localement (paiement d'Entretien pas
+            // encore persisté) — doivent être recalés sur cette nouvelle
+            // base SANS perdre ce suivi local : on ne réaffecte jamais
+            // stockEval tel quel depuis la nouvelle partie (ça effacerait
+            // les clics "Payer" déjà faits), seulement l'écart encore dû
+            // par rapport au stock d'AVANT ce gain (`ressourcesEval` avant
+            // réaffectation). N'affecte QUE Nourriture/Énergie/Matériel/
+            // Influence, les seules ressources qu'un gain de ce Lot 1 peut
+            // toucher (jeton Prime — TOKENS_PRIME_ peut rapporter n'importe
+            // laquelle des 5, y compris l'Influence). entretienTotal/
+            // agregatsSecteursEval/pointsProgrammesEval/revenusEval restent
+            // volontairement le SNAPSHOT pris à l'ouverture (comme pour un
+            // clic "Payer" déjà existant, qui ne les recalcule pas non
+            // plus) — simplification acceptée, sans conséquence pour ce
+            // Lot 1 (aucune de ses clés ne change l'Entretien/le Revenu ;
+            // gagner_programme place la carte en `programmesEnMain`, pas
+            // encore `programmesUtilises`, donc pas encore comptée dans
+            // l'Entretien de Programme de cette même popup).
+            Array.prototype.forEach.call(contenu.querySelectorAll('.btn-objectif-appliquer'), function (btn) {
+              btn.addEventListener('click', function () {
+                var blocIndex = Number(btn.dataset.bloc);
+                var ligneIndex = Number(btn.dataset.ligne);
+                btn.disabled = true;
+                GameService.appliquerGainObjectif(partieEval.id, partieEval.cycleNum, blocIndex, ligneIndex, demanderChoix)
+                  .then(function (resultat) {
+                    if (resultat && resultat.annule) { btn.disabled = false; return; }
+                    var ressourcesAvant = ressourcesEval;
+                    var creditRestantNourriture = ressourcesAvant.nourriture - stockEval.nourriture;
+                    var creditRestantEnergie = ressourcesAvant.energie - stockEval.energie;
+                    var creditRestantMateriel = ressourcesAvant.materiel - stockEval.materiel;
+
+                    partieEval = resultat;
+                    evenementCycleEval = (partieEval.evenements || {})['cycle' + partieEval.cycleNum];
+                    objectifsCatalogueEval = evenementCycleEval ? evenementCycleEval.objectifs : null;
+                    ressourcesEval = (partieEval.plateauMaison || {}).ressources || {};
+                    stockEval.nourriture = ressourcesEval.nourriture - creditRestantNourriture;
+                    stockEval.energie = ressourcesEval.energie - creditRestantEnergie;
+                    stockEval.materiel = ressourcesEval.materiel - creditRestantMateriel;
+                    influenceInitiale = ressourcesEval.influence || 0;
+
+                    renderPhaseEvaluation_();
+                  })
+                  .catch(function (erreur) {
+                    btn.disabled = false;
+                    window.alert('Échec de l\'application de l\'Objectif : ' + erreur.message);
+                  });
+              });
+            });
 
             btnValider.disabled = peutEncorePayer;
           }

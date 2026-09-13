@@ -1,7 +1,49 @@
 /**
  * version.js
- * Version 143 — 2026-09-13
+ * Version 144 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Application automatique
+ * élargie des Objectifs (gains non-Influence, choix multiples)") —
+ * inventaire avant de coder : sur 59 lignes "exploit"/"multiplicateur"
+ * (formule déjà 6/6), 35 ont un gain qui reste manuel (22 mode "unique"/
+ * 1 gain, 6 "libre", 4 "exclusif", 2 "groupe", 1 "exclusif_repete"). Lot
+ * 1 : lignes "exploit" mode "unique"/1 gain SANS `par`/`formule`/`bareme`,
+ * clé déjà résolvable par FocusEngine — 13/22 lignes "unique" :
+ * - `js/gameService.js` : `gainObjectifAutomatisable(ligne)`/
+ *   `appliquerGainObjectif(partieId, cycle, blocIndex, ligneIndex,
+ *   demanderChoix)` — réutilise `cleFocusEnginePourOptionCadre_` (déjà
+ *   utilisée pour les Cadres "choix", même vocabulaire `{cle, valeur}`)
+ *   + 2 clés propres aux Objectifs (`programme`/`gagner_programme` ->
+ *   FocusEngine `gagner_programme`, `prime` -> FocusEngine `prime`).
+ *   Délègue à `FocusEngine.resoudreEffet`, MÊME mécanisme que
+ *   `appliquerCadreChoixFocusEngine`. Garde-fou anti-double-application :
+ *   `evenementCycle.objectifsAppliques["blocIndex:ligneIndex"]`, MÊME
+ *   principe que `cadresAppliques`.
+ * - `js/strategieService.js` : chaque ligne "exploit" REMPLIE et
+ *   automatisable reçoit son propre bouton "Appliquer" (popup
+ *   'phase_evaluation', `texteObjectifsGalactiques_`/
+ *   `renderPhaseEvaluation_`) — MÊME principe que les Cadres (un clic par
+ *   ligne). `ressourcesEval`/`stockEval`/`influenceInitiale` (suivi local
+ *   du paiement d'Entretien pas encore persisté) recalés sur la nouvelle
+ *   partie après chaque application réussie sans perdre ce suivi local —
+ *   un gain de ce Lot 1 (jeton Prime) peut modifier Nourriture/Énergie/
+ *   Matériel/Influence. `entretienTotal`/agrégats secteurs/points
+ *   Programme restent le instantané pris à l'ouverture de la popup
+ *   (comme un clic "Payer" existant) — aucune clé de ce Lot 1 ne les
+ *   affecte réellement.
+ * - `docs/docs-rules-cycle-de-jeu.md` §3.3/§3.4 : mis à jour (étaient
+ *   restés au statut "placeholder" malgré les chantiers Objectifs
+ *   galactiques/Points de victoire des Programmes déjà livrés).
+ * - Tests : `js/gameService_appliquer_gain_objectif_test.js` (nouveau,
+ *   15 tests). 370 tests au vert (`node --test js/*.test.js` + tous les
+ *   `*_test.js` individuels).
+ * - Hors périmètre (prochains lots) : modes libre/groupe/exclusif/
+ *   exclusif_repete (13 lignes), lignes "multiplicateur" à gain
+ *   non-Influence répété `compte` fois, et les 9 lignes "unique"
+ *   restantes (commerce/gloire — mécaniques pas câblées côté FocusEngine ;
+ *   produire_type_ressource — choix de ressource du joueur ; evaluer_
+ *   objectifs_programme — mécanique ambiguë, jamais devinée).
  *
  * 13/09/2026, suite (retour utilisateur : "Les 9 lignes d'Objectifs
  * galactiques restées hors périmètre (4 exploit + 5 multiplicateur) —
@@ -5077,4 +5119,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.13';
+var APP_VERSION = '20260913.14';

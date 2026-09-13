@@ -319,6 +319,8 @@ les fonctions marquées **Pure** ci-dessous. Dépend en tolérant
 | `appliquerCadreGainCorruption` | `(partieId, cycle, ordreCadre, demanderChoix)` | Applique un cadre "gain" de Corruption sur une piste de Civilisation |
 | `appliquerCadreChoixCorruptionGloire` | `(partieId, cycle, ordreCadre, indexOption, demanderChoix)` | Option "choix" au gabarit `{gain:{corruption:1,gloire:1}}` (Événement H Cycle 1 Cadre 1, seul cas connu) — ouvre 'gagner_corruption' (4 cibles ouvertes) puis ajoute un jeton Gloire valeur 1 au premier emplacement libre de `plateauMaison.gloire` |
 | `appliquerCadreChoixRappelCube` | `(partieId, cycle, ordreCadre, indexOption, demanderChoix)` | Option "choix" au gabarit `{recall:{cube:1}}` (Événement H Cycle 1 Cadre 1) — ouvre 'rappeler_cube' (secteur + type de vaisseau), qui persiste elle-même via `SecteurService.rappelerCube` |
+| `gainObjectifAutomatisable` | `(ligne)` | **Pure.** true si une ligne "exploit" d'Objectif galactique (mode "unique", 1 seul gain, sans `par`/`formule`/`bareme`) a une clé résolvable par FocusEngine — chantier "Application automatique élargie des Objectifs", Lot 1 (13/09/2026) |
+| `appliquerGainObjectif` | `(partieId, cycle, blocIndex, ligneIndex, demanderChoix)` | Applique le gain d'une ligne d'Objectif galactique via `FocusEngine.resoudreEffet` — MÊME mécanisme que `appliquerCadreChoixFocusEngine` (un gain d'Objectif `{cle,valeur}` et une option de Cadre partagent le même vocabulaire) ; garde-fou anti-double-application `evenementCycle.objectifsAppliques["blocIndex:ligneIndex"]` |
 | `definirTechnologieAmelioree` | `(partieId, cible, amelioree)` | Marque une techno possédée (`'depart'` ou slot 0-4) améliorée/non |
 | `avancerCycle` | `(partieId)` | Avance `cycleNum`/`cycleTermine` (1→2→3→'termine'), amorce les Focus héroïques du nouveau cycle |
 | `choisirFocusHeroique` | `(partieId, cycle, slot, nom)` | Enregistre/retire un Focus héroïque (slot 0-2), unicité via `focusHeroiquesPioches`, **pas** d'entrée d'historique |
@@ -683,6 +685,22 @@ point de lecture correct de `contexte.gloire` dans ce fichier.
 Testé par `js/objectifsService.test.js` (40 tests) — voir aussi les tests
 étendus d'`obtenirAgregatsInfluenceSecteursPurs` dans
 `js/secteurService_actions.test.js` pour les nouveaux champs.
+
+**Application automatique élargie (Lot 1, 13/09/2026, suite)** — au-delà
+du gain Influence unique/simple ci-dessus, une ligne "exploit" REMPLIE
+dont le gain (mode "unique", 1 seul, sans `par`/`formule`/`bareme`) a une
+clé résolvable par FocusEngine (`retirer_corruption`/`avancer_civilisation`/
+`gagner_technologie`/`gagner_programme`/`prime`/`construire_installation`/
+`augmenter_population_pure`) reçoit son propre bouton "Appliquer" dans la
+popup 'phase_evaluation' — voir `GameService.gainObjectifAutomatisable`/
+`appliquerGainObjectif` (§4.4) et `StrategieService.texteObjectifsGalactiques_`
+(§4.7). MÊME principe que les Cadres d'Événement galactique (un clic par
+ligne, jamais groupé) — garde-fou anti-double-application par cycle
+(`evenementCycle.objectifsAppliques`). Couvre 13 des 22 lignes "exploit"
+mode "unique" restées manuelles ; les modes libre/groupe/exclusif/
+exclusif_repete et les lignes "multiplicateur" à gain non-Influence
+répété restent hors périmètre de ce lot (docs/TODO.md EVOLUTION 26).
+Testé par `js/gameService_appliquer_gain_objectif_test.js` (15 tests).
 
 ### 4.11 Schéma de dépendances
 

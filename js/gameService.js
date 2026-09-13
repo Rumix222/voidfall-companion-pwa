@@ -1343,6 +1343,111 @@ var GameService = (function () {
     });
   }
 
+  // ------------------------------------------------------------
+  // Application AUTOMATIQUE élargie des Objectifs galactiques (§3.3,
+  // retour utilisateur 13/09/2026 : "gains non-Influence, choix
+  // multiples") — Lot 1 : lignes "exploit"/"multiplicateur" mode
+  // "unique" (1 seul gain) dont la clé est déjà résolvable par
+  // FocusEngine (MÊME mécanisme que les Cadres "choix" ci-dessus —
+  // cleFocusEnginePourOptionCadre_/FocusEngine.resoudreEffet). Chaque
+  // ligne d'Objectif a son propre bouton "Appliquer" (comme un Cadre),
+  // PAS un clic groupé avec les autres lignes — un "Annuler" sur la
+  // popup ouverte laisse la ligne non appliquée, réessayable.
+  //
+  // `objectifsAppliques` (evenementCycle, MÊME principe que
+  // cadresAppliques ci-dessus, garde-fou anti-double-application inclus)
+  // — clé stable "blocIndex:ligneIndex" (position dans `objectifs.blocs`
+  // du catalogue de l'Événement du cycle, jamais réordonnée), PAS
+  // l'ordre d'affichage (qui peut sauter des blocs "OU" non retenus).
+  // ------------------------------------------------------------
+
+  /**
+   * Comme cleFocusEnginePourOptionCadre_ ci-dessus (même vocabulaire de
+   * clé, `{cle, valeur}`), mais pour un `recompense.gains[0]` d'Objectif
+   * galactique — 2 clés en plus, jamais rencontrées côté Cadre : `programme`/
+   * `gagner_programme` (2 orthographes du catalogue pour la même clé
+   * FocusEngine, voir focusEngine.js) et `prime` (FocusEngine.resoudreCle_
+   * la reconnaît nativement, CLES_SIMPLES — ouvre resoudreGainJetonsPrime_,
+   * même mécanisme qu'un gain de jeton Prime par Focus/Cadre).
+   */
+  function cleFocusEnginePourGainObjectif_(gain) {
+    if (!gain) return null;
+    if (gain.cle === 'programme' || gain.cle === 'gagner_programme') return 'gagner_programme';
+    if (gain.cle === 'prime') return 'prime';
+    return cleFocusEnginePourOptionCadre_(gain);
+  }
+
+  /**
+   * Boilerplate commun à appliquerGainObjectif ci-dessous — MÊME principe
+   * que chargerCadreOuvrable_ (lit parties+plateauMaison, garde-fou
+   * anti-double-application), mais indexe `objectifs.blocs[blocIndex].
+   * lignes[ligneIndex]` (catalogue de l'Événement du cycle) au lieu de
+   * `cadres[ordreCadre]`.
+   */
+  function chargerObjectifOuvrable_(partieId, cycle, blocIndex, ligneIndex) {
+    return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+      var lignePlateauMaison = resultats[1];
+      var partie = assemblerPartie_(resultats[0], lignePlateauMaison);
+      if (!partie) throw new Error('Partie introuvable.');
+
+      var cleCycle = 'cycle' + cycle;
+      var evenementCycle = (partie.evenements || {})[cleCycle];
+      if (!evenementCycle || !evenementCycle.objectifs) throw new Error('Aucun Événement galactique (avec Objectifs) choisi pour ce cycle.');
+      evenementCycle.objectifsAppliques = evenementCycle.objectifsAppliques || {};
+      var cleLigne = blocIndex + ':' + ligneIndex;
+      if (evenementCycle.objectifsAppliques[cleLigne]) {
+        throw new Error('Cet Objectif a déjà été appliqué pour ce cycle.');
+      }
+
+      var bloc = (evenementCycle.objectifs.blocs || [])[blocIndex];
+      var ligne = bloc ? (bloc.lignes || [])[ligneIndex] : null;
+      if (!ligne) throw new Error('Ligne d\'Objectif introuvable.');
+
+      return {
+        partie: partie, lignePlateauMaison: lignePlateauMaison,
+        cleCycle: cleCycle, evenementCycle: evenementCycle, cleLigne: cleLigne, ligne: ligne
+      };
+    });
+  }
+
+  /**
+   * Finalise la résolution d'un Objectif via FocusEngine.resoudreEffet —
+   * MÊME contrat que finaliserResolutionCadreFocusEngine_ ci-dessus
+   * (persiste les mutations plateauMaison suivies par FocusEngine, marque
+   * `objectifsAppliques[cleLigne]`, recharge la partie). Certaines clés
+   * (gagner_programme/prime notamment) persistent DÉJÀ elles-mêmes via
+   * leur propre popup (aucune mutation `etat` correspondante) — `champs`
+   * reste alors vide, `ecrirePlateauMaison` un no-op, cohérent.
+   */
+  function finaliserResolutionObjectifFocusEngine_(partieId, ctx, source, resultatEffet) {
+    if (!resultatEffet.succes) return Promise.resolve({ annule: true });
+
+    var champs = {};
+    resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+
+    var resume = resultatEffet.journal.map(function (ligne) {
+      var prefixe = source + ' : ';
+      return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
+    }).join(' ').replace(/\.\s*$/, '');
+
+    ctx.evenementCycle.objectifsAppliques[ctx.cleLigne] = { resume: resume, le: new Date().toISOString() };
+    ctx.partie.evenements[ctx.cleCycle] = ctx.evenementCycle;
+
+    var ecrirePlateauMaison = Object.keys(champs).length
+      ? DB.get('plateauMaison', partieId).then(function (ligneFraiche) {
+        Object.keys(champs).forEach(function (champ) { ligneFraiche[champ] = champs[champ]; });
+        return DB.put('plateauMaison', ligneFraiche);
+      })
+      : Promise.resolve();
+
+    return Promise.all([
+      ecrirePlateauMaison,
+      GameService.sauvegarderPartie(ctx.partie, 'objectif_galactique_applique', ctx.cleCycle + ' — objectif ' + ctx.cleLigne)
+    ]).then(function () {
+      return rechargerPartie_(partieId);
+    });
+  }
+
   /**
    * Retire de l'objet partie tout ce qui a une colonne/clé dédiée
    * ailleurs, avant persistance dans parties.etatJson (voir en-tête).
@@ -2497,6 +2602,76 @@ var GameService = (function () {
               return rechargerPartie_(partieId);
             });
         });
+      });
+    },
+
+    /**
+     * true si `ligne` (une ligne du catalogue Objectifs galactiques) est
+     * automatisable par appliquerGainObjectif ci-dessous — Lot 1 : type
+     * "exploit" UNIQUEMENT (jamais "multiplicateur", même mode "unique/1
+     * gain" — voir la garde `gain.par` ci-dessous, qui exclurait de toute
+     * façon les rares cas où un "multiplicateur" a `mode:"unique"`),
+     * `recompense.mode === 'unique'`, 1 seul gain, SANS `par`/`formule`/
+     * `bareme` (ces 3 supposent une répétition/un calcul que cette
+     * fonction ne fait pas — appliquer `Number(gain.valeur)` une seule
+     * fois sous-appliquerait le gain réel), clé résolvable par
+     * cleFocusEnginePourGainObjectif_. Utilisée par index.html/
+     * strategieService.js pour décider d'afficher le bouton "Appliquer"
+     * à côté d'une ligne (au lieu du simple rappel textuel
+     * "Non automatisé").
+     */
+    gainObjectifAutomatisable: function (ligne) {
+      if (!ligne || ligne.type !== 'exploit') return false;
+      var rec = ligne.recompense;
+      if (!rec || rec.mode !== 'unique' || !rec.gains || rec.gains.length !== 1) return false;
+      var gain = rec.gains[0];
+      if (gain.par || gain.formule || gain.bareme) return false;
+      return !!cleFocusEnginePourGainObjectif_(gain);
+    },
+
+    /**
+     * Applique AUTOMATIQUEMENT le gain d'une ligne d'Objectif galactique
+     * (Lot 1, voir gainObjectifAutomatisable ci-dessus) — délègue à
+     * FocusEngine.resoudreEffet, MÊME mécanisme que appliquerCadreChoix
+     * FocusEngine ci-dessus (un Objectif "gain unique" et une option de
+     * Cadre partagent le même vocabulaire `{cle, valeur}`). `demanderChoix`
+     * ouvre la popup dédiée à la clé résolue (retirer_corruption/
+     * avancer_civilisation/gagner_technologie/gagner_programme/prime/
+     * construire_installation/augmenter_population_pure) exactement comme
+     * pour un Cadre ou une action Focus — le joueur choisit sa cible
+     * normalement. Un "Annuler" laisse la ligne non appliquée (pas de
+     * garde-fou "déjà tenté", seul un SUCCÈS marque `objectifsAppliques`).
+     */
+    appliquerGainObjectif: function (partieId, cycle, blocIndex, ligneIndex, demanderChoix) {
+      return chargerObjectifOuvrable_(partieId, cycle, blocIndex, ligneIndex).then(function (ctx) {
+        var ligne = ctx.ligne;
+        if (ligne.type !== 'exploit') {
+          throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (type non pris en charge).');
+        }
+        var rec = ligne.recompense;
+        if (!rec || rec.mode !== 'unique' || !rec.gains || rec.gains.length !== 1) {
+          throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
+        }
+        var gain = rec.gains[0];
+        if (gain.par || gain.formule || gain.bareme) {
+          throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (gain répété/calculé non pris en charge).');
+        }
+        var cleFocusEngine = cleFocusEnginePourGainObjectif_(gain);
+        if (!cleFocusEngine) throw new Error('Gain non automatisable pour cette ligne d\'Objectif.');
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+        var effet = {};
+        effet[cleFocusEngine] = cleFocusEngine === 'gagner_technologie'
+          ? niveauxTechnologieOptionCadre_(gain.cle)
+          : (Number(gain.valeur) || 1);
+
+        var source = 'Objectif galactique';
+        var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, ctx.lignePlateauMaison);
+
+        return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effet, source, ligne.texte, demanderChoix)
+          .then(function (resultatEffet) {
+            return finaliserResolutionObjectifFocusEngine_(partieId, ctx, source, resultatEffet);
+          });
       });
     },
 
