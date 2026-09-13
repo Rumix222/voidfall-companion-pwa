@@ -9,7 +9,7 @@
 # 1. INFLUENCE
 L’Influence n’a qu’une utilité, et non des moindres : gagner la partie. ✅
 Lorsque vous gagnez ou perdez de l’Influence, ajustez les cadrans de votre plateau Influence du montant concerné. ✅
-Il est rare de perdre de l’Influence (voir Entretien) ; si toutefois vous deviez perdre de l’Influence alors que vous n’en avez plus, retombez simplement à zéro. ❌
+Il est rare de perdre de l’Influence (voir Entretien) ; si toutefois vous deviez perdre de l’Influence alors que vous n’en avez plus, retombez simplement à zéro. ✅ 💬 clamp systématique `Math.max(0, ...)` sur toute perte d'Influence (gameService.js, focusEngine.js, strategieService.js).
 
 # 2. RÉSERVE DE RESSOURCES
 La plupart des coûts doivent être réglés en ressources : Nourriture, Énergie, Matériel, Crédits, ou Science. ✅
@@ -28,9 +28,9 @@ Celui qui apparaît au milieu est le Revenu. ✅
 Le Niveau de Production d’un type de ressource est déterminé par les Guildes correspondantes que vous contrôlez. ✅
 Chaque Guilde ajoute au Niveau de Production la valeur en Population de son secteur : +1 si le secteur a 1 Population, +2 si le secteur a 2 Population, etc. ✅
 Une Guilde augmente le Niveau de Production quelle que soit la nature de son secteur (Pur ou Corrompu). ✅
-Un Niveau de Production peut atteindre, au maximum, la valeur de 13. ❌
+Un Niveau de Production peut atteindre, au maximum, la valeur de 13. ✅ 💬 `calculerProduction_` (strategieService.js) : `niveau = Math.max(0, Math.min(13, ...))` avant lecture de la table Niveau→Production.
 Cependant, même si vous atteignez ce maximum pour un type de ressource, vous pouvez tout de même établir des Guildes supplémentaires (ou envahir des secteurs qui en ont). ✅
-Ajustez vos Niveaux de Production lorsque vous établissez ou détruisez une Guilde, lorsque vous augmentez ou diminuez la Population, ou lorsque vous gagnez ou perdez le contrôle d’un secteur. 🔍
+Ajustez vos Niveaux de Production lorsque vous établissez ou détruisez une Guilde, lorsque vous augmentez ou diminuez la Population, ou lorsque vous gagnez ou perdez le contrôle d’un secteur. ✅ 💬 `calculerNiveauxProduction_` (strategieService.js) recalcule intégralement les Niveaux depuis les Guildes/Population/contrôle de `secteursPartie` à chaque affichage — pas d'ajustement incrémental, mais toujours à jour.
 Votre carte Programme de départ peut afficher une icône qui indique que le Niveau de Production d’une ressource est augmenté de 1 en permanence. Ce bonus s’ajoute à ce que fournissent vos Guildes. ✅
 Le Revenu d’une ressource n’augmente pas de la même façon que son Niveau de Production. ✅
 Le Revenu en Crédits , notamment, augmente encore plus lentement que celui des autres ressources. ✅
@@ -40,5 +40,5 @@ Lorsque vous produisez un ou plusieurs types de ressources, vous ajoutez à votr
 Lorsque votre production de ressources vous fait dépasser le cap de 15 ressources du même type dans vos réserves, vous générez une surproduction. ✅
 Dans ce cas, vous devez perdre l’excédent de manière à ne pas dépasser 15 en réserve. Lorsque cela vous arrive, gagnez 3 Influence, quel que soit l’excédent ainsi perdu. ✅
 Si, à votre tour, vous surproduisez plusieurs types de ressources, ou la même ressource plusieurs fois, vous gagnez les 3 Influence pour chaque surproduction. ✅ 💬 chaque clé produire_<ressource> résolue est un événement indépendant, aucune déduplication.
-Note : il existe d’autres sources de production que les Guildes, comme les Technologies Matrice Neuronale ou Quais Orbitaux Améliorés. ❌
+Note : il existe d’autres sources de production que les Guildes, comme les Technologies Matrice Neuronale ou Quais Orbitaux Améliorés. ✅ 💬 `calculerProductionAvecBonusTechnologie_` (Matrice neuronale, +2 Crédit flat) et `calculerNiveauxProduction_` (Quais orbitaux Améliorée, +2 Niveau Crédit par Chantier Naval ; Collecte de données, +2 Niveau Science par Guilde de Banquiers) — strategieService.js.
 Note : certains secteurs spéciaux (Ceinture d’Astéroïdes, Monde-paradis) peuvent également fournir des Niveaux de Production supplémentaires. ❌

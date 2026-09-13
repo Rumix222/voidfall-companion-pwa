@@ -7495,7 +7495,21 @@ var StrategieService = (function () {
               // Emplacements 1-3 de programmesUtilises (l'emplacement 0,
               // Programme de départ, n'est jamais concerné — "hors
               // départ" dans le texte de tous les objectifs de ce type).
-              programmesNonDepart: slotsProgrammeEval.slice(1)
+              programmesNonDepart: slotsProgrammeEval.slice(1),
+              // Lignes hors périmètre restantes du chantier "Objectifs
+              // galactiques" (13/09/2026, suite) — jetonLiberation (champ
+              // plateauMaison déjà existant, jamais transmis jusqu'ici) et
+              // emplacementsGuildeVidesTotal (SecteurService.
+              // obtenirAgregatsInfluenceSecteursPurs, étendu) sont
+              // calculables directement ; les 3 derniers sont des
+              // compteurs manuels (index.html/renderPlateauCrise_, voir
+              // GameService.CHAMPS_PLATEAU_MAISON_AUTORISES) — aucun état
+              // physique correspondant modélisé ailleurs dans l'appli.
+              jetonLiberation: (partieEval.plateauMaison || {}).jetonLiberation || 0,
+              emplacementsGuildeVidesTotal: agregatsSecteursEval.emplacementsGuildeVidesTotal,
+              jetonsCatastrophePlateauCrise: (partieEval.plateauMaison || {}).jetonsCatastrophePlateauCrise || 0,
+              corruptionsConservees: (partieEval.plateauMaison || {}).corruptionsConservees || 0,
+              focusPrefereEnDefausse: !!(partieEval.plateauMaison || {}).focusPrefereEnDefausse
             };
           }
 

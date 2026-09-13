@@ -29,9 +29,9 @@ Pour déployer 1 cube, prenez un cube de la zone active de votre fiche Maison et
 Vous devez aussi choisir le type de Flotte (donc le jeton) associé à ce cube. ✅
 Les Flottes de Corvettes ne requièrent aucune Technologie spécifique. ✅
 Les quatre autres, en revanche, peuvent uniquement être déployés avec la Technologie correspondante (du même nom). ✅
-Si vous n’avez aucun cube actif, vous ne pouvez pas en déployer. 🔍
+Si vous n’avez aucun cube actif, vous ne pouvez pas en déployer. ✅ 💬 vérifié via l'alerte "Pas assez de Cube actif" (strategieService.js, flux Feuille 'deployer_cube'/'deployer_cube_par_chantier') qui bloque l'ajout d'un déploiement au-delà du stock disponible.
 Vous ne pouvez pas volontairement rappeler un cube du plateau pour le déployer ailleurs. ✅
-Lorsque vous déployez un cube sur un ou plusieurs types de Flottes, vous devez payer le coût en ressources indiqué sur la Technologie du type correspondant. Si vous ne pouvez pas payer ce coût, vous ne pouvez pas déployer de cube sur ce type de Flotte. 🔍
+Lorsque vous déployez un cube sur un ou plusieurs types de Flottes, vous devez payer le coût en ressources indiqué sur la Technologie du type correspondant. Si vous ne pouvez pas payer ce coût, vous ne pouvez pas déployer de cube sur ce type de Flotte. ✅ 💬 `COUT_DEPLOIEMENT_PAR_TYPE` (strategieService.js) vérifie le stock de la ressource requise par type de Flotte et bloque l'ajout (alerte "Pas assez de ...") si insuffisant.
 Un déploiement peut faire l’objet de restrictions : ✅
 Icone 1 - Déployez dans votre Secteur-Mère uniquement. ✅
 Icone 2 - Déployez sur un type de Flotte spécifique. ✅
@@ -40,12 +40,12 @@ Icone 3 - Pour chaque Chantier Naval en votre possession, déployez 1 cube dans 
 Le coût de certaines actions est de rappeler 1 cube depuis le plateau vers la zone active de votre fiche Maison. 🔍
 Lorsque vous subissez des Dégâts au Combat, vous devez également rappeler 1 cube depuis le secteur du Combat de la même façon. 🔍
 Si vous rappelez le dernier cube d’une Flotte, remettez le jeton Flotte à la réserve commune. ✅
-Si vous rappelez le dernier cube d’un secteur qui n’est pas votre Secteur-Mère, vous devez défausser un jeton Gloire de votre choix (voir Jetons Gloire) et le secteur est abandonné (voir Secteurs abandonnés) 🔍
+Si vous rappelez le dernier cube d’un secteur qui n’est pas votre Secteur-Mère, vous devez défausser un jeton Gloire de votre choix (voir Jetons Gloire) et le secteur est abandonné (voir Secteurs abandonnés) ❌ 💬 confirmé : `SecteurService.rappelerCube` décrémente juste le stock du type concerné, sans jamais toucher `jetonGloire` ni déclencher la reprise du secteur par le Néant.
 Certaines actions précisent que vous devez résoudre un effet dans le secteur depuis lequel vous avez rappelé le cube. ✅
 ## 1.6 Activer / désactiever un cube
 Lorsque vous activez 1 cube, déplacez-le depuis votre zone inactive vers votre zone active. Si vous n’avez aucun cube inactif, vous ne pouvez pas exercer cet effet. 🔍
 Le coût de certaines actions est de désactiver 1 cube : vous devez alors le déplacer depuis votre zone active vers votre zone inactive. ✅
-Si vous n’avez aucun cube actif lorsqu’il vous est demandé d’en désactiver un, vous devez rappeler un cube puis le désactiver aussitôt. 🔍
+Si vous n’avez aucun cube actif lorsqu’il vous est demandé d’en désactiver un, vous devez rappeler un cube puis le désactiver aussitôt. ❌ 💬 confirmé : `focusEngine.js` (résolution d'un coût `desactiver_cube`/`cubeActif`) tronque simplement le coût jusqu'à 0 ("pris = Math.min(etat.cubeActif, valeur)") au lieu d'implémenter le rappel automatique d'un cube suivi de sa désactivation.
 ## 1.7 Note importante : à la fin de chacun de vos tours de la phase Focus (étape 3, Nettoyage), vous ne pouvez jamais avoir plus de 2 jetons Flotte dans un même secteur sous votre contrôle. ❌
 Si vous disposez de 3 Flottes (ou plus) dans un secteur, vous devez rappeler autant de cubes que nécessaire dans votre zone active pour que le reste de vos cubes tienne sur 2 jetons Flotte. ❌
 #2. FLOTTES DU NÉANT
@@ -60,10 +60,10 @@ Il existe deux types de déplacements possibles dans Voidfall : regrouper et env
 Lorsque vous décidez de regrouper des cubes de Puissance Navale, vous pouvez faire jusqu’à cinq déplacements de cubes au total en les emmenant vers des secteurs adjacents que vous contrôlez. ✅
 Les cubes que vous déplacez ne sont pas obligés de commencer et terminer leur déplacement dans le même secteur. ✅
 Vous pouvez déplacer un même cube plusieurs fois. Déplacez, ajoutez ou retirez des jetons Flotte au fil du déplacement s’il le faut. ✅ 
-Important : vous ne pouvez pas déplacer le dernier cube d’un secteur si cela conduit à son abandon (sauf Secteur-Mère). 🔍
+Important : vous ne pouvez pas déplacer le dernier cube d’un secteur si cela conduit à son abandon (sauf Secteur-Mère). ✅ 💬 `SecteurService.regrouper` (EVOLUTION 15) interdit explicitement de retirer la dernière Puissance Navale d'un secteur de départ hors Secteur-Mère.
 # 3.1 Envahir
 Lorsque vous envahissez un secteur, vous devez cibler un secteur que vous ne contrôlez pas. ✅
-Les cibles valides sont : Un secteur du Néant, Un secteur ne contenant aucune Puissance Navale. 🔍
+Les cibles valides sont : Un secteur du Néant, Un secteur ne contenant aucune Puissance Navale. ✅ 💬 filtre `ciblesEligibles` (strategieService.js, Feuille Envahir) : `(s.pnNeant||0) > 0 || maisonDechue_(s)` (secteur de Maison déchue = sans Puissance Navale) sur les secteurs adjacents non possédés.
 Ensuite, résolvez une Invasion, constituée des étapes suivantes : ✅
 # 3.1.1. Déplacement de Flotte(s) : ✅
 Choisissez autant de cubes que vous le souhaitez depuis un ou plusieurs secteurs adjacents au secteur ciblé et déplacez-les dans ce secteur.✅
@@ -77,9 +77,9 @@ Lorsque vous lancez une Invasion, vous êtes autorisé à abandonner des secteur
 Si vous le faites, vous devez défausser un jeton Gloire de votre choix de votre fiche Maison (le cas échéant) pour chaque secteur abandonné. ❌
 Tout secteur abandonné est laissé à la merci du Néant qui tente immédiatement d’en prendre le contrôle. 🔍
 #4 SECTEURS ABANDONNÉS ET PRISE DE CONTRÔLE DU NÉANT
-Lorsque le dernier cube de Puissance Navale est retiré d’un secteur (sauf Secteur-Mère), ce secteur est immédiatement abandonné. 🔍
-Cela peut survenir après une égalité au Combat, en cas de défaite lors d’une Escarmouche du Néant, lors d’un rappel de Puissance Navale (pour payer un coût ou à cause d’un effet de jeu) ou même volontairement, si vous déplacez votre dernier cube pour envahir un secteur adjacent. 🔍
-Quelle que soit la cause, le Néant tente immédiatement de prendre le contrôle de ce secteur. 🔍
+Lorsque le dernier cube de Puissance Navale est retiré d’un secteur (sauf Secteur-Mère), ce secteur est immédiatement abandonné. ✅ 💬 partiel : `SecteurService.envahirResoudre` détecte un secteur SOURCE d'Invasion retombé à 0 PN (hors Secteur-Mère) et le fait basculer immédiatement au Néant — uniquement pour ce déclencheur (voir ligne suivante).
+Cela peut survenir après une égalité au Combat, en cas de défaite lors d’une Escarmouche du Néant, lors d’un rappel de Puissance Navale (pour payer un coût ou à cause d’un effet de jeu) ou même volontairement, si vous déplacez votre dernier cube pour envahir un secteur adjacent. ✅ 💬 partiel : seul le cas "volontairement en envahissant" est couvert (`envahirResoudre`, secteurs sources) ; `SecteurService.rappelerCube` ne déclenche jamais cette reprise, et aucune Escarmouche/égalité de Combat hors Invasion n'est modélisée.
+Quelle que soit la cause, le Néant tente immédiatement de prendre le contrôle de ce secteur. ✅ 💬 partiel : `envahirResoudre` pose `pnNeant = 2` sur le secteur abandonné, mais sans dérouler les 3 autres étapes de la prise de contrôle (retrait des Installations, marqueur Corruption, jeton Prime face cachée — voir §4.1-4.3 ci-dessous, toujours ❌).
 Résolvez les étapes suivantes : 
 ## 4.1. Retirez toutes les Installations (mais pas les Guildes), ❌
 ## 4.2. Placez un marqueur Corruption sous le dé Population (s’il n’en a pas déjà un), ❌

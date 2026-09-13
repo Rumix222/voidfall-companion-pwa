@@ -1,7 +1,42 @@
 /**
  * version.js
- * Version 142 — 2026-09-13
+ * Version 143 — 2026-09-13
  * Source de vérité unique pour la version de l'application.
+ *
+ * 13/09/2026, suite (retour utilisateur : "Les 9 lignes d'Objectifs
+ * galactiques restées hors périmètre (4 exploit + 5 multiplicateur) —
+ * chacune bloquée par une donnée précise manquante, traitable au cas par
+ * cas comme le reste du chantier qu'on vient de finir") :
+ * `ObjectifsService.CLES_NON_COUVERTES`/`CLES_PAR_NON_COUVERTES` sont
+ * désormais VIDES — 35/35 lignes "exploit" et 24/24 lignes
+ * "multiplicateur" ont une condition/un compte calculable :
+ * - `js/secteurService.js`/`obtenirAgregatsInfluenceSecteursPurs` :
+ *   étendue (fetch `typesSecteur`/`scenarioSecteurs`, comme
+ *   `obtenirDetailSecteursProgrammes`) avec `emplacementsGuildeVidesTotal`
+ *   (tous secteurs possédés, même simplification que `guildeVacante` —
+ *   nuance "Vaisseaux-Arches" ignorée), `secteursPurs[].guildeScientifiques`
+ *   (manquait), et `secteursPossedes[].entretien`/`guildeFermiers`/
+ *   `guildeIngenieurs`/`guildeMineurs` (Purs ET Corrompus).
+ * - `js/objectifsService.js` : 4 nouveaux évaluateurs EVALUATEURS_
+ *   (emplacements_guilde_vides_max/secteurs_avec_guildes_specifiques_min/
+ *   focus_preferes_absents_de_defausse/jetons_catastrophe_plateau_crise)
+ *   et 5 nouveaux compteurs COMPTEURS_PAR_ (corruption_conservee/secteur_
+ *   pur_avec_guilde_scientifique/jeton_gloire_valeur_5/jeton_liberation/
+ *   secteur_pur_ou_corrompu_entretien_min_2 — seule Influence pure de ce
+ *   lot, auto-appliquée).
+ * - `js/strategieService.js`/`construireContexteObjectifs_` : transmet
+ *   les 2 champs secteurService étendus ci-dessus + 3 nouveaux compteurs
+ *   MANUELS (jetonsCatastrophePlateauCrise/corruptionsConservees/
+ *   focusPrefereEnDefausse — aucun état correspondant modélisé ailleurs
+ *   dans l'appli : pas de jeton Catastrophe, pas de suivi des Corruptions
+ *   "conservées" par le Cadre de l'Événement G, pas de pioche/défausse de
+ *   Focus) whitelistés dans `GameService.CHAMPS_PLATEAU_MAISON_AUTORISES`
+ *   et saisis dans une nouvelle sous-section "Objectifs galactiques (aide
+ *   au calcul)" du bloc Plateau Crise (`index.html`/`renderPlateauCrise_`),
+ *   même mécanisme manuel que `crisePerpetuelle` (EVOLUTION 21).
+ * - Tests : `js/objectifsService.test.js` (+9, une par ligne débloquée),
+ *   `js/secteurService_actions.test.js` (+1). 355 tests au vert
+ *   (`node --test js/*.test.js` + tous les `*_test.js` individuels).
  *
  * 13/09/2026, suite (retour utilisateur : "Implémente la règle de
  * surproduction", docs-rules-Influence-et-ressources.md §2/§3) : la
@@ -5042,4 +5077,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.12';
+var APP_VERSION = '20260913.13';

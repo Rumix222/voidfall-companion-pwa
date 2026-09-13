@@ -30,13 +30,13 @@ Vous ne pouvez pas gagner de l’Influence depuis des Programmes Corrompus. ✅
 Chacune des quatre offres de Programmes peut également être Corrompue. ✅
 Si vous gagnez un Programme depuis une offre Corrompue, vous devez aussi gagner le marqueur Corruption de cette offre (où vous voulez). L’offre redevient alors Pure. ✅
 # 2. FOCUS PRÉFÉRÉS
-Certains effets de jeu vous permettent de résoudre une action de Focus préféré à partir de l’une de vos cartes Focus préférés, que cette carte soit dans votre main ou dans votre défausse. ❌
-Vos Focus préférés sont indiqués du côté droit de votre fiche Maison. ❌
-Vous devez tout de même payer le coût de l’action que vous entreprenez. ❌
-Faire une action de Focus de cette manière ne compte pas comme résoudre ce Focus. ❌
-Cela ne déclenche donc pas les capacités liées à la résolution d’un Focus en particulier, ni ne permet de jouer les cartes Programme correspondantes. ❌
-Vous ne pouvez pas non plus retourner un jeton Commerce pour bénéficier d’une action supplémentaire dans le cadre de votre carte Focus préféré. ❌
-Si l’un de vos Focus préférés est aussi une carte spéciale propre à votre Maison, résolvez le coût de l’action et son bénéfice comme indiqué sur votre carte Focus plutôt que sur la version standard de cette carte. ❌
+Certains effets de jeu vous permettent de résoudre une action de Focus préféré à partir de l’une de vos cartes Focus préférés, que cette carte soit dans votre main ou dans votre défausse. ✅ 💬 popup 'action_focus_prefere' (strategieService.js) liste à plat toutes les actions des cartes Focus des familles `focusPrefere` (maisons.json) — la distinction main/défausse n'a pas d'équivalent modélisé (aucune pioche/défausse Focus suivie), les 2 cartes sont donc toujours proposées en entier.
+Vos Focus préférés sont indiqués du côté droit de votre fiche Maison. ✅ 💬 `maisons.json` (champ `focusPrefere`), lu par la popup 'action_focus_prefere' (strategieService.js) pour filtrer les cartes proposées.
+Vous devez tout de même payer le coût de l’action que vous entreprenez. ✅ 💬 `FocusEngine.resoudreEffetEtCout` (Effet PUIS Coût, comme une action Focus normale) résout l'action choisie dans la popup 'action_focus_prefere'.
+Faire une action de Focus de cette manière ne compte pas comme résoudre ce Focus. ✅ 💬 la carte empruntée n'est jamais sélectionnée comme le Focus du tour (pas d'ajout à `actionsFocusUtilisees`/la défausse personnelle) — seule sa résolution Effet+Coût est déclenchée par 'action_focus_prefere'.
+Cela ne déclenche donc pas les capacités liées à la résolution d’un Focus en particulier, ni ne permet de jouer les cartes Programme correspondantes. ✅ 💬 la résolution passe directement par `FocusEngine.resoudreEffetEtCout`, en dehors du flux normal de sélection d'un Focus (étape Sélection) auquel est rattaché le jeu d'un Programme — aucun code ne relie 'action_focus_prefere' à cette mécanique.
+Vous ne pouvez pas non plus retourner un jeton Commerce pour bénéficier d’une action supplémentaire dans le cadre de votre carte Focus préféré. ✅ 💬 la popup 'action_focus_prefere' ne propose jamais de jeton Commerce ni de 3e action — un seul choix d'action résolu par appel.
+Si l’un de vos Focus préférés est aussi une carte spéciale propre à votre Maison, résolvez le coût de l’action et son bénéfice comme indiqué sur votre carte Focus plutôt que sur la version standard de cette carte. ✅ 💬 `FocusService.obtenirMiseEnPlace` (via la popup 'action_focus_prefere') retourne déjà la version spécifique à la Maison à la place de la Standard, même logique que la mise en place initiale.
 # 3. CONSULTER LES ÉVÉNEMENTS GALACTIQUES
 Lorsqu’il vous est permis de consulter les Événements galactiques à venir (ce qui est rare), piochez deux cartes depuis le paquet des Événements galactiques du prochain Cycle : 🚫
 • Au Cycle 1, piochez depuis le paquet des Événements galactiques du Cycle 2. 🚫

@@ -618,32 +618,60 @@ ressources, pas le niveau brut ni le stock en réserve).
 
 Chantier lancé le 13/09/2026 : sur 65 lignes d'Objectifs au catalogue (35
 "exploit", 24 "multiplicateur", 6 "formule") :
-- **Lot 1 (exploit)** : 30/35 lignes via 28 clés de condition (voir
-  `CLES_NON_COUVERTES`) — dont `revenu_credit_min`, ajoutée rétroactivement
-  au Lot 3 une fois `revenus` disponible dans le contexte (30/35 inclut
-  déjà cette clé).
-- **Lot 2 (multiplicateur)** : 19/24 lignes avec un compte calculable via
-  15 clés `par` (voir `CLES_PAR_NON_COUVERTES`), plus le cas "barème par
-  niveau de piste" (Événement A, `gain.bareme` remplace `gain.valeur`).
+- **Lot 1 (exploit)** : **35/35 lignes** via 33 clés de condition — les 4
+  dernières (`emplacements_guilde_vides_max`/`secteurs_avec_guildes_
+  specifiques_min`/`focus_preferes_absents_de_defausse`/`jetons_
+  catastrophe_plateau_crise`) ajoutées le 13/09/2026 (suite), voir
+  ci-dessous.
+- **Lot 2 (multiplicateur)** : **24/24 lignes** avec un compte calculable
+  via 20 clés `par` — les 5 dernières (`corruption_conservee`/`secteur_
+  pur_avec_guilde_scientifique`/`jeton_gloire_valeur_5`/`jeton_liberation`/
+  `secteur_pur_ou_corrompu_entretien_min_2`) ajoutées le 13/09/2026
+  (suite) —, plus le cas "barème par niveau de piste" (Événement A,
+  `gain.bareme` remplace `gain.valeur`).
 - **Lot 3 (formule)** : **6/6 lignes** — `gain.formule` est une chaîne
   (calcul direct, `FORMULES_SIMPLES_`) ou un objet `{operation, termes}`
   ("somme"/"produit", chaque terme résolu via `TERMES_FORMULE_` ou un
   nombre littéral — `resoudreFormule_`).
 
+`CLES_NON_COUVERTES`/`CLES_PAR_NON_COUVERTES` sont désormais VIDES
+(gardées, pour la forme de l'API/les tests). Les 9 lignes du dernier lot
+(13/09/2026, suite) dépendaient d'un état physique jamais modélisé
+ailleurs dans l'appli : 2 sont désormais calculées (`SecteurService.
+obtenirAgregatsInfluenceSecteursPurs`, étendu — `emplacementsGuildeVidesTotal`
+et `secteursPossedes[].entretien`/`guildeFermiers`/`guildeIngenieurs`/
+`guildeMineurs`, MÊME simplification que `guildeVacante`/l'ancien
+`getEntretien` : nuance "Vaisseaux-Arches" ignorée, calcul par secteur au
+lieu d'un seul total) ; 3 données étaient déjà disponibles mais jamais
+transmises au `contexte` (`jetonLiberation`, `secteursPurs[].
+guildeScientifiques`, la Gloire déjà présente) ; les 3 dernières
+(`jetonsCatastrophePlateauCrise`/`corruptionsConservees`/
+`focusPrefereEnDefausse`) restent des **compteurs manuels** (aucune
+pioche/défausse de Focus ni jeton Catastrophe modélisés) — saisis dans
+une nouvelle sous-section "Objectifs galactiques (aide au calcul)" du
+bloc Plateau Crise (`index.html`/`renderPlateauCrise_`, voir
+`GameService.CHAMPS_PLATEAU_MAISON_AUTORISES`), même mécanisme que
+`crisePerpetuelle`.
+
 | Export | Paramètres | Description |
 |---|---|---|
 | `evaluerCondition` | `(condition, contexte)` | **Pure.** `true`/`false` si évaluable, `null` sinon (clé non couverte — jamais une approximation). Récursif sur `{et:[...]}`/`{ou:[...]}` |
 | `evaluerObjectifs` | `(objectifs, contexte)` | **Pure.** Parcourt tous les blocs/lignes, retourne `[{blocIndex, ligneIndex, ligne, rempli, compte, gainAuto}]` — `rempli` (exploit)/`compte` (multiplicateur) `null` si non automatisable pour ce type ("formule" : toujours `null` pour les deux) ; `gainAuto` = Influence à ajouter automatiquement (gain Influence unique/simple, tous types confondus), sinon `null` |
-| `CLES_NON_COUVERTES` | (constante) | Les 4 clés de condition "exploit" hors périmètre |
-| `CLES_PAR_NON_COUVERTES` | (constante) | Les 5 clés `par` "multiplicateur" hors périmètre |
+| `CLES_NON_COUVERTES` | (constante) | Vide (35/35 lignes "exploit" couvertes) |
+| `CLES_PAR_NON_COUVERTES` | (constante) | Vide (24/24 lignes "multiplicateur" couvertes) |
 
 Application du gain : reste manuelle dans la majorité des cas (affichage
 du compte/statut), SAUF le gain Influence UNIQUE (mode `"unique"`, 1 seul
-élément dans `recompense.gains`, sans complication supplémentaire) — 5
-lignes "exploit" + 18 lignes "multiplicateur" + **les 6 lignes "formule"
-(100 %)** — `gainAuto` est alors directement ajouté à l'Influence à la
-validation de la popup 'phase_evaluation', même mécanisme que
-`gainInfluenceProgrammesEval` (§4.9 ci-dessus).
+élément dans `recompense.gains`, sans complication supplémentaire) — 6
+lignes "exploit" (+1 au dernier lot : `secteurs_avec_guildes_specifiques_
+min`/`emplacements_guilde_vides_max`/`focus_preferes_absents_de_defausse`/
+`jetons_catastrophe_plateau_crise` restent tous à récompense non-Influence
+ou complexe, donc manuels malgré leur condition désormais calculée) + 19
+lignes "multiplicateur" (+1 : `secteur_pur_ou_corrompu_entretien_min_2`,
+Influence pure) + **les 6 lignes "formule" (100 %)** — `gainAuto` est
+alors directement ajouté à l'Influence à la validation de la popup
+'phase_evaluation', même mécanisme que `gainInfluenceProgrammesEval`
+(§4.9 ci-dessus).
 
 🐛 Bug corrigé (13/09/2026, retour utilisateur) : `plateauMaison.gloire`
 est un tableau à 5 emplacements FIXES (`null` = vide, jamais compacté,
@@ -652,8 +680,8 @@ utilisaient `.length` directement (toujours 5) au lieu du nombre réel de
 jetons possédés. Corrigé via `valeursGloire_` (filtre les `null`), seul
 point de lecture correct de `contexte.gloire` dans ce fichier.
 
-Testé par `js/objectifsService.test.js` (31 tests) — voir aussi le test
-étendu d'`obtenirAgregatsInfluenceSecteursPurs` dans
+Testé par `js/objectifsService.test.js` (40 tests) — voir aussi les tests
+étendus d'`obtenirAgregatsInfluenceSecteursPurs` dans
 `js/secteurService_actions.test.js` pour les nouveaux champs.
 
 ### 4.11 Schéma de dépendances

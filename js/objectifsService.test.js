@@ -24,6 +24,11 @@ function contexteDeBase_(extra) {
     corruptionMaison: 0,
     cubeActif: 0, cubesSecteurPurTotal: 0,
     revenus: null,
+    jetonLiberation: 0,
+    emplacementsGuildeVidesTotal: 0,
+    jetonsCatastrophePlateauCrise: 0,
+    corruptionsConservees: 0,
+    focusPrefereEnDefausse: false,
     gloire: [],
     civilisation: { societe: 0, gouvernement: 0, economie: 0, corrompues: { societe: false, gouvernement: false, economie: false } },
     ressources: { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 },
@@ -200,11 +205,11 @@ test('multiplicateur : "par" simple (installation_pure) -> compte + gainAuto (ga
 
 test('multiplicateur : compte calculable mais gain NON-Influence -> compte renseigné, gainAuto null (reste manuel)', function () {
   var ObjectifsService = chargerDansContexte_().ObjectifsService;
-  // Forme réelle Événement J : "gagnez un jeton Prime pour chaque jeton Libération" — "par" non couvert (CLES_PAR_NON_COUVERTES).
+  // Forme réelle Événement J : "gagnez un jeton Prime pour chaque jeton Libération".
   var ligne = { type: 'multiplicateur', texte: 'Événement J', recompense: { mode: 'unique', gains: [{ cle: 'prime', valeur: 1, par: 'jeton_liberation' }] } };
-  var resultats = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_());
-  assert.strictEqual(resultats[0].compte, null, '"jeton_liberation" hors de COMPTEURS_PAR_ — jamais un gain non-Influence deviné');
-  assert.strictEqual(resultats[0].gainAuto, null);
+  var resultats = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_({ jetonLiberation: 3 }));
+  assert.strictEqual(resultats[0].compte, 3, '"jeton_liberation" couvert par COMPTEURS_PAR_ — compte affiché à titre indicatif');
+  assert.strictEqual(resultats[0].gainAuto, null, 'gain "prime", jamais de l\'Influence -> reste manuel malgré le compte calculable');
 });
 
 test('multiplicateur : secteur_pur_population_4/5/6 comptent EXACTEMENT (pas "au moins")', function () {
@@ -334,17 +339,106 @@ test('revenu_credit_min (exploit, Lot 1 -> couverte au Lot 3) : lit ctx.revenus.
 });
 
 // ---------------------------------------------------------------
+// 9 lignes restées hors périmètre après les Lots 1/2/3 (13/09/2026,
+// suite) : 4 "exploit" + 5 "multiplicateur", chacune débloquée par une
+// donnée précise (calculée, ou compteur manuel index.html/
+// renderPlateauCrise_) — CLES_NON_COUVERTES/CLES_PAR_NON_COUVERTES sont
+// désormais vides (voir tests dédiés ci-dessous).
+// ---------------------------------------------------------------
+
+test('CLES_NON_COUVERTES et CLES_PAR_NON_COUVERTES sont désormais vides (35/35 exploit, 24/24 multiplicateur couverts)', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  assert.strictEqual(ObjectifsService.CLES_NON_COUVERTES.length, 0);
+  assert.strictEqual(ObjectifsService.CLES_PAR_NON_COUVERTES.length, 0);
+});
+
+test('emplacements_guilde_vides_max (exploit, Événement E cycle 1) : <= valeur, tous secteurs possédés', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var condition = { cle: 'emplacements_guilde_vides_max', valeur: 2, precision: 'emplacements_vaisseaux_arches_exclus' };
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ emplacementsGuildeVidesTotal: 2 })), true);
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ emplacementsGuildeVidesTotal: 3 })), false);
+});
+
+test('secteurs_avec_guildes_specifiques_min (exploit, Événement C cycle 2) : >= 2 Guildes Fermier/Ingénieur/Mineur, Purs OU Corrompus', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var condition = { cle: 'secteurs_avec_guildes_specifiques_min', valeur: 3, guildes: ['fermier', 'ingenieur', 'mineur'], min_guildes_par_secteur: 2, precision: 'purs_ou_corrompus' };
+  var secteursOk = [
+    { corrompu: false, guildeFermiers: 2, guildeIngenieurs: 0, guildeMineurs: 0 }, // 2 -> ok
+    { corrompu: true, guildeFermiers: 1, guildeIngenieurs: 1, guildeMineurs: 0 },  // 2 -> ok (Corrompu compte quand même)
+    { corrompu: false, guildeFermiers: 0, guildeIngenieurs: 1, guildeMineurs: 1 }  // 2 -> ok
+  ];
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ secteursPossedes: secteursOk })), true);
+  // Seulement 2 secteurs qualifiés (pas 3) -> condition non remplie.
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ secteursPossedes: secteursOk.slice(0, 2) })), false);
+  // Un secteur avec 1 seule Guilde Banquiers (hors liste fermier/ingenieur/mineur) ne compte pas.
+  var secteursAvecBanquiers = secteursOk.slice(0, 2).concat([{ corrompu: false, guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0 }]);
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ secteursPossedes: secteursAvecBanquiers })), false);
+});
+
+test('focus_preferes_absents_de_defausse (exploit, Événement E cycle 2) : lit la négation du compteur manuel', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var condition = { cle: 'focus_preferes_absents_de_defausse', valeur: true };
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ focusPrefereEnDefausse: false })), true);
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ focusPrefereEnDefausse: true })), false);
+});
+
+test('jetons_catastrophe_plateau_crise (exploit, Événement J cycle 2) : compteur manuel === valeur (0)', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var condition = { cle: 'jetons_catastrophe_plateau_crise', valeur: 0, precision: 'evaluation_individuelle_par_joueur' };
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ jetonsCatastrophePlateauCrise: 0 })), true);
+  assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ jetonsCatastrophePlateauCrise: 1 })), false);
+});
+
+test('multiplicateur : corruption_conservee (Événement G cycle 1) : compte = compteur manuel, gainAuto null (mode "libre")', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var ligne = {
+    type: 'multiplicateur',
+    recompense: { mode: 'libre', gains: [{ cle: 'nourriture', valeur: 2, par: 'corruption_conservee' }, { cle: 'influence', valeur: 1, par: 'corruption_conservee' }] }
+  };
+  // Mode "libre" (pas "unique") -> evaluerMultiplicateur_ retourne {compte:null, gainAuto:null}, MÊME comportement que tout autre mode non "unique".
+  var resultat = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_({ corruptionsConservees: 4 }))[0];
+  assert.strictEqual(resultat.compte, null);
+  assert.strictEqual(resultat.gainAuto, null);
+});
+
+test('multiplicateur : secteur_pur_avec_guilde_scientifique (Événement G cycle 1) : compte plafonné à 3 (plafond_occurrences), gain non-Influence -> manuel', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var ligne = { type: 'multiplicateur', recompense: { mode: 'unique', gains: [{ cle: 'augmenter_population_pure', valeur: 1, par: 'secteur_pur_avec_guilde_scientifique', plafond_occurrences: 3 }] } };
+  var secteursPurs = [{ guildeScientifiques: 1 }, { guildeScientifiques: 2 }, { guildeScientifiques: 0 }, { guildeScientifiques: 1 }];
+  var resultat = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_({ secteursPurs: secteursPurs }))[0];
+  assert.strictEqual(resultat.compte, 3, '4 secteurs qualifiés (guildeScientifiques>=1 chacun) mais plafond_occurrences=3');
+  assert.strictEqual(resultat.gainAuto, null, 'gain "augmenter_population_pure", pas de l\'Influence -> reste manuel');
+});
+
+test('multiplicateur : jeton_gloire_valeur_5 (Événement I cycle 2) : compte les jetons Gloire de valeur EXACTEMENT 5', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var ligne = { type: 'multiplicateur', recompense: { mode: 'unique', gains: [{ cle: 'produire_type_ressource', valeur: 1, par: 'jeton_gloire_valeur_5', contrainte: 'type_different_par_occurrence' }] } };
+  var resultat = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_({ gloire: [5, 3, 5, null, null] }))[0];
+  assert.strictEqual(resultat.compte, 2);
+  assert.strictEqual(resultat.gainAuto, null, 'gain "produire_type_ressource", pas de l\'Influence -> reste manuel');
+});
+
+test('multiplicateur : secteur_pur_ou_corrompu_entretien_min_2 (Événement B cycle 3) : Influence pure -> auto-appliqué, Purs ET Corrompus', function () {
+  var ObjectifsService = chargerDansContexte_().ObjectifsService;
+  var ligne = { type: 'multiplicateur', recompense: { mode: 'unique', gains: [{ cle: 'influence', valeur: 3, par: 'secteur_pur_ou_corrompu_entretien_min_2' }] } };
+  var secteursPossedes = [{ corrompu: false, entretien: 2 }, { corrompu: true, entretien: 2 }, { corrompu: false, entretien: 1 }];
+  var resultat = ObjectifsService.evaluerObjectifs(objectifsAvecUneLigne_(ligne), contexteDeBase_({ secteursPossedes: secteursPossedes }))[0];
+  assert.strictEqual(resultat.compte, 2, 'les 2 secteurs à Entretien >= 2 comptent, Pur ou Corrompu');
+  assert.strictEqual(resultat.gainAuto, 6); // 2 x 3
+});
+
+// ---------------------------------------------------------------
 // Clés non couvertes / evaluerObjectifs
 // ---------------------------------------------------------------
 
 test('evaluerCondition : clé inconnue -> null (jamais une approximation)', function () {
   var ObjectifsService = chargerDansContexte_().ObjectifsService;
-  assert.strictEqual(ObjectifsService.evaluerCondition({ cle: 'jetons_catastrophe_plateau_crise', valeur: 0 }, contexteDeBase_()), null);
+  assert.strictEqual(ObjectifsService.evaluerCondition({ cle: 'cle_totalement_inventee_pour_le_test', valeur: 0 }, contexteDeBase_()), null);
 });
 
 test('evaluerCondition : "et" avec une sous-condition non couverte -> null (jamais une approximation partielle)', function () {
   var ObjectifsService = chargerDansContexte_().ObjectifsService;
-  var condition = { et: [{ cle: 'entretien_total_min', valeur: 1 }, { cle: 'focus_preferes_absents_de_defausse', valeur: true }] };
+  var condition = { et: [{ cle: 'entretien_total_min', valeur: 1 }, { cle: 'cle_totalement_inventee_pour_le_test', valeur: true }] };
   assert.strictEqual(ObjectifsService.evaluerCondition(condition, contexteDeBase_({ entretienTotal: 5 })), null);
 });
 

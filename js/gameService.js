@@ -460,7 +460,29 @@ var GameService = (function () {
     // - crisePerpetuelle : compteur non borné, utilisé en fin de partie
     //   (ScoreService/écran Fin de partie) — AUCUN branchement automatique
     //   à ce jour (voir EVOLUTION 21), saisie manuelle par le joueur.
-    'crisePerpetuelle'
+    'crisePerpetuelle',
+    // Chantier "Objectifs galactiques", lignes hors périmètre restantes
+    // (13/09/2026) — MÊME principe que crisePerpetuelle ci-dessus : 3
+    // compteurs manuels simples pour de l'état physique jamais modélisé
+    // ailleurs dans l'appli, saisis/persistés directement par
+    // index.html/renderPlateauCrise_, lus en lecture seule par
+    // ObjectifsService.evaluerCondition/COMPTEURS_PAR_ (via le `contexte`
+    // assemblé par StrategieService.construireContexteObjectifs_) :
+    // - jetonsCatastrophePlateauCrise : nombre de jetons Catastrophe sur
+    //   le plateau Crise (côté droit) — condition
+    //   jetons_catastrophe_plateau_crise (Événement J).
+    // - corruptionsConservees : Corruptions retirées mais conservées en
+    //   zone de jeu personnelle CE Cycle (Cadre "Le visage du mal",
+    //   permanent au Cycle 1 — le joueur les remet lui-même à 0 en
+    //   réserve commune à la phase Évaluation, comme l'indique la carte)
+    //   — compteur `corruption_conservee` (Événement G).
+    // - focusPrefereEnDefausse (booléen) : au moins un des Focus préférés
+    //   de la Maison est actuellement dans la défausse — aucune pioche/
+    //   défausse de Focus modélisée dans l'appli (voir mémoire de session
+    //   voidfall-focus-prefere-report.md), donc jamais déductible
+    //   automatiquement — condition focus_preferes_absents_de_defausse
+    //   (Événement E) lit sa négation.
+    'jetonsCatastrophePlateauCrise', 'corruptionsConservees', 'focusPrefereEnDefausse'
   ];
 
   // ------------------------------------------------------------

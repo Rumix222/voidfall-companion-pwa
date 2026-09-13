@@ -33,32 +33,32 @@
  * d'Événement galactique (GameService.appliquerCadreChoixManuel) —
  * cohérent avec l'existant.
  *
- * Sur les 35 lignes "exploit", 28 clés de condition distinctes sont
- * couvertes (30/35 lignes automatisables — voir CLES_NON_COUVERTES_
- * ci-dessous pour le détail des 5 lignes restantes, hors périmètre car la
- * donnée sous-jacente n'est pas trackée par l'app aujourd'hui, ou demande
- * un calcul de Revenu asynchrone non inclus dans `contexte`) :
- *   - focus_preferes_absents_de_defausse (Événement E) : aucune pioche/
- *     défausse de cartes Focus modélisée dans l'appli (voir mémoire de
- *     session voidfall-focus-prefere-report.md) — non calculable.
- *   - jetons_catastrophe_plateau_crise (Événement J) : le Plateau Crise
- *     "light" ne suit pas de jeton Catastrophe — non calculable.
- *   - emplacements_guilde_vides_max (Événement E) : demande le nombre
- *     d'emplacements Guilde CONSTRUCTIBLES par secteur (typesSecteur.json)
- *     moins les emplacements Vaisseaux-Arches (exclusion spécifique) —
- *     reporté, calcul plus complexe que le reste de ce lot.
- *   - secteurs_avec_guildes_specifiques_min (Événement C) : condition ET
- *     récompense ("exclusif_repete") toutes deux complexes — reporté.
- *   - revenu_credit_min (Événement D) : nécessite un calcul de Revenu
- *     asynchrone (StrategieService.calculerNiveauxProduction_ +
- *     calculerProductionAvecBonusTechnologie_) non inclus dans `contexte`
- *     aujourd'hui — reporté (contexte à enrichir si besoin).
+ * Sur les 35 lignes "exploit", les 33 clés de condition distinctes du
+ * catalogue sont TOUTES couvertes (35/35 lignes automatisables, chantier
+ * complet depuis le 13/09/2026, suite) — voir CLES_NON_COUVERTES_
+ * (désormais vide) et EVALUATEURS_ ci-dessous. Les 4 dernières couvertes
+ * (focus_preferes_absents_de_defausse/jetons_catastrophe_plateau_crise/
+ * emplacements_guilde_vides_max/secteurs_avec_guildes_specifiques_min)
+ * dépendaient d'un état physique jamais modélisé ailleurs dans l'appli —
+ * les 2 premières lisent désormais un compteur MANUEL (index.html/
+ * renderPlateauCrise_, voir GameService.CHAMPS_PLATEAU_MAISON_AUTORISES),
+ * les 2 dernières sont calculées à partir de
+ * SecteurService.obtenirAgregatsInfluenceSecteursPurs, étendu
+ * (emplacementsGuildeVidesTotal, secteursPossedes[].guildeFermiers/
+ * Ingenieurs/Mineurs).
  *
- * Sur les 24 lignes "multiplicateur", 15 clés `par` distinctes sont
- * couvertes par COMPTEURS_PAR_ (19/24 lignes avec un `compte` calculable ;
- * `gainAuto` seulement pour celles au gain Influence pur — voir
- * CLES_PAR_NON_COUVERTES_ pour les 5 restantes : gains non-Influence ou
- * Entretien par secteur non tracké).
+ * Sur les 24 lignes "multiplicateur", les 20 clés `par` distinctes du
+ * catalogue sont TOUTES couvertes par COMPTEURS_PAR_ (24/24 lignes avec
+ * un `compte` calculable ; `gainAuto` seulement pour celles au gain
+ * Influence pur — voir CLES_PAR_NON_COUVERTES_, désormais vide). Des 5
+ * dernières clés couvertes, 4 restent à gain MANUEL (compte affiché à
+ * titre indicatif, gain non-Influence ou mode "libre") : corruption_
+ * conservee (compteur manuel, même mécanisme que ci-dessus), secteur_pur_
+ * avec_guilde_scientifique/jeton_gloire_valeur_5/jeton_liberation
+ * (données déjà disponibles, juste jamais transmises au `contexte`) ;
+ * seule secteur_pur_ou_corrompu_entretien_min_2 (Influence pure) s'auto-
+ * applique, grâce à secteursPossedes[].entretien (nouveau, calcul par
+ * secteur au lieu du seul total qu'exposait SecteurService.getEntretien).
  *
  * Forme du `contexte` attendu (construit par StrategieService,
  * `construireContexteObjectifs_`, popup 'phase_evaluation') :
@@ -68,6 +68,11 @@
  *     corruptionMaison,                      // plateauMaison.corruptionMaison
  *     cubeActif,                             // plateauMaison.cubeActif (cube de la zone active)
  *     cubesSecteurPurTotal,                  // total PN sur secteurs Purs (tous types confondus)
+ *     jetonLiberation,                       // plateauMaison.jetonLiberation
+ *     emplacementsGuildeVidesTotal,          // tous secteurs possédés, Vaisseaux-Arches ignorés (simplification)
+ *     jetonsCatastrophePlateauCrise,         // compteur manuel (Plateau Crise)
+ *     corruptionsConservees,                 // compteur manuel (Cadre "Le visage du mal")
+ *     focusPrefereEnDefausse,                // booléen manuel
  *     gloire: [valeur|null, ...],            // plateauMaison.gloire, TEL QUEL —
  *                                            // 5 emplacements fixes, null = vide
  *                                            // (voir valeursGloire_ ci-dessous,
@@ -76,8 +81,10 @@
  *                     corrompues: { societe, gouvernement, economie } },
  *     ressources: { nourriture, energie, materiel, credit, science },
  *     secteursPurs: [{ population, guildeBanquiers, guildeFermiers,
- *                      guildeIngenieurs, guildeMineurs, guildesTotal, cubes }],
- *     secteursPossedes: [{ corrompu, cubes }], // Purs ET Corrompus, joueur
+ *                      guildeIngenieurs, guildeMineurs, guildeScientifiques,
+ *                      guildesTotal, cubes }],
+ *     secteursPossedes: [{ corrompu, cubes, entretien,               // Purs ET Corrompus, joueur
+ *                          guildeFermiers, guildeIngenieurs, guildeMineurs }],
  *     installationsPuresTotal, defenseOuBaseStellairePureTotal,
  *     guildesPuresTotal, guildeBanquierPureTotal, guildeScientifiquePureTotal,
  *     populationPureTotale,
@@ -87,15 +94,16 @@
 var ObjectifsService = (function () {
   'use strict';
 
-  var CLES_NON_COUVERTES_ = [
-    'focus_preferes_absents_de_defausse',
-    'jetons_catastrophe_plateau_crise',
-    'emplacements_guilde_vides_max',
-    'secteurs_avec_guildes_specifiques_min'
-    // revenu_credit_min COUVERTE depuis le Lot 3 (13/09/2026) — contexte
-    // enrichi de `revenus` (StrategieService.calculerNiveauxProduction_ +
-    // calculerProductionAvecBonusTechnologie_), voir EVALUATEURS_ ci-dessous.
-  ];
+  // Les 4 lignes restantes (focus_preferes_absents_de_defausse/
+  // jetons_catastrophe_plateau_crise/emplacements_guilde_vides_max/
+  // secteurs_avec_guildes_specifiques_min) sont désormais TOUTES
+  // couvertes (13/09/2026, suite — voir EVALUATEURS_ ci-dessous), les 2
+  // premières via un compteur manuel (index.html/renderPlateauCrise_,
+  // aucun état physique correspondant modélisé ailleurs dans l'appli) ;
+  // revenu_credit_min était déjà couverte depuis le Lot 3. Les 35 lignes
+  // "exploit" du catalogue sont donc désormais toutes automatisables
+  // (35/35) — tableau gardé (vide) pour la forme de l'API/les tests.
+  var CLES_NON_COUVERTES_ = [];
 
   // ------------------------------------------------------------
   // Évaluateurs par clé de condition — chacun reçoit (condition, contexte)
@@ -224,7 +232,44 @@ var ObjectifsService = (function () {
     },
     programme_pur_en_jeu_hors_depart_disponible: function (c, ctx) {
       return (ctx.programmesNonDepart || []).some(function (p) { return p.nom && !p.corrompu; });
-    }
+    },
+
+    // Chantier "Objectifs galactiques", lignes hors périmètre restantes
+    // (13/09/2026, suite) — les 4 lignes "exploit" du Lot 1
+    // (CLES_NON_COUVERTES_) sont désormais toutes couvertes.
+
+    // "au total" (pas seulement les secteurs Purs), tous types de Guilde
+    // confondus — voir SecteurService.obtenirAgregatsInfluenceSecteursPurs
+    // (emplacementsGuildeVidesTotal, MÊME simplification que la ligne
+    // guildeVacante existante : nuance "Vaisseaux-Arches" ignorée).
+    emplacements_guilde_vides_max: function (c, ctx) { return (ctx.emplacementsGuildeVidesTotal || 0) <= c.valeur; },
+
+    // "au moins deux Guildes parmi Fermiers/Ingénieurs/Mineurs" sur un
+    // même secteur (Pur OU Corrompu, "purs_ou_corrompus" du catalogue) —
+    // `c.guildes` nomme les types concernés, `c.min_guildes_par_secteur`
+    // le seuil par secteur ; les 3 seuls champs guilde exposés par
+    // secteursPossedes[] (guildeFermiers/Ingenieurs/Mineurs, PAS
+    // Banquiers/Scientifiques — jamais nécessaires ici).
+    secteurs_avec_guildes_specifiques_min: function (c, ctx) {
+      var champParGuilde = { fermier: 'guildeFermiers', ingenieur: 'guildeIngenieurs', mineur: 'guildeMineurs' };
+      var guildesVoulues = c.guildes || [];
+      var seuilParSecteur = c.min_guildes_par_secteur || 1;
+      var nb = (ctx.secteursPossedes || []).filter(function (s) {
+        var total = guildesVoulues.reduce(function (somme, g) { return somme + (s[champParGuilde[g]] || 0); }, 0);
+        return total >= seuilParSecteur;
+      }).length;
+      return nb >= c.valeur;
+    },
+
+    // Compteur manuel (index.html/renderPlateauCrise_, voir
+    // GameService.CHAMPS_PLATEAU_MAISON_AUTORISES) — aucune pioche/
+    // défausse de Focus modélisée dans l'appli, condition lit sa
+    // négation ("aucun Focus préféré n'est dans votre défausse").
+    focus_preferes_absents_de_defausse: function (c, ctx) { return !ctx.focusPrefereEnDefausse; },
+
+    // Compteur manuel (même mécanisme que ci-dessus) — le Plateau Crise
+    // "light" ne suit pas ce jeton automatiquement.
+    jetons_catastrophe_plateau_crise: function (c, ctx) { return (ctx.jetonsCatastrophePlateauCrise || 0) === c.valeur; }
   };
 
   // ------------------------------------------------------------
@@ -242,13 +287,15 @@ var ObjectifsService = (function () {
   // manuellement — voir CLES_PAR_NON_COUVERTES_ pour le détail.
   // ------------------------------------------------------------
 
-  var CLES_PAR_NON_COUVERTES_ = [
-    'corruption_conservee',                    // Événement G — gain Nourriture/Influence, mode "libre" (pas juste Influence)
-    'secteur_pur_avec_guilde_scientifique',     // Événement G — gain augmenter_population_pure, pas Influence
-    'jeton_gloire_valeur_5',                    // Événement I — gain produire_type_ressource, pas Influence
-    'jeton_liberation',                         // Événement J — gain jeton Prime, pas Influence
-    'secteur_pur_ou_corrompu_entretien_min_2'   // Événement B — Entretien PAR SECTEUR non tracké (SecteurService.getEntretien ne donne qu'un total)
-  ];
+  // Les 5 clés restantes sont désormais TOUTES couvertes par
+  // COMPTEURS_PAR_ ci-dessous (13/09/2026, suite) — `compte` calculable
+  // pour les 24 lignes "multiplicateur" du catalogue (24/24) ; `gainAuto`
+  // reste `null` pour corruption_conservee/secteur_pur_avec_guilde_
+  // scientifique/jeton_gloire_valeur_5/jeton_liberation (gain non-Influence
+  // ou mode "libre" — reste manuel), seule secteur_pur_ou_corrompu_
+  // entretien_min_2 (Influence pure) s'auto-applique. Tableau gardé
+  // (vide) pour la forme de l'API/les tests.
+  var CLES_PAR_NON_COUVERTES_ = [];
 
   function compterSecteursPurs_(contexte, predicat) {
     return (contexte.secteursPurs || []).filter(predicat).length;
@@ -294,7 +341,32 @@ var ObjectifsService = (function () {
       return niveauxPistesCivilisationPures_(ctx).filter(function (n) { return n >= 1; }).length;
     },
     credit_en_reserve: function (ctx) { return (ctx.ressources || {}).credit || 0; },
-    guilde_banquier_pure: function (ctx) { return ctx.guildeBanquierPureTotal || 0; }
+    guilde_banquier_pure: function (ctx) { return ctx.guildeBanquierPureTotal || 0; },
+
+    // Chantier "Objectifs galactiques", lignes hors périmètre restantes
+    // (13/09/2026, suite) — les 5 clés `par` du Lot 2
+    // (CLES_PAR_NON_COUVERTES_) sont désormais toutes couvertes ; le gain
+    // reste MANUEL pour les 4 premières (aucune n'est de l'Influence pure
+    // — `gainAuto` reste `null`, seul `compte` est désormais affiché),
+    // seule secteur_pur_ou_corrompu_entretien_min_2 (Influence pure) est
+    // auto-appliquée.
+
+    // Compteur manuel (index.html/renderPlateauCrise_) — voir
+    // EVALUATEURS_.focus_preferes_absents_de_defausse ci-dessus pour le
+    // même compteur côté "exploit".
+    corruption_conservee: function (ctx) { return ctx.corruptionsConservees || 0; },
+    secteur_pur_avec_guilde_scientifique: function (ctx) { return compterSecteursPurs_(ctx, function (s) { return (s.guildeScientifiques || 0) >= 1; }); },
+    jeton_gloire_valeur_5: function (ctx) { return valeursGloire_(ctx).filter(function (v) { return v === 5; }).length; },
+    // Champ plateauMaison déjà existant (jetonPrime/jetonLiberation),
+    // jamais transmis au `contexte` jusqu'ici.
+    jeton_liberation: function (ctx) { return ctx.jetonLiberation || 0; },
+    // "Purs ET Corrompus" (contrairement à secteur_pur_cube_min_3 et aux
+    // autres clés secteur_pur_... ci-dessus) — secteursPossedes[].entretien,
+    // MÊME calcul par secteur que SecteurService.getEntretien (total),
+    // désormais exposé secteur par secteur.
+    secteur_pur_ou_corrompu_entretien_min_2: function (ctx) {
+      return (ctx.secteursPossedes || []).filter(function (s) { return (s.entretien || 0) >= 2; }).length;
+    }
   };
 
   /**

@@ -341,8 +341,8 @@ test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes
     assert.strictEqual(agregats.guildeBanquierPureTotal, 0);
     assert.strictEqual(agregats.guildeScientifiquePureTotal, 1);
     assert.strictEqual(JSON.stringify(agregats.secteursPurs), JSON.stringify([
-      { population: 6, guildeBanquiers: 0, guildeFermiers: 2, guildeIngenieurs: 0, guildeMineurs: 0, guildesTotal: 3, cubes: 2 },
-      { population: 3, guildeBanquiers: 0, guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0, guildesTotal: 0, cubes: 3 }
+      { population: 6, guildeBanquiers: 0, guildeFermiers: 2, guildeIngenieurs: 0, guildeMineurs: 0, guildeScientifiques: 1, guildesTotal: 3, cubes: 2 },
+      { population: 3, guildeBanquiers: 0, guildeFermiers: 0, guildeIngenieurs: 0, guildeMineurs: 0, guildeScientifiques: 0, guildesTotal: 0, cubes: 3 }
     ]));
     // secteursPossedes : Purs ET Corrompus (secteurs 1/2/3), le secteur 4
     // (du Néant, non possédé) reste exclu.
@@ -350,6 +350,48 @@ test('obtenirAgregatsInfluenceSecteursPurs : agrège Guildes/Installations/cubes
     assert.strictEqual(agregats.secteursPossedes.length, 3);
     assert.strictEqual(JSON.stringify(numerosPossedes), JSON.stringify([2, 3, 5]));
     assert.strictEqual(agregats.secteursPossedes.filter(function (s) { return s.corrompu; }).length, 1);
+    // Aucune scenarioSecteurs/typesSecteur configurée dans ce fixture ->
+    // type introuvable pour chaque secteur -> entretien 0 partout,
+    // emplacementsGuildeVidesTotal 0 (voir test dédié ci-dessous pour le
+    // cas où le type EST configuré).
+    assert.ok(agregats.secteursPossedes.every(function (s) { return s.entretien === 0; }));
+    assert.strictEqual(agregats.emplacementsGuildeVidesTotal, 0);
+  });
+});
+
+// Chantier "Objectifs galactiques", lignes hors périmètre restantes
+// (13/09/2026) : secteur_pur_ou_corrompu_entretien_min_2 (Entretien PAR
+// secteur, Purs ET Corrompus), secteurs_avec_guildes_specifiques_min
+// (Guildes Fermiers/Ingénieurs/Mineurs, Purs ET Corrompus) et
+// emplacements_guilde_vides_max (total, tous secteurs possédés) ont
+// besoin de typesSecteur/scenarioSecteurs — non couvert par le test
+// ci-dessus (fixture sans type de secteur).
+test('obtenirAgregatsInfluenceSecteursPurs : entretien par secteur + guildes Fermiers/Ingénieurs/Mineurs + emplacements de Guilde vides (Purs ET Corrompus)', function () {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  db._stores.typesSecteur['standard'] = { id: 'standard', nombreGuildeMax: 3, nombreInstallationMax: 3 };
+  // Secteur 1 : Pur, 3 Guildes (plein -> Entretien Guilde 1), 1 Installation (pas plein -> 0), 0 emplacement Guilde vide.
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'standard' };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({
+    numero: 1, pnCorvette: 1, corrompu: false,
+    guildeFermiers: 2, guildeIngenieurs: 1, installationDefenseSecteur: 1
+  });
+  // Secteur 2 : Corrompu (mais possédé), 1 seule Guilde Mineurs -> Entretien 0, 2 emplacements Guilde vides.
+  db._stores.scenarioSecteurs['s1|2'] = { scenarioId: 's1', numero: 2, type: 'standard' };
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, corrompu: true, guildeMineurs: 1 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirAgregatsInfluenceSecteursPurs('p1').then(function (agregats) {
+    var s1 = agregats.secteursPossedes.filter(function (s) { return !s.corrompu; })[0];
+    var s2 = agregats.secteursPossedes.filter(function (s) { return s.corrompu; })[0];
+    assert.strictEqual(s1.entretien, 1); // 3 Guildes / 3 max -> plein ; 1 Installation / 3 max -> pas plein
+    assert.strictEqual(s1.guildeFermiers, 2);
+    assert.strictEqual(s1.guildeIngenieurs, 1);
+    assert.strictEqual(s1.guildeMineurs, 0);
+    assert.strictEqual(s2.entretien, 0);
+    assert.strictEqual(s2.guildeMineurs, 1);
+    // emplacements vides : secteur 1 (3 max - 3 utilisées = 0) + secteur 2 (3 max - 1 utilisée = 2) = 2.
+    assert.strictEqual(agregats.emplacementsGuildeVidesTotal, 2);
   });
 });
 

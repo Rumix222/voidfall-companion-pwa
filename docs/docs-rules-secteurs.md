@@ -16,8 +16,8 @@ Certaines actions du jeu vous demandent de payer un coût et de résoudre un eff
 Un secteur peut connaître trois états, en fonction de qui le contrôle. 
 Les secteurs du Néant abritent une ou plusieurs Flottes du Néant et sont presque toujours Corrompus. ✅
 Les secteurs de Joueur (ou “vos secteurs”) abritent une ou plusieurs Puissances Navales à la couleur du joueur ✅
-Votre Secteur-Mère reste toujours sous votre contrôle, même si aucun cube de Puissance Navale ne s’y trouve, et ne peut jamais être attaqué. 🔍
-Un effet qui détruit directement une Guilde ou Installation (cf. plus bas) ne peut pas non plus viser un Secteur-Mère. 🔍
+Votre Secteur-Mère reste toujours sous votre contrôle, même si aucun cube de Puissance Navale ne s’y trouve, et ne peut jamais être attaqué. ✅ 💬 partiel/indirect : `secteurEstPossede_`/le filtre `ciblesEligibles` d'Envahir (strategieService.js) n'exclut pas explicitement le Secteur-Mère, mais celui-ci ne peut structurellement jamais satisfaire la condition de cible (pnNeant>0 ou Maison déchue) tant qu'il reste sous contrôle joueur — jamais de garde-fou nommé.
+Un effet qui détruit directement une Guilde ou Installation (cf. plus bas) ne peut pas non plus viser un Secteur-Mère. ❌ 💬 confirmé : aucune mécanique "détruire une Guilde/Installation" n'existe dans l'app (focusEngine.js note explicitement cette clé comme hors périmètre) — la question de l'exception Secteur-Mère est donc sans objet pour l'instant.
 Vous n’avez qu’un seul Secteur-Mère : vos autres secteurs n’ont pas ce statut. ✅
 Les secteurs sans aucun cube de Puissance Navale ne sont contrôlés ni par le joueur, ni par le Néant, et sont défendus par une ou plusieurs Défenses de Secteur.✅
 On y trouve entre autres les secteurs des Maisons Déchues, identifiés par une carte représentant les aspects uniques de la Maison qui les contrôle.✅
@@ -30,7 +30,7 @@ Ces effets doivent être pris en compte lors de la résolution des conséquences
 En termes de Corruption, un secteur peut avoir deux états : 
 - Les secteurs Corrompus sont identifiés par un marqueur Corruption placé sous le dé Population. Presque tous les secteurs, même ceux des joueurs, peuvent être Corrompus. ✅
 - Les secteurs Purs, par opposition, sont ceux qui n’ont pas de marqueur Corruption ✅
-Certains secteurs ne peuvent pas être Corrompus et resteront toujours Purs : c’est le cas de tous les Secteurs-Mères, par exemple. 🔍
+Certains secteurs ne peuvent pas être Corrompus et resteront toujours Purs : c’est le cas de tous les Secteurs-Mères, par exemple. ✅ 💬 `SecteurService.obtenirSecteursEligiblesGainCorruption` exclut explicitement le numéro du Secteur-Mère (`s.numero !== numeroSecteurMere`) de la liste des secteurs où placer une Corruption.
 # 2. GUILDES ET INSTALLATIONS
 Il y a deux catégories principales d’infrastructures qui peuvent être développées dans un secteur : les Guildes civiles et les Installations militaires. ✅
 ## 2.1 Guildes ✅
@@ -44,9 +44,9 @@ Il existe 5 types de Guildes, chacune augmentant la production de l’unique res
 Il existe 3 types d’Installations, chacun ayant une fonction différente.
 ### 2.2.1 Les Chantiers Navals permettent de déployer des cubes de Puissance Navale (voir FLOTTES ET PUISSANCE NAVALE).✅
 ### 2.2.2 Les Défenses de Secteur servent au Combat. Elles infligent 1 Dégât d'Approche en défense (voir détails sur le Combat). ✅
-### 2.2.3 Les Bases Stellaires requièrent une Technologie spécifique.🔍
-Si vous avez la Technologie Bases Stellaires, vos bases agissent comme des Chantiers Navals pour déployer de la Puissance Navale. 🔍
-Elles infligent aussi 1 Dégât d'Approche en défense, comme une Défense de Secteur le ferait. 🔍
+### 2.2.3 Les Bases Stellaires requièrent une Technologie spécifique. ❌ 💬 confirmé : `SecteurService.construire` ne vérifie aucune Technologie possédée avant de poser une Base Stellaire (seules les limites de slots du typeSecteur sont vérifiées).
+Si vous avez la Technologie Bases Stellaires, vos bases agissent comme des Chantiers Navals pour déployer de la Puissance Navale. ❌ 💬 confirmé : le calcul de `maxCubes` du mode 'deployer_cube_par_chantier' (strategieService.js) ne compte que `installationChantierNaval`, jamais `installationBaseStellaire`.
+Elles infligent aussi 1 Dégât d'Approche en défense, comme une Défense de Secteur le ferait. ✅ 💬 `combatService.js` : `defenseSecteur = installationDefenseSecteur + installationBaseStellaire`, les deux comptent identiquement pour le Dégât d'Approche.
 ## 2.3 construire une Installation ou établir une Guilde
 Lorsque vous construisez une Installation ou établissez une Guilde, prenez le jeton correspondant dans la réserve commune et placez-le sur l’emplacement libre d’un secteur que vous contrôlez. ✅
 Vous pouvez construire ou établir sur des secteurs Corrompus. ✅
@@ -57,16 +57,16 @@ Si vous n’avez pas d’emplacements restants pour une infrastructure, vous ne 
 Vous ne pouvez pas détruire volontairement, déplacer ou construire par-dessus une Guilde ou une Installation. ✅
 Certains effets de jeu (coûts d’action, Événements galactiques, Crises) peuvent vous forcer à détruire une Guilde ou Installation en dehors de votre Secteur-Mère. ✅
 Dans ce cas, vous pouvez détruire n’importe laquelle. Ensuite, n’oubliez pas de décaler les jetons restants d’un cran vers la gauche. ✅
-Les Guildes ou Installations permanentes (imprimées sur la tuile) comptent comme un jeton à part entière, mais elles ne peuvent pas être retirées ou remplacées par un effet de jeu. 🔍
+Les Guildes ou Installations permanentes (imprimées sur la tuile) comptent comme un jeton à part entière, mais elles ne peuvent pas être retirées ou remplacées par un effet de jeu. ❌ 💬 confirmé : aucune mécanique "détruire une Guilde/Installation" n'existe dans l'app (voir §1.3 ci-dessus) — la distinction permanente/non-permanente est donc sans objet pour l'instant.
 On parle de Guildes Pures et d’Installations Pures lorsque ces infrastructures occupent un secteur Pur. ✅
 # 3. POPULATION
 La plupart des secteurs ont de la Population (entre 1 et 6) représentée par un dé posé sur leur hexagone. ✅
 La Population de votre Secteur Mère est représentée par un dé à votre couleur. ✅
 La Population affecte la production de ressources (voir ressources). ✅
-La Population d’un secteur Pur est appelée Population Pure. Vous pouvez la modifier, ce que vous ne pouvez pas faire avec la Population d’un secteur Corrompu. ❌
+La Population d’un secteur Pur est appelée Population Pure. Vous pouvez la modifier, ce que vous ne pouvez pas faire avec la Population d’un secteur Corrompu. ❌ 💬 partiel : seule l'augmentation est automatisée (`SecteurService.augmenterPopulationPure`/`obtenirSecteursEligiblesAugmenterPopulationPure`, qui exclut bien les secteurs `corrompu`) ; aucune fonction de diminution de Population n'existe dans l'app.
 Lorsque vous augmentez une Population Pure, ajoutez 1 au dé Population de l’un de vos secteurs. ✅
-Une Population de 6 ne peut pas être augmentée. 🔍
-Lorsque vous diminuez une Population Pure, retirez 1 du dé Population de l’un de vos secteurs. Cela compte comme un coût, et vous pouvez uniquement le faire dans un secteur qui n’est pas votre Secteur-Mère. 🔍
-Une Population de 1 ne peut pas être diminuée. 🔍
-Certains secteurs spéciaux ont une Population fixe, identifiée par un dé rouge et noir directement imprimé dessus. La Population de ces secteurs ne peut jamais être modifiée. 🔍
-D'autres secteurs n'ont pas de Population du tout, et ne peuvent donc être Corrompus. 🔍
+Une Population de 6 ne peut pas être augmentée. ✅ 💬 `SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure` filtre `s.population < 6`.
+Lorsque vous diminuez une Population Pure, retirez 1 du dé Population de l’un de vos secteurs. Cela compte comme un coût, et vous pouvez uniquement le faire dans un secteur qui n’est pas votre Secteur-Mère. ❌ 💬 confirmé : aucune fonction de diminution de Population n'existe dans `secteurService.js` (seule `augmenterPopulationPure` existe).
+Une Population de 1 ne peut pas être diminuée. ❌ 💬 confirmé : sans objet, aucune diminution de Population n'est modélisée (voir ligne précédente).
+Certains secteurs spéciaux ont une Population fixe, identifiée par un dé rouge et noir directement imprimé dessus. La Population de ces secteurs ne peut jamais être modifiée. ❌ 💬 confirmé : aucun concept de "Population fixe" dans le catalogue/le code (`typesSecteur.json`/`scenarioSecteurs.json`) — seul `population === null` (pas de Population du tout, voir ligne suivante) est distingué.
+D'autres secteurs n'ont pas de Population du tout, et ne peuvent donc être Corrompus. ❌ 💬 partiel : `population === null` exclut bien ces secteurs de l'augmentation de Population, mais `SecteurService.obtenirSecteursEligiblesGainCorruption` ne les exclut PAS de la liste des secteurs où placer une Corruption.

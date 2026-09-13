@@ -61,7 +61,7 @@ La limite par défaut est d’un jeton Flotte (3 cubes) sur un secteur, mais cer
 ### 1.5.10 Il existe d’autres instructions spécifiques concernant la Corruption. Voyez le glossaire et la description des cartes Événement galactique à ce sujet. ❌
 # 2. PHASE FOCUS
 ## Introduction
-Cette phase comprend autant de manches que le nombre indiqué dans le coin supérieur droit de l’Événement galactique en cours. ❌
+Cette phase comprend autant de manches que le nombre indiqué dans le coin supérieur droit de l’Événement galactique en cours. ✅ 💬 affiché en suffixe du titre "Événement galactique" (`#plateau-galactique-manches`, index.html) depuis `evenementActuel.manches`.
 Le tour du joueur se divise en cinq étapes : Révéler une crise, Sélection, Actions, Nettoyage, Progression du Néant. 
 ## 2.0 Révéler une crise 🚫
 À chaque manche, révélez la carte du sommet de la pioche Alerte. Ce sera la carte Alerte en cours pour cette manche. 🚫
@@ -88,7 +88,7 @@ Si aucune nouvelle information n’a été révélée entre temps, vous avez le 
 Une fois que vous avez choisi un Focus, résolvez-le : vous pouvez faire jusqu’à deux des trois actions Focus dans n’importe quel ordre. ✅
 Vous pouvez faire les trois actions si vous avez retourné un jeton Commerce lors de l’étape 1. ✅
 Chaque action de Focus ne peut être entreprise qu’une seule fois par tour. ✅
-Vous résolvez également le Programme choisi en étape 1 (le cas échéant) : vous pouvez faire l’action Programme indiquée dessus avant ou après vos autres actions. ❌
+Vous résolvez également le Programme choisi en étape 1 (le cas échéant) : vous pouvez faire l’action Programme indiquée dessus avant ou après vos autres actions. ✅ 💬 partiel : popup 'utiliser_programme' (strategieService.js) → `GameService.utiliserProgramme`/`EFFET_PROGRAMME_PAR_TYPE_` résout l'action Domination/Soutien/Force automatiquement ; la moitié Richesse (`produire_ressource`) retombe sur le repli manuel générique de `FocusEngine.resoudreCle_` (niveaux de production non calculés à cet endroit).
 Rappel : vous ne pouvez pas jouer un Programme lors de l’étape Actions – seulement lors de l’étape Sélection. 🚫
 En conséquence, vous devez avoir la carte Programme que vous souhaitez jouer avant de commencer votre tour. 🚫
 Vous ne pouvez pas retourner un jeton Commerce lors du tour où vous le gagnez, mais vous pouvez le dépenser. 🚫
@@ -136,11 +136,11 @@ Cela signifie que vous devez faire une action qui vous permet de faire ce qui vo
 Une fois que vous avez terminé toutes vos actions : 
 ### 2.3.1 Pour chaque secteur avec au moins trois jetons Flotte, vous devez rappeler un (ou plusieurs) cubes de Puissance Navale de votre choix pour que les cubes restants tiennent sur deux jetons Flotte ❌
 ### 2.3.2 Si vous avez plus de quatre jetons Gloire, remettez les jetons Gloire de votre choix dans la réserve commune, jusqu’à retomber à 4 jetons. 🚫
-### 2.3.3 Si vous avez joué une carte Programme à ce tour, vous devez choisir une des options suivantes : ❌
-- Placez-la dans un emplacement de Programme libre (pas un emplacement de départ) du bas de votre fiche Maison. ❌
-Ce Programme est maintenant en jeu. Si vous avez déjà une carte Programme du même type dans l’un de vos emplacements de Programme, vous ne pouvez pas choisir cette option. ❌
-- Retirez l’une de vos cartes Programme (sauf cartes de départ) d’un emplacement de votre fiche Maison et placez la nouvelle carte Programme à la place (s’il y avait un jeton Commerce sur l’ancienne carte, il reste sur cet emplacement). ❌
-Ce Programme est maintenant en jeu. Défaussez la carte Programme que vous avez retirée face cachée sous la pioche correspondante. Si cette manœuvre vous conduit à avoir deux cartes Programme du même type dans vos emplacements, vous ne pouvez pas choisir cette option. ❌
+### 2.3.3 Si vous avez joué une carte Programme à ce tour, vous devez choisir une des options suivantes : ✅ 💬 GameService.utiliserProgramme (popup 'utiliser_programme') : détecte un emplacement libre ou un conflit de type et propose la bonne option (voir détail lignes suivantes).
+- Placez-la dans un emplacement de Programme libre (pas un emplacement de départ) du bas de votre fiche Maison. ✅ 💬 GameService.utiliserProgramme, boucle indexLibre (emplacements 1-3).
+Ce Programme est maintenant en jeu. Si vous avez déjà une carte Programme du même type dans l’un de vos emplacements de Programme, vous ne pouvez pas choisir cette option. ✅ 💬 GameService.utiliserProgramme, boucle indexConflit (comparaison de `type` sur les emplacements 1-3) — bascule alors sur le remplacement (ligne suivante) au lieu de proposer un emplacement libre.
+- Retirez l’une de vos cartes Programme (sauf cartes de départ) d’un emplacement de votre fiche Maison et placez la nouvelle carte Programme à la place (s’il y avait un jeton Commerce sur l’ancienne carte, il reste sur cet emplacement). ✅ 💬 partiel : popup 'confirmation' ("Remplacer un Programme ?") + GameService.utiliserProgramme ; la préservation du jeton Commerce sur l'emplacement n'est PAS modélisée (jetonCommerce est un compteur global sur plateauMaison, pas suivi par emplacement).
+Ce Programme est maintenant en jeu. Défaussez la carte Programme que vous avez retirée face cachée sous la pioche correspondante. Si cette manœuvre vous conduit à avoir deux cartes Programme du même type dans vos emplacements, vous ne pouvez pas choisir cette option. ✅ 💬 partiel : le remplacement lui-même est automatisé (GameService.utiliserProgramme) et la contrainte de doublon de type est structurellement impossible (le conflit de type est toujours résolu par un remplacement, jamais par un nouvel emplacement) ; en revanche la défausse physique sous la pioche correspondante n'est pas modélisée (aucune pioche Programme suivie par l'app).
 Important : les cartes Programme sont placées sous votre fiche Maison uniquement lors de l’étape Nettoyage et ne sont pas considérées comme en jeu avant ce moment. Les cartes Technologie ne fonctionnent pas de la même façon. ❌
 ### 2.3.4 Comptez tous les jetons Commerce que vous avez à cet instant. ❌
 Si vous avez retourné un jeton Commerce lors de l’étape 1, remettez-le sur le plateau galactique. Chaque jeton Commerce restant doit être placé selon l’une des options suivantes : 🚫
@@ -192,12 +192,12 @@ Vous devez dépenser des ressources si vous en avez. Chaque ressource que vous n
 💬 Section "Entretien" de la popup "Phase Évaluation" — total = SecteurService.getEntretien (3.2.1.2) + 2 par emplacement Programme "Entretien actif" (3.2.1.1, plateauMaison.programmesUtilises). Paiement par unité au choix (1 Nourriture / 2 Énergie / 2 Matériel), un bouton par ressource, désactivé si le stock ne suffit plus. "Valider" reste bloqué tant qu'il reste de l'Entretien ET qu'au moins une ressource permet encore de payer une unité (3.2.2) ; sinon la validation applique -3 Influence par unité restée impayée (Math.max(0, ...), jamais négatif).
 ### 3.2.1 Calculez votre coût d’Entretien total comme suit : ✅
 #### 3.2.1.1 Chaque carte Programme (en bas de votre fiche Maison) affiche deux icônes Entretien. ✅
-Prenez en compte chaque icône non recouverte d’un jeton Commerce. 🔍 le jeton Commerce éventuel sur un emplacement Programme n'est pas déduit du compte (2 par emplacement "Entretien actif", sans distinction) — hors périmètre pour l'instant.
+Prenez en compte chaque icône non recouverte d’un jeton Commerce. ❌ 💬 confirmé : jetonCommerce est un compteur global (longueur de tableau, plateauMaison.jetonCommerce), jamais associé à un emplacement de Programme précis — le jeton éventuel sur un emplacement Programme n'est donc pas déduit du compte (2 par emplacement "Entretien actif", sans distinction) — hors périmètre pour l'instant.
 #### 3.2.1.2 La plupart des secteurs ont des emplacements d’Installation ou de Guilde qui affichent également des icônes Entretien (souvent, une par emplacement). ✅
 Prenez en compte chaque emplacement occupé. ✅
 #### 3.2.1.3 Certains secteurs affichent une ou deux icônes Entretien indépendantes. Si vous contrôlez de tels secteurs, prenez en compte les icônes indépendantes qui s’y trouvent. ❌
 ### 3.2.2 Vous devez maintenant satisfaire le coût d’Entretien, en dépensant pour chaque unité soit 1 Nourriture , soit 2 Matériel ou Énergie (ou 1 de chaque). ✅
-Vous ne pouvez pas dépenser des Crédits ou de la Science pour satisfaire les coûts d’Entretien, sauf si une Technologie vous le permet. 🔍 l'exception liée à une Technologie n'est pas modélisée — la popup n'autorise jamais Crédit/Science, quelle que soit la Technologie possédée.
+Vous ne pouvez pas dépenser des Crédits ou de la Science pour satisfaire les coûts d’Entretien, sauf si une Technologie vous le permet. ❌ 💬 confirmé : seule "Cellules énergétiques" Améliorée (evaluation.free_sector_maintenance) est automatisée, et elle EXEMPTE entièrement l'Entretien des secteurs plutôt que d'autoriser un paiement en Crédit/Science — la vraie mécanique de substitution par Crédit ("Collecte de données" Améliorée, evaluation.maintenance_credit_ratio) n'est pas modélisée ; la popup Phase Évaluation n'autorise jamais Crédit/Science.
 Si vous n’avez pas assez de ressources, vous perdez 3 Influuence par unité d’Entretien non satisfaite. ✅
 Vous n’avez pas le droit de choisir de perdre de l’Influence pour économiser vos ressources. ✅ "Valider" reste désactivé tant qu'un paiement reste possible.
 ### 3.2.3 Pour chaque secteur Pur que vous contrôlez avec 6 Population et au moins trois Guildes, vous pouvez prendre l’un de vos cubes de Puissance Navale inactif et le placer sur une tuile Refuge. ❌

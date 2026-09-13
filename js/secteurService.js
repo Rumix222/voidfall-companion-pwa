@@ -465,9 +465,59 @@ var SecteurService = (function () {
    * secteurs du joueur, Purs ET Corrompus — pour secteurs_min/
    * cubes_secteurs_min, "purs_ou_corrompus" dans le catalogue). Champs
    * existants inchangés (plusieurs appelants déjà en prod en dépendent).
+   *
+   * Étendue à nouveau (chantier "Objectifs galactiques", lignes hors
+   * périmètre restantes, 13/09/2026) : `secteursPurs[].guildeScientifiques`
+   * (manquait, nécessaire à secteur_pur_avec_guilde_scientifique) ;
+   * `secteursPossedes[].entretien` (0/1/2 — MÊME calcul que getEntretien
+   * ci-dessous mais PAR secteur au lieu d'un total, nécessite désormais
+   * typesSecteur/scenarioSecteurs comme obtenirDetailSecteursProgrammes,
+   * pour secteur_pur_ou_corrompu_entretien_min_2) ; `secteursPossedes[].
+   * guildeFermiers/guildeIngenieurs/guildeMineurs` (pour
+   * secteurs_avec_guildes_specifiques_min, "Purs ou Corrompus" — pas
+   * besoin des 2 autres types de Guilde pour cette clé) ;
+   * `emplacementsGuildeVidesTotal` (somme, sur TOUS les secteurs
+   * possédés, de `nombreGuildeMax - guildesUtilisées`, pour
+   * emplacements_guilde_vides_max — SIMPLIFIÉ comme `guildeVacante`
+   * d'obtenirDetailSecteursProgrammes ci-dessous : ignore la nuance
+   * "emplacements Vaisseaux-Arches exclus", mécanique non modélisée dans
+   * l'app, décision déjà actée pour ce même type de calcul).
    */
   function obtenirAgregatsInfluenceSecteursPurs(partieId) {
-    return obtenirSecteurs(partieId).then(function (secteurs) {
+    return Promise.all([
+      obtenirSecteurs(partieId),
+      DB.get('parties', partieId),
+      DB.getAll('scenarioSecteurs'),
+      DB.getAll('typesSecteur')
+    ]).then(function (resultats) {
+      var secteurs = resultats[0];
+      var ligneP = resultats[1];
+      var scenarioSecteurs = (ligneP && ligneP.scenarioId)
+        ? resultats[2].filter(function (l) { return l.scenarioId === ligneP.scenarioId; })
+        : [];
+      var typesParId = {};
+      resultats[3].forEach(function (t) { typesParId[t.id] = t; });
+
+      function typeDe_(s) {
+        var ligneScenario = scenarioSecteurs.filter(function (l) { return l.numero === s.numero; })[0];
+        return ligneScenario ? typesParId[ligneScenario.type] : null;
+      }
+
+      function entretienSecteur_(s) {
+        var typeSecteur = typeDe_(s);
+        if (!typeSecteur) return 0;
+        var entretien = 0;
+        if ((typeSecteur.nombreGuildeMax || 0) > 0 && guildesUtilisees_(s) >= typeSecteur.nombreGuildeMax) entretien += 1;
+        if ((typeSecteur.nombreInstallationMax || 0) > 0 && installationsUtilisees_(s) >= typeSecteur.nombreInstallationMax) entretien += 1;
+        return entretien;
+      }
+
+      function emplacementsGuildeVides_(s) {
+        var typeSecteur = typeDe_(s);
+        if (!typeSecteur) return 0;
+        return Math.max(0, (typeSecteur.nombreGuildeMax || 0) - guildesUtilisees_(s));
+      }
+
       var purs = secteurs.filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu; });
 
       var guildesPures = { fermiers: 0, ingenieurs: 0, mineurs: 0, banquiers: 0, scientifiques: 0, total: 0 };
@@ -500,14 +550,26 @@ var SecteurService = (function () {
           guildeFermiers: s.guildeFermiers || 0,
           guildeIngenieurs: s.guildeIngenieurs || 0,
           guildeMineurs: s.guildeMineurs || 0,
+          guildeScientifiques: s.guildeScientifiques || 0,
           guildesTotal: guildesSecteur,
           cubes: totalPn_(s)
         });
       });
 
+      var emplacementsGuildeVidesTotal = 0;
       var secteursPossedes = secteurs
         .filter(function (s) { return appartientAuJoueur_(s); })
-        .map(function (s) { return { corrompu: !!s.corrompu, cubes: totalPn_(s) }; });
+        .map(function (s) {
+          emplacementsGuildeVidesTotal += emplacementsGuildeVides_(s);
+          return {
+            corrompu: !!s.corrompu,
+            cubes: totalPn_(s),
+            entretien: entretienSecteur_(s),
+            guildeFermiers: s.guildeFermiers || 0,
+            guildeIngenieurs: s.guildeIngenieurs || 0,
+            guildeMineurs: s.guildeMineurs || 0
+          };
+        });
 
       return {
         nombreSecteurPur: purs.length,
@@ -521,7 +583,8 @@ var SecteurService = (function () {
         guildeBanquierPureTotal: guildesPures.banquiers,
         guildeScientifiquePureTotal: guildesPures.scientifiques,
         secteursPurs: secteursPurs,
-        secteursPossedes: secteursPossedes
+        secteursPossedes: secteursPossedes,
+        emplacementsGuildeVidesTotal: emplacementsGuildeVidesTotal
       };
     });
   }
