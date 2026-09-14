@@ -545,6 +545,23 @@ var StrategieService = (function () {
     gagner_programme: 'Gagner un Programme',
     gagner_commerce: 'Gagner un jeton Commerce',
     gagner_prime: 'Gagner un jeton Prime',
+    // Objectifs galactiques (Lot 2, 14/09/2026) — vocabulaire de gain
+    // "à plat" (fragmentFocusEnginePourGainObjectif_, gameService.js),
+    // affiché dans les popups 'option_exclusive'/'options_inclusives' des
+    // modes exclusif/libre/exclusif_repete. "prime"/"ameliorer_gloire" sont
+    // déjà résolus nativement par FocusEngine mais n'avaient jamais besoin
+    // d'un libellé de LISTE avant ce lot (gagner_prime/gagner_commerce
+    // ci-dessus servent un vocabulaire différent — Focus "Bonus Commerce").
+    // "commerce"/"gain_gloire"/"produire_ressource_type" ne sont PAS
+    // automatisés par FocusEngine (repli générique, avertissement
+    // journalisé) — gardés lisibles ici malgré tout, l'option reste
+    // affichée même si son application reste partiellement manuelle.
+    prime: 'Gagner un jeton Prime',
+    ameliorer_gloire: 'Améliorer un jeton Gloire',
+    commerce: 'Gagner un jeton Commerce',
+    gain_gloire: 'Gagner un jeton Gloire',
+    produire_ressource_type: 'Produire un type de ressource (au choix)',
+    gagner_technologie: 'Gagner une Technologie',
     produire_ressource: 'Produire un type de ressource',
     produire_deux_ressources: 'Produire deux types de ressources différentes',
     avancer_civilisation: 'Avancer sur une piste de Civilisation au choix',

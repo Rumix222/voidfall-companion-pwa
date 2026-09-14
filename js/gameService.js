@@ -1378,6 +1378,80 @@ var GameService = (function () {
   }
 
   /**
+   * Traduit un gain d'Objectif `{cle, valeur}` en fragment JSON FocusEngine
+   * `{cleFocusEngine: valeur}` — utilisée par les modes "groupe"/"exclusif"/
+   * "libre"/"exclusif_repete" ci-dessous (Lot 2), contrairement au mode
+   * "unique" (Lot 1) qui exige `cleFocusEnginePourGainObjectif_` résolue
+   * (throw sinon, voir gainObjectifAutomatisable/appliquerGainObjectif).
+   * Ici, une clé NON résolue par cleFocusEnginePourGainObjectif_ (ex.
+   * "credit", "produire_nourriture" — de simples ressources, jamais
+   * couvertes par cleFocusEnginePourOptionCadre_, scopée aux mécaniques de
+   * Cadre) est conservée TELLE QUELLE (`gain.cle` brut) : FocusEngine.
+   * resoudreCle_ la reconnaît nativement dans la plupart des cas (CLES_
+   * SIMPLES, "produire_<ressource>"...), et pour les rares clés qu'il ne
+   * reconnaît pas non plus ("commerce", "gain_gloire", "produire_ressource_
+   * type" — jamais câblées, voir focusEngine.js) retombe sur son repli
+   * générique (avertissement journalisé, JAMAIS bloquant) — ne doit donc
+   * jamais empêcher la résolution des AUTRES gains d'une même ligne
+   * "groupe"/"exclusif"/"libre" à cause d'une seule clé non automatisée.
+   */
+  function fragmentFocusEnginePourGainObjectif_(gain) {
+    if (!gain) return null;
+    var cleFocusEngine = cleFocusEnginePourGainObjectif_(gain) || gain.cle;
+    var valeur = cleFocusEngine === 'gagner_technologie' ? niveauxTechnologieOptionCadre_(gain.cle) : (Number(gain.valeur) || 1);
+    var fragment = {};
+    fragment[cleFocusEngine] = valeur;
+    return fragment;
+  }
+
+  /**
+   * Résout une SÉQUENCE de gains d'Objectif (modes "groupe"/"libre"/
+   * "exclusif_repete" ci-dessous, Lot 2) — CHAQUE gain a sa PROPRE
+   * résolution FocusEngine.resoudreEffet indépendante, enchaînée sur
+   * l'état RÉSULTANT du gain précédent, plutôt qu'un unique appel avec
+   * plusieurs clés (ou le "choice_repeat" natif de FocusEngine).
+   *
+   * Nécessaire car plusieurs clés (retirer_corruption/deplacer_corruption/
+   * gagner_programme/avancer_civilisation/ameliorer_gloire/construire...)
+   * PERSISTENT DIRECTEMENT en base depuis leur propre popup, AVANT même
+   * que le `succes` global d'un JSON à plusieurs clés soit connu
+   * (FocusEngine reste pur, voir son en-tête — c'est la popup DOM,
+   * strategieService.js, qui écrit) : un JSON {retirer_corruption:1,
+   * deplacer_corruption:1} (mode "groupe") dont la 2e clé échouerait
+   * (ex. plus aucune Corruption à déplacer, la 1re venant de la retirer)
+   * verrait `resoudreJsonInterne_` retourner `succes:false` pour
+   * l'ENSEMBLE — alors que la 1re Corruption a RÉELLEMENT déjà été
+   * retirée du plateau. Même bug de fond déjà corrigé pour
+   * GameService.appliquerCadreGainCorruption ci-dessus (voir son en-tête)
+   * — ici généralisé à un gain d'Objectif quelconque : un échec/une
+   * annulation au gain N n'efface JAMAIS les gains 1..N-1 déjà résolus,
+   * la ligne est marquée appliquée avec un résumé PARTIEL (jamais perdu)
+   * plutôt que de tout annuler. `succes` du résultat retourné n'est vrai
+   * que si AU MOINS un gain a été résolu (sinon `{annule:true}` côté
+   * finaliserResolutionObjectifFocusEngine_, comme un Annuler classique).
+   */
+  function resoudreGainsObjectifSequentiellement_(gains, etatDepart, source, demanderChoix) {
+    var etatCourant = etatDepart;
+    var journalCumule = [];
+    var mutationsAcc = [];
+    return gains.reduce(function (promesse, gain) {
+      return promesse.then(function (arreter) {
+        if (arreter) return true;
+        return FocusEngine.resoudreEffet(etatCourant, fragmentFocusEnginePourGainObjectif_(gain), source, '', demanderChoix)
+          .then(function (resultat) {
+            if (!resultat.succes) return true;
+            etatCourant = resultat.etatResultat;
+            journalCumule = journalCumule.concat(resultat.journal);
+            mutationsAcc = mutationsAcc.concat(resultat.mutations);
+            return false;
+          });
+      });
+    }, Promise.resolve(false)).then(function () {
+      return { succes: journalCumule.length > 0, journal: journalCumule, mutations: mutationsAcc, etatResultat: etatCourant };
+    });
+  }
+
+  /**
    * Boilerplate commun à appliquerGainObjectif ci-dessous — MÊME principe
    * que chargerCadreOuvrable_ (lit parties+plateauMaison, garde-fou
    * anti-double-application), mais indexe `objectifs.blocs[blocIndex].
@@ -2607,40 +2681,75 @@ var GameService = (function () {
 
     /**
      * true si `ligne` (une ligne du catalogue Objectifs galactiques) est
-     * automatisable par appliquerGainObjectif ci-dessous — Lot 1 : type
-     * "exploit" UNIQUEMENT (jamais "multiplicateur", même mode "unique/1
-     * gain" — voir la garde `gain.par` ci-dessous, qui exclurait de toute
-     * façon les rares cas où un "multiplicateur" a `mode:"unique"`),
-     * `recompense.mode === 'unique'`, 1 seul gain, SANS `par`/`formule`/
-     * `bareme` (ces 3 supposent une répétition/un calcul que cette
-     * fonction ne fait pas — appliquer `Number(gain.valeur)` une seule
-     * fois sous-appliquerait le gain réel), clé résolvable par
-     * cleFocusEnginePourGainObjectif_. Utilisée par index.html/
-     * strategieService.js pour décider d'afficher le bouton "Appliquer"
-     * à côté d'une ligne (au lieu du simple rappel textuel
-     * "Non automatisé").
+     * automatisable par appliquerGainObjectif ci-dessous — type "exploit"
+     * UNIQUEMENT (jamais "multiplicateur" : un gain "par" compte suppose
+     * une répétition que ni ce lot ni le précédent ne gèrent ici — voir
+     * la garde `gain.par` ci-dessous), et JAMAIS `formule`/`bareme` (valeur
+     * calculée, hors périmètre de ce mécanisme de gain "à plat"). Selon
+     * `recompense.mode` :
+     *   - "unique" (Lot 1, 13/09/2026) : exactement 1 gain, clé résolvable
+     *     par cleFocusEnginePourGainObjectif_ (strict — sinon "Non
+     *     automatisé", ex. gains resource/commerce/gloire simples jamais
+     *     couverts par ce vocabulaire de Cadre).
+     *   - "groupe"/"exclusif"/"libre" (Lot 2, 14/09/2026) : au moins 1
+     *     gain, PAS de garde de résolution — voir
+     *     fragmentFocusEnginePourGainObjectif_ (clé non résolue conservée
+     *     brute, FocusEngine.resoudreCle_ la reconnaît nativement dans la
+     *     plupart des cas, ou journalise un avertissement non-bloquant
+     *     pour les rares clés qu'il ne reconnaît pas non plus).
+     *   - "exclusif_repete" (Lot 2) : idem + `recompense.repetitions`
+     *     entier positif.
+     * Utilisée par index.html/strategieService.js pour décider d'afficher
+     * le bouton "Appliquer" à côté d'une ligne (au lieu du simple rappel
+     * textuel "Non automatisé").
      */
     gainObjectifAutomatisable: function (ligne) {
       if (!ligne || ligne.type !== 'exploit') return false;
       var rec = ligne.recompense;
-      if (!rec || rec.mode !== 'unique' || !rec.gains || rec.gains.length !== 1) return false;
-      var gain = rec.gains[0];
-      if (gain.par || gain.formule || gain.bareme) return false;
-      return !!cleFocusEnginePourGainObjectif_(gain);
+      if (!rec || !Array.isArray(rec.gains) || !rec.gains.length) return false;
+      if (rec.gains.some(function (g) { return g.par || g.formule || g.bareme; })) return false;
+      if (rec.mode === 'unique') {
+        return rec.gains.length === 1 && !!cleFocusEnginePourGainObjectif_(rec.gains[0]);
+      }
+      if (rec.mode === 'groupe' || rec.mode === 'exclusif' || rec.mode === 'libre') return true;
+      if (rec.mode === 'exclusif_repete') return Number(rec.repetitions) > 0;
+      return false;
     },
 
     /**
      * Applique AUTOMATIQUEMENT le gain d'une ligne d'Objectif galactique
-     * (Lot 1, voir gainObjectifAutomatisable ci-dessus) — délègue à
-     * FocusEngine.resoudreEffet, MÊME mécanisme que appliquerCadreChoix
-     * FocusEngine ci-dessus (un Objectif "gain unique" et une option de
-     * Cadre partagent le même vocabulaire `{cle, valeur}`). `demanderChoix`
-     * ouvre la popup dédiée à la clé résolue (retirer_corruption/
-     * avancer_civilisation/gagner_technologie/gagner_programme/prime/
-     * construire_installation/augmenter_population_pure) exactement comme
-     * pour un Cadre ou une action Focus — le joueur choisit sa cible
-     * normalement. Un "Annuler" laisse la ligne non appliquée (pas de
-     * garde-fou "déjà tenté", seul un SUCCÈS marque `objectifsAppliques`).
+     * (voir gainObjectifAutomatisable ci-dessus) — délègue à FocusEngine.
+     * resoudreEffet. `demanderChoix` ouvre la popup dédiée à la clé
+     * résolue, exactement comme pour un Cadre ou une action Focus — le
+     * joueur choisit sa cible normalement. Un "Annuler" (ou un choix "0
+     * gain") laisse la ligne non appliquée (pas de garde-fou "déjà
+     * tenté", seul un résultat avec AU MOINS un gain résolu marque
+     * `objectifsAppliques`).
+     *
+     * Selon `recompense.mode` (Lot 2, 14/09/2026) :
+     *   - "unique" (Lot 1) : `{ [cleFocusEngine]: valeur }`, un seul appel
+     *     FocusEngine.resoudreEffet — inchangé.
+     *   - "exclusif" : le joueur choisit UN gain parmi `rec.gains` via
+     *     `{ choix: [fragments...] }` (popup 'option_exclusive') — un seul
+     *     gain résolu, donc un seul appel FocusEngine.resoudreEffet : AUCUN
+     *     risque de persistance partielle (voir resoudreGainsObjectif
+     *     Sequentiellement_ ci-dessus pour le cas contraire).
+     *   - "groupe" : TOUS les gains résolus, un par un, via
+     *     resoudreGainsObjectifSequentiellement_ — jamais un JSON à
+     *     plusieurs clés en un seul appel (risque de persistance
+     *     partielle si une clé postérieure échoue après qu'une clé
+     *     "impure" — retirer_corruption, par ex. — a déjà écrit en base).
+     *   - "libre" : le joueur choisit LIBREMENT lesquels des gains
+     *     appliquer via `demanderChoix({type:'options_inclusives', ...})`
+     *     (popup à cases à cocher, résolution = tableau d'index choisis,
+     *     JAMAIS de bouton Annuler — 0 case cochée équivaut à annuler),
+     *     PUIS résout la sélection un par un (resoudreGainsObjectif
+     *     Sequentiellement_, même raison que "groupe" ci-dessus).
+     *   - "exclusif_repete" : répète `repetitions` fois un choix exclusif
+     *     (popup 'option_exclusive', un tour à la fois), résolvant CHAQUE
+     *     choix retenu séparément — même principe que
+     *     GameService.appliquerCadreGainCorruption ci-dessus (une
+     *     annulation à un tour N préserve les tours 1..N-1 déjà résolus).
      */
     appliquerGainObjectif: function (partieId, cycle, blocIndex, ligneIndex, demanderChoix) {
       return chargerObjectifOuvrable_(partieId, cycle, blocIndex, ligneIndex).then(function (ctx) {
@@ -2649,29 +2758,84 @@ var GameService = (function () {
           throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (type non pris en charge).');
         }
         var rec = ligne.recompense;
-        if (!rec || rec.mode !== 'unique' || !rec.gains || rec.gains.length !== 1) {
+        if (!rec || !Array.isArray(rec.gains) || !rec.gains.length) {
           throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
         }
-        var gain = rec.gains[0];
-        if (gain.par || gain.formule || gain.bareme) {
+        if (rec.gains.some(function (g) { return g.par || g.formule || g.bareme; })) {
           throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (gain répété/calculé non pris en charge).');
         }
-        var cleFocusEngine = cleFocusEnginePourGainObjectif_(gain);
-        if (!cleFocusEngine) throw new Error('Gain non automatisable pour cette ligne d\'Objectif.');
         if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
-
-        var effet = {};
-        effet[cleFocusEngine] = cleFocusEngine === 'gagner_technologie'
-          ? niveauxTechnologieOptionCadre_(gain.cle)
-          : (Number(gain.valeur) || 1);
 
         var source = 'Objectif galactique';
         var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, ctx.lignePlateauMaison);
 
-        return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effet, source, ligne.texte, demanderChoix)
-          .then(function (resultatEffet) {
-            return finaliserResolutionObjectifFocusEngine_(partieId, ctx, source, resultatEffet);
+        var finaliser = function (resultatEffet) {
+          return finaliserResolutionObjectifFocusEngine_(partieId, ctx, source, resultatEffet);
+        };
+
+        if (rec.mode === 'unique') {
+          if (rec.gains.length !== 1) throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
+          var cleFocusEngine = cleFocusEnginePourGainObjectif_(rec.gains[0]);
+          if (!cleFocusEngine) throw new Error('Gain non automatisable pour cette ligne d\'Objectif.');
+          var effetUnique = {};
+          effetUnique[cleFocusEngine] = cleFocusEngine === 'gagner_technologie'
+            ? niveauxTechnologieOptionCadre_(rec.gains[0].cle)
+            : (Number(rec.gains[0].valeur) || 1);
+          return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effetUnique, source, '', demanderChoix).then(finaliser);
+        }
+
+        if (rec.mode === 'exclusif') {
+          var effetExclusif = { choix: rec.gains.map(fragmentFocusEnginePourGainObjectif_) };
+          return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effetExclusif, source, '', demanderChoix).then(finaliser);
+        }
+
+        if (rec.mode === 'groupe') {
+          return resoudreGainsObjectifSequentiellement_(rec.gains, lignePlateauMaisonAvecId, source, demanderChoix).then(finaliser);
+        }
+
+        if (rec.mode === 'libre') {
+          var optionsLibres = rec.gains.map(fragmentFocusEnginePourGainObjectif_);
+          return Promise.resolve(demanderChoix({ type: 'options_inclusives', options: optionsLibres, source: source })).then(function (indices) {
+            var indicesChoisis = Array.isArray(indices) ? indices : [];
+            var gainsChoisis = indicesChoisis.map(function (i) { return rec.gains[i]; }).filter(Boolean);
+            if (!gainsChoisis.length) return { annule: true };
+            return resoudreGainsObjectifSequentiellement_(gainsChoisis, lignePlateauMaisonAvecId, source, demanderChoix).then(finaliser);
           });
+        }
+
+        if (rec.mode === 'exclusif_repete') {
+          var repetitions = Number(rec.repetitions) || 0;
+          if (repetitions <= 0) throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
+          var optionsRepete = rec.gains.map(fragmentFocusEnginePourGainObjectif_);
+          var etatCourantRepete = lignePlateauMaisonAvecId;
+          var journalRepete = [];
+          var mutationsRepete = [];
+          var tours = [];
+          for (var i = 0; i < repetitions; i++) tours.push(i);
+          return tours.reduce(function (promesse, numeroTour) {
+            return promesse.then(function (arreter) {
+              if (arreter) return true;
+              return Promise.resolve(demanderChoix({
+                type: 'option_exclusive', options: optionsRepete,
+                source: source + ' (choix ' + (numeroTour + 1) + '/' + repetitions + ')'
+              })).then(function (reponse) {
+                if (!reponse || reponse.indexChoisi == null || reponse.annule) return true;
+                return FocusEngine.resoudreEffet(etatCourantRepete, fragmentFocusEnginePourGainObjectif_(rec.gains[reponse.indexChoisi]), source, '', demanderChoix)
+                  .then(function (resultat) {
+                    if (!resultat.succes) return true;
+                    etatCourantRepete = resultat.etatResultat;
+                    journalRepete = journalRepete.concat(resultat.journal);
+                    mutationsRepete = mutationsRepete.concat(resultat.mutations);
+                    return false;
+                  });
+              });
+            });
+          }, Promise.resolve(false)).then(function () {
+            return finaliser({ succes: journalRepete.length > 0, journal: journalRepete, mutations: mutationsRepete, etatResultat: etatCourantRepete });
+          });
+        }
+
+        throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
       });
     },
 

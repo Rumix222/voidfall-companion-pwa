@@ -92,12 +92,181 @@ test('gainObjectifAutomatisable : false pour type "multiplicateur" (même mode u
   assert.strictEqual(GameService.gainObjectifAutomatisable(ligne), false);
 });
 
-test('gainObjectifAutomatisable : false si mode != unique, ou plusieurs gains, ou gain.par/formule/bareme présent', function () {
+test('gainObjectifAutomatisable : false si mode "unique" a plusieurs gains, ou gain.par/formule/bareme présent (même mode "libre"/"groupe")', function () {
   var ctx = creerSandbox(creerFixtureBase([]));
   var GameService = ctx.sandbox.GameService;
-  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'libre', gains: [{ cle: 'retirer_corruption', valeur: 1 }] })), false);
+  // mode "unique" à 2 gains : jamais automatisable (voir Lot 1) — contrairement
+  // à "libre"/"groupe"/"exclusif" ci-dessous (Lot 2), qui acceptent plusieurs gains.
   assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'unique', gains: [{ cle: 'retirer_corruption', valeur: 1 }, { cle: 'prime', valeur: 1 }] })), false);
   assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('multiplicateur', { mode: 'unique', gains: [{ cle: 'augmenter_population_pure', valeur: 1, par: 'secteur_pur_avec_guilde_scientifique' }] })), false);
+  // gain.par présent -> jamais automatisable, quel que soit le mode (Lot 2 ne couvre pas les gains répétés "par").
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'libre', gains: [{ cle: 'nourriture', valeur: 2, par: 'corruption_conservee' }, { cle: 'influence', valeur: 1, par: 'corruption_conservee' } ] })), false);
+});
+
+// ---------------------------------------------------------------
+// gainObjectifAutomatisable / appliquerGainObjectif — Lot 2 (14/09/2026) :
+// modes "groupe"/"exclusif"/"libre"/"exclusif_repete"
+// ---------------------------------------------------------------
+
+test('gainObjectifAutomatisable : true pour "groupe"/"exclusif"/"libre" (type exploit, sans par/formule/bareme)', function () {
+  var ctx = creerSandbox(creerFixtureBase([]));
+  var GameService = ctx.sandbox.GameService;
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'groupe', gains: [{ cle: 'retirer_corruption', valeur: 1 }, { cle: 'deplacer_corruption', valeur: 1 }] })), true);
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'exclusif', gains: [{ cle: 'credit', valeur: 2 }, { cle: 'commerce', valeur: 1 }] })), true);
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'libre', gains: [{ cle: 'prime', valeur: 2 }, { cle: 'activer_cube', valeur: 1 }] })), true);
+});
+
+test('gainObjectifAutomatisable : exclusif_repete -> true seulement si repetitions est un entier positif', function () {
+  var ctx = creerSandbox(creerFixtureBase([]));
+  var GameService = ctx.sandbox.GameService;
+  var gains = [{ cle: 'retirer_corruption', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }];
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'exclusif_repete', repetitions: 2, gains: gains })), true);
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'exclusif_repete', repetitions: 0, gains: gains })), false);
+  assert.strictEqual(GameService.gainObjectifAutomatisable(ligneObjectif_('exploit', { mode: 'exclusif_repete', gains: gains })), false);
+});
+
+test('appliquerGainObjectif : mode "groupe" -> résout chaque gain séparément (activer_cube pur + retirer_corruption via demanderChoix)', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'groupe', gains: [{ cle: 'retirer_corruption', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  var appels = [];
+  function demanderChoix(contexte) {
+    appels.push(contexte.type);
+    assert.strictEqual(contexte.type, 'retirer_corruption');
+    return { detail: 'Corruption retirée du Secteur 1.' };
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(appels.length, 1); // activer_cube ne passe jamais par demanderChoix (mutation pure)
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 4); // 3 + 1
+    var applique = partieMaj.evenements.cycle1.objectifsAppliques['0:0'];
+    assert.ok(applique);
+    assert.ok(applique.resume.indexOf('Corruption retirée du Secteur 1') !== -1);
+  });
+});
+
+test('appliquerGainObjectif : mode "groupe" -> une clé postérieure annulée NE PERD PAS le gain déjà résolu (résumé partiel, ligne marquée appliquée)', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'groupe', gains: [{ cle: 'activer_cube', valeur: 1 }, { cle: 'retirer_corruption', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  // activer_cube (pur, jamais de demanderChoix) réussit toujours ; retirer_corruption est annulé (aucune cible).
+  function demanderChoix(contexte) {
+    assert.strictEqual(contexte.type, 'retirer_corruption');
+    return { annule: true };
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 4); // 3 + 1, conservé malgré l'annulation du 2e gain
+    var applique = partieMaj.evenements.cycle1.objectifsAppliques['0:0'];
+    assert.ok(applique, 'la ligne doit être marquée appliquée (au moins un gain résolu)');
+  });
+});
+
+test('appliquerGainObjectif : mode "groupe" -> annulation dès le 1er gain -> {annule:true}, rien marqué', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'groupe', gains: [{ cle: 'retirer_corruption', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  function demanderChoix() { return { annule: true }; }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.annule, true);
+    assert.strictEqual(Object.keys((ctx.parties[PARTIE_ID].etatJson.evenements.cycle1.objectifsAppliques) || {}).length, 0);
+    assert.strictEqual(ctx.plateauMaison[PARTIE_ID].cubeActif, 3, 'activer_cube (2e gain) ne doit jamais être tenté après le 1er annulé');
+  });
+});
+
+test('appliquerGainObjectif : mode "exclusif" -> ouvre "option_exclusive", ne résout QUE le gain choisi', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'exclusif', gains: [{ cle: 'credit', valeur: 2 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  function demanderChoix(contexte) {
+    assert.strictEqual(contexte.type, 'option_exclusive');
+    assert.strictEqual(contexte.options.length, 2);
+    return { indexChoisi: 0 };
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(partieMaj.plateauMaison.ressources.credit, 7); // 5 + 2
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 3); // inchangé, gain non choisi
+    assert.ok(partieMaj.evenements.cycle1.objectifsAppliques['0:0']);
+  });
+});
+
+test('appliquerGainObjectif : mode "exclusif" -> Annuler -> {annule:true}, rien marqué', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'exclusif', gains: [{ cle: 'credit', valeur: 2 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, function () { return { annule: true }; }).then(function (resultat) {
+    assert.strictEqual(resultat.annule, true);
+    assert.strictEqual(Object.keys((ctx.parties[PARTIE_ID].etatJson.evenements.cycle1.objectifsAppliques) || {}).length, 0);
+  });
+});
+
+test('appliquerGainObjectif : mode "libre" -> demande "options_inclusives" (tableau d\'index, pas d\'objet), résout seulement la sélection', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'libre', gains: [{ cle: 'credit', valeur: 2 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  function demanderChoix(contexte) {
+    assert.strictEqual(contexte.type, 'options_inclusives');
+    assert.strictEqual(contexte.options.length, 2);
+    return [1]; // seulement activer_cube
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(partieMaj.plateauMaison.ressources.credit, 5); // inchangé, non choisi
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 4); // 3 + 1
+    assert.ok(partieMaj.evenements.cycle1.objectifsAppliques['0:0']);
+  });
+});
+
+test('appliquerGainObjectif : mode "libre" -> aucune case cochée -> {annule:true}, rien marqué (pas de bouton Annuler pour ce type)', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'libre', gains: [{ cle: 'credit', valeur: 2 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, function () { return []; }).then(function (resultat) {
+    assert.strictEqual(resultat.annule, true);
+    assert.strictEqual(Object.keys((ctx.parties[PARTIE_ID].etatJson.evenements.cycle1.objectifsAppliques) || {}).length, 0);
+  });
+});
+
+test('appliquerGainObjectif : mode "exclusif_repete" -> répète le choix "repetitions" fois, cumule les gains', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'exclusif_repete', repetitions: 2, gains: [{ cle: 'credit', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  var tour = 0;
+  function demanderChoix(contexte) {
+    assert.strictEqual(contexte.type, 'option_exclusive');
+    tour++;
+    return { indexChoisi: tour === 1 ? 0 : 1 }; // 1er tour : credit, 2e tour : activer_cube
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(tour, 2);
+    assert.strictEqual(partieMaj.plateauMaison.ressources.credit, 6); // 5 + 1
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 4); // 3 + 1
+    assert.ok(partieMaj.evenements.cycle1.objectifsAppliques['0:0']);
+  });
+});
+
+test('appliquerGainObjectif : mode "exclusif_repete" -> Annuler au 2e tour préserve le 1er tour déjà résolu (résumé partiel)', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'exclusif_repete', repetitions: 2, gains: [{ cle: 'credit', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  var tour = 0;
+  function demanderChoix() {
+    tour++;
+    if (tour === 1) return { indexChoisi: 0 }; // credit
+    return { annule: true }; // 2e tour annulé
+  }
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, demanderChoix).then(function (partieMaj) {
+    assert.strictEqual(partieMaj.plateauMaison.ressources.credit, 6, 'le 1er tour (credit) doit rester acquis malgré l\'annulation du 2e');
+    assert.strictEqual(partieMaj.plateauMaison.cubeActif, 3, 'le 2e tour (annulé) ne doit rien appliquer');
+    assert.ok(partieMaj.evenements.cycle1.objectifsAppliques['0:0'], 'la ligne doit être marquée appliquée (au moins un tour résolu)');
+  });
+});
+
+test('appliquerGainObjectif : mode "exclusif_repete" -> Annuler dès le 1er tour -> {annule:true}, rien marqué', function () {
+  var objectifs = [{ lignes: [ligneObjectif_('exploit', { mode: 'exclusif_repete', repetitions: 2, gains: [{ cle: 'credit', valeur: 1 }, { cle: 'activer_cube', valeur: 1 }] })] }];
+  var ctx = creerSandbox(creerFixtureBase(objectifs));
+  var GameService = ctx.sandbox.GameService;
+  return GameService.appliquerGainObjectif(PARTIE_ID, 1, 0, 0, function () { return { annule: true }; }).then(function (resultat) {
+    assert.strictEqual(resultat.annule, true);
+    assert.strictEqual(Object.keys((ctx.parties[PARTIE_ID].etatJson.evenements.cycle1.objectifsAppliques) || {}).length, 0);
+  });
 });
 
 test('gainObjectifAutomatisable : false pour un gain Influence (déjà couvert par le mécanisme existant, jamais de double bouton)', function () {

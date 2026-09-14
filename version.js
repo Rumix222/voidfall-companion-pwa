@@ -1,7 +1,65 @@
 /**
  * version.js
- * Version 144 — 2026-09-13
+ * Version 145 — 2026-09-14
  * Source de vérité unique pour la version de l'application.
+ *
+ * 14/09/2026 (retour utilisateur : "Continue le travail d'hier lot 2") —
+ * Objectifs galactiques, "Application automatique élargie", Lot 2 : les
+ * modes "groupe"/"exclusif"/"libre"/"exclusif_repete" (13 lignes
+ * "exploit" du catalogue, voir l'inventaire du 13/09/2026 ci-dessous)
+ * rejoignent le mode "unique" (Lot 1) — reçoivent désormais eux aussi un
+ * bouton "Appliquer" :
+ * - `js/gameService.js` : `fragmentFocusEnginePourGainObjectif_(gain)`
+ *   traduit un gain `{cle, valeur}` en fragment JSON FocusEngine à plat
+ *   (`cleFocusEnginePourGainObjectif_` si résolue, sinon `gain.cle` brut —
+ *   FocusEngine.resoudreCle_ reconnaît nativement la plupart des clés
+ *   simples jamais couvertes par ce vocabulaire de Cadre, ex. "credit",
+ *   "produire_nourriture" ; les rares clés qu'il ne reconnaît pas non
+ *   plus, ex. "commerce"/"gain_gloire"/"produire_ressource_type", jamais
+ *   câblées, retombent sur son repli générique — avertissement
+ *   journalisé, jamais bloquant). `gainObjectifAutomatisable`/
+ *   `appliquerGainObjectif` étendues à ces 4 modes.
+ * - Piège corrigé AVANT de livrer (jamais visible en test superficiel) :
+ *   plusieurs clés (retirer_corruption/deplacer_corruption/gagner_
+ *   programme/avancer_civilisation/ameliorer_gloire/construire...)
+ *   PERSISTENT DIRECTEMENT en base depuis leur popup dédiée (FocusEngine
+ *   reste pur, voir son en-tête) — un JSON à plusieurs clés en un seul
+ *   appel (ou le "choice_repeat" natif de FocusEngine) dont une clé
+ *   TARDIVE échouerait effacerait à tort le `succes` global alors qu'une
+ *   clé ANTÉRIEURE a déjà écrit pour de vrai (même bug de fond que celui
+ *   déjà corrigé pour `GameService.appliquerCadreGainCorruption`, voir
+ *   son en-tête). Résolu en généralisant ce même principe : nouvelle
+ *   `resoudreGainsObjectifSequentiellement_` résout CHAQUE gain de
+ *   "groupe"/"libre"/"exclusif_repete" via son PROPRE appel FocusEngine.
+ *   resoudreEffet, jamais un JSON fusionné — un échec/une annulation au
+ *   gain N préserve les gains 1..N-1 déjà résolus (résumé partiel, ligne
+ *   quand même marquée appliquée). "exclusif" reste un unique appel
+ *   `{choix:[...]}` (un seul gain résolu, donc aucun risque). "libre"
+ *   appelle `demanderChoix({type:'options_inclusives',...})` directement
+ *   (résolution = tableau d'index choisis, sans bouton Annuler — 0 case
+ *   cochée équivaut à annuler) puis résout la sélection séquentiellement ;
+ *   "exclusif_repete" répète un choix exclusif `repetitions` fois (popup
+ *   'option_exclusive', un tour à la fois), même principe qu'
+ *   `appliquerCadreGainCorruption`.
+ * - `js/strategieService.js` : 6 nouveaux libellés `LIBELLES_OPTIONS`
+ *   (`prime`/`ameliorer_gloire`/`commerce`/`gain_gloire`/`produire_
+ *   ressource_type`/`gagner_technologie`) pour l'affichage dans les
+ *   popups 'option_exclusive'/'options_inclusives' — vocabulaire jamais
+ *   affiché en LISTE avant ce lot (`gagner_prime`/`gagner_commerce`
+ *   existants servent un vocabulaire différent, Focus "Bonus Commerce").
+ * - Tests : `js/gameService_appliquer_gain_objectif_test.js` — 12
+ *   nouveaux tests Lot 2 (dont les 2 scénarios "annulation tardive
+ *   préserve les gains déjà résolus", groupe et exclusif_repete). 27
+ *   tests dans ce fichier, tous au vert ; 251 + tous les `*_test.js`
+ *   individuels au vert.
+ * - Hors périmètre (reste à faire, voir mémoire "voidfall-objectifs-
+ *   galactiques-plan" §"À REPRENDRE") : lignes "multiplicateur" à gain
+ *   non-Influence répété `compte` fois (augmenter_population_pure/prime),
+ *   les 9 lignes "unique" restantes (commerce/gloire/produire_type_
+ *   ressource/evaluer_objectifs_programme), et le bug connu de longue
+ *   date `bloc.separateur_avant` "OU" jamais pris en compte (double-
+ *   comptage possible si 2 lignes d'un même bloc "OU" sont simultanément
+ *   automatisables — toujours pas rencontré au catalogue réel).
  *
  * 13/09/2026, suite (retour utilisateur : "Application automatique
  * élargie des Objectifs (gains non-Influence, choix multiples)") —
@@ -5119,4 +5177,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260913.14';
+var APP_VERSION = '20260914.1';
