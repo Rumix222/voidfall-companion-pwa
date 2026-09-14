@@ -403,10 +403,75 @@ var CombatService = (function () {
     return resultat;
   }
 
+  /**
+   * Résout une Escarmouche (docs-rules-cycle-de-jeu.md §3.1/§2.3.3.1.1) —
+   * rôles INVERSÉS par rapport à resoudreInvasion ci-dessus : le Néant est
+   * ATTAQUANT (retour utilisateur, 14/09/2026 : "la puissance navale du
+   * Néant est équivalente à des Corvettes, il n'y a qu'un seul type" —
+   * même convention que le camp Néant DÉFENSEUR de resoudreInvasion, qui
+   * passe déjà `secteurCible.pnNeant` tel quel comme 1er paramètre
+   * "corvette" de construireCamp), et le joueur est DÉFENSEUR sur
+   * `secteurCible` (ses propres unités + Défense de Secteur/Base
+   * Stellaire, Technologies de combat appliquées via `estJoueur:true`).
+   *
+   * §3.1.4 ("Puissance Néant à 0 = défense automatique") est un cas
+   * particulier déjà couvert nativement par resoudreCombat_ : un camp à 0
+   * Puissance Navale ET 0 Défense de Secteur perd immédiatement (`totalAttaquant
+   * <= 0`), donc `vainqueur` = le défenseur (joueur) sans round de combat.
+   *
+   * `victoireJoueur` couvre aussi l'égalité (`vainqueur === null`, les 2
+   * camps réduits à 0 simultanément) comme une défense RÉUSSIE — les
+   * règles ne détaillent une égalité que pour Envahir, jamais pour une
+   * Escarmouche spécifiquement (hypothèse documentée, voir le plan de ce
+   * chantier).
+   *
+   * Retourne { vainqueur, cubesRestants, log, victoireJoueur,
+   * survivantsJoueur }. Ne PERSISTE rien (module pur) — voir
+   * SecteurService.appliquerResultatEscarmouche pour les conséquences sur
+   * le secteur (abandon complet en cas de défaite, docs-rules-flottes.md
+   * §4.1-4.4).
+   */
+  function resoudreEscarmouche(partie, puissanceNeant, secteurCible) {
+    secteurCible = secteurCible || {};
+
+    var attaquant = construireCamp(
+      'Le Néant', Math.max(0, Number(puissanceNeant) || 0), 0, 0, 0, 0,
+      0,
+      false, partie
+    );
+
+    var defenseSecteur = (secteurCible.installationDefenseSecteur || 0) + (secteurCible.installationBaseStellaire || 0);
+    var defenseur = construireCamp(
+      partie.joueur.nom,
+      secteurCible.pnCorvette || 0, secteurCible.pnDestroyer || 0, secteurCible.pnCuirasse || 0,
+      secteurCible.pnSentinelle || 0, secteurCible.pnPorteVaisseau || 0,
+      defenseSecteur,
+      true, partie
+    );
+
+    var resultat = resoudreCombat(attaquant, defenseur);
+
+    resultat.victoireJoueur = !resultat.vainqueur || resultat.vainqueur.estJoueur === true;
+    // `defenseur` a été muté en place pendant le combat — ses champs par
+    // type sont déjà les survivants exacts (utilisé même en cas de
+    // défaite : la Défense de Secteur n'est pas un cube de PN, les cubes
+    // par type peuvent donc être non-nuls même si le joueur perd).
+    resultat.survivantsJoueur = {
+      corvette: defenseur.corvette,
+      destroyer: defenseur.destroyer,
+      cuirasse: defenseur.cuirasse,
+      sentinelle: defenseur.sentinelle,
+      portevaisseau: defenseur.portevaisseau
+    };
+
+    return resultat;
+  }
+
   return {
     vaisseauxDebloques: vaisseauxDebloques,
     construireCamp: construireCamp,
     resoudreCombat: resoudreCombat,
+    resoudreEscarmouche: resoudreEscarmouche,
     resoudreInvasion: resoudreInvasion
   };
 })();

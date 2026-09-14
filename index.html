@@ -164,6 +164,7 @@
     <details id="bloc-plateau-crise" style="margin-bottom:22px;">
       <summary class="section-title" style="cursor:pointer;">Plateau Crise</summary>
       <div class="game-block">
+        <button id="btn-escarmouche-standalone" class="btn btn-secondary" style="width:100%;margin-bottom:14px;">Escarmouche</button>
         <div class="plateau-influence">
           <label for="crise-modificateur-escarmouche">Modificateur escarmouche (s'ajoute à la puissance du Néant)</label>
           <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
@@ -779,6 +780,38 @@
             .catch(function (erreur) {
               window.alert('Échec de l\'enregistrement : ' + erreur.message);
               checkFocusPrefereEnDefausse.checked = !!pm.focusPrefereEnDefausse;
+            });
+        };
+      }
+
+      // Bouton "Escarmouche" (chantier "Escarmouche + Plateau Crise",
+      // 14/09/2026, retour utilisateur) — Alerte Guerre (§2.3.3) ou tout
+      // autre moment : ouvre la popup 'escarmouche_standalone'
+      // (StrategieService.demanderChoix) qui cible/simule/persiste SANS
+      // paiement (déjà couvert par les compteurs `criseCout*`/"Payer"
+      // ci-dessus) — répétable à volonté, aucun flag "résolu".
+      var btnEscarmoucheStandalone = document.getElementById('btn-escarmouche-standalone');
+      if (btnEscarmoucheStandalone) {
+        btnEscarmoucheStandalone.onclick = function () {
+          if (typeof StrategieService === 'undefined' || !StrategieService.demanderChoix) return;
+          btnEscarmoucheStandalone.disabled = true;
+          GameService.calculerPuissanceNeantDefaut(partie.id)
+            .then(function (puissanceDefaut) {
+              return StrategieService.demanderChoix({
+                type: 'escarmouche_standalone', partieId: partie.id, puissanceNeant: puissanceDefaut
+              });
+            })
+            .then(function (resultat) {
+              btnEscarmoucheStandalone.disabled = false;
+              if (!resultat || resultat.annule) return;
+              partieCourante = resultat.partie;
+              renderPlateauCrise_(resultat.partie);
+              App.renderSecteurs(resultat.partie);
+              StrategieService.afficher(resultat.partie);
+            })
+            .catch(function (erreur) {
+              btnEscarmoucheStandalone.disabled = false;
+              window.alert('Échec de la résolution de l\'Escarmouche : ' + erreur.message);
             });
         };
       }
@@ -2204,6 +2237,47 @@
     }
 
     /**
+     * Cadre de type "placement" à zone GALAXIE ENTIÈRE (chantier "Cadres
+     * placement en masse", 14/09/2026 — ex. "chaque secteur de Faille",
+     * voir GameService.ZONES_PLACEMENT_MASSE) : AUCUN choix du joueur,
+     * contrairement à appliquerCadrePlacementEtRafraichir_ ci-dessus — une
+     * popup de confirmation (Annuler/Valider) récapitule d'abord les
+     * secteurs qui vont être touchés (GameService.
+     * previsualiserCadrePlacementEnMasse, lecture seule) avant d'écrire
+     * quoi que ce soit, pour que le joueur puisse reporter l'effet sur le
+     * plateau physique. 0 secteur éligible reste confirmable (le résumé
+     * l'indique explicitement) plutôt que de bloquer le cadre : la carte
+     * peut légitimement n'avoir plus aucune cible ce cycle-ci (ex. plus
+     * aucune Faille).
+     */
+    function appliquerCadrePlacementMasseEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined' || typeof GameService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.previsualiserCadrePlacementEnMasse(partie.id, cadre).then(function (numeros) {
+        var message = numeros.length
+          ? 'Secteurs concernés : ' + numeros.slice().sort(function (a, b) { return a - b; }).join(', ') + '.'
+          : 'Aucun secteur ne remplit actuellement le critère de cette carte.';
+        return StrategieService.demanderChoix({
+          type: 'confirmation',
+          titre: 'Confirmer le placement',
+          message: message,
+          texteValider: 'Valider'
+        }).then(function (confirmation) {
+          if (!confirmation || confirmation.annule || !confirmation.confirme) { bouton.disabled = false; return; }
+          return GameService.appliquerCadrePlacementEnMasse(partie.id, cycle, ordre).then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+        });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
      * Construit le texte de la popup de confirmation d'un cadre
      * "placement_multiple" une fois les cibles connues (sans égalité de
      * Population à trancher) — jamais le texte du cadre répété (déjà
@@ -2671,6 +2745,15 @@
             ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
 
           var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+          // Cadre "placement" à zone GALAXIE ENTIÈRE (chantier "Cadres
+          // placement en masse", 14/09/2026 — ex. "chaque secteur de
+          // Faille") : AUCUN choix du joueur (contrairement à
+          // estPlacementNeantAdjacent ci-dessus), pose les mêmes éléments
+          // sur TOUS les secteurs remplissant le critère de la carte —
+          // voir GameService.ZONES_PLACEMENT_MASSE/
+          // appliquerCadrePlacementEnMasse.
+          var estPlacementMasse = !!(cadre.effet && cadre.effet.type === 'placement' && !estPlacementNeantAdjacent &&
+            typeof GameService !== 'undefined' && GameService.ZONES_PLACEMENT_MASSE.indexOf(cadre.effet.zone) !== -1);
           // Cadre "placement_multiple" : plusieurs jeux d'éléments, chacun
           // sur un secteur du Néant adjacent déterminé par un critère de
           // Population (voir
@@ -2698,11 +2781,12 @@
           var actions = [];
           if (estPlacementNeantAdjacent) {
             if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
-          } else if (estPlacementMultiple) {
+          } else if (estPlacementMasse || estPlacementMultiple) {
             if (applique) {
-              var secteursTexte = (applique.secteurs || []).length > 1
-                ? 'Secteurs ' + applique.secteurs.join(' et ')
-                : 'Secteur ' + applique.secteurs[0];
+              var secteursListe = applique.secteurs || [];
+              var secteursTexte = !secteursListe.length
+                ? 'aucun secteur éligible'
+                : (secteursListe.length > 1 ? 'Secteurs ' + secteursListe.join(' et ') : 'Secteur ' + secteursListe[0]);
               statutHtml = '<p class="cadre-statut">✓ Appliqué (' + secteursTexte + ')</p>';
             }
           } else if (estManuel) {
@@ -2719,12 +2803,13 @@
             actions = actionsCadre_(cadre);
           }
 
-          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMultiple || estManuel || estGainCorruption || estOffreProgrammeCorrompue || actions.length);
+          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMasse || estPlacementMultiple || estManuel || estGainCorruption || estOffreProgrammeCorrompue || actions.length);
           var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
           var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' :
-            (estPlacementMultiple ? ' data-placement-multiple="1"' :
-              (estGainCorruption ? ' data-gain-corruption="1"' :
-                (estOffreProgrammeCorrompue ? ' data-offre-programme="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"'))));
+            (estPlacementMasse ? ' data-placement-masse="1"' :
+              (estPlacementMultiple ? ' data-placement-multiple="1"' :
+                (estGainCorruption ? ' data-gain-corruption="1"' :
+                  (estOffreProgrammeCorrompue ? ' data-offre-programme="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"')))));
           var attributsCarte = cliquable
             ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
             : '';
@@ -2742,6 +2827,19 @@
         var declencher = function () {
           if (carteEl.classList.contains('cadre-carte-en-cours')) return;
           appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement-masse="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementMasseEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
         };
         carteEl.addEventListener('click', declencher);
         carteEl.addEventListener('keydown', function (evenement) {

@@ -379,3 +379,60 @@ test('resoudreInvasion : bonusMissilesLonguePortee/bonusDronesAutonomes (5e/6e p
     'Absorption d\'Approche (Drones autonomes) doit apparaître dans le journal');
   assert.strictEqual(rSans.log.indexOf('Rumix inflige 1 Dégât d\'Approche supplémentaire (Missiles longue portée, 1 Énergie dépensée).'), -1, 'aucun bonus sans les paramètres');
 });
+
+// ------------------------------------------------------------
+// resoudreEscarmouche (chantier "Escarmouche + Plateau Crise", 14/09/2026)
+// ------------------------------------------------------------
+
+test('resoudreEscarmouche : rôles inversés — le Néant est attaquant (tout en Corvettes), le joueur défenseur', function () {
+  var CS = creerContexte_().CombatService;
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: null }, technologiesObtenues: [] };
+  var secteur = { pnCorvette: 3, installationDefenseSecteur: 0, installationBaseStellaire: 0 };
+  var r = CS.resoudreEscarmouche(partie, 5, secteur);
+
+  assert.strictEqual(r.vainqueur.nom, 'Le Néant');
+  assert.strictEqual(r.victoireJoueur, false);
+});
+
+test('resoudreEscarmouche : Puissance Néant à 0 -> défense automatiquement réussie (§3.1.4)', function () {
+  var CS = creerContexte_().CombatService;
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: null }, technologiesObtenues: [] };
+  var secteur = { pnCorvette: 0, installationDefenseSecteur: 0, installationBaseStellaire: 0 };
+  var r = CS.resoudreEscarmouche(partie, 0, secteur);
+
+  assert.strictEqual(r.vainqueur, null); // égalité (aucune unité des deux côtés)
+  assert.strictEqual(r.victoireJoueur, true); // égalité traitée comme défense réussie
+});
+
+test('resoudreEscarmouche : victoire du joueur -> survivantsJoueur reflète les cubes réellement restants', function () {
+  var CS = creerContexte_().CombatService;
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: null }, technologiesObtenues: [] };
+  var secteur = { pnCorvette: 4, pnCuirasse: 1, installationDefenseSecteur: 2, installationBaseStellaire: 0 };
+  var r = CS.resoudreEscarmouche(partie, 2, secteur);
+
+  assert.strictEqual(r.vainqueur.nom, 'Rumix');
+  assert.strictEqual(r.victoireJoueur, true);
+  // JSON.stringify plutôt que deepStrictEqual : objet issu du contexte vm
+  // (voir resoudreInvasion ci-dessus pour la même précaution).
+  assert.strictEqual(JSON.stringify(r.survivantsJoueur), JSON.stringify({
+    corvette: 4, destroyer: 0, cuirasse: 1, sentinelle: 0, portevaisseau: 0
+  }));
+});
+
+test('resoudreEscarmouche : Technologies du joueur (estJoueur:true) appliquées côté défenseur', function () {
+  var CS = creerContexte_().CombatService;
+  // Cellules énergétiques : +1 Dégât d'Approche pour le défenseur si sa
+  // Défense de Secteur/Sentinelle infligent déjà des Dégâts d'Approche.
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: { nom: 'Cellules énergétiques' } }, technologiesObtenues: [] };
+  var secteur = { pnCorvette: 0, installationDefenseSecteur: 1, installationBaseStellaire: 0 };
+  var r = CS.resoudreEscarmouche(partie, 3, secteur);
+  assert.ok(r.log.indexOf('Rumix inflige 1 Dégât d\'Approche supplémentaire (Cellules énergétiques).') !== -1);
+});
+
+test('resoudreEscarmouche : secteurCible absent -> traité comme vide (aucune exception)', function () {
+  var CS = creerContexte_().CombatService;
+  var partie = { joueur: { nom: 'Rumix', technologieDepart: null }, technologiesObtenues: [] };
+  var r = CS.resoudreEscarmouche(partie, 4, undefined);
+  assert.strictEqual(r.vainqueur.nom, 'Le Néant');
+  assert.strictEqual(r.victoireJoueur, false);
+});

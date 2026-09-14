@@ -36,7 +36,7 @@ Le Revenu d’une ressource n’augmente pas de la même façon que son Niveau d
 Le Revenu en Crédits , notamment, augmente encore plus lentement que celui des autres ressources. ✅
 Note : pour voir à quel Niveau de Production correspond chaque Revenu, veuillez consulter le glossaire. ✅
 Lorsque vous produisez un ou plusieurs types de ressources, vous ajoutez à votre réserve autant de ressources que le Revenu de la ressource en question (et non autant que son Niveau de Production)✅
-, jusqu’à la limite max. de 15.✅ 💬 focusEngine.js (RESERVE_MAX_RESSOURCE_, resoudreCle_ "produire_<ressource>") — uniquement pour la production automatisée (produire_nourriture/energie/materiel/credit/science) ; produire_ressource/produire_deux_ressources (choix du joueur) restent hors périmètre, popup de sélection pas construite.
+, jusqu’à la limite max. de 15.✅ 💬 focusEngine.js (RESERVE_MAX_RESSOURCE_, resoudreCle_ "produire_<ressource>" ET "produire_ressource"/"produire_deux_ressources"/"produire_ressource_type" — ce dernier trio via resoudreProductionChoisieRessource_, popup dédiée `produire_ressource_choix`, 14/09/2026) — même plafond/même règle de surproduction pour les deux familles.
 Lorsque votre production de ressources vous fait dépasser le cap de 15 ressources du même type dans vos réserves, vous générez une surproduction. ✅
 Dans ce cas, vous devez perdre l’excédent de manière à ne pas dépasser 15 en réserve. Lorsque cela vous arrive, gagnez 3 Influence, quel que soit l’excédent ainsi perdu. ✅
 Si, à votre tour, vous surproduisez plusieurs types de ressources, ou la même ressource plusieurs fois, vous gagnez les 3 Influence pour chaque surproduction. ✅ 💬 chaque clé produire_<ressource> résolue est un événement indépendant, aucune déduplication.

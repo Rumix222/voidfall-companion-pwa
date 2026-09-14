@@ -918,6 +918,182 @@ var SecteurService = (function () {
   }
 
   /**
+   * Détermine le secteur ciblé par une Escarmouche (chantier "Escarmouche +
+   * Plateau Crise", 14/09/2026 — retour utilisateur, règle précise fournie
+   * car absente de docs-rules-cycle-de-jeu.md §3.1/§2.3.3.1.1, qui se
+   * contente de "Déterminez lequel de vos secteurs est envahi"). Cascade
+   * de critères, dans l'ordre :
+   * 1. Éligibilité : secteur possédé par le joueur (`appartientAuJoueur_`),
+   *    JAMAIS le Secteur-Mère, adjacent à au moins un secteur du Néant
+   *    (pnNeant > 0). "Secteur immunisé aux Flottes du Néant"/"Gardien au
+   *    bord étend l'adjacence" (docs-rules-flottes.md §4) : AUCUNE donnée
+   *    modélisée (typesSecteur.json.effet est null partout, aucun champ
+   *    "Gardien au bord" en base) — ignorés, jamais bloquant.
+   * 2. Le Néant préfère un secteur où il gagne ou égalise le Combat (simulé
+   *    via CombatService.resoudreEscarmouche sur des camps jetables —
+   *    AUCUNE mutation DB). Si le joueur gagnerait partout, retombe sur
+   *    TOUS les candidats de l'étape 1 (une Escarmouche cible toujours).
+   * 3. Puis le secteur qui force le joueur à rappeler le PLUS de Puissance
+   *    Navale (totalPn avant − après combat simulé).
+   * 4. Puis un secteur Pur (`!corrompu`) de préférence.
+   * 5. Puis la Population la plus élevée.
+   * 6. Puis le plus de Guildes (somme des 5 champs `guilde*`).
+   * 7. Puis aléatoire parmi les ex-aequo restants.
+   *
+   * Retourne `{numero, secteur, resultatCombat}` (résultat de la
+   * simulation RETENUE, réutilisable tel quel par l'appelant — aucun
+   * second calcul nécessaire) ou `null` si aucun secteur éligible (étape
+   * 1 vide — pas une erreur, une Escarmouche peut légitimement n'avoir
+   * aucune cible).
+   */
+  function determinerCibleEscarmouche(partieId, puissanceNeant) {
+    return DB.get('parties', partieId).then(function (ligneP) {
+      if (!ligneP || !ligneP.scenarioId) return null;
+
+      return Promise.all([
+        obtenirSecteurs(partieId),
+        obtenirAdjacences(ligneP.scenarioId),
+        obtenirSecteurMere(ligneP.scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var adjacences = resultats[1];
+        var numeroSecteurMere = resultats[2];
+
+        var secteursParNumero = {};
+        secteurs.forEach(function (s) { secteursParNumero[s.numero] = s; });
+
+        function sontAdjacents(a, b) {
+          return adjacences.some(function (adj) {
+            return (adj.numeroA === a && adj.numeroB === b) || (adj.numeroA === b && adj.numeroB === a);
+          });
+        }
+        function adjacentAUnSecteurDuNeant_(numero) {
+          return secteurs.some(function (autre) {
+            return autre.numero !== numero && (autre.pnNeant || 0) > 0 && sontAdjacents(numero, autre.numero);
+          });
+        }
+
+        // --- Étape 1 : éligibilité ---
+        var candidats = secteurs.filter(function (s) {
+          return appartientAuJoueur_(s) && s.numero !== numeroSecteurMere && adjacentAUnSecteurDuNeant_(s.numero);
+        });
+        if (!candidats.length) return null;
+
+        return SecteurService_obtenirPartieAssemblee_(partieId).then(function (partie) {
+          var simulations = candidats.map(function (s) {
+            var resultatCombat = CombatService.resoudreEscarmouche(partie, puissanceNeant, s);
+            return {
+              numero: s.numero,
+              secteur: s,
+              resultatCombat: resultatCombat,
+              pnRappele: totalPn_(s) - (resultatCombat.survivantsJoueur.corvette + resultatCombat.survivantsJoueur.destroyer +
+                resultatCombat.survivantsJoueur.cuirasse + resultatCombat.survivantsJoueur.sentinelle + resultatCombat.survivantsJoueur.portevaisseau)
+            };
+          });
+
+          // --- Étape 2 : préférence victoire/égalité du Néant ---
+          var neantGagneOuEgalise = simulations.filter(function (sim) { return !sim.resultatCombat.victoireJoueur; });
+          var restants = neantGagneOuEgalise.length ? neantGagneOuEgalise : simulations;
+
+          // --- Étape 3 : le plus de PN rappelé ---
+          var maxPnRappele = Math.max.apply(null, restants.map(function (sim) { return sim.pnRappele; }));
+          restants = restants.filter(function (sim) { return sim.pnRappele === maxPnRappele; });
+
+          // --- Étape 4 : secteur Pur de préférence ---
+          var purs = restants.filter(function (sim) { return !sim.secteur.corrompu; });
+          if (purs.length) restants = purs;
+
+          // --- Étape 5 : Population la plus élevée ---
+          var maxPopulation = Math.max.apply(null, restants.map(function (sim) { return Number(sim.secteur.population) || 0; }));
+          restants = restants.filter(function (sim) { return (Number(sim.secteur.population) || 0) === maxPopulation; });
+
+          // --- Étape 6 : le plus de Guildes ---
+          function totalGuildes_(s) {
+            return (s.guildeFermiers || 0) + (s.guildeIngenieurs || 0) + (s.guildeMineurs || 0) +
+              (s.guildeBanquiers || 0) + (s.guildeScientifiques || 0);
+          }
+          var maxGuildes = Math.max.apply(null, restants.map(function (sim) { return totalGuildes_(sim.secteur); }));
+          restants = restants.filter(function (sim) { return totalGuildes_(sim.secteur) === maxGuildes; });
+
+          // --- Étape 7 : aléatoire parmi les ex-aequo restants ---
+          var choisi = restants[Math.floor(Math.random() * restants.length)];
+          return { numero: choisi.numero, secteur: choisi.secteur, resultatCombat: choisi.resultatCombat };
+        });
+      });
+    });
+  }
+
+  // Récupère le strict sous-ensemble de l'objet `partie` assemblé requis
+  // par CombatService.construireCamp/resoudreEscarmouche (joueur.nom,
+  // joueur.technologieDepart.{nom,amelioree}, technologiesObtenues) —
+  // GameService.assemblerPartie_ (privée, bien plus complète) n'est PAS
+  // accessible depuis ce fichier (chargé AVANT gameService.js, voir
+  // en-tête) : même lecture (`lignePartie.etatJson.joueur` pour le nom de
+  // Maison/les Technologies de départ possibles, `plateauMaison.
+  // technologieDepart`/`technologieDepartAmelioree` pour celle
+  // effectivement choisie), sans dupliquer le reste (Civilisation, offres
+  // Programme, etc. — inutile au combat).
+  function SecteurService_obtenirPartieAssemblee_(partieId) {
+    return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+      var ligneP = resultats[0];
+      var pm = resultats[1] || {};
+      if (!ligneP) throw new Error('Partie introuvable.');
+      var joueur = (ligneP.etatJson && ligneP.etatJson.joueur) || {};
+      return {
+        joueur: Object.assign({}, joueur, {
+          technologieDepart: pm.technologieDepart ? { nom: pm.technologieDepart, amelioree: !!pm.technologieDepartAmelioree } : null
+        }),
+        technologiesObtenues: pm.technologiesObtenues || [null, null, null, null, null]
+      };
+    });
+  }
+
+  /**
+   * Persiste les conséquences d'une Escarmouche déjà simulée
+   * (CombatService.resoudreEscarmouche) sur le secteur ciblé — appelée
+   * après confirmation du joueur (jamais automatiquement).
+   * - Victoire ou égalité (`resultatCombat.victoireJoueur`) : écrit les
+   *   survivants (`survivantsJoueur`), rien d'autre ne change (les
+   *   Installations/Guildes/jetons restent en place).
+   * - Défaite : abandon COMPLET du secteur (docs-rules-flottes.md
+   *   §4.1-4.4, PLUS complet que le raccourci de envahirResoudre pour un
+   *   secteur SOURCE abandonné — voir son en-tête) : PN à 0, retrait des 3
+   *   champs Installation (PAS les Guildes), marqueur `corrompu = true`,
+   *   `pnNeant = 2` (jeton Flotte du Néant), `jetonPrime` incrémenté de 1
+   *   (jeton face cachée — résolu ensuite comme n'importe quel gain de
+   *   jeton Prime, FocusEngine.resoudreGainJetonsPrime_, par l'appelant).
+   * Retourne le secteur persisté.
+   */
+  function appliquerResultatEscarmouche(partieId, numeroCible, resultatCombat) {
+    return DB.get('secteursPartie', [partieId, numeroCible]).then(function (secteur) {
+      if (!secteur) throw new Error('Secteur introuvable : ' + numeroCible);
+
+      if (resultatCombat.victoireJoueur) {
+        var survivants = resultatCombat.survivantsJoueur || {};
+        secteur.pnCorvette = survivants.corvette || 0;
+        secteur.pnDestroyer = survivants.destroyer || 0;
+        secteur.pnCuirasse = survivants.cuirasse || 0;
+        secteur.pnSentinelle = survivants.sentinelle || 0;
+        secteur.pnPorteVaisseau = survivants.portevaisseau || 0;
+      } else {
+        secteur.pnCorvette = 0;
+        secteur.pnDestroyer = 0;
+        secteur.pnCuirasse = 0;
+        secteur.pnSentinelle = 0;
+        secteur.pnPorteVaisseau = 0;
+        secteur.installationChantierNaval = 0;
+        secteur.installationDefenseSecteur = 0;
+        secteur.installationBaseStellaire = 0;
+        secteur.corrompu = true;
+        secteur.pnNeant = 2;
+        secteur.jetonPrime = (secteur.jetonPrime || 0) + 1;
+      }
+
+      return DB.put('secteursPartie', secteur).then(function () { return secteur; });
+    });
+  }
+
+  /**
    * Secteurs qui appartiennent au joueur avec au moins un emplacement
    * Installation/Guilde libre (utilisé pour peupler le sélecteur de
    * secteur d'un formulaire Construire).
@@ -1028,6 +1204,12 @@ var SecteurService = (function () {
     // l'écraser ou de l'incrémenter comme un simple compteur.
     cube_neant: { champ: 'pnNeant', categorie: 'jeton' },
     gloire: { champ: 'jetonGloire', categorie: 'jeton', tableauValeurs: true },
+    // Chantier "Cadres placement en masse" (14/09/2026) — un Gardien posé
+    // par un cadre "chaque_faille" (ex. Événement J Cycle 2), jeton comme
+    // liberation/prime ci-dessus (aucun emplacement Installation/Guilde
+    // consommé). N'existait pas encore ici : les seuls Gardiens jusqu'ici
+    // posés par l'app venaient de la mise en place (nombreGardienDepart).
+    gardien: { champ: 'nombreGardien', categorie: 'jeton' },
     // "guilde" GÉNÉRIQUE (type au choix du joueur, pas de suffixe) —
     // aucun `champ` (le type précis n'est connu qu'au moment du
     // placement, résolu côté appelant AVANT d'appeler
@@ -1127,6 +1309,42 @@ var SecteurService = (function () {
    * incrémente le champ secteursPartie de chaque clé de `elements`
    * reconnue par CHAMP_ELEMENT_PLACEMENT_, de la quantité indiquée.
    */
+  /**
+   * Applique `elements` (gabarit CHAMP_ELEMENT_PLACEMENT_) EN MÉMOIRE sur
+   * `secteur` — MUTE l'objet reçu, n'écrit rien elle-même (voir les 2
+   * appelants : placerElementsNeantAdjacent, qui persiste 1 secteur, et
+   * placerElementsEnMasse ci-dessous, qui persiste plusieurs secteurs en
+   * série). Factorisée le 14/09/2026 (chantier "Cadres placement en
+   * masse") pour ne jamais dupliquer cette logique d'écriture.
+   */
+  function appliquerElementsSurSecteur_(secteur, elements) {
+    Object.keys(elements || {}).forEach(function (cle) {
+      var info = CHAMP_ELEMENT_PLACEMENT_[cle];
+      // `!info.champ` couvre les entrées GÉNÉRIQUES sans type résolu (ex.
+      // "guilde", voir CHAMP_ELEMENT_PLACEMENT_ ci-dessus) — ne devrait
+      // jamais arriver ici en usage normal (le type est toujours résolu
+      // par l'appelant AVANT d'appeler cette fonction), mais ignoré
+      // silencieusement plutôt que d'écrire sur un champ "undefined",
+      // même filet de sécurité que pour une clé totalement inconnue.
+      if (!info || !info.champ) return;
+      var quantite = Number(elements[cle]) || 0;
+      if (info.tableauValeurs) {
+        // Un secteur peut porter plusieurs jetons Gloire (valeur
+        // individuelle chacun, aucun plafond) — ajoute cette valeur au
+        // tableau existant au lieu de l'écraser, normalisant au passage
+        // une éventuelle ancienne sauvegarde où ce champ était encore un
+        // simple nombre (jamais un tableau).
+        var tableauExistant = Array.isArray(secteur[info.champ])
+          ? secteur[info.champ].slice()
+          : (secteur[info.champ] ? [secteur[info.champ]] : []);
+        tableauExistant.push(quantite);
+        secteur[info.champ] = tableauExistant;
+      } else {
+        secteur[info.champ] = (secteur[info.champ] || 0) + quantite;
+      }
+    });
+  }
+
   function placerElementsNeantAdjacent(partieId, numero, elements) {
     return obtenirSecteursEligiblesPlacementNeantAdjacent(partieId, elements).then(function (eligibles) {
       var cible = eligibles.filter(function (e) { return e.numero === numero; })[0];
@@ -1136,34 +1354,121 @@ var SecteurService = (function () {
 
       return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
         if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
-        Object.keys(elements || {}).forEach(function (cle) {
-          var info = CHAMP_ELEMENT_PLACEMENT_[cle];
-          // `!info.champ` couvre les entrées GÉNÉRIQUES sans type résolu
-          // (ex. "guilde", voir CHAMP_ELEMENT_PLACEMENT_ ci-dessus) — ne
-          // devrait jamais arriver ici en usage normal (le type est
-          // toujours résolu par l'appelant AVANT d'appeler cette
-          // fonction), mais ignoré silencieusement plutôt que d'écrire
-          // sur un champ "undefined", même filet de sécurité que pour
-          // une clé totalement inconnue.
-          if (!info || !info.champ) return;
-          var quantite = Number(elements[cle]) || 0;
-          if (info.tableauValeurs) {
-            // Un secteur peut porter plusieurs jetons Gloire (valeur
-            // individuelle chacun, aucun plafond) — ajoute cette valeur au
-            // tableau existant au lieu de l'écraser, normalisant au passage
-            // une éventuelle ancienne sauvegarde où ce champ était encore
-            // un simple nombre (jamais un tableau).
-            var tableauExistant = Array.isArray(secteur[info.champ])
-              ? secteur[info.champ].slice()
-              : (secteur[info.champ] ? [secteur[info.champ]] : []);
-            tableauExistant.push(quantite);
-            secteur[info.champ] = tableauExistant;
-          } else {
-            secteur[info.champ] = (secteur[info.champ] || 0) + quantite;
-          }
-        });
+        appliquerElementsSurSecteur_(secteur, elements);
         return DB.put('secteursPartie', secteur).then(function () { return secteur; });
       });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Chantier "Cadres placement en masse" (14/09/2026) — cadres de type
+  // "placement" dont la `zone` du catalogue (data/catalogue/evenements.json)
+  // n'est PAS "secteur_neant_adjacent" mais un critère GALACTIQUE
+  // ("chaque secteur de Faille", "chaque secteur du Néant avec au moins 4
+  // Population"...) : contrairement à placerElementsNeantAdjacent
+  // ci-dessus (UN secteur, choisi par le joueur parmi ceux adjacents à
+  // ses propres secteurs), ces cadres posent les MÊMES éléments sur TOUS
+  // les secteurs de la galaxie remplissant le critère, sans aucun choix
+  // du joueur — jamais automatisés jusqu'ici (chaque cadre de ce type
+  // tombait dans le "hors périmètre" générique, invisible/non cliquable
+  // côté index.html). "secteur du Néant" garde ici EXACTEMENT le même
+  // sens qu'ailleurs dans ce fichier (pnNeant > 0) — PAS "n'appartient pas
+  // au joueur" (un secteur du joueur ou une Faille sans pnNeant peuvent
+  // très bien ne pas être un "secteur du Néant").
+  // ------------------------------------------------------------
+
+  /**
+   * Un prédicat par `zone` connue — reçoit (secteur, ctx) où
+   * `ctx.typeParNumero`/`ctx.adjacenceMap` sont déjà résolus par
+   * obtenirSecteursEligiblesPlacementEnMasse ci-dessous. Liste tenue
+   * VOLONTAIREMENT limitée aux zones réellement rencontrées au catalogue
+   * (vérifiées une par une contre le texte imprimé de la carte) — jamais
+   * de correspondance approximative pour une zone inconnue, voir la
+   * fonction appelante qui retourne [] dans ce cas.
+   */
+  var CRITERES_PLACEMENT_MASSE_ = {
+    // "Placez un Gardien sur chaque Faille." — un TYPE de secteur, jamais
+    // conditionné par pnNeant (une Faille reste une Faille même sans
+    // Puissance Navale du Néant dessus).
+    chaque_faille: function (secteur, ctx) { return ctx.typeParNumero[secteur.numero] === 'faille'; },
+    chaque_secteur_neant_population_min_4: function (secteur) {
+      return (secteur.pnNeant || 0) > 0 && (secteur.population || 0) >= 4;
+    },
+    chaque_secteur_neant_avec_defense_secteur_min_1: function (secteur) {
+      return (secteur.pnNeant || 0) > 0 && (secteur.installationDefenseSecteur || 0) >= 1;
+    },
+    chaque_secteur_neant_cube_neant_max_2: function (secteur) {
+      return (secteur.pnNeant || 0) > 0 && (secteur.pnNeant || 0) <= 2;
+    },
+    chaque_secteur_neant_adjacent_a_une_faille: function (secteur, ctx) {
+      if ((secteur.pnNeant || 0) <= 0) return false;
+      return (ctx.adjacenceMap[secteur.numero] || []).some(function (n) { return ctx.typeParNumero[n] === 'faille'; });
+    }
+  };
+
+  /**
+   * Secteurs galaxie entière remplissant le critère `zone` (voir
+   * CRITERES_PLACEMENT_MASSE_ ci-dessus) — [] si `zone` est inconnue
+   * (jamais une approximation). Contrairement à
+   * obtenirSecteursEligiblesPlacementNeantAdjacent, ne filtre PAS sur la
+   * possession du joueur ni sur les emplacements Installation/Guilde
+   * libres : ces cadres s'appliquent inconditionnellement (la carte ne
+   * prévoit aucun cas où l'emplacement manquerait).
+   */
+  function obtenirSecteursEligiblesPlacementEnMasse(partieId, zone) {
+    var predicat = CRITERES_PLACEMENT_MASSE_[zone];
+    if (!predicat) return Promise.resolve([]);
+
+    return DB.get('parties', partieId).then(function (ligneP) {
+      if (!ligneP || !ligneP.scenarioId) return [];
+
+      return Promise.all([
+        obtenirSecteurs(partieId),
+        DB.getAll('scenarioSecteurs'),
+        obtenirAdjacences(ligneP.scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[0];
+        var scenarioSecteurs = resultats[1].filter(function (l) { return l.scenarioId === ligneP.scenarioId; });
+
+        var typeParNumero = {};
+        scenarioSecteurs.forEach(function (l) { typeParNumero[l.numero] = l.type; });
+
+        var adjacenceMap = {};
+        resultats[2].forEach(function (a) {
+          adjacenceMap[a.numeroA] = adjacenceMap[a.numeroA] || [];
+          adjacenceMap[a.numeroA].push(a.numeroB);
+          adjacenceMap[a.numeroB] = adjacenceMap[a.numeroB] || [];
+          adjacenceMap[a.numeroB].push(a.numeroA);
+        });
+
+        var ctx = { typeParNumero: typeParNumero, adjacenceMap: adjacenceMap };
+        return secteurs.filter(function (s) { return predicat(s, ctx); }).map(function (s) { return s.numero; });
+      });
+    });
+  }
+
+  /**
+   * Place `elements` sur CHAQUE secteur remplissant le critère `zone` —
+   * revalide l'éligibilité à neuf (jamais confiance à l'appelant, même
+   * principe que placerElementsNeantAdjacent) avant d'écrire. Retourne la
+   * liste des numéros de secteur effectivement modifiés (pour le résumé
+   * "✓ Appliqué (Secteurs ...)", même gabarit que placement_multiple —
+   * voir GameService.appliquerCadrePlacementEnMasse). Aucune écriture si
+   * `zone` est inconnue ou si aucun secteur n'est éligible (tableau vide,
+   * pas une erreur — une carte peut retrouver 0 cible, ex. aucune Faille
+   * restante).
+   */
+  function placerElementsEnMasse(partieId, zone, elements) {
+    return obtenirSecteursEligiblesPlacementEnMasse(partieId, zone).then(function (numeros) {
+      return numeros.reduce(function (promesse, numero) {
+        return promesse.then(function () {
+          return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+            if (!secteur) return null;
+            appliquerElementsSurSecteur_(secteur, elements);
+            return DB.put('secteursPartie', secteur);
+          });
+        });
+      }, Promise.resolve()).then(function () { return numeros; });
     });
   }
 
@@ -1292,6 +1597,8 @@ var SecteurService = (function () {
     retirerGardien: retirerGardien,
     regrouper: regrouper,
     envahirResoudre: envahirResoudre,
+    determinerCibleEscarmouche: determinerCibleEscarmouche,
+    appliquerResultatEscarmouche: appliquerResultatEscarmouche,
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,
     obtenirSecteursEligiblesAugmenterPopulationPure: obtenirSecteursEligiblesAugmenterPopulationPure,
     augmenterPopulationPure: augmenterPopulationPure,
@@ -1303,6 +1610,8 @@ var SecteurService = (function () {
     obtenirDetailSecteursProgrammes: obtenirDetailSecteursProgrammes,
     obtenirSecteursEligiblesPlacementNeantAdjacent: obtenirSecteursEligiblesPlacementNeantAdjacent,
     placerElementsNeantAdjacent: placerElementsNeantAdjacent,
+    obtenirSecteursEligiblesPlacementEnMasse: obtenirSecteursEligiblesPlacementEnMasse,
+    placerElementsEnMasse: placerElementsEnMasse,
     resoudrePlacementMultipleNeantAdjacent: resoudrePlacementMultipleNeantAdjacent,
     appliquerPlacementMultipleNeantAdjacent: appliquerPlacementMultipleNeantAdjacent,
     getEntretien: getEntretien,

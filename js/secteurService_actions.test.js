@@ -26,7 +26,7 @@ function chargerDansContexte_(chemin, contexte) {
 function creerDbFactice_() {
   var stores = {
     parties: {}, secteursPartie: {}, scenarioSecteurs: {},
-    typesSecteur: {}, scenarioAdjacences: {}
+    typesSecteur: {}, scenarioAdjacences: {}, plateauMaison: {}
   };
   function cleDe_(nom, valeur) {
     if (nom === 'parties') return valeur.id;
@@ -34,6 +34,7 @@ function creerDbFactice_() {
     if (nom === 'scenarioSecteurs') return valeur.scenarioId + '|' + valeur.numero;
     if (nom === 'typesSecteur') return valeur.id;
     if (nom === 'scenarioAdjacences') return valeur.scenarioId + '|' + valeur.numeroA + '|' + valeur.numeroB;
+    if (nom === 'plateauMaison') return valeur.partieId;
     return valeur.id;
   }
   return {
@@ -62,6 +63,14 @@ function secteurDeBase_(extra) {
 
 function creerContexte_(db) {
   var ctx = { console: console, Promise: Promise, JSON: JSON, Object: Object, Math: Math, DB: db };
+  // determinerCibleEscarmouche (chantier "Escarmouche + Plateau Crise")
+  // référence le global CombatService — chargé AVANT secteurService.js
+  // ici pour que ce global existe déjà au moment où le second fichier est
+  // évalué (ordre inversé de index.html, sans consequence : aucun des 2
+  // fichiers n'y référence l'autre à l'exécution DE SON PROPRE IIFE, seule
+  // resoudreCle_/determinerCibleEscarmouche y accèdent, bien plus tard,
+  // au moment d'un appel réel).
+  chargerDansContexte_(__dirname + '/combatService.js', ctx);
   chargerDansContexte_(__dirname + '/secteurService.js', ctx);
   return ctx;
 }
@@ -677,5 +686,262 @@ test('getEntretien : aucun secteur plein -> 0', function () {
 
   return ctx.SecteurService.getEntretien('p1').then(function (total) {
     assert.strictEqual(total, 0);
+  });
+});
+
+// ---------------------------------------------------------------
+// obtenirSecteursEligiblesPlacementEnMasse / placerElementsEnMasse —
+// chantier "Cadres placement en masse" (14/09/2026, §1.5 docs-rules-
+// cycle-de-jeu.md) : cadres "placement" à zone GALAXIE ENTIÈRE (ex.
+// "chaque secteur de Faille"), jamais possession/adjacence au joueur.
+// ---------------------------------------------------------------
+
+function dbBaseMasse_() {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  return db;
+}
+
+test('obtenirSecteursEligiblesPlacementEnMasse : zone inconnue -> []', function () {
+  var db = dbBaseMasse_();
+  var ctx = creerContexte_(db);
+  return ctx.SecteurService.obtenirSecteursEligiblesPlacementEnMasse('p1', 'zone_jamais_vue').then(function (numeros) {
+    assert.strictEqual(numeros.length, 0);
+  });
+});
+
+test('obtenirSecteursEligiblesPlacementEnMasse : chaque_faille -> secteurs de type "faille", pnNeant indifférent', function () {
+  var db = dbBaseMasse_();
+  db._stores.scenarioSecteurs['s1|40'] = { scenarioId: 's1', numero: 40, type: 'faille', sousType: null };
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'standard', sousType: null };
+  db._stores.secteursPartie['p1|40'] = secteurDeBase_({ numero: 40, pnCorvette: 0, pnNeant: 0 }); // Faille SANS pnNeant -> reste éligible
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1 }); // standard -> non éligible
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesPlacementEnMasse('p1', 'chaque_faille').then(function (numeros) {
+    assert.strictEqual(JSON.stringify(numeros), JSON.stringify([40]));
+  });
+});
+
+test('obtenirSecteursEligiblesPlacementEnMasse : chaque_secteur_neant_population_min_4 -> pnNeant>0 ET population>=4', function () {
+  var db = dbBaseMasse_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 0, pnNeant: 2, population: 4 }); // éligible
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 0, pnNeant: 2, population: 3 }); // population insuffisante
+  db._stores.secteursPartie['p1|3'] = secteurDeBase_({ numero: 3, pnCorvette: 0, pnNeant: 0, population: 6 }); // pas un secteur du Néant (pnNeant=0)
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesPlacementEnMasse('p1', 'chaque_secteur_neant_population_min_4').then(function (numeros) {
+    assert.strictEqual(JSON.stringify(numeros), JSON.stringify([1]));
+  });
+});
+
+test('obtenirSecteursEligiblesPlacementEnMasse : chaque_secteur_neant_adjacent_a_une_faille', function () {
+  var db = dbBaseMasse_();
+  db._stores.scenarioSecteurs['s1|40'] = { scenarioId: 's1', numero: 40, type: 'faille', sousType: null };
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'standard', sousType: null };
+  db._stores.scenarioSecteurs['s1|2'] = { scenarioId: 's1', numero: 2, type: 'standard', sousType: null };
+  db._stores.scenarioAdjacences['s1|1|40'] = { scenarioId: 's1', numeroA: 1, numeroB: 40 };
+  // Secteur 1 : secteur du Néant, adjacent à la Faille (40) -> éligible.
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 0, pnNeant: 1 });
+  // Secteur 2 : secteur du Néant mais PAS adjacent à une Faille -> non éligible.
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 0, pnNeant: 1 });
+  db._stores.secteursPartie['p1|40'] = secteurDeBase_({ numero: 40, pnCorvette: 0, pnNeant: 3 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesPlacementEnMasse('p1', 'chaque_secteur_neant_adjacent_a_une_faille').then(function (numeros) {
+    assert.strictEqual(JSON.stringify(numeros), JSON.stringify([1]));
+  });
+});
+
+test('placerElementsEnMasse : incrémente les éléments (dont "gardien") sur chaque secteur éligible, aucun autre', function () {
+  var db = dbBaseMasse_();
+  db._stores.scenarioSecteurs['s1|40'] = { scenarioId: 's1', numero: 40, type: 'faille', sousType: null };
+  db._stores.scenarioSecteurs['s1|1'] = { scenarioId: 's1', numero: 1, type: 'standard', sousType: null };
+  db._stores.secteursPartie['p1|40'] = secteurDeBase_({ numero: 40, pnCorvette: 0, pnNeant: 3, nombreGardien: 0 });
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, nombreGardien: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.placerElementsEnMasse('p1', 'chaque_faille', { gardien: 1 }).then(function (numeros) {
+    assert.strictEqual(JSON.stringify(numeros), JSON.stringify([40]));
+    assert.strictEqual(db._stores.secteursPartie['p1|40'].nombreGardien, 1);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].nombreGardien, 0, 'le secteur non éligible ne doit jamais être touché');
+  });
+});
+
+test('placerElementsEnMasse : aucun secteur éligible -> [], aucune écriture', function () {
+  var db = dbBaseMasse_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 0, pnNeant: 0, installationDefenseSecteur: 5 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.placerElementsEnMasse('p1', 'chaque_secteur_neant_avec_defense_secteur_min_1', { prime: 1 }).then(function (numeros) {
+    assert.strictEqual(numeros.length, 0);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].jetonPrime, 0);
+  });
+});
+
+// ---------------------------------------------------------------
+// determinerCibleEscarmouche / appliquerResultatEscarmouche
+// (chantier "Escarmouche + Plateau Crise", 14/09/2026)
+// ---------------------------------------------------------------
+
+function dbBaseEscarmouche_() {
+  var db = creerDbFactice_();
+  db._stores.parties['p1'] = { id: 'p1', scenarioId: 's1' };
+  db._stores.plateauMaison['p1'] = { partieId: 'p1', technologiesObtenues: [null, null, null, null, null] };
+  return db;
+}
+
+test('determinerCibleEscarmouche : éligibilité — possédé + adjacent à un secteur du Néant, JAMAIS le Secteur-Mère', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioSecteurs['s1|99'] = { scenarioId: 's1', numero: 99, type: 'secteur_mere', sousType: null };
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|99|10'] = { scenarioId: 's1', numeroA: 99, numeroB: 10 };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 1 }); // possédé, adjacent au Néant -> éligible
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1 }); // possédé, PAS adjacent -> non éligible
+  db._stores.secteursPartie['p1|99'] = secteurDeBase_({ numero: 99, pnCorvette: 5 }); // Secteur-Mère, adjacent -> jamais ciblé
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 }); // secteur du Néant
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 3).then(function (cible) {
+    assert.strictEqual(cible.numero, 1);
+  });
+});
+
+test('determinerCibleEscarmouche : aucun secteur éligible -> null', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1 }); // possédé mais pas adjacent au Néant
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 3).then(function (cible) {
+    assert.strictEqual(cible, null);
+  });
+});
+
+test('determinerCibleEscarmouche : préfère un secteur où le Néant gagne ou égalise (jamais un où le joueur gagne, si un autre choix existe)', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 10 }); // le joueur gagnerait largement
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1 }); // possédé (>=1 PN), mais le joueur perd face à la puissance 3
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 3).then(function (cible) {
+    assert.strictEqual(cible.numero, 2);
+    assert.strictEqual(cible.resultatCombat.victoireJoueur, false);
+  });
+});
+
+test('determinerCibleEscarmouche : le joueur gagne partout -> retombe sur tous les candidats, puis préfère celui qui rappelle le plus de PN', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  // Les 2 secteurs font gagner le joueur (vérifié par exécution réelle,
+  // voir combatService.js) : secteur 1 (3 Corvette + Défense de Secteur 2)
+  // ne perd AUCUN cube (victoire "propre", pnRappele=0) ; secteur 2 (10
+  // Corvette, aucune Défense) en perd 2 (pnRappele=2, combat plus long).
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 3, installationDefenseSecteur: 2 });
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 10 });
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 3).then(function (cible) {
+    assert.strictEqual(cible.numero, 2);
+    assert.strictEqual(cible.resultatCombat.victoireJoueur, true);
+  });
+});
+
+test('determinerCibleEscarmouche : ex-aequo (victoire/égalité + PN rappelé) -> préfère un secteur Pur', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  // Les 2 secteurs sont IDENTIQUES au combat (1 Corvette chacun — le
+  // minimum pour rester "possédé", appartientAuJoueur_ exige totalPn>0 —
+  // écrasée par une puissance du Néant à 5, défaite totale des deux
+  // côtés, pnRappele=1 des deux côtés) — seul `corrompu` diffère.
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 1, corrompu: true });
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, corrompu: false });
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 5).then(function (cible) {
+    assert.strictEqual(cible.numero, 2, 'le secteur Pur (numéro 2) doit être préféré au Corrompu');
+  });
+});
+
+test('determinerCibleEscarmouche : ex-aequo (Pur/Corrompu identiques) -> préfère la Population la plus élevée', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 1, population: 3 });
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, population: 6 });
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 5).then(function (cible) {
+    assert.strictEqual(cible.numero, 2, 'la Population la plus élevée (6) doit être préférée');
+  });
+});
+
+test('determinerCibleEscarmouche : ex-aequo (même Population) -> préfère le plus de Guildes', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 1, population: 4, guildeFermiers: 1 });
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, population: 4, guildeFermiers: 1, guildeMineurs: 1 });
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 5).then(function (cible) {
+    assert.strictEqual(cible.numero, 2, 'le secteur avec 2 Guildes doit être préféré à celui avec 1 seule');
+  });
+});
+
+test('determinerCibleEscarmouche : ex-aequo total -> choisit aléatoirement parmi les candidats restants', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.scenarioAdjacences['s1|1|10'] = { scenarioId: 's1', numeroA: 1, numeroB: 10 };
+  db._stores.scenarioAdjacences['s1|2|10'] = { scenarioId: 's1', numeroA: 2, numeroB: 10 };
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 1, population: 4 });
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, population: 4 });
+  db._stores.secteursPartie['p1|10'] = secteurDeBase_({ numero: 10, pnCorvette: 0, pnNeant: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.determinerCibleEscarmouche('p1', 5).then(function (cible) {
+    assert.ok(cible.numero === 1 || cible.numero === 2);
+  });
+});
+
+test('appliquerResultatEscarmouche : victoire du joueur -> écrit uniquement les survivants', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 3, installationDefenseSecteur: 1 });
+  var ctx = creerContexte_(db);
+  var resultatCombat = { victoireJoueur: true, survivantsJoueur: { corvette: 2, destroyer: 1, cuirasse: 0, sentinelle: 0, portevaisseau: 0 } };
+
+  return ctx.SecteurService.appliquerResultatEscarmouche('p1', 1, resultatCombat).then(function (secteur) {
+    assert.strictEqual(secteur.pnCorvette, 2);
+    assert.strictEqual(secteur.pnDestroyer, 1);
+    assert.strictEqual(secteur.installationDefenseSecteur, 1, 'les Installations ne sont jamais touchées en cas de victoire');
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].pnCorvette, 2);
+  });
+});
+
+test('appliquerResultatEscarmouche : défaite -> abandon complet du secteur (docs-rules-flottes.md §4.1-4.4)', function () {
+  var db = dbBaseEscarmouche_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({
+    numero: 1, pnCorvette: 3, installationDefenseSecteur: 1, installationChantierNaval: 1,
+    installationBaseStellaire: 1, guildeFermiers: 2, jetonPrime: 0, corrompu: false
+  });
+  var ctx = creerContexte_(db);
+  var resultatCombat = { victoireJoueur: false, survivantsJoueur: { corvette: 0, destroyer: 0, cuirasse: 0, sentinelle: 0, portevaisseau: 0 } };
+
+  return ctx.SecteurService.appliquerResultatEscarmouche('p1', 1, resultatCombat).then(function (secteur) {
+    assert.strictEqual(secteur.pnCorvette, 0);
+    assert.strictEqual(secteur.installationChantierNaval, 0);
+    assert.strictEqual(secteur.installationDefenseSecteur, 0);
+    assert.strictEqual(secteur.installationBaseStellaire, 0);
+    assert.strictEqual(secteur.guildeFermiers, 2, 'les Guildes ne sont JAMAIS retirées (§4.1 — "mais pas les Guildes")');
+    assert.strictEqual(secteur.corrompu, true);
+    assert.strictEqual(secteur.pnNeant, 2);
+    assert.strictEqual(secteur.jetonPrime, 1);
   });
 });

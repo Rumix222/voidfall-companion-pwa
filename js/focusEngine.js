@@ -59,14 +59,17 @@
  *     CHAMPS_PLATEAU_MAISON_AUTORISES de gameService.js exclut toujours
  *     civSociete/civGouvernement/civEconomie — ces champs restent sous la
  *     seule responsabilité de CivilisationService)
- *   - Production : produire_ressource, produire_deux_ressources — CHOIX du
- *     joueur parmi les 5 ressources, popup de sélection pas encore
- *     construite (produire_<ressource>, où la ressource est imposée par
- *     le nom de la clé — ex. Focus Production "Ravitailler" — A un cas
- *     dédié ci-dessous qui délègue le calcul du revenu à une popup
+ *   - Production : produire_<ressource>, où la ressource est imposée par
+ *     le nom de la clé (ex. Focus Production "Ravitailler") — cas dédié
+ *     ci-dessous qui délègue le calcul du revenu à une popup
  *     'produire_revenu', strategieService.js, seul niveauxProduction
  *     — calcul agrégé sur secteursPartie, population × guildes — dépend
- *     d'un accès secteurs hors de portée de ce moteur pur)
+ *     d'un accès secteurs hors de portée de ce moteur pur. produire_
+ *     ressource/produire_deux_ressources/produire_ressource_type — CHOIX
+ *     du joueur parmi les 5 ressources (Objectifs galactiques, retour
+ *     utilisateur 14/09/2026) — même principe, popup 'produire_ressource_
+ *     choix' (resoudreProductionChoisieRessource_ ci-dessous), le joueur
+ *     désigne la ressource AVANT le même calcul de revenu.
  * Pour ces clés, resoudreCle_ NE BLOQUE PAS l'action : elle journalise un
  * avertissement explicite ("effet non chiffré — à appliquer manuellement")
  * et continue. Aucune ressource n'est débitée/créditée à tort pour ces
@@ -375,6 +378,60 @@ var FocusEngine = (function () {
           var token = TOKENS_PRIME_[reponse.indexChoisi];
           var sourceToken = source + ' (' + token.label + ')';
           return resoudreJsonInterne_(token.effet, 1, sourceToken, token.inclusif ? 'et/ou' : '', etat, journal, demanderChoix);
+        });
+      });
+    };
+    for (var i = 1; i <= n; i++) { _boucle(i); }
+    return promise;
+  }
+
+  /**
+   * Résout "produire_ressource"/"produire_ressource_type" (n=1) ou
+   * "produire_deux_ressources" (n=2) — retour utilisateur 14/09/2026
+   * (Objectif galactique Événement A ligne 2, "produisez un type de
+   * ressources" restait sans interaction, repli générique "non
+   * automatisé"). Même boucle Promise séquentielle que
+   * resoudreGainJetonsPrime_ ci-dessus ("Annuler" sur N'IMPORTE LEQUEL des
+   * tours bloque TOUT — les mutations déjà appliquées à `etat` sont
+   * défaites par resoudreJsonInterne_, voir son en-tête). Pour n=2, les 2
+   * ressources doivent être DISTINCTES (LIBELLES_OPTIONS,
+   * strategieService.js : "deux types de ressources différentes") —
+   * `ressourcesExclues` (accumulée au fil des tours, lue au moment de
+   * CHAQUE demanderChoix, jamais figée à la définition de la boucle)
+   * retire du choix la ressource déjà retenue au tour précédent ; la
+   * popup (contexte.exclure) filtre ses boutons en conséquence.
+   *
+   * Chaque tour applique EXACTEMENT la même règle de plafond/surproduction
+   * que "produire_<ressource>" (ressource imposée) ci-dessous : réserve
+   * plafonnée à RESERVE_MAX_RESSOURCE_, excédent perdu, +3 Influence par
+   * surproduction — voir ce cas pour le détail de la règle.
+   */
+  function resoudreProductionChoisieRessource_(n, source, etat, journal, demanderChoix) {
+    var ressourcesExclues = [];
+    var promise = Promise.resolve(true);
+    var _boucle = function (numero) {
+      promise = promise.then(function (succesPrecedent) {
+        if (succesPrecedent === false) return false;
+        return Promise.resolve(demanderChoix({
+          type: 'produire_ressource_choix',
+          source: source + (n > 1 ? ' (ressource ' + numero + '/' + n + ')' : ''),
+          exclure: ressourcesExclues.slice()
+        })).then(function (reponse) {
+          if (reponseAnnulee_(reponse)) return false;
+          var champProduit = CHAMP_PAR_CLE[reponse.ressource];
+          if (!champProduit) return false;
+          ressourcesExclues.push(reponse.ressource);
+          var montantProduit = Number(reponse.montant) || 0;
+          var totalAvantPlafond = etat[champProduit] + montantProduit;
+          var excedentSurproduction = Math.max(0, totalAvantPlafond - RESERVE_MAX_RESSOURCE_);
+          etat[champProduit] = Math.max(0, Math.min(RESERVE_MAX_RESSOURCE_, totalAvantPlafond));
+          journal.push(source + ' : ' + reponse.detail);
+          if (excedentSurproduction > 0) {
+            etat.influence = Math.max(0, etat.influence + 3);
+            journal.push(source + ' : surproduction (' + reponse.ressource + ', réserve plafonnée à ' +
+              RESERVE_MAX_RESSOURCE_ + ', excédent de ' + excedentSurproduction + ' perdu) — +3 influence.');
+          }
+          return true;
         });
       });
     };
@@ -1197,11 +1254,12 @@ var FocusEngine = (function () {
     // 3 Influence à chaque fois (§3, "si vous surproduisez plusieurs types
     // de ressources... vous gagnez les 3 Influence pour chaque
     // surproduction") — pas de déduplication ni de plafond sur ce cumul.
-    // Ne couvre PAS produire_ressource/produire_deux_ressources (choix du
-    // joueur, hors périmètre, voir juste en-dessous) ni les autres sources
-    // de production non automatisées (Technologies, secteurs spéciaux —
+    // Ne couvre PAS produire_ressource/produire_ressource_type/produire_
+    // deux_ressources (ressource au CHOIX du joueur, voir resoudre
+    // ProductionChoisieRessource_ plus bas) ni les autres sources de
+    // production non automatisées (Technologies, secteurs spéciaux —
     // en-tête de fichier). ---
-    if (cle.indexOf('produire_') === 0 && cle !== 'produire_ressource' && cle !== 'produire_deux_ressources' && signe > 0) {
+    if (cle.indexOf('produire_') === 0 && cle !== 'produire_ressource' && cle !== 'produire_ressource_type' && cle !== 'produire_deux_ressources' && signe > 0) {
       var cleRessourceProduite = cle.slice('produire_'.length);
       if (RESSOURCES_PRODUCTION.indexOf(cleRessourceProduite) !== -1) {
         return Promise.resolve(demanderChoix({
@@ -1227,13 +1285,22 @@ var FocusEngine = (function () {
       }
     }
 
-    // --- Production non portée côté PWA (produire_ressource/
-    // produire_deux_ressources — CHOIX du joueur parmi les 5 ressources,
-    // popup de sélection pas encore construite ; et tout produire_<clé>
-    // qui ne correspond à aucune des 5 ressources ci-dessus, cas non
-    // rencontré dans le catalogue à ce jour) ---
-    if (cle === 'produire_ressource' || cle === 'produire_deux_ressources' || cle.indexOf('produire_') === 0) {
-      journal.push(source + ' : ⚠️ "' + cle + '" non automatisé (sélection de ressource au choix du joueur pas encore construite côté PWA) — à appliquer manuellement.');
+    // --- Production, ressource au CHOIX du joueur (produire_ressource —
+    // 1 ressource ; produire_deux_ressources — 2 ressources DISTINCTES ;
+    // produire_ressource_type — vocabulaire Objectif galactique, même
+    // sémantique que produire_ressource) : retour utilisateur 14/09/2026.
+    // Effet UNIQUEMENT (signe > 0, jamais rencontré en coût dans le
+    // catalogue) — voir resoudreProductionChoisieRessource_ ci-dessus. ---
+    if (signe > 0 && (cle === 'produire_ressource' || cle === 'produire_ressource_type' || cle === 'produire_deux_ressources')) {
+      return resoudreProductionChoisieRessource_(cle === 'produire_deux_ressources' ? 2 : 1, source, etat, journal, demanderChoix);
+    }
+
+    // --- Repli : tout produire_<clé> qui ne correspond à aucune des 5
+    // ressources ci-dessus ni aux 3 clés "au choix" ci-dessus (cas non
+    // rencontré dans le catalogue à ce jour), ou l'un des 3 cas ci-dessus
+    // utilisé en coût (jamais vu, prudence) ---
+    if (cle.indexOf('produire_') === 0) {
+      journal.push(source + ' : ⚠️ "' + cle + '" non automatisé — à appliquer manuellement.');
       return Promise.resolve(true);
     }
 

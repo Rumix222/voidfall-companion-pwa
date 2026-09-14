@@ -2168,6 +2168,118 @@ var GameService = (function () {
     },
 
     /**
+     * Formule par défaut de "Puissance Navale totale du Néant" pour une
+     * Escarmouche (chantier "Escarmouche + Plateau Crise", 14/09/2026,
+     * retour utilisateur — introuvable telle quelle dans docs-rules-
+     * cycle-de-jeu.md §3.1.2, qui se contente de "Calculez la Puissance
+     * Navale totale du Néant" sans jamais la détailler) : Corruption
+     * totale (ScoreService.calculerCompteursAutomatiques — secteurs
+     * Corrompus + pistes de Civilisation Corrompues) + criseModificateur
+     * Escarmouche (champ EXISTANT du Plateau Crise (light), couvre déjà
+     * le "modificateur éventuel effet Shiveus" cité par l'utilisateur) +
+     * 1 aux Cycles 2 et 3. Simple valeur de DÉPART, librement modifiable
+     * par le joueur avant de résoudre (voir strategieService.js) — jamais
+     * cette fonction elle-même qui décide de la valeur finale.
+     */
+    calculerPuissanceNeantDefaut: function (partieId) {
+      return Promise.all([
+        rechargerPartie_(partieId),
+        ScoreService.calculerCompteursAutomatiques(partieId)
+      ]).then(function (resultats) {
+        var partie = resultats[0];
+        if (!partie) throw new Error('Partie introuvable.');
+        var compteurs = resultats[1];
+        var modificateur = (partie.plateauMaison && partie.plateauMaison.criseModificateurEscarmouche) || 0;
+        var bonusCycle = (Number(partie.cycleNum) || 1) >= 2 ? 1 : 0;
+        return (compteurs.corruption || 0) + modificateur + bonusCycle;
+      });
+    },
+
+    /**
+     * Prévisualisation (lecture seule, AUCUNE écriture) d'une Escarmouche
+     * avec la Puissance du Néant fournie : cible via SecteurService.
+     * determinerCibleEscarmouche, résultat de combat déjà inclus dedans
+     * (jamais un second calcul). `{aucuneCible:true}` si aucun secteur
+     * n'est éligible (docs-rules-cycle-de-jeu.md §2.3.3.1.1/§3.1.2) — pas
+     * une erreur, une Escarmouche peut légitimement n'avoir aucune cible.
+     */
+    previsualiserEscarmouche: function (partieId, puissanceNeant) {
+      return SecteurService.determinerCibleEscarmouche(partieId, puissanceNeant).then(function (cible) {
+        return cible || { aucuneCible: true };
+      });
+    },
+
+    /**
+     * Résout une Escarmouche "à la demande" (bouton standalone du bloc
+     * Plateau Crise persistant — Alerte Guerre §2.3.3, ou tout autre
+     * moment) : re-cible et re-simule avec la `puissanceNeant` VALIDÉE
+     * par le joueur (peut différer de la prévisualisation, le champ étant
+     * librement modifiable), persiste via SecteurService.
+     * appliquerResultatEscarmouche. AUCUN paiement ici (§2.3.3.1.2/§3.1.3
+     * restent une étape séparée, déjà couverte par les compteurs manuels
+     * `criseCout*`/`GameService.payerCoutCrise` existants). Répétable à
+     * volonté, aucun flag "résolu" posé.
+     */
+    appliquerEscarmouche: function (partieId, puissanceNeant) {
+      return SecteurService.determinerCibleEscarmouche(partieId, puissanceNeant).then(function (cible) {
+        if (!cible) return { aucuneCible: true };
+        return SecteurService.appliquerResultatEscarmouche(partieId, cible.numero, cible.resultatCombat)
+          .then(function () { return rechargerPartie_(partieId); })
+          .then(function (partie) { return { partie: partie, cible: cible }; });
+      });
+    },
+
+    /**
+     * Même résolution qu'appliquerEscarmouche ci-dessus, APPELÉE DEPUIS la
+     * popup "Phase Évaluation" (section "Plateau Crise") : en plus,
+     * applique le paiement (§3.1.3 — mêmes 5 compteurs `criseCout*` que
+     * le bloc "Plateau Crise" persistant, `paiement` = leurs valeurs
+     * ÉVENTUELLEMENT modifiées par le joueur dans cette popup avant de
+     * Valider, MÊME calcul que GameService.payerCoutCrise, inliné ici
+     * pour ne faire qu'UNE seule écriture `plateauMaison`) et pose
+     * `evenementCycle.escarmoucheResoluePhaseEval = true` (remis à 0
+     * automatiquement à chaque nouveau Cycle, même `evenementCycle` que
+     * `objectifsAppliques`/`refugeCubesPhaseEval` — voir leurs en-têtes).
+     */
+    appliquerEscarmouchePhaseEval: function (partieId, cycle, puissanceNeant, paiement) {
+      return SecteurService.determinerCibleEscarmouche(partieId, puissanceNeant).then(function (cible) {
+        return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+          var lignePartie = resultats[0], pm = resultats[1];
+          if (!lignePartie || !pm) throw new Error('Partie introuvable.');
+          var cleCycle = 'cycle' + cycle;
+          var evenementCycle = (lignePartie.etatJson.evenements || {})[cleCycle];
+          if (!evenementCycle) throw new Error('Aucun Événement galactique choisi pour ce cycle.');
+          if (evenementCycle.escarmoucheResoluePhaseEval) throw new Error('L\'Escarmouche de ce Cycle a déjà été résolue.');
+
+          paiement = paiement || {};
+          pm.ressourceMateriel = Math.max(0, (pm.ressourceMateriel || 0) - (Number(paiement.materiel) || 0));
+          pm.ressourceEnergie = Math.max(0, (pm.ressourceEnergie || 0) - (Number(paiement.energie) || 0));
+          pm.ressourceScience = Math.max(0, (pm.ressourceScience || 0) - (Number(paiement.science) || 0));
+          pm.ressourceCredit = Math.max(0, (pm.ressourceCredit || 0) - (Number(paiement.credit) || 0));
+          pm.influence = Math.max(0, (pm.influence || 0) - (Number(paiement.influence) || 0));
+          pm.criseCoutMateriel = 0;
+          pm.criseCoutEnergie = 0;
+          pm.criseCoutScience = 0;
+          pm.criseCoutCredit = 0;
+          pm.criseCoutInfluence = 0;
+
+          evenementCycle.escarmoucheResoluePhaseEval = true;
+          lignePartie.etatJson.evenements[cleCycle] = evenementCycle;
+
+          return Promise.all([
+            DB.put('plateauMaison', pm),
+            DB.put('parties', lignePartie),
+            cible ? SecteurService.appliquerResultatEscarmouche(partieId, cible.numero, cible.resultatCombat) : Promise.resolve(null)
+          ]).then(function () {
+            return rechargerPartie_(partieId);
+          }).then(function (partie) {
+            return { partie: partie, cible: cible || { aucuneCible: true } };
+          });
+        });
+      });
+    },
+
+    /**
      * Mise à jour partielle des 6 champs Civilisation (niveaux des 3
      * pistes + leurs 3 marqueurs "Corrompue"), volontairement exclus de
      * majPlateauMaison (voir commentaire ci-dessus). Même principe
@@ -2431,6 +2543,68 @@ var GameService = (function () {
             if (secteursUniques.indexOf(numero) === -1) secteursUniques.push(numero);
           });
           evenementCycle.cadresAppliques[ordreCadre] = { secteurs: secteursUniques, le: new Date().toISOString() };
+          partie.evenements[cleCycle] = evenementCycle;
+          return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
+        });
+      }).then(function () {
+        return rechargerPartie_(partieId);
+      });
+    },
+
+    /**
+     * Zones connues de SecteurService.CRITERES_PLACEMENT_MASSE_ — copie
+     * PUBLIQUE de la même liste (chantier "Cadres placement en masse",
+     * 14/09/2026), exposée pour qu'index.html sache reconnaître un cadre
+     * "placement" à zone galaxie entière (ex. "chaque_faille") SANS
+     * dupliquer la liste des zones connues à 2 endroits — un cadre dont
+     * `effet.zone` n'y figure PAS retombe sur le hors-périmètre existant
+     * (jamais cliquable), exactement comme avant ce chantier.
+     */
+    ZONES_PLACEMENT_MASSE: [
+      'chaque_faille',
+      'chaque_secteur_neant_population_min_4',
+      'chaque_secteur_neant_avec_defense_secteur_min_1',
+      'chaque_secteur_neant_cube_neant_max_2',
+      'chaque_secteur_neant_adjacent_a_une_faille'
+    ],
+
+    /**
+     * Retourne, SANS écrire, les secteurs qu'un cadre "placement en
+     * masse" (voir ZONES_PLACEMENT_MASSE ci-dessus) va affecter — utilisée
+     * par index.html pour afficher la liste dans la popup de confirmation
+     * AVANT que le joueur ne valide (transparence : "ceci va toucher les
+     * secteurs 12, 23, 40"). `cadre` vient de `evenementCycle.cadres`,
+     * jamais revalidé côté serveur ici (lecture seule — la revalidation
+     * réelle a lieu dans SecteurService.placerElementsEnMasse au moment
+     * d'appliquerCadrePlacementEnMasse ci-dessous).
+     */
+    previsualiserCadrePlacementEnMasse: function (partieId, cadre) {
+      if (!cadre || !cadre.effet || cadre.effet.type !== 'placement') return Promise.resolve([]);
+      return SecteurService.obtenirSecteursEligiblesPlacementEnMasse(partieId, cadre.effet.zone);
+    },
+
+    /**
+     * Applique un cadre "placement" à zone galaxie entière (voir
+     * ZONES_PLACEMENT_MASSE ci-dessus) — AUCUN choix du joueur (contraire
+     * à appliquerCadrePlacement, zone "secteur_neant_adjacent") : place
+     * `cadre.effet.elements` sur TOUS les secteurs remplissant le critère
+     * de la carte, en un seul clic. Même garde-fou anti-double-application
+     * que les autres appliquerCadre* (chargerCadreOuvrable_). Résumé
+     * stocké au même gabarit que appliquerCadrePlacementMultiple
+     * ci-dessus (`{secteurs:[...], le}`) — 0 secteur éligible est un
+     * résultat valide (carte sans effet ce cycle-ci), pas une erreur.
+     */
+    appliquerCadrePlacementEnMasse: function (partieId, cycle, ordreCadre) {
+      return chargerCadreOuvrable_(partieId, cycle, ordreCadre).then(function (ctx) {
+        var partie = ctx.partie, cleCycle = ctx.cleCycle, evenementCycle = ctx.evenementCycle, cadre = ctx.cadre;
+
+        if (!cadre || !cadre.effet || cadre.effet.type !== 'placement' ||
+          GameService.ZONES_PLACEMENT_MASSE.indexOf(cadre.effet.zone) === -1) {
+          throw new Error('Cadre de placement en masse introuvable pour cet ordre.');
+        }
+
+        return SecteurService.placerElementsEnMasse(partieId, cadre.effet.zone, cadre.effet.elements).then(function (secteurs) {
+          evenementCycle.cadresAppliques[ordreCadre] = { secteurs: secteurs, le: new Date().toISOString() };
           partie.evenements[cleCycle] = evenementCycle;
           return GameService.sauvegarderPartie(partie, 'cadre_evenement_applique', cleCycle + ' — cadre #' + ordreCadre);
         });

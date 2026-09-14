@@ -461,15 +461,18 @@ jamais) :
   implémenté dans `civilisationService.js`, mais uniquement via les boutons
   dédiés de l'écran Plat. maison — pas de pont automatique depuis une carte
   Focus.
-- `produire_ressource`, `produire_deux_ressources` : CHOIX du joueur parmi
-  les 5 ressources, popup de sélection pas encore construite.
+- `produire_ressource`, `produire_deux_ressources`, `produire_ressource_
+  type` : N'est PLUS hors périmètre (14/09/2026) — CHOIX du joueur parmi
+  les 5 ressources via la popup `produire_ressource_choix`
+  (`strategieService.js`, `resoudreProductionChoisieRessource_`,
+  `focusEngine.js`), puis même calcul de revenu que `produire_<ressource>`
+  ci-dessous.
   `produire_<ressource>` (ressource imposée par le nom de la clé, ex. Focus
   Production "Ravitailler" — `produire_energie`/`produire_materiel`/
-  `produire_nourriture`) N'est PLUS hors périmètre : délègue à une popup
-  dédiée (`produire_revenu`, `strategieService.js`) qui calcule le revenu
-  de production actuel via `calculerNiveauxProduction_` (même calcul que
-  `renderCubes_` §5.2, désormais factorisé en commun) et crédite la
-  ressource.
+  `produire_nourriture`) délègue à une popup dédiée (`produire_revenu`,
+  `strategieService.js`) qui calcule le revenu de production actuel via
+  `calculerNiveauxProduction_` (même calcul que `renderCubes_` §5.2,
+  désormais factorisé en commun) et crédite la ressource.
 
 ### 4.6 `js/annulationService.js` — pile d'annulation
 
@@ -1045,10 +1048,15 @@ Récapitulatif transverse (détail par module en §4.5) :
   ailleurs (`civilisationService.js`, boutons Plat. maison), pas de pont
   Focus automatique.
 - **Production, choix de la ressource** (`produire_ressource`/
-  `produire_deux_ressources`) : le joueur choisit parmi les 5 ressources,
-  popup de sélection pas encore construite. `produire_<ressource>`
+  `produire_deux_ressources`/`produire_ressource_type` — 14/09/2026) : EST
+  automatisé. Le joueur choisit parmi les 5 ressources via la popup
+  `produire_ressource_choix` (`strategieService.js`, §4.5 — branche
+  `#modal-choix` ET `feuilleFlowProduireRessourceChoix_`), qui calcule
+  ensuite le revenu ACTUEL de la ressource choisie (même calcul que
+  `produire_revenu` ci-dessous). `produire_deux_ressources` rappelle cette
+  popup 2 fois (2 ressources DISTINCTES). `produire_<ressource>`
   (ressource imposée par la clé, ex. Focus Production "Ravitailler") EST
-  automatisé (popup `produire_revenu`, `strategieService.js`, §4.5).
+  également automatisé (popup `produire_revenu`, `strategieService.js`, §4.5).
 - **Défausse de Gloire pour secteur source abandonné** lors d'une invasion,
   et **résolution immédiate des jetons Prime/Libération** : simples
   compteurs journalisés/crédités, pas de popup dédiée.

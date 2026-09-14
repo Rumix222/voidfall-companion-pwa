@@ -1271,25 +1271,104 @@ test('produire_credit : annulé (popup "Annuler") — bloque toute l’action, c
   });
 });
 
-// "produire_ressource"/"produire_deux_ressources" (CHOIX du joueur parmi
-// les 5 ressources) restent hors périmètre — pas de popup de sélection
-// construite, contrairement à produire_<ressource> (ressource imposée)
-// ci-dessus.
-test('produire_ressource (choix du joueur) : reste hors périmètre, ne bloque pas, journalisé', function () {
+// "produire_ressource"/"produire_deux_ressources"/"produire_ressource_type"
+// (CHOIX du joueur parmi les 5 ressources — retour utilisateur 14/09/2026)
+// délèguent à demanderChoix({type:'produire_ressource_choix'}) — la popup
+// (strategieService.js) fait le choix ET le calcul de revenu, résout
+// {ressource, montant, detail} ; focusEngine.js applique ensuite le MÊME
+// plafond/règle de surproduction que produire_<ressource> (ressource
+// imposée) ci-dessus.
+test('produire_ressource (choix du joueur) : délègue à demanderChoix({type:"produire_ressource_choix"}), crédite la ressource choisie', function () {
   var ctx = creerContexte_();
-  var carte = { focus: 'Test' };
-  var action = { action: 'Jouer', effet: { produire_ressource: 1 }, cout: {}, texte: '' };
+  var carte = { focus: 'Prospérité' };
+  var action = { action: 'Stocker', effet: { produire_ressource: 1 }, cout: {}, texte: '' };
 
-  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoixSansPopup_).then(function (resultat) {
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'produire_ressource_choix');
+    assert.strictEqual(JSON.stringify(contexte.exclure), JSON.stringify([]));
+    return { ressource: 'materiel', montant: 4, detail: '+4 Matériel (Production, choisie).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
-    assert.ok(resultat.journal.some(function (l) { return l.indexOf('non automatisé') !== -1; }));
-    // EVOLUTION 12 : l'action a réussi (succes:true) malgré l'effet hors
-    // périmètre — elle est donc marquée utilisée (actionsFocusUtilisees),
-    // seule mutation produite ici (aucune ressource n'est réellement
-    // modifiée par cet effet non automatisé).
-    assert.strictEqual(resultat.mutations.length, 1);
-    assert.strictEqual(resultat.mutations[0].champ, 'actionsFocusUtilisees');
-    assert.strictEqual(JSON.stringify(resultat.plateauMaisonApres.actionsFocusUtilisees), JSON.stringify(['Test — Jouer']));
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 9); // 5 + 4
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('+4 Matériel') !== -1; }));
+  });
+});
+
+test('produire_ressource_type (Objectif galactique) : même clé/même popup que produire_ressource', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Objectif galactique' };
+  var action = { action: 'Appliquer', effet: { produire_ressource_type: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'produire_ressource_choix');
+    return { ressource: 'science', montant: 2, detail: '+2 Science (Production, choisie).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, 4); // 2 + 2
+  });
+});
+
+test('produire_ressource : annulé (popup "Annuler") — bloque toute l’action, aucune ressource créditée', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Prospérité' };
+  var action = { action: 'Stocker', effet: { produire_ressource: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
+// "produire_deux_ressources" : 2 ressources DISTINCTES — 2 appels
+// séquentiels à demanderChoix, le 2e reçoit contexte.exclure = [la
+// ressource retenue au 1er tour] (la popup filtre ses boutons en
+// conséquence, focusEngine.js ne fait que transmettre l'exclusion).
+test('produire_deux_ressources : 2 appels séquentiels, le 2e exclut la ressource déjà choisie, crédite les deux', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = { action: 'Accélérer', effet: { produire_deux_ressources: 1 }, cout: {}, texte: '' };
+
+  var appels = [];
+  var demanderChoix = function (contexte) {
+    appels.push(contexte);
+    assert.strictEqual(contexte.type, 'produire_ressource_choix');
+    if (appels.length === 1) return { ressource: 'energie', montant: 4, detail: '+4 Énergie (Production, choisie).' };
+    return { ressource: 'credit', montant: 3, detail: '+3 Crédit (Production, choisie).' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(appels.length, 2);
+    assert.strictEqual(JSON.stringify(appels[0].exclure), JSON.stringify([]));
+    assert.strictEqual(JSON.stringify(appels[1].exclure), JSON.stringify(['energie']));
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceEnergie, 9); // 5 + 4
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, 6); // 3 + 3
+  });
+});
+
+test('produire_deux_ressources : annulé sur le 2e tour — bloque TOUT (même le 1er déjà "résolu")', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Production' };
+  var action = { action: 'Accélérer', effet: { produire_deux_ressources: 1 }, cout: {}, texte: '' };
+
+  var appels = 0;
+  var demanderChoix = function () {
+    appels += 1;
+    if (appels === 1) return { ressource: 'energie', montant: 4, detail: '+4 Énergie (Production, choisie).' };
+    return { annule: true };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
   });
 });
 

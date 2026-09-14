@@ -1,7 +1,183 @@
 /**
  * version.js
- * Version 146 — 2026-09-14
+ * Version 151 — 2026-09-14
  * Source de vérité unique pour la version de l'application.
+ *
+ * 14/09/2026, suite (BUG trouvé en testant le chantier Escarmouche en
+ * navigateur — popup "Phase Évaluation" plantait avec "Cannot read
+ * properties of null (reading 'refugeCubesPhaseEval')" dès qu'aucun
+ * Événement galactique n'était encore choisi pour le Cycle en cours) —
+ * `texteRefugesPhaseEval_` (chantier "Refuges", 14/09/2026) lisait
+ * `evenementCycleEval.refugeCubesPhaseEval` sans garde-fou nul, alors que
+ * `evenementCycleEval` est `null` tant qu'aucun Événement n'est
+ * sélectionné (voir juste au-dessus, `objectifsCatalogueEval` a bien ce
+ * garde-fou, celui-ci ne l'avait pas). Fix d'une ligne
+ * (`(evenementCycleEval && evenementCycleEval.refugeCubesPhaseEval) || 0`) —
+ * bug latent PRÉ-EXISTANT, sans lien avec le chantier Escarmouche
+ * lui-même, découvert en testant "Fin du cycle" sur une partie sans
+ * Événement encore choisi.
+ *
+ * 14/09/2026, suite (retour utilisateur : "Implémentons escarmouche et
+ * résoudre plateau crise") — les 2 étaient de simples placeholders
+ * textuels ("Non automatisé — résolvez sur le plateau physique", §3.1/
+ * §2.3.3.1.1 docs-rules-cycle-de-jeu.md). Spec détaillée fournie par
+ * l'utilisateur, confrontée aux docs annotées puis 3 questions de
+ * clarification validées (règle précise de ciblage du secteur — absente
+ * des docs, fournie ; Puissance du Néant "équivalente à des Corvettes,
+ * un seul type" ; défaite = abandon complet du secteur,
+ * docs-rules-flottes.md §4.1-4.4).
+ * - `js/combatService.js` : nouvelle `resoudreEscarmouche` (pure) — rôles
+ *   INVERSÉS par rapport à `resoudreInvasion` (le Néant est attaquant,
+ *   tout en Corvettes ; le joueur est défenseur sur le secteur ciblé,
+ *   Technologies de combat appliquées). Une égalité (les 2 camps réduits
+ *   à 0 simultanément) est traitée comme une défense réussie.
+ * - `js/secteurService.js` : nouvelles `determinerCibleEscarmouche`
+ *   (cascade de 7 critères fournie par l'utilisateur — éligibilité
+ *   adjacence/Secteur-Mère exclu, préférence victoire/égalité du Néant,
+ *   PN rappelé, Secteur Pur, Population, Guildes, aléatoire) et
+ *   `appliquerResultatEscarmouche` (persistance : survivants si victoire,
+ *   abandon complet — Installations retirées, Corruption, jeton Flotte du
+ *   Néant, jeton Prime posé sur le secteur — si défaite).
+ * - `js/gameService.js` : nouvelles `calculerPuissanceNeantDefaut`
+ *   (formule proposée par l'utilisateur, absente des docs — Corruption
+ *   totale + `criseModificateurEscarmouche` [couvre déjà le modificateur
+ *   Shiveus] + 1 aux Cycles 2/3 — librement modifiable ensuite),
+ *   `previsualiserEscarmouche` (lecture seule), `appliquerEscarmouche`
+ *   (bouton standalone, sans paiement) et `appliquerEscarmouchePhaseEval`
+ *   (popup "Phase Évaluation", avec paiement — réutilise le calcul de
+ *   `payerCoutCrise` existant sur les 5 compteurs `criseCout*` — et pose
+ *   `evenementCycle.escarmoucheResoluePhaseEval`).
+ * - `js/strategieService.js` : section "Plateau Crise" de la popup "Phase
+ *   Évaluation" remplacée (champ "Puissance du Néant" éditable + rappel
+ *   du montant à payer + bouton "Résoudre"/"✓ Résolu") ; 2 nouvelles
+ *   branches `demanderChoix` partageant la même popup ("Résoudre
+ *   l'Escarmouche") — `escarmouche_phase_eval` (avec paiement) et
+ *   `escarmouche_standalone` (sans) — secteur attaqué, puissances,
+ *   résultat (log complet dépliable), bouton "Recalculer" si la Puissance
+ *   du Néant est ajustée.
+ * - `index.html` : nouveau bouton "Escarmouche" en haut du bloc "Plateau
+ *   Crise" persistant (Alerte Guerre §2.3.3, utilisable à tout moment,
+ *   répétable, aucun paiement — déjà couvert par les compteurs `criseCout*`/
+ *   "Payer" existants).
+ * Tests : `js/combatService.test.js` (+5), `js/secteurService_actions.test.js`
+ * (+9 : cascade de ciblage complète + persistance victoire/défaite),
+ * nouveau `js/gameService_escarmouche_test.js` (10 tests). 291 tests au
+ * vert.
+ *
+ * 14/09/2026, suite (retour utilisateur : "Implémentons le sélecteur de
+ * ressource pour ce cas [Objectif galactique Événement A ligne 2,
+ * "produisez un type de ressources"] et les autres du même type" — les
+ * clés focusEngine.js "produire_ressource" (Focus, ex. Prospérité
+ * Standard "Stocker"), "produire_deux_ressources" (Focus Production
+ * Héroïque "Accélérer" etc.) et "produire_ressource_type" (Objectif
+ * galactique) retombaient sur le repli générique "non automatisé" — le
+ * joueur ne pouvait choisir AUCUNE ressource, contrairement à
+ * `produire_<ressource>` (ressource imposée par le nom de la clé, déjà
+ * automatisée). Nouvelle popup `produire_ressource_choix`
+ * (`js/strategieService.js`, branche `#modal-choix` ET
+ * `feuilleFlowProduireRessourceChoix_` — Focus Prospérité Standard
+ * "Stocker" est migré vers la Feuille d'action) : un bouton par ressource,
+ * prévisualisant son revenu de Production ACTUEL (même calcul que
+ * `produire_revenu`, ressource imposée). `js/focusEngine.js`
+ * (`resoudreProductionChoisieRessource_`) enchaîne 1 (produire_ressource/
+ * _type) ou 2 (produire_deux_ressources — 2 ressources DISTINCTES,
+ * `contexte.exclure` retire du choix celle déjà retenue au tour
+ * précédent) appels séquentiels à cette popup, puis applique EXACTEMENT
+ * la même règle de plafond/surproduction (réserve à 15, +3 Influence)
+ * que `produire_<ressource>` — un "Annuler" sur n'importe quel tour
+ * bloque TOUT (même garde-fou que le gain de jetons Prime).
+ * Tests : `js/focusEngine.test.js` — 1 test obsolète remplacé ("reste
+ * hors périmètre") + 4 nouveaux (choix simple, Objectif `produire_
+ * ressource_type`, 2 ressources distinctes, annulation au 2e tour).
+ * 266 tests au vert.
+ *
+ * 14/09/2026, suite (BUG, retour utilisateur : "je clique sur Appliquer
+ * [Objectif galactique, ligne 'libre']... je coche les deux options...
+ * je valide et la popup fin de cycle disparaît") — régression présente
+ * depuis le Lot 1 des Objectifs galactiques (13/09/2026), jamais
+ * remarquée jusqu'ici : `js/strategieService.js`/`demanderChoix` réutilise
+ * une SEULE modale (`#modal-choix`) pour absolument tout (Focus, Cadres,
+ * Objectifs, Refuges, la popup "Phase Évaluation" elle-même...). Chaque
+ * type de contexte résolu (`option_exclusive`, `options_inclusives`,
+ * `retirer_corruption`, `avancer_civilisation`...) appelle TOUJOURS
+ * `fermerModale_()` (masque `#modal-choix`) juste avant `resolve()` — Correct
+ * pour un appel de PREMIER NIVEAU (rien à ré-afficher derrière), mais un
+ * bouton "Appliquer"/"Ajouter un cube" DANS la popup "Phase Évaluation"
+ * ouvre un sous-popup NESTED dans la MÊME modale : si le gain résolu
+ * n'a besoin d'AUCUN autre `demanderChoix` par la suite (ex. Objectif
+ * "libre" `produire_ressource_type` + `credit`, aucun popup requis pour
+ * ni l'un ni l'autre), rien ne rouvrait jamais `#modal-choix` —
+ * `renderPhaseEvaluation_()` reconstruisait bien `contenu.innerHTML`,
+ * mais dans le vide, la modale entière restant masquée. Confirmé
+ * affecter AUSSI le mode "unique" (Lot 1, ex. `avancer_civilisation`) —
+ * pas spécifique au mode "libre" du rapport initial : TOUT gain d'Objectif
+ * (et le déclencheur "Phase Évaluation" des Refuges) redemandant au moins
+ * un `demanderChoix` avant de finir sans popup final déclenchait le bug.
+ * Corrigé en réaffirmant, en tête de `renderPhaseEvaluation_()`
+ * (rappelée à CHAQUE rendu, pas seulement au premier) : `modal.hidden =
+ * false`, le titre, et le chrome Annuler/Valider (`btnAnnuler.onclick`/
+ * `btnValider.hidden`/`.textContent`) — et en déplaçant l'assignation de
+ * `btnValider.onclick` ("Valider et passer au cycle suivant") À
+ * L'INTÉRIEUR de cette même fonction (réassignée à chaque rendu) : sinon
+ * `options_inclusives`, qui réutilise aussi `btnValider` avec SON PROPRE
+ * `onclick` (lecture des cases cochées), l'aurait laissé collé après le
+ * retour à cette vue. Reproduit puis vérifié corrigé en navigateur
+ * (`.hidden` du modal + capture d'écran, AVANT/APRÈS) — aucune régression
+ * possible détectable par les tests Node existants (code DOM pur, non
+ * couvert par le harnais `vm`).
+ *
+ * 14/09/2026, suite (retour utilisateur : "Traite le point 1" — parmi les
+ * 2 failles transversales relevées lors d'un inventaire des Cadres/
+ * Objectifs/Technologies non automatisés) — Cadres de type "placement"
+ * (data/catalogue/evenements.json) dont la `zone` n'est PAS
+ * "secteur_neant_adjacent" mais un critère GALAXIE ENTIÈRE ("chaque
+ * secteur de Faille", "chaque secteur du Néant avec au moins 4
+ * Population"...) : jamais reconnus par le dispatch d'index.html, donc
+ * jamais cliquables, alors qu'ils ne demandent AUCUN choix au joueur
+ * (contrairement aux cadres "placement"/zone "secteur_neant_adjacent",
+ * où le joueur choisit LEQUEL des secteurs adjacents à ses propres
+ * secteurs recevoir les éléments). 5 zones vérifiées une par une contre
+ * le texte imprimé de la carte, touchant 6 Cadres sur 5 Événements
+ * (C/D/J Cycle 2, A/F Cycle 3) :
+ * - `js/secteurService.js` : nouvelle entrée `gardien` (→ `nombreGardien`)
+ *   dans `CHAMP_ELEMENT_PLACEMENT_` (jamais posé par l'app jusqu'ici,
+ *   seulement à la mise en place) ; écriture d'élément factorisée dans
+ *   `appliquerElementsSurSecteur_` (partagée par `placerElementsNeantAdjacent`
+ *   et les 2 nouvelles fonctions) ; `CRITERES_PLACEMENT_MASSE_` (1
+ *   prédicat par zone connue) + `obtenirSecteursEligiblesPlacementEnMasse`/
+ *   `placerElementsEnMasse` — contrairement à
+ *   `obtenirSecteursEligiblesPlacementNeantAdjacent`, ne filtrent JAMAIS
+ *   sur la possession du joueur ni les emplacements Installation/Guilde
+ *   libres (la carte s'applique inconditionnellement à TOUTE la
+ *   galaxie). "secteur du Néant" y garde EXACTEMENT le même sens
+ *   qu'ailleurs dans ce fichier (`pnNeant > 0`), sauf pour `chaque_faille`
+ *   (un TYPE de secteur, jamais conditionné par `pnNeant`).
+ * - `js/gameService.js` : `ZONES_PLACEMENT_MASSE` (liste publique des 5
+ *   zones connues, partagée avec index.html pour éviter une 2e copie) +
+ *   `previsualiserCadrePlacementEnMasse` (lecture seule, pour afficher la
+ *   liste des secteurs concernés AVANT que le joueur ne valide) +
+ *   `appliquerCadrePlacementEnMasse` (même garde-fou anti-double-
+ *   application que les autres `appliquerCadre*`, résumé stocké au même
+ *   gabarit `{secteurs:[...], le}` que `appliquerCadrePlacementMultiple`
+ *   — 0 secteur éligible est un résultat VALIDE, pas une erreur : une
+ *   carte peut légitimement n'avoir plus aucune cible ce cycle-ci, ex.
+ *   plus aucune Faille restante).
+ * - `index.html` : nouvelle détection `estPlacementMasse` (renderCadresEvenement_)
+ *   + `appliquerCadrePlacementMasseEtRafraichir_` — popup de confirmation
+ *   (Annuler/Valider) récapitulant les secteurs concernés avant d'écrire,
+ *   même principe que les cadres "gain" déjà automatisés sans choix du
+ *   joueur (`appliquerCadreCorruptionOffreProgrammeEtRafraichir_`).
+ * - Tests : `js/gameService_cadre_placement_masse_test.js` (nouveau, 6
+ *   tests) + 6 nouveaux dans `secteurService_actions.test.js`. 262 tests
+ *   `*.test.js` + tous les `*_test.js` individuels au vert.
+ * - Hors périmètre de ce lot (2e faille transversale relevée au même
+ *   inventaire, pas traitée ici) : options de cadre "choix" sans `cle` au
+ *   premier niveau (`{mode:"groupe"/"libre", gains:[...]}` imbriqué, ou
+ *   `type:"echange"`) — silencieusement absentes du popup de résolution,
+ *   même en repli manuel. Également non traitées : les 2 zones
+ *   "placement" à cible UNIQUE mais critère (`secteur_neant_adjacent_
+ *   population_max`, `secteur_neant_ou_secteur_maison_dechue`) —
+ *   demandent une vraie sélection, pas juste une confirmation.
  *
  * 14/09/2026, suite (retour utilisateur : "On va implémenter les
  * refuges") — chantier "Refuges" (§3, docs-rules-corruption-gardiens-
@@ -5240,4 +5416,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260914.2';
+var APP_VERSION = '20260914.7';

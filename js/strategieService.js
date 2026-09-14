@@ -554,10 +554,13 @@ var StrategieService = (function () {
     // déjà résolus nativement par FocusEngine mais n'avaient jamais besoin
     // d'un libellé de LISTE avant ce lot (gagner_prime/gagner_commerce
     // ci-dessus servent un vocabulaire différent — Focus "Bonus Commerce").
-    // "commerce"/"gain_gloire"/"produire_ressource_type" ne sont PAS
-    // automatisés par FocusEngine (repli générique, avertissement
-    // journalisé) — gardés lisibles ici malgré tout, l'option reste
-    // affichée même si son application reste partiellement manuelle.
+    // "commerce"/"gain_gloire" ne sont PAS automatisés par FocusEngine
+    // (repli générique, avertissement journalisé) — gardés lisibles ici
+    // malgré tout, l'option reste affichée même si son application reste
+    // partiellement manuelle. "produire_ressource_type" EST automatisé
+    // depuis le 14/09/2026 (popup 'produire_ressource_choix', même clé que
+    // "produire_ressource" ci-dessous — voir focusEngine.js,
+    // resoudreProductionChoisieRessource_).
     prime: 'Gagner un jeton Prime',
     ameliorer_gloire: 'Améliorer un jeton Gloire',
     commerce: 'Gagner un jeton Commerce',
@@ -1950,14 +1953,17 @@ var StrategieService = (function () {
     { focus: 'Progrès', type: 'Novaris' },
     { focus: 'Progrès', type: 'Héroïque' },
     // Focus Prospérité — les 3 variantes du catalogue (Standard/Astoran/
-    // Héroïque). Un seul nouveau contexte.type nécessaire :
-    // 'ressource_choix' (feuilleFlowRessourceChoix_ ci-dessus — "N
-    // ressources au choix", Effet OU Coût). "programme_force"/
-    // "programme_richesse" (Astoran "Réguler") déjà couverts
-    // (CLE_PROGRAMME_VERS_TYPE_ -> 'gagner_programme'). Le reste retombe
-    // sur des clés SANS résolution automatisée (detruire/destroy en coût,
-    // etablir_guilde_meme_secteur, retirer_gardien — hors périmètre AVANT
-    // cette migration comme après, repli générique non bloquant).
+    // Héroïque). 2 contexte.type nécessaires : 'ressource_choix'
+    // (feuilleFlowRessourceChoix_ ci-dessus — "N ressources au choix",
+    // Effet OU Coût) et 'produire_ressource_choix' (Standard "Stocker",
+    // clé "produire_ressource" — retour utilisateur 14/09/2026,
+    // feuilleFlowProduireRessourceChoix_, auparavant sans résolution).
+    // "programme_force"/"programme_richesse" (Astoran "Réguler") déjà
+    // couverts (CLE_PROGRAMME_VERS_TYPE_ -> 'gagner_programme'). Le reste
+    // retombe sur des clés SANS résolution automatisée (detruire/destroy
+    // en coût, etablir_guilde_meme_secteur, retirer_gardien — hors
+    // périmètre AVANT cette migration comme après, repli générique non
+    // bloquant).
     { focus: 'Prospérité', type: 'Standard' },
     { focus: 'Prospérité', type: 'Astoran' },
     { focus: 'Prospérité', type: 'Héroïque' },
@@ -2024,6 +2030,9 @@ var StrategieService = (function () {
     'defausser_gloire',
     // Focus Prospérité (Standard "Stocker"/Héroïque "Prospérer") :
     'ressource_choix',
+    // Focus Prospérité Standard "Stocker" (produire_ressource, retour
+    // utilisateur 14/09/2026 — feuilleFlowProduireRessourceChoix_) :
+    'produire_ressource_choix',
     // Focus Renfort (Standard/Novaris "Rassembler"/"Adapter") :
     'deployer_cube'
   ];
@@ -2793,6 +2802,65 @@ var StrategieService = (function () {
         montant: montantProduit,
         detail: '+' + montantProduit + ' ' + labelRessourceProduite + ' (Production, Niveau ' + niveauProduit + ').'
       });
+    }).catch(function (erreur) {
+      window.alert('Échec du calcul de production : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
+   * Chantier "sélecteur de ressource au choix" (retour utilisateur
+   * 14/09/2026 — Objectif galactique Événement A ligne 2 "produisez un
+   * type de ressources" restait sans interaction). Couvre les clés
+   * focusEngine.js "produire_ressource" (Focus, ex. Prospérité Standard
+   * "Stocker"), "produire_deux_ressources" (2 ressources DISTINCTES — ce
+   * flow est rappelé 2 fois par resoudreProductionChoisieRessource_,
+   * `contexte.exclure` retire du choix celle déjà retenue au tour
+   * précédent) et "produire_ressource_type" (Objectif galactique, même
+   * sémantique que "produire_ressource"). MÊME calcul de revenu que
+   * feuilleFlowProduireRevenu_ ci-dessus (ressource IMPOSÉE celle-là),
+   * mais un bouton par ressource — le joueur désigne laquelle avant de
+   * résoudre. Port direct du même principe que feuilleFlowGagnerProgramme_
+   * (placeholder "Calcul en cours…" poussé, puis étape courante réécrite
+   * EN PLACE une fois le calcul asynchrone terminé — jamais un nouvel
+   * objet étape, pour que "← Retour" retrouve le bon contenu).
+   */
+  function feuilleFlowProduireRessourceChoix_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var ressourcesExcluesChoix = contexte.exclure || [];
+    feuillePousserEtape_({
+      titre: etiquette + 'Produire — choisissez une ressource', nbEtapes: 1, etapeIndex: 0,
+      html: '<p class="hint">Calcul en cours…</p>'
+    }, feuillePile_.length > 1 ? 'avant' : null);
+
+    calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      var ressourcesDisponiblesChoix = RESSOURCES_PRODUCTION.filter(function (cle) { return ressourcesExcluesChoix.indexOf(cle) === -1; });
+      etapeCourante.html = '<div class="modal-choix-boutons">' + ressourcesDisponiblesChoix.map(function (cle) {
+        var niveau = resultat.niveaux[cle] || 0;
+        var montant = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
+        return '<button type="button" class="btn btn-secondary btn-choix-ressource" data-ressource="' + cle + '" data-montant="' + montant + '">' +
+          CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
+      }).join('') + '</div>';
+      etapeCourante.brancher = function (el) {
+        Array.prototype.forEach.call(el.querySelectorAll('.btn-choix-ressource'), function (btn) {
+          btn.addEventListener('click', function () {
+            var cleRessourceChoisie = btn.dataset.ressource;
+            var montantChoisi = Number(btn.dataset.montant) || 0;
+            feuilleRejetCourant_ = null;
+            resolve({
+              ressource: cleRessourceChoisie,
+              montant: montantChoisi,
+              detail: '+' + montantChoisi + ' ' + CHAMP_RESSOURCE[cleRessourceChoisie].label + ' (Production, choisie).'
+            });
+          });
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
     }).catch(function (erreur) {
       window.alert('Échec du calcul de production : ' + erreur.message);
     });
@@ -4661,6 +4729,7 @@ var StrategieService = (function () {
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
     if (contexte.type === 'influence_secteur') return feuilleFlowInfluenceSecteur_(contexte);
     if (contexte.type === 'produire_revenu') return feuilleFlowProduireRevenu_(contexte);
+    if (contexte.type === 'produire_ressource_choix') return feuilleFlowProduireRessourceChoix_(contexte);
     // Chantier "Focus Politique sur la Feuille" : 'bonus_commerce' a le
     // MÊME contrat que 'option_exclusive' (options = tableau de libellés
     // déjà formés, résolution {indexChoisi}) — aucune fonction dédiée,
@@ -7099,6 +7168,51 @@ var StrategieService = (function () {
           window.alert('Échec du calcul de production : ' + erreur.message);
         });
 
+      } else if (contexte.type === 'produire_ressource_choix') {
+        // Effet "Produire une ressource au CHOIX du joueur" (clés
+        // focusEngine.js "produire_ressource"/"produire_deux_ressources" —
+        // Focus, ex. Prospérité Standard "Stocker" — et "produire_
+        // ressource_type" — Objectif galactique, ex. Événement A ligne 2 :
+        // retour utilisateur 14/09/2026, restait sans interaction). MÊME
+        // calcul de revenu que 'produire_revenu' ci-dessus, mais la
+        // ressource N'EST PAS imposée — un bouton par ressource
+        // (contexte.exclure retire celle déjà choisie au tour précédent
+        // pour "produire_deux_ressources", 2 ressources DISTINCTES,
+        // resoudreProductionChoisieRessource_ focusEngine.js). Le plafond/
+        // la surproduction restent appliqués par focusEngine.js, qui ne
+        // reçoit ici que {ressource, montant, detail}.
+        var ressourcesExcluesChoix = contexte.exclure || [];
+        titre.textContent = 'Produire — choisissez une ressource';
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        calculerNiveauxProduction_(partieAffichee).then(function (resultat) {
+          var ressourcesDisponiblesChoix = RESSOURCES_PRODUCTION.filter(function (cle) { return ressourcesExcluesChoix.indexOf(cle) === -1; });
+          contenu.innerHTML = '<div class="modal-choix-boutons">' + ressourcesDisponiblesChoix.map(function (cle) {
+            var niveau = resultat.niveaux[cle] || 0;
+            var montant = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
+            return '<button class="btn btn-secondary btn-choix-liste" data-ressource="' + cle + '" data-montant="' + montant + '">' +
+              CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
+          }).join('') + '</div>';
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var cleRessourceChoisie = btn.dataset.ressource;
+              var montantChoisi = Number(btn.dataset.montant) || 0;
+              fermerModale_();
+              resolve({
+                ressource: cleRessourceChoisie,
+                montant: montantChoisi,
+                detail: '+' + montantChoisi + ' ' + CHAMP_RESSOURCE[cleRessourceChoisie].label + ' (Production, choisie).'
+              });
+            });
+          });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du calcul de production : ' + erreur.message);
+        });
+
       } else if (contexte.type === 'ameliorer_gloire') {
         // focusEngine.js reconnaît la clé "ameliorer_gloire" mais ne peut
         // pas écrire lui-même le résultat — le jeton Gloire (array) n'est
@@ -7515,13 +7629,22 @@ var StrategieService = (function () {
           // aucune dépendance sur l'Entretien ceci dit, mais gardé dans le
           // même renderPhaseEvaluation_ pour rester cohérent avec
           // objectifsAppliques/refugeCubesPhaseEval qui, eux, changent).
-          GameService.obtenirConfigRefuges(partieEval.scenarioId)
+          GameService.obtenirConfigRefuges(partieEval.scenarioId),
+          // Chantier "Escarmouche + Plateau Crise" (14/09/2026) — valeur de
+          // DÉPART du champ "Puissance du Néant" (librement modifiable,
+          // voir puissanceNeantCourante ci-dessous), chargée une seule
+          // fois à l'ouverture comme configRefugesEval ci-dessus (jamais
+          // recalculée à chaque renderPhaseEvaluation_ — un clic "Payer"
+          // l'Entretien ne doit pas réinitialiser une valeur déjà éditée
+          // par le joueur).
+          GameService.calculerPuissanceNeantDefaut(partieEval.id)
         ]).then(function (resultatsEval) {
           var unitesSecteursEval = resultatsEval[0];
           var pointsProgrammesEval = resultatsEval[1];
           var agregatsSecteursEval = resultatsEval[2];
           var niveauxProductionEval = resultatsEval[3];
           var configRefugesEval = resultatsEval[4];
+          var puissanceNeantCourante = resultatsEval[5];
           var revenusEval = {
             nourriture: calculerProductionAvecBonusTechnologie_('nourriture', niveauxProductionEval.nourriture, partieEval),
             energie: calculerProductionAvecBonusTechnologie_('energie', niveauxProductionEval.energie, partieEval),
@@ -7595,6 +7718,52 @@ var StrategieService = (function () {
           }
 
           /**
+           * Chantier "Escarmouche + Plateau Crise" (docs-rules-cycle-de-
+           * jeu.md §2.3.3.1/§3.1, 14/09/2026, retour utilisateur) — section
+           * "Plateau Crise" de la popup "Phase Évaluation" : un champ
+           * "Puissance du Néant" (`puissanceNeantCourante`, valeur de
+           * départ calculée par GameService.calculerPuissanceNeantDefaut,
+           * LIBREMENT modifiable — "laisse modifiable au cas où", retour
+           * utilisateur), un rappel texte du "montant à payer" (les 5
+           * compteurs `criseCout*` EXISTANTS du bloc "Plateau Crise"
+           * persistant, index.html — jamais dupliqués ici, juste relus) et
+           * un bouton "Résoudre" (ou "✓ Résolu", texte figé, une fois
+           * `evenementCycleEval.escarmoucheResoluePhaseEval` vrai — même
+           * convention que les lignes d'Objectifs/Refuges "✓ Appliqué").
+           * Le bouton ouvre la popup NESTED 'escarmouche_phase_eval' (voir
+           * demanderChoix plus bas) — MÊME principe que "Ajouter un cube"
+           * (Refuges)/"Appliquer" (Objectifs) ci-dessous : cette popup
+           * réutilise la MÊME modale, `renderPhaseEvaluation_()` la
+           * réaffiche correctement au retour (voir le commentaire en tête
+           * de cette fonction).
+           */
+          function texteCrisePhaseEval_() {
+            var pmCrise = partieEval.plateauMaison || {};
+            var montantDu = [
+              pmCrise.criseCoutMateriel ? pmCrise.criseCoutMateriel + ' Matériel' : null,
+              pmCrise.criseCoutEnergie ? pmCrise.criseCoutEnergie + ' Énergie' : null,
+              pmCrise.criseCoutScience ? pmCrise.criseCoutScience + ' Science' : null,
+              pmCrise.criseCoutCredit ? pmCrise.criseCoutCredit + ' Crédit' : null,
+              pmCrise.criseCoutInfluence ? pmCrise.criseCoutInfluence + ' Influence' : null
+            ].filter(Boolean);
+            var texteMontant = montantDu.length
+              ? '<p class="hint">Montant à payer (cf. section "Plateau Crise" du Plat. Galactique) : ' + montantDu.join(', ') + '.</p>'
+              : '<p class="hint">Aucun montant à payer.</p>';
+
+            var dejaResolue = !!(evenementCycleEval && evenementCycleEval.escarmoucheResoluePhaseEval);
+
+            return '<div class="plateau-influence">' +
+              '<label for="crise-escarmouche-puissance-eval">Puissance du Néant</label>' +
+              '<input type="number" min="0" step="1" value="' + puissanceNeantCourante + '" id="crise-escarmouche-puissance-eval" class="ressource-case-input"' +
+              (dejaResolue ? ' disabled' : '') + '>' +
+              '</div>' +
+              texteMontant +
+              (dejaResolue
+                ? '<p><strong style="color:var(--color-coral);">✓ Résolu</strong></p>'
+                : '<div class="modal-choix-boutons"><button type="button" class="btn btn-secondary btn-escarmouche-resoudre">Résoudre</button></div>');
+          }
+
+          /**
            * Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
            * technoConsume.md) — déclencheur "secteur Pur 6 Population/3
            * Guildes", évalué à l'étape 2 (Entretien) de la Phase
@@ -7616,7 +7785,7 @@ var StrategieService = (function () {
 
             var nombreEligibles = (agregatsSecteursEval.secteursPurs || [])
               .filter(function (s) { return s.population === 6 && s.guildesTotal >= 3; }).length;
-            var dejaAppliques = evenementCycleEval.refugeCubesPhaseEval || 0;
+            var dejaAppliques = (evenementCycleEval && evenementCycleEval.refugeCubesPhaseEval) || 0;
             var restant = Math.max(0, nombreEligibles - dejaAppliques);
 
             var texte = '<p>' + nombreEligibles + ' secteur(s) Pur(s) à 6 Population et au moins 3 Guildes' +
@@ -7754,6 +7923,38 @@ var StrategieService = (function () {
           var gainInfluenceObjectifsEval = 0;
 
           function renderPhaseEvaluation_() {
+            // Bug corrigé (14/09/2026, retour utilisateur : "je clique sur
+            // Appliquer... la popup fin de cycle disparaît") — TOUT sous-
+            // popup ouvert PENDANT que "Phase Évaluation" est affichée
+            // (bouton "Appliquer" d'un Objectif, "Ajouter un cube" d'un
+            // Refuge...) réutilise le MÊME #modal-choix (une seule modale
+            // pour toute l'appli, voir demanderChoix) : sa résolution
+            // (n'importe quel type de contexte — 'option_exclusive',
+            // 'options_inclusives', 'retirer_corruption', 'avancer_
+            // civilisation'...) appelle TOUJOURS fermerModale_() juste
+            // avant resolve(), ce qui masque #modal-choix. Correct pour un
+            // appel de demanderChoix de PREMIER NIVEAU (rien à ré-afficher
+            // derrière), mais faux ici : le sous-popup est NESTED dans la
+            // session "Phase Évaluation" en cours, qui doit rester visible
+            // jusqu'à ce que LE JOUEUR clique Annuler/Valider. Si le gain
+            // résolu ne redemande ensuite AUCUN autre demanderChoix (ex.
+            // "produire_ressource_type" + "credit", aucun popup requis),
+            // rien ne rouvrait #modal-choix — renderPhaseEvaluation_()
+            // reconstruisait `contenu.innerHTML` dans le vide, invisible.
+            // Réaffirme donc ICI, à CHAQUE rendu (pas seulement au tout
+            // premier), tout ce qu'un sous-popup peut avoir altéré :
+            // visibilité de la modale, titre, et chrome Annuler/Valider
+            // (btnValider.onclick est réassigné plus bas, en fin de cette
+            // fonction — 'options_inclusives' réutilise aussi ce bouton
+            // avec SON PROPRE onclick, qui resterait sinon collé après
+            // le retour à cette vue).
+            modal.hidden = false;
+            titre.textContent = 'Phase Évaluation — Cycle ' + (partieEval.cycleActuel || '');
+            btnAnnuler.hidden = false;
+            btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+            btnValider.hidden = false;
+            btnValider.textContent = 'Valider et passer au cycle suivant';
+
             var restant = entretienTotal - entretienPaye;
             var peutPayerNourriture = restant > 0 && stockEval.nourriture >= 1;
             var peutPayerEnergie = restant > 0 && stockEval.energie >= 2;
@@ -7789,7 +7990,7 @@ var StrategieService = (function () {
             contenu.innerHTML = '' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Plateau Crise</h4>' +
-              '<p class="hint">Non automatisé — résolvez l’Escarmouche sur le plateau physique (docs-rules-cycle-de-jeu.md §3.1).</p>' +
+              texteCrisePhaseEval_() +
               '</div>' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Entretien</h4>' +
@@ -7814,6 +8015,69 @@ var StrategieService = (function () {
             if (btnPayerNourriture) btnPayerNourriture.addEventListener('click', function () { stockEval.nourriture -= 1; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerEnergie) btnPayerEnergie.addEventListener('click', function () { stockEval.energie -= 2; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerMateriel) btnPayerMateriel.addEventListener('click', function () { stockEval.materiel -= 2; entretienPaye++; renderPhaseEvaluation_(); });
+
+            // Champ "Puissance du Néant" (texteCrisePhaseEval_ ci-dessus) —
+            // capté dans `puissanceNeantCourante` à chaque frappe (PAS de
+            // re-rendu ici, contrairement aux boutons "Payer" ci-dessus :
+            // un re-rendu à chaque frappe rétablirait le curseur en début
+            // de champ) pour que la valeur survive un re-rendu déclenché
+            // PAR AILLEURS (clic "Payer"/"Ajouter un cube"/"Appliquer").
+            var inputPuissanceNeant = document.getElementById('crise-escarmouche-puissance-eval');
+            if (inputPuissanceNeant) {
+              inputPuissanceNeant.addEventListener('input', function () {
+                puissanceNeantCourante = Math.max(0, Math.floor(Number(inputPuissanceNeant.value)) || 0);
+              });
+            }
+
+            // Bouton "Résoudre" (Plateau Crise, texteCrisePhaseEval_
+            // ci-dessus) — ouvre la popup NESTED 'escarmouche_phase_eval'
+            // (voir demanderChoix plus bas), MÊME principe de réouverture
+            // automatique de "Phase Évaluation" que "Ajouter un cube"/
+            // "Appliquer" ci-dessous. Le paiement (§3.1.3) peut toucher
+            // Matériel/Énergie — MÊMES ressources que l'Entretien
+            // ci-dessus — d'où le MÊME recalage `stockEval` (créditRestant*)
+            // que le bouton "Appliquer" des Objectifs plus bas, pour ne
+            // jamais perdre un paiement d'Entretien déjà effectué.
+            var btnEscarmoucheResoudre = document.querySelector('.btn-escarmouche-resoudre');
+            if (btnEscarmoucheResoudre) {
+              btnEscarmoucheResoudre.addEventListener('click', function () {
+                btnEscarmoucheResoudre.disabled = true;
+                var pmCriseActuel = partieEval.plateauMaison || {};
+                demanderChoix({
+                  type: 'escarmouche_phase_eval',
+                  partieId: partieEval.id,
+                  cycle: partieEval.cycleNum,
+                  puissanceNeant: puissanceNeantCourante,
+                  criseCoutActuel: {
+                    materiel: pmCriseActuel.criseCoutMateriel || 0,
+                    energie: pmCriseActuel.criseCoutEnergie || 0,
+                    science: pmCriseActuel.criseCoutScience || 0,
+                    credit: pmCriseActuel.criseCoutCredit || 0,
+                    influence: pmCriseActuel.criseCoutInfluence || 0
+                  }
+                }).then(function (resultat) {
+                  if (!resultat || resultat.annule) { btnEscarmoucheResoudre.disabled = false; return; }
+                  var ressourcesAvant = ressourcesEval;
+                  var creditRestantNourriture = ressourcesAvant.nourriture - stockEval.nourriture;
+                  var creditRestantEnergie = ressourcesAvant.energie - stockEval.energie;
+                  var creditRestantMateriel = ressourcesAvant.materiel - stockEval.materiel;
+
+                  partieEval = resultat.partie;
+                  evenementCycleEval = (partieEval.evenements || {})['cycle' + partieEval.cycleNum];
+                  objectifsCatalogueEval = evenementCycleEval ? evenementCycleEval.objectifs : null;
+                  ressourcesEval = (partieEval.plateauMaison || {}).ressources || {};
+                  stockEval.nourriture = ressourcesEval.nourriture - creditRestantNourriture;
+                  stockEval.energie = ressourcesEval.energie - creditRestantEnergie;
+                  stockEval.materiel = ressourcesEval.materiel - creditRestantMateriel;
+                  influenceInitiale = ressourcesEval.influence || 0;
+
+                  renderPhaseEvaluation_();
+                }).catch(function (erreur) {
+                  btnEscarmoucheResoudre.disabled = false;
+                  window.alert('Échec de la résolution de l\'Escarmouche : ' + erreur.message);
+                });
+              });
+            }
 
             // Bouton "Ajouter un cube" du déclencheur Refuges (voir
             // texteRefugesPhaseEval_ ci-dessus) — GameService.
@@ -7904,46 +8168,193 @@ var StrategieService = (function () {
             });
 
             btnValider.disabled = peutEncorePayer;
+
+            // Réassigné à CHAQUE rendu (pas seulement au premier) — voir
+            // le commentaire en tête de cette fonction : 'options_inclusives'
+            // réutilise aussi btnValider avec SON PROPRE onclick (lecture
+            // des cases cochées), qui resterait collé après le retour à
+            // cette vue si on ne le réaffirmait pas ici systématiquement.
+            btnValider.onclick = function () {
+              btnValider.disabled = true;
+              var restant = entretienTotal - entretienPaye;
+              var perteInfluence = restant * 3;
+              // Chantier "Programme de départ" (28/08/2026) : certaines
+              // cartes de départ ont un malus (Corruption fiche Maison,
+              // peut rendre gainInfluenceProgrammesEval négatif) — plancher
+              // final à 0 en plus de celui, déjà existant, sur l'Entretien
+              // seul (qui ne peut pas À LUI SEUL vider l'Influence sous 0
+              // avant l'ajout des Programmes). gainInfluenceObjectifsEval
+              // (chantier "Objectifs galactiques", toujours positif ou nul —
+              // voir texteObjectifsGalactiques_ plus haut) s'ajoute de la
+              // même façon.
+              var nouvelleInfluence = Math.max(0, Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval + gainInfluenceObjectifsEval);
+
+              GameService.majPlateauMaison(partieEval.id, {
+                ressourceNourriture: stockEval.nourriture,
+                ressourceEnergie: stockEval.energie,
+                ressourceMateriel: stockEval.materiel,
+                influence: nouvelleInfluence
+              }).then(function () {
+                partieEval.plateauMaison.ressources.nourriture = stockEval.nourriture;
+                partieEval.plateauMaison.ressources.energie = stockEval.energie;
+                partieEval.plateauMaison.ressources.materiel = stockEval.materiel;
+                partieEval.plateauMaison.ressources.influence = nouvelleInfluence;
+                fermerModale_();
+                resolve({ confirme: true, entretienNonPaye: restant, influencePerdue: perteInfluence, influenceGagneeProgrammes: gainInfluenceProgrammesEval });
+              }).catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec de l\'enregistrement de l\'Entretien : ' + erreur.message);
+              });
+            };
           }
 
           renderPhaseEvaluation_();
-
-          btnValider.onclick = function () {
-            btnValider.disabled = true;
-            var restant = entretienTotal - entretienPaye;
-            var perteInfluence = restant * 3;
-            // Chantier "Programme de départ" (28/08/2026) : certaines
-            // cartes de départ ont un malus (Corruption fiche Maison,
-            // peut rendre gainInfluenceProgrammesEval négatif) — plancher
-            // final à 0 en plus de celui, déjà existant, sur l'Entretien
-            // seul (qui ne peut pas À LUI SEUL vider l'Influence sous 0
-            // avant l'ajout des Programmes). gainInfluenceObjectifsEval
-            // (chantier "Objectifs galactiques", toujours positif ou nul —
-            // voir texteObjectifsGalactiques_ plus haut) s'ajoute de la
-            // même façon.
-            var nouvelleInfluence = Math.max(0, Math.max(0, influenceInitiale - perteInfluence) + gainInfluenceProgrammesEval + gainInfluenceObjectifsEval);
-
-            GameService.majPlateauMaison(partieEval.id, {
-              ressourceNourriture: stockEval.nourriture,
-              ressourceEnergie: stockEval.energie,
-              ressourceMateriel: stockEval.materiel,
-              influence: nouvelleInfluence
-            }).then(function () {
-              partieEval.plateauMaison.ressources.nourriture = stockEval.nourriture;
-              partieEval.plateauMaison.ressources.energie = stockEval.energie;
-              partieEval.plateauMaison.ressources.materiel = stockEval.materiel;
-              partieEval.plateauMaison.ressources.influence = nouvelleInfluence;
-              fermerModale_();
-              resolve({ confirme: true, entretienNonPaye: restant, influencePerdue: perteInfluence, influenceGagneeProgrammes: gainInfluenceProgrammesEval });
-            }).catch(function (erreur) {
-              btnValider.disabled = false;
-              window.alert('Échec de l\'enregistrement de l\'Entretien : ' + erreur.message);
-            });
-          };
         }).catch(function (erreur) {
           contenu.innerHTML = '<p class="hint">Erreur de chargement de l’Entretien.</p>';
           window.alert('Échec du chargement de l\'Entretien : ' + erreur.message);
         });
+
+      } else if (contexte.type === 'escarmouche_phase_eval' || contexte.type === 'escarmouche_standalone') {
+        // Popup "Résoudre l'Escarmouche" — 2 points d'entrée (chantier
+        // "Escarmouche + Plateau Crise", docs-rules-cycle-de-jeu.md
+        // §2.3.3.1.1/§3.1, 14/09/2026, retour utilisateur) :
+        // - 'escarmouche_phase_eval' (bouton "Résoudre", section "Plateau
+        //   Crise" de "Phase Évaluation" — texteCrisePhaseEval_ ci-dessus)
+        //   : inclut le paiement (§3.1.3, 5 ressources pré-remplies depuis
+        //   contexte.criseCoutActuel, éditables) et pose `evenementCycle.
+        //   escarmoucheResoluePhaseEval`.
+        // - 'escarmouche_standalone' (bouton "Escarmouche" du bloc
+        //   "Plateau Crise" PERSISTANT, index.html — Alerte Guerre §2.3.3,
+        //   utilisable à tout moment) : AUCUN paiement (déjà couvert par
+        //   les compteurs manuels `criseCout*`/le bouton "Payer"
+        //   existants), répétable à volonté, aucun flag posé.
+        // Dans les 2 cas : prévisualisation en LECTURE SEULE
+        // (GameService.previsualiserEscarmouche, aucune écriture) puis
+        // Valider applique tout en une fois (appliquerEscarmouchePhaseEval/
+        // appliquerEscarmouche).
+        var estPhaseEval = contexte.type === 'escarmouche_phase_eval';
+        titre.textContent = 'Résoudre l\'Escarmouche';
+        contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var CHAMPS_PN_TEXTE_ESCARMOUCHE_ = [
+          ['pnCorvette', 'Corvette'], ['pnDestroyer', 'Destroyer'], ['pnCuirasse', 'Cuirassé'],
+          ['pnSentinelle', 'Sentinelle'], ['pnPorteVaisseau', 'Porte-Vaisseau']
+        ];
+        var TECHS_COMBAT_ESCARMOUCHE_ = ['Boucliers', 'Ciblage', 'Torpilles', 'Cellules énergétiques', 'Destroyers'];
+        var puissanceNeantEscarmouche_ = contexte.puissanceNeant;
+
+        // Recalcule l'aperçu (secteur/puissances/résultat) pour la valeur
+        // COURANTE de "Puissance du Néant" — rappelable depuis le bouton
+        // "Recalculer" ci-dessous (champ "librement modifiable", retour
+        // utilisateur — la simulation affichée doit donc pouvoir suivre un
+        // ajustement manuel, jamais figée à contexte.puissanceNeant).
+        // AUCUNE écriture (GameService.previsualiserEscarmouche est pure).
+        function rafraichirApercuEscarmouche_() {
+          contenu.innerHTML = '<p class="hint">Calcul en cours…</p>';
+          btnValider.hidden = true;
+
+          GameService.previsualiserEscarmouche(contexte.partieId, puissanceNeantEscarmouche_).then(function (previsu) {
+            var texteSecteur, texteResultat;
+
+            if (previsu.aucuneCible) {
+              texteSecteur = '<p class="hint">Aucun secteur éligible pour cette Escarmouche (aucun de vos secteurs n\'est adjacent à un secteur du Néant, hors Secteur-Mère).</p>';
+              texteResultat = estPhaseEval ? '<p class="hint">Seul le paiement ci-dessous sera appliqué.</p>' : '';
+            } else {
+              var secteurCible = previsu.secteur;
+              var puissanceJoueurTexte = CHAMPS_PN_TEXTE_ESCARMOUCHE_
+                .filter(function (t) { return secteurCible[t[0]] > 0; })
+                .map(function (t) { return secteurCible[t[0]] + ' ' + t[1]; }).join(', ') || 'aucune Puissance Navale';
+              var defenseTexte = (secteurCible.installationDefenseSecteur || 0) + (secteurCible.installationBaseStellaire || 0);
+              var techsPossedees = TECHS_COMBAT_ESCARMOUCHE_
+                .map(function (nom) {
+                  var t = technologieJoueurParNom_(partieAffichee, nom);
+                  return t ? nom + (t.amelioree ? ' (Améliorée)' : '') : null;
+                }).filter(Boolean);
+
+              texteSecteur = '<p>Secteur attaqué : <strong>n°' + secteurCible.numero + '</strong>' +
+                (secteurCible.corrompu ? ' (Corrompu)' : ' (Pur)') + ', Population ' + (secteurCible.population || 0) + '.</p>' +
+                '<p>Puissance du joueur : ' + puissanceJoueurTexte + (defenseTexte ? ', Défense ' + defenseTexte : '') + '.' +
+                (techsPossedees.length ? ' Technologies : ' + techsPossedees.join(', ') + '.' : '') + '</p>';
+
+              var resultatCombat = previsu.resultatCombat;
+              texteResultat = resultatCombat.victoireJoueur
+                ? '<p><strong style="color:var(--color-coral);">Victoire</strong> — ' + resultatCombat.cubesRestants + ' cube(s) de Puissance Navale restant(s).</p>'
+                : '<p><strong style="color:var(--color-coral);">Défaite</strong> — le secteur sera intégralement abandonné (Installations retirées, Corruption, repris par le Néant).</p>';
+              texteResultat += '<details><summary class="hint" style="cursor:pointer;">Détail du combat</summary><pre class="hint" style="white-space:pre-wrap;">' +
+                resultatCombat.log.join('\n') + '</pre></details>';
+            }
+
+            var texteSectionPaiement = '';
+            if (estPhaseEval) {
+              var cca = contexte.criseCoutActuel || {};
+              texteSectionPaiement = '<h4 class="modal-section-titre" style="margin-top:14px;">Paiement (§3.1.3)</h4>' +
+                '<p class="hint">Substitution de la Nourriture/Énergie/Matériel par du Crédit autorisée ; chaque ressource non payée fait perdre 3 Influence.</p>' +
+                '<div class="plateau-influence-ligne">' +
+                ['materiel', 'energie', 'science', 'credit', 'influence'].map(function (cle) {
+                  var label = { materiel: 'Matériel', energie: 'Énergie', science: 'Science', credit: 'Crédit', influence: 'Influence' }[cle];
+                  return '<div class="plateau-influence"><label for="escarmouche-paiement-' + cle + '">' + label + '</label>' +
+                    '<input type="number" min="0" step="1" value="' + (cca[cle] || 0) + '" id="escarmouche-paiement-' + cle + '" class="ressource-case-input"></div>';
+                }).join('') + '</div>';
+            }
+
+            contenu.innerHTML = '<div class="plateau-influence">' +
+              '<label for="escarmouche-puissance-neant">Puissance du Néant</label>' +
+              '<input type="number" min="0" step="1" value="' + puissanceNeantEscarmouche_ + '" id="escarmouche-puissance-neant" class="ressource-case-input">' +
+              '</div>' +
+              '<div class="modal-choix-boutons"><button type="button" class="btn btn-secondary" id="escarmouche-recalculer">Recalculer</button></div>' +
+              texteSecteur + texteResultat + texteSectionPaiement;
+
+            document.getElementById('escarmouche-recalculer').addEventListener('click', function () {
+              var input = document.getElementById('escarmouche-puissance-neant');
+              puissanceNeantEscarmouche_ = Math.max(0, Math.floor(Number(input.value)) || 0);
+              rafraichirApercuEscarmouche_();
+            });
+
+            btnValider.hidden = false;
+            btnValider.textContent = 'Valider';
+            btnValider.onclick = function () {
+              btnValider.disabled = true;
+              var inputFinal = document.getElementById('escarmouche-puissance-neant');
+              var puissanceFinale = inputFinal ? Math.max(0, Math.floor(Number(inputFinal.value)) || 0) : puissanceNeantEscarmouche_;
+
+              if (estPhaseEval) {
+                var lireChamp_ = function (cle) {
+                  var el = document.getElementById('escarmouche-paiement-' + cle);
+                  return el ? Math.max(0, Math.floor(Number(el.value)) || 0) : 0;
+                };
+                var paiement = {
+                  materiel: lireChamp_('materiel'), energie: lireChamp_('energie'), science: lireChamp_('science'),
+                  credit: lireChamp_('credit'), influence: lireChamp_('influence')
+                };
+                GameService.appliquerEscarmouchePhaseEval(contexte.partieId, contexte.cycle, puissanceFinale, paiement)
+                  .then(function (resultat) {
+                    fermerModale_();
+                    resolve({ partie: resultat.partie, cible: resultat.cible });
+                  }).catch(function (erreur) {
+                    btnValider.disabled = false;
+                    window.alert('Échec de la résolution de l\'Escarmouche : ' + erreur.message);
+                  });
+              } else {
+                GameService.appliquerEscarmouche(contexte.partieId, puissanceFinale)
+                  .then(function (resultat) {
+                    fermerModale_();
+                    resolve({ partie: resultat.partie, cible: resultat.cible });
+                  }).catch(function (erreur) {
+                    btnValider.disabled = false;
+                    window.alert('Échec de la résolution de l\'Escarmouche : ' + erreur.message);
+                  });
+              }
+            };
+          }).catch(function (erreur) {
+            contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+            window.alert('Échec du calcul de l\'Escarmouche : ' + erreur.message);
+          });
+        }
+
+        rafraichirApercuEscarmouche_();
 
       } else {
         // Type de contexte inconnu — ne devrait pas arriver (tous les
