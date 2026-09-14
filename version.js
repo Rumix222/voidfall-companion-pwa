@@ -1,7 +1,70 @@
 /**
  * version.js
- * Version 145 — 2026-09-14
+ * Version 146 — 2026-09-14
  * Source de vérité unique pour la version de l'application.
+ *
+ * 14/09/2026, suite (retour utilisateur : "On va implémenter les
+ * refuges") — chantier "Refuges" (§3, docs-rules-corruption-gardiens-
+ * refuges-technoConsume.md), jamais automatisé jusqu'ici (simple
+ * placeholder dans la popup Phase Évaluation, "Refuges incomplets" 100 %
+ * manuel en fin de partie) :
+ * - `data/catalogue/scenarios.json` : nouveau champ `refuges` (tableau
+ *   des tailles de tuile, ex. `[2,2]` pour `solo_1`) — lu dynamiquement,
+ *   jamais codé en dur.
+ * - `js/gameService.js` : `plateauMaison.refuges` (`[{cubes,
+ *   recompenseAppliquee}, ...]`) + 3 flags `refugeNiveau4<Piste>` (voir
+ *   CHAMPS_PLATEAU_MAISON_AUTORISES) ; nouvelles fonctions
+ *   `obtenirConfigRefuges`/`completerRefuges`/
+ *   `pistesNiveau4EligiblesRefuge`/`ajouterCubeRefuge`/
+ *   `appliquerRefugeNiveau4`/`appliquerRefugePhaseEval`/
+ *   `appliquerRecompenseRefuge`. Sourcing d'un cube (3 branches du
+ *   livret) factorisé dans `sourcerCubeRefuge_` : cube inactif dérivé en
+ *   priorité, sinon désactivation d'un cube actif, sinon popup
+ *   'rappeler_cube_cout' déjà existante (Coût Focus "rappeler_cube",
+ *   réutilisée telle quelle — persiste elle-même via SecteurService.
+ *   rappelerCube).
+ * - Bug corrigé en passant (assemblerPartie_) : `jetonsCatastrophePlateauCrise`/
+ *   `corruptionsConservees`/`focusPrefereEnDefausse` étaient whitelistés
+ *   et bien persistés, mais jamais RELUS dans `partie.plateauMaison` —
+ *   3 conditions d'Objectifs galactiques lisaient donc toujours 0/false
+ *   quelle que soit la saisie réelle du joueur. Jamais remarqué faute de
+ *   test couvrant la relecture.
+ * - Récompense de tuile complétée (4 options) : déléguée à
+ *   `FocusEngine.resoudreEffet` (`{choix:[...]}`, même mécanisme que le
+ *   mode "exclusif" des Objectifs galactiques Lot 2 — un seul gain
+ *   résolu, aucun risque de persistance partielle). 3 des 4 clés étaient
+ *   déjà automatisées (retirer_corruption/ressource_choix/deployer_cube) ;
+ *   nouvelle clé `retirer_gardien` (focusEngine.js — popup dédiée
+ *   strategieService.js ; `SecteurService.obtenirSecteursEligiblesRetraitGardien`/
+ *   `retirerGardien`, miroir de retirer_corruption).
+ * - `js/strategieService.js` : section "Refuges" de la popup Phase
+ *   Évaluation (`texteRefugesPhaseEval_`, déclencheur "secteur Pur 6
+ *   Population/3 Guildes", recalculé à chaque Cycle comme les Objectifs
+ *   galactiques, allocation plafonnée par `evenementCycle.
+ *   refugeCubesPhaseEval`) ; popup `retirer_gardien` ; libellés
+ *   `retirer_gardien`/`LIBELLES_OPTIONS`.
+ * - `index.html` : nouvelle section "Refuges" persistante en bas de
+ *   Plat. Galactique (`App.renderRefuges_`) — une tuile par entrée
+ *   scénario (●/○ par emplacement), bouton manuel "+1 cube" (2
+ *   surproductions — aucune notion de tour suivie par l'appli, décision
+ *   actée avec l'utilisateur avant de coder), bouton par piste Niveau 4
+ *   éligible, bouton "Choisir une récompense" sur une tuile pleine.
+ * - `js/scoreService.js` : `refugesIncomplets` rejoint
+ *   `CLES_COMPTEURS_AUTOMATISABLES` (compare `plateauMaison.refuges` à la
+ *   config scénario) — pré-rempli comme secteursFaille/gardiens,
+ *   `scoreVueService.js` n'a nécessité AUCUN changement (mécanisme déjà
+ *   générique).
+ * - Docs : §3 de docs-rules-corruption-gardiens-refuges-technoConsume.md
+ *   et §3.2.3/Néant de docs-rules-cycle-de-jeu.md annotés (✅/💬).
+ * - Tests : nouveau `js/gameService_refuges_test.js` (19 tests) + 2 tests
+ *   `retirer_gardien` dans focusEngine.test.js + 3 dans
+ *   secteurService_actions.test.js. 406 tests au total (`node --test
+ *   js/*.test.js` + tous les `*_test.js` individuels) au vert.
+ * - Hors périmètre (jamais rencontré au catalogue, documenté) : Focus
+ *   Héroïque "Commandement" propose `construire_refuge_niveau` en choix
+ *   — pas câblé côté FocusEngine, retombe sur le repli générique manuel ;
+ *   aucun effet d'Événement galactique ne déclenche encore les 2 premiers
+ *   exploits économiques en Phase Préparation/Évaluation.
  *
  * 14/09/2026 (retour utilisateur : "Continue le travail d'hier lot 2") —
  * Objectifs galactiques, "Application automatique élargie", Lot 2 : les
@@ -5177,4 +5240,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260914.1';
+var APP_VERSION = '20260914.2';

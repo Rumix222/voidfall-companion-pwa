@@ -3,6 +3,7 @@
     "id": "solo_1",
     "nom": "Première ligne",
     "complexite": 1,
-    "nombreSecteurs": 10
+    "nombreSecteurs": 10,
+    "refuges": [2, 2]
   }
 ]

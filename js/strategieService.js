@@ -531,6 +531,8 @@ var StrategieService = (function () {
     construire_base_stellaire: 'Construire une Base Stellaire',
     construire_defense_secteur: 'Construire une Défense de Secteur',
     retirer_corruption: 'Retirer une Corruption',
+    // Chantier "Refuges" (§3) — récompense de tuile complétée.
+    retirer_gardien: 'Retirer un Gardien',
     // EVOLUTION 14 (todo.md) : "augmenter_population" (pistesCivilisation.json/
     // focus.json) et "augmenter_population_pure" (evenements.json) sont la
     // MÊME mécanique (voir FocusEngine.resoudreCle_) — même libellé pour
@@ -6483,6 +6485,58 @@ var StrategieService = (function () {
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
 
+      } else if (contexte.type === 'retirer_gardien') {
+        // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+        // technoConsume.md) — popup à un seul niveau, plus simple que
+        // 'retirer_corruption' ci-dessus (pas de piste/Programme/techno
+        // ici) : un bouton par secteur possédé portant au moins 1 Gardien
+        // (SecteurService.obtenirSecteursEligiblesRetraitGardien) + une
+        // option TOUJOURS proposée "Ailleurs" (bord de secteur/Trou de
+        // ver/plateau Crise — jamais suivis en base, résolution manuelle
+        // comme l'option "Programme" de 'retirer_corruption').
+        titre.textContent = 'Retirer un Gardien';
+        contenu.innerHTML = '<p class="hint">Chargement…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieGardien = partieAffichee;
+        SecteurService.obtenirSecteursEligiblesRetraitGardien(partieGardien.id).then(function (eligibles) {
+          var options = eligibles.map(function (e) { return { cle: 'secteur-' + e.numero, label: 'Secteur ' + e.numero, numero: e.numero }; });
+          options.push({ cle: 'ailleurs', label: 'Ailleurs', sousTexte: 'à retirer manuellement' });
+
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            options.map(function (o) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-cle="' + o.cle + '">' +
+                o.label + (o.sousTexte ? '<br><span class="cadre-action-sous-texte">' + o.sousTexte + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>';
+
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var option = options.filter(function (o) { return o.cle === btn.dataset.cle; })[0];
+              if (option.cle === 'ailleurs') {
+                fermerModale_();
+                resolve({ detail: 'Gardien retiré ailleurs (manuellement).' });
+                return;
+              }
+              btn.disabled = true;
+              SecteurService.retirerGardien(partieGardien.id, option.numero)
+                .then(function () {
+                  fermerModale_();
+                  resolve({ detail: 'Gardien retiré du Secteur ' + option.numero + '.', numero: option.numero });
+                })
+                .catch(function (erreur) {
+                  btn.disabled = false;
+                  window.alert('Échec du retrait : ' + erreur.message);
+                });
+            });
+          });
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
+
       } else if (contexte.type === 'gagner_corruption') {
         // Effet "Gagner une Corruption" (voir
         // docs-rules-corruption-gardiens-refuges-technoConsume.md §1) :
@@ -7452,12 +7506,22 @@ var StrategieService = (function () {
           // (ObjectifsService.TERMES_FORMULE_). Async (accès secteurs) —
           // calculerProductionAvecBonusTechnologie_ est en revanche
           // synchrone (tables + bonus Technologie), appliquée juste après.
-          calculerNiveauxProduction_(partieEval)
+          calculerNiveauxProduction_(partieEval),
+          // Chantier "Refuges" (§3) — config des tuiles du scénario
+          // (tailles), chargée une fois à l'ouverture comme le reste
+          // ci-dessus (jamais recalculée à chaque renderPhaseEvaluation_,
+          // contrairement à texteRefugesPhaseEval_ qui, lui, doit
+          // recalculer le nombre de secteurs éligibles à CHAQUE rendu —
+          // aucune dépendance sur l'Entretien ceci dit, mais gardé dans le
+          // même renderPhaseEvaluation_ pour rester cohérent avec
+          // objectifsAppliques/refugeCubesPhaseEval qui, eux, changent).
+          GameService.obtenirConfigRefuges(partieEval.scenarioId)
         ]).then(function (resultatsEval) {
           var unitesSecteursEval = resultatsEval[0];
           var pointsProgrammesEval = resultatsEval[1];
           var agregatsSecteursEval = resultatsEval[2];
           var niveauxProductionEval = resultatsEval[3];
+          var configRefugesEval = resultatsEval[4];
           var revenusEval = {
             nourriture: calculerProductionAvecBonusTechnologie_('nourriture', niveauxProductionEval.nourriture, partieEval),
             energie: calculerProductionAvecBonusTechnologie_('energie', niveauxProductionEval.energie, partieEval),
@@ -7528,6 +7592,50 @@ var StrategieService = (function () {
               corruptionsConservees: (partieEval.plateauMaison || {}).corruptionsConservees || 0,
               focusPrefereEnDefausse: !!(partieEval.plateauMaison || {}).focusPrefereEnDefausse
             };
+          }
+
+          /**
+           * Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+           * technoConsume.md) — déclencheur "secteur Pur 6 Population/3
+           * Guildes", évalué à l'étape 2 (Entretien) de la Phase
+           * Évaluation. MÊME géométrie que texteObjectifsGalactiques_
+           * ci-dessous : recalculé à CHAQUE renderPhaseEvaluation_ (pas
+           * seulement à l'ouverture). Les 2 autres déclencheurs (bouton
+           * manuel "2 surproductions", Niveau 4 de piste) vivent dans la
+           * section "Refuges" PERSISTANTE de l'écran Plat. Galactique
+           * (index.html/App.renderRefuges_), pas ici — seul celui-ci
+           * dépend d'un état RÉÉVALUÉ à chaque Cycle (comme les Objectifs
+           * galactiques), d'où sa place dans cette popup.
+           */
+          function texteRefugesPhaseEval_() {
+            if (!configRefugesEval.length) return '<p class="hint">Aucun Refuge pour ce scénario.</p>';
+
+            var refugesEval = GameService.completerRefuges((partieEval.plateauMaison || {}).refuges, configRefugesEval);
+            var tuilesOuvertes = [];
+            refugesEval.forEach(function (r, i) { if (r.cubes < configRefugesEval[i]) tuilesOuvertes.push(i); });
+
+            var nombreEligibles = (agregatsSecteursEval.secteursPurs || [])
+              .filter(function (s) { return s.population === 6 && s.guildesTotal >= 3; }).length;
+            var dejaAppliques = evenementCycleEval.refugeCubesPhaseEval || 0;
+            var restant = Math.max(0, nombreEligibles - dejaAppliques);
+
+            var texte = '<p>' + nombreEligibles + ' secteur(s) Pur(s) à 6 Population et au moins 3 Guildes' +
+              (nombreEligibles ? ' — ' + dejaAppliques + '/' + nombreEligibles + ' cube(s) déjà ajouté(s) ce Cycle' : '') + '.</p>';
+
+            if (!restant) return texte;
+            if (!tuilesOuvertes.length) return texte + '<p class="hint">Tous les Refuges sont déjà complets.</p>';
+
+            texte += '<div class="modal-choix-boutons">' +
+              (tuilesOuvertes.length > 1
+                ? '<select id="refuge-phase-eval-select" class="modal-choix-select">' +
+                  tuilesOuvertes.map(function (i) {
+                    return '<option value="' + i + '">Refuge ' + (i + 1) + ' (' + refugesEval[i].cubes + '/' + configRefugesEval[i] + ')</option>';
+                  }).join('') + '</select>'
+                : '') +
+              '<button type="button" class="btn btn-secondary btn-refuge-phase-eval" data-index-unique="' + tuilesOuvertes[0] + '">' +
+              'Ajouter un cube (' + restant + ' restant' + (restant > 1 ? 's' : '') + ')</button>' +
+              '</div>';
+            return texte;
           }
 
           /**
@@ -7688,8 +7796,8 @@ var StrategieService = (function () {
               texteEntretien +
               '</div>' +
               '<div class="modal-section">' +
-              '<h4 class="modal-section-titre">Refuge</h4>' +
-              '<p class="hint">Non automatisé — à détailler plus tard (§3.2.3).</p>' +
+              '<h4 class="modal-section-titre">Refuges</h4>' +
+              texteRefugesPhaseEval_() +
               '</div>' +
               '<div class="modal-section">' +
               '<h4 class="modal-section-titre">Objectifs galactiques</h4>' +
@@ -7706,6 +7814,38 @@ var StrategieService = (function () {
             if (btnPayerNourriture) btnPayerNourriture.addEventListener('click', function () { stockEval.nourriture -= 1; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerEnergie) btnPayerEnergie.addEventListener('click', function () { stockEval.energie -= 2; entretienPaye++; renderPhaseEvaluation_(); });
             if (btnPayerMateriel) btnPayerMateriel.addEventListener('click', function () { stockEval.materiel -= 2; entretienPaye++; renderPhaseEvaluation_(); });
+
+            // Bouton "Ajouter un cube" du déclencheur Refuges (voir
+            // texteRefugesPhaseEval_ ci-dessus) — GameService.
+            // appliquerRefugePhaseEval ÉCRIT en base immédiatement, comme
+            // le bouton "Appliquer" des Objectifs juste en dessous, mais
+            // ne touche JAMAIS les 5 ressources simples ni l'Influence
+            // (sourcerCubeRefuge_ ne mute que cubeActif, ou délègue à la
+            // popup 'rappeler_cube_cout' qui persiste elle-même sur un
+            // secteur) : aucun recalage de stockEval/influenceInitiale
+            // nécessaire, contrairement au cas des Objectifs (jeton Prime).
+            var btnRefugePhaseEval = document.querySelector('.btn-refuge-phase-eval');
+            if (btnRefugePhaseEval) {
+              btnRefugePhaseEval.addEventListener('click', function () {
+                var selectRefuge = document.getElementById('refuge-phase-eval-select');
+                var indexRefuge = selectRefuge ? Number(selectRefuge.value) : Number(btnRefugePhaseEval.dataset.indexUnique);
+                var nombreEligiblesClic = (agregatsSecteursEval.secteursPurs || [])
+                  .filter(function (s) { return s.population === 6 && s.guildesTotal >= 3; }).length;
+                btnRefugePhaseEval.disabled = true;
+                GameService.appliquerRefugePhaseEval(partieEval.id, partieEval.cycleNum, indexRefuge, nombreEligiblesClic, demanderChoix)
+                  .then(function (resultat) {
+                    if (resultat && resultat.annule) { btnRefugePhaseEval.disabled = false; return; }
+                    partieEval = resultat;
+                    evenementCycleEval = (partieEval.evenements || {})['cycle' + partieEval.cycleNum];
+                    objectifsCatalogueEval = evenementCycleEval ? evenementCycleEval.objectifs : null;
+                    renderPhaseEvaluation_();
+                  })
+                  .catch(function (erreur) {
+                    btnRefugePhaseEval.disabled = false;
+                    window.alert('Échec de l\'ajout du cube au Refuge : ' + erreur.message);
+                  });
+              });
+            }
 
             // Boutons "Appliquer" (voir texteObjectifsGalactiques_ ci-dessus)
             // — un listener par bouton à CHAQUE rendu, comme les 3 boutons

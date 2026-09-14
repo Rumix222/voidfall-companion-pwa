@@ -63,10 +63,12 @@ var ScoreVueService = (function () {
 
   // Pré-remplit les compteurs automatisables (secteurs de Faille,
   // Gardiens, Maisons Déchues, Population du Néant, Corruption connue de
-  // l'app) depuis l'état de la partie — les champs restent modifiables,
-  // le joueur ajuste selon le plateau physique (catastrophes, crises
-  // permanentes, refuges, technologies consumées, difficulté de base :
-  // aucune trace en base, restent à saisir entièrement à la main).
+  // l'app, Refuges incomplets depuis le 14/09/2026 — voir
+  // ScoreService.CLES_COMPTEURS_AUTOMATISABLES) depuis l'état de la
+  // partie — les champs restent modifiables, le joueur ajuste selon le
+  // plateau physique (catastrophes, crises permanentes, technologies
+  // consumées, difficulté de base : aucune trace en base, restent à
+  // saisir entièrement à la main).
   function preremplirCompteursAutomatiques_(partieId) {
     return ScoreService.calculerCompteursAutomatiques(partieId).then(function (compteurs) {
       Object.keys(compteurs).forEach(function (cle) {

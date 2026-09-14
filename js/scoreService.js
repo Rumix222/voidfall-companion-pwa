@@ -120,10 +120,29 @@ var ScoreService = (function () {
   }
 
   // Postes du barème calculables depuis l'état déjà suivi par l'app —
-  // le reste (catastrophes, crises permanentes, refuges incomplets,
-  // technologies consumées, difficulté de base) ne vit que sur le
-  // plateau physique et reste à saisir à la main.
-  var CLES_COMPTEURS_AUTOMATISABLES = ['secteursFaille', 'gardiens', 'maisonsDechues', 'populationNeant', 'corruption'];
+  // le reste (catastrophes, crises permanentes, technologies consumées,
+  // difficulté de base) ne vit que sur le plateau physique et reste à
+  // saisir à la main. `refugesIncomplets` a rejoint cette liste le
+  // 14/09/2026 (chantier "Refuges", §3) — voir refugesIncomplets_ ci-dessous.
+  var CLES_COMPTEURS_AUTOMATISABLES = ['secteursFaille', 'gardiens', 'maisonsDechues', 'populationNeant', 'corruption', 'refugesIncomplets'];
+
+  /**
+   * Nombre de tuiles de Refuge INCOMPLÈTES (§3, docs-rules-corruption-
+   * gardiens-refuges-technoConsume.md — "20 Influence pour chaque Refuge
+   * incomplet") — une tuile absente de `plateauMaison.refuges` (jamais
+   * initialisée) compte comme incomplète par défaut, même logique que
+   * GameService.completerRefuges. `config` = tailles de tuile du
+   * scénario (ex. [2,2]) ; `refugesBruts` = `plateauMaison.refuges`.
+   */
+  function refugesIncomplets_(refugesBruts, config) {
+    var refuges = refugesBruts || [];
+    var incomplets = 0;
+    config.forEach(function (taille, index) {
+      var cubes = (refuges[index] && refuges[index].cubes) || 0;
+      if (cubes < taille) incomplets += 1;
+    });
+    return incomplets;
+  }
 
   /**
    * Calcule la part automatisable des compteurs d'Influence à partir de
@@ -147,7 +166,7 @@ var ScoreService = (function () {
    *   fiches Maison/offre de Programmes, non suivie par l'app — à
    *   compléter à la main si besoin.
    */
-  function compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation) {
+  function compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges) {
     secteurs = secteurs || [];
 
     var gardiens = 0;
@@ -171,7 +190,8 @@ var ScoreService = (function () {
       gardiens: gardiens,
       maisonsDechues: maisonsDechues,
       populationNeant: populationNeant,
-      corruption: corruptionSecteurs + corruptionCivilisation
+      corruption: corruptionSecteurs + corruptionCivilisation,
+      refugesIncomplets: refugesIncomplets_(refugesBruts, configRefuges || [])
     };
   }
 
@@ -182,23 +202,27 @@ var ScoreService = (function () {
    * laissés modifiables, voir scoreVueService.js).
    */
   function calculerCompteursAutomatiques(partieId) {
-    return Promise.all([
-      GameService.obtenirPartie(partieId),
-      SecteurService.obtenirSecteurs(partieId),
-      DB.getAll('scenarioSecteurs')
-    ]).then(function (resultats) {
-      var partie = resultats[0];
-      var secteurs = resultats[1];
-      var lignesScenario = resultats[2];
-
+    return GameService.obtenirPartie(partieId).then(function (partie) {
       var scenarioId = (partie && partie.scenarioId) || SecteurService.SCENARIO_PAR_DEFAUT;
-      var nombreSecteursFaille = lignesScenario.filter(function (l) {
-        return l.scenarioId === scenarioId && l.type === 'faille';
-      }).length;
+      return Promise.all([
+        Promise.resolve(partie),
+        SecteurService.obtenirSecteurs(partieId),
+        DB.getAll('scenarioSecteurs'),
+        GameService.obtenirConfigRefuges(scenarioId)
+      ]).then(function (resultats) {
+        var secteurs = resultats[1];
+        var lignesScenario = resultats[2];
+        var configRefuges = resultats[3];
 
-      var corrompuesCivilisation = partie && partie.civilisation && partie.civilisation.corrompues;
+        var nombreSecteursFaille = lignesScenario.filter(function (l) {
+          return l.scenarioId === scenarioId && l.type === 'faille';
+        }).length;
 
-      return compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation);
+        var corrompuesCivilisation = partie && partie.civilisation && partie.civilisation.corrompues;
+        var refugesBruts = partie && partie.plateauMaison && partie.plateauMaison.refuges;
+
+        return compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges);
+      });
     });
   }
 

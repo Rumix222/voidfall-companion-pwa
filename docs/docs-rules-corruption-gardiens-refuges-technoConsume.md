@@ -59,22 +59,22 @@ Lorsqu’un Gardien est placé sur une rangée, déplacez tout Gardien ou Crise 
 Si cela force un Gardien ou une Crise à sortir du plateau par la droite, défaussez-le et placez un jeton Catastrophe sur un emplacement Catastrophe du plateau Crise.
 Lorsque vous retirez un Gardien d’une rangée, faites glisser les Gardiens et Crises restant(e)s d’un cran vers la gauche pour combler l’espace vacant.
 # 3. REFUGES
-Chaque Refuge dispose de 2, 3 ou 4 niveaux, que les joueurs peuvent construire.
-Lorsque vous construisez un niveau de Refuge, vous pouvez placer 1 cube de Puissance Navale inactif sur l’emplacement libre le plus bas d’une tuile Refuge.
-Si vous n’avez aucun cube inactif à placer, alors vous pouvez désactiver un cube actif.
-Si vous n’avez pas de cube actif, vous pouvez en rappeler un et le désactiver aussitôt.
+Chaque Refuge dispose de 2, 3 ou 4 niveaux, que les joueurs peuvent construire. ✅ 💬 Chantier "Refuges" lancé le 14/09/2026 (retour utilisateur) — nombre de tuiles et de niveaux par tuile fixés par le scénario (`data/catalogue/scenarios.json`, champ `refuges`, ex. `[2,2]` pour l'unique scénario `solo_1` à ce jour), lus dynamiquement (GameService.obtenirConfigRefuges) — jamais codés en dur. Section persistante "Refuges" en bas de l'écran Plat. Galactique (index.html/App.renderRefuges_) : une tuile par entrée, ●/○ pour chaque emplacement rempli/vide.
+Lorsque vous construisez un niveau de Refuge, vous pouvez placer 1 cube de Puissance Navale inactif sur l’emplacement libre le plus bas d’une tuile Refuge. ✅
+Si vous n’avez aucun cube inactif à placer, alors vous pouvez désactiver un cube actif. ✅
+Si vous n’avez pas de cube actif, vous pouvez en rappeler un et le désactiver aussitôt. ✅ 💬 GameService.sourcerCubeRefuge_ implémente les 3 branches dans cet ordre exact (inactif dérivé — NB_CUBES_TOTAL moins actif moins déployé sur secteurs moins déjà-sur-Refuge — puis désactivation de `cubeActif`, puis popup 'rappeler_cube_cout' déjà existante comme Coût Focus, qui persiste elle-même via SecteurService.rappelerCube — le cube ne repasse jamais par `cubeActif` dans ce dernier cas).
 Vous pouvez immédiatement construire un niveau de Refuge à chaque fois que vous parvenez à accomplir l’un des exploits économiques suivants :
-- Vous surproduisez au moins deux fois lors du même tour. Chaque joueur peut placer 1 seul cube inactif lors d’un même tour de cette façon, mais il est possible de le faire à votre propre tour et pendant le tour de quelqu’un d’autre lors d’une même manche.
-- Vous atteignez le Niveau 4 de n’importe laquelle de vos pistes de Civilisation.
-- Lors de l’étape 2 de la phase Évaluation (Entretien), vous avez un secteur Pur avec 6 Population et au moins trois Guildes. Si vous avez deux secteurs qui remplissent ces conditions, vous pouvez construire deux niveaux lors de chaque Cycle, et ainsi de suite.
-Lorsque le dernier niveau d’une tuile Refuge a été construit, la tuile est complétée (sinon, elle reste incomplète).
-Laissez les cubes de Puissance Navale sur la tuile. Tous les joueurs peuvent immédiatement choisir une récompense différente parmi ces 4 options :
-- Retirer une Corruption,
-- Retirer un Gardien,
-- Gagner 3 ressources (quelles qu’elles soient)
-- Déployer 2 cubes de Puissance Navale.
-Les deux premiers exploits économiques peuvent être atteints lors de la phase Préparation ou Évaluation via certains effets d’Événements galactiques.
-Lorsque vous comptez le nombre de surproductions que vous avez réalisées, considérez la phase Préparation et la phase Évaluation comme deux tours distincts.
+- Vous surproduisez au moins deux fois lors du même tour. Chaque joueur peut placer 1 seul cube inactif lors d’un même tour de cette façon, mais il est possible de le faire à votre propre tour et pendant le tour de quelqu’un d’autre lors d’une même manche. ❌ 💬 aucune notion de "tour"/"manche" suivie par l'appli (Phase Focus non modélisée en tours discrets) — bouton manuel "+1 cube" toujours disponible (section "Refuges" persistante), le joueur juge lui-même la condition remplie sur le plateau physique. Décision actée avec l'utilisateur avant de coder (construire un concept de tour dédié à cette seule règle serait disproportionné).
+- Vous atteignez le Niveau 4 de n’importe laquelle de vos pistes de Civilisation. ✅ GameService.pistesNiveau4EligiblesRefuge (pure) détecte `civ<Piste> >= 4` non encore réclamé (flag `refugeNiveau4<Piste>`, un événement UNIQUE par piste — les niveaux ne redescendant jamais) — bouton dédié par piste éligible dans la section "Refuges" persistante.
+- Lors de l’étape 2 de la phase Évaluation (Entretien), vous avez un secteur Pur avec 6 Population et au moins trois Guildes. Si vous avez deux secteurs qui remplissent ces conditions, vous pouvez construire deux niveaux lors de chaque Cycle, et ainsi de suite. ✅ Section "Refuges" de la popup "Phase Évaluation" (strategieService.js/texteRefugesPhaseEval_) — recalculée à CHAQUE Cycle (comme les Objectifs galactiques), compte les secteurs Purs éligibles via `agregatsSecteursEval.secteursPurs` déjà chargé, plafonne l'allocation via `evenementCycle.refugeCubesPhaseEval` (remis à 0 à chaque nouveau Cycle).
+Lorsque le dernier niveau d’une tuile Refuge a été construit, la tuile est complétée (sinon, elle reste incomplète). ✅
+Laissez les cubes de Puissance Navale sur la tuile. Tous les joueurs peuvent immédiatement choisir une récompense différente parmi ces 4 options : ✅ 💬 GameService.appliquerRecompenseRefuge délègue à FocusEngine.resoudreEffet (`{choix:[...]}`, même mécanisme que le mode "exclusif" des Objectifs galactiques Lot 2) — un seul gain résolu au final, aucun risque de persistance partielle.
+- Retirer une Corruption, ✅ clé déjà automatisée (retirer_corruption)
+- Retirer un Gardien, ✅ nouvelle clé `retirer_gardien` (focusEngine.js/secteurService.js/strategieService.js) — popup listant les secteurs possédés avec au moins 1 Gardien + option "Ailleurs" (bord de secteur/Trou de ver/plateau Crise, jamais suivis en base) toujours proposée, résolution manuelle comme l'option "Programme" de retirer_corruption
+- Gagner 3 ressources (quelles qu’elles soient) ✅ clé déjà automatisée (ressource_choix)
+- Déployer 2 cubes de Puissance Navale. ✅ clé déjà automatisée (deployer_cube)
+Les deux premiers exploits économiques peuvent être atteints lors de la phase Préparation ou Évaluation via certains effets d’Événements galactiques. ❌ 💬 aucun effet de ce type rencontré au catalogue à ce jour (Focus Héroïque "Commandement" propose `construire_refuge_niveau` en choix — hors périmètre de ce chantier, non câblé côté FocusEngine.resoudreCle_, retombe sur le repli générique manuel).
+Lorsque vous comptez le nombre de surproductions que vous avez réalisées, considérez la phase Préparation et la phase Évaluation comme deux tours distincts. 🚫 sans objet (déclencheur manuel, voir ci-dessus).
 # 4. TECHNOLOGIES CONSUMEES
 Certaines Technologies peuvent être consumées ; il s’agit d’une pénalité de Crise représentant la disparition du savoir des Novarques, qui se consume dans l’influence corruptrice du Néant.
 Lorsque vous consumez une Technologie de base, choisissez une Technologie du tableau avec de l’Influence, si possible, et placez-la à côté du plateau Crise.

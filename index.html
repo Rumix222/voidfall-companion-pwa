@@ -255,6 +255,20 @@
       <div id="offre-programmes-liste"></div>
     </div>
 
+    <!-- Refuges (§3, docs-rules-corruption-gardiens-refuges-technoConsume.md)
+         — retour utilisateur (14/09/2026) : section persistante (pas un
+         <details> replié comme Plateau Crise ci-dessus) affichant les
+         tuiles du scénario en cours (GameService.obtenirConfigRefuges) et
+         2 des 3 déclencheurs (bouton manuel "2 surproductions" + Niveau 4
+         de piste) — le 3e (secteur Pur 6 Pop/3 Guildes) vit dans la popup
+         Phase Évaluation (strategieService.js/texteRefugesPhaseEval_),
+         recalculé à chaque Cycle comme les Objectifs galactiques. Rendu
+         par App.renderRefuges_. -->
+    <h2 class="section-title" style="margin-top:22px;">Refuges</h2>
+    <div class="game-block" id="bloc-refuges">
+      <div id="refuges-liste"></div>
+    </div>
+
     <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:14px;" hidden>Terminer la partie</button>
   </section>
 
@@ -691,6 +705,7 @@
       renderEvenementCycle_(partie);
       renderTechnologiesAvancees_(partie);
       renderOffreProgrammes_(partie);
+      renderRefuges_(partie);
       chargerEntretien_(partie);
     }
 
@@ -1486,6 +1501,101 @@
         });
       }).catch(function () {
         container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+      });
+    }
+
+    /**
+     * Section "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+     * technoConsume.md) — persistante en bas de Plat. Galactique (retour
+     * utilisateur 14/09/2026). Affiche chaque tuile du scénario
+     * (GameService.obtenirConfigRefuges/completerRefuges) avec ses
+     * emplacements (●/○ rempli/vide) et 2 des 3 déclencheurs (le 3e —
+     * secteur Pur 6 Population/3 Guildes — vit dans la popup Phase
+     * Évaluation, voir strategieService.js/texteRefugesPhaseEval_,
+     * réévalué à chaque Cycle) :
+     *   - bouton manuel "+1 cube" (2 surproductions dans le même tour —
+     *     aucune notion de tour suivie par l'appli, toujours disponible
+     *     tant que la tuile n'est pas pleine) ;
+     *   - un bouton par piste de Civilisation au Niveau 4 dont le cube
+     *     n'a pas encore été réclamé (GameService.pistesNiveau4EligiblesRefuge
+     *     — un événement UNIQUE par piste, les niveaux ne redescendant
+     *     jamais).
+     * Une tuile pleine dont la récompense n'est pas encore choisie
+     * affiche un bouton "Choisir une récompense" à la place (§3 : 4
+     * options, déléguées à FocusEngine.resoudreEffet — voir
+     * GameService.appliquerRecompenseRefuge).
+     */
+    function renderRefuges_(partie) {
+      var container = document.getElementById('refuges-liste');
+      if (!container) return;
+
+      GameService.obtenirConfigRefuges(partie.scenarioId).then(function (config) {
+        if (!config.length) {
+          container.innerHTML = '<p class="hint">Aucun Refuge pour ce scénario.</p>';
+          return;
+        }
+        var refuges = GameService.completerRefuges((partie.plateauMaison || {}).refuges, config);
+        var pistesNiveau4 = GameService.pistesNiveau4EligiblesRefuge(partie);
+
+        container.innerHTML = refuges.map(function (r, index) {
+          var taille = config[index];
+          var plein = r.cubes >= taille;
+          var emplacements = [];
+          for (var i = 0; i < taille; i++) emplacements.push(i < r.cubes ? '●' : '○');
+
+          var actions;
+          if (plein && r.recompenseAppliquee) {
+            actions = '<span class="hint">Récompense déjà appliquée.</span>';
+          } else if (plein) {
+            actions = '<button type="button" class="btn btn-secondary btn-refuge-recompense" data-index="' + index + '">Choisir une récompense</button>';
+          } else {
+            actions = '<button type="button" class="btn btn-secondary btn-refuge-ajouter" data-index="' + index + '">+1 cube (manuel)</button>' +
+              pistesNiveau4.map(function (p) {
+                return '<button type="button" class="btn btn-secondary btn-refuge-niveau4" data-index="' + index + '" data-piste="' + p.cle + '">' +
+                  '+1 cube (Niveau 4 — ' + p.label + ')</button>';
+              }).join('');
+          }
+
+          return '<div class="plateau-influence" style="margin-bottom:12px;">' +
+            '<label>Refuge ' + (index + 1) + ' <span class="hint">(' + r.cubes + '/' + taille + ')</span></label>' +
+            '<div class="hint" style="font-size:1.2em;letter-spacing:3px;">' + emplacements.join(' ') + '</div>' +
+            '<div class="modal-choix-boutons" style="margin-top:6px;">' + actions + '</div>' +
+            '</div>';
+        }).join('');
+
+        function apresAction_(promesse, btn) {
+          promesse.then(function (resultat) {
+            if (resultat && resultat.annule) { btn.disabled = false; return; }
+            partieCourante = resultat;
+            renderRefuges_(resultat);
+          }).catch(function (erreur) {
+            btn.disabled = false;
+            window.alert('Échec : ' + erreur.message);
+          });
+        }
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-ajouter'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.ajouterCubeRefuge(partie.id, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-niveau4'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.appliquerRefugeNiveau4(partie.id, btn.dataset.piste, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-recompense'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.appliquerRecompenseRefuge(partie.id, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement des Refuges.</p>';
       });
     }
 

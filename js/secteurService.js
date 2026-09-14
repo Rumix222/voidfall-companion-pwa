@@ -364,6 +364,37 @@ var SecteurService = (function () {
 
   /**
    * Secteurs éligibles pour l'option "Secteur" de la popup de choix de
+   * retirer_gardien (chantier "Refuges", §3 docs-rules-corruption-
+   * gardiens-refuges-technoConsume.md — un Gardien peut aussi se trouver
+   * au bord d'un secteur, sur un Trou de ver, ou sur le plateau Crise,
+   * jamais suivis en base — voir strategieService.js, option manuelle
+   * "Ailleurs" de cette même popup) — même gabarit qu'
+   * obtenirSecteursEligiblesRetraitCorruption ci-dessus.
+   */
+  function obtenirSecteursEligiblesRetraitGardien(partieId) {
+    return obtenirSecteurs(partieId).then(function (secteurs) {
+      return secteurs
+        .filter(function (s) { return appartientAuJoueur_(s) && (s.nombreGardien || 0) > 0; })
+        .map(function (s) { return { numero: s.numero }; });
+    });
+  }
+
+  /**
+   * Retire 1 Gardien du secteur choisi — miroir de retirerCorruption
+   * ci-dessus, mais décrémente (un secteur peut porter plusieurs
+   * Gardiens) plutôt que de basculer un booléen.
+   */
+  function retirerGardien(partieId, numero) {
+    return DB.get('secteursPartie', [partieId, numero]).then(function (secteur) {
+      if (!secteur) throw new Error('Secteur ' + numero + ' introuvable pour cette partie.');
+      if (!(secteur.nombreGardien > 0)) throw new Error('Aucun Gardien à retirer dans le secteur ' + numero + '.');
+      secteur.nombreGardien -= 1;
+      return DB.put('secteursPartie', secteur).then(function () { return { ok: true }; });
+    });
+  }
+
+  /**
+   * Secteurs éligibles pour l'option "Secteur" de la popup de choix de
    * gagner_corruption — miroir d'obtenirSecteursEligiblesRetraitCorruption
    * ci-dessus, mais INVERSÉ (un secteur possédé, PAS encore Corrompu) ET
    * avec une contrainte supplémentaire absente du retrait : le
@@ -1257,6 +1288,8 @@ var SecteurService = (function () {
     deployerCube: deployerCube,
     rappelerCube: rappelerCube,
     retirerCorruption: retirerCorruption,
+    obtenirSecteursEligiblesRetraitGardien: obtenirSecteursEligiblesRetraitGardien,
+    retirerGardien: retirerGardien,
     regrouper: regrouper,
     envahirResoudre: envahirResoudre,
     obtenirSecteursEligiblesConstruction: obtenirSecteursEligiblesConstruction,

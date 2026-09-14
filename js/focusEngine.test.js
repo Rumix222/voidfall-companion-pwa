@@ -697,6 +697,40 @@ test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019act
   });
 });
 
+// "retirer_gardien" (chantier "Refuges", §3) délègue à
+// demanderChoix({type:'retirer_gardien'}) — miroir exact de
+// retirer_corruption ci-dessus, même contrat.
+test('retirer_gardien : succès — délègue à demanderChoix({type:"retirer_gardien"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_gardien: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'retirer_gardien');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Gardien retiré du Secteur 4.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Gardien retiré du Secteur 4') !== -1; }));
+  });
+});
+
+test('retirer_gardien : annulé (popup "Annuler") — bloque toute l’action, coût jamais débité', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_gardien: 1 }, cout: { energie: 2 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 // "gain_corruption" délègue à demanderChoix({type:'gagner_corruption'})
 // (voir docs-rules-corruption-gardiens-refuges-technoConsume.md) — miroir
 // exact de retirer_corruption ci-dessus, même contrat (la popup fait le

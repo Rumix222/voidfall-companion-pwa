@@ -198,6 +198,49 @@ test('obtenirSecteursEligiblesRetraitCorruption : ne retourne que les secteurs p
 });
 
 // ---------------------------------------------------------------
+// retirerGardien / obtenirSecteursEligiblesRetraitGardien — chantier
+// "Refuges" (§3), miroir de retirerCorruption/
+// obtenirSecteursEligiblesRetraitCorruption ci-dessus.
+// ---------------------------------------------------------------
+
+test('retirerGardien : décrémente nombreGardien de 1', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ nombreGardien: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.retirerGardien('p1', 1).then(function () {
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].nombreGardien, 1);
+  });
+});
+
+test('retirerGardien : aucun Gardien à retirer -> rejette', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ nombreGardien: 0 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.retirerGardien('p1', 1).then(
+    function () { assert.fail('aurait dû rejeter'); },
+    function (erreur) { assert.ok(erreur.message.indexOf('Aucun Gardien') !== -1); }
+  );
+});
+
+test('obtenirSecteursEligiblesRetraitGardien : ne retourne que les secteurs possédés avec au moins 1 Gardien', function () {
+  var db = creerDbFactice_();
+  // Secteur 1 : possédé ET porte un Gardien -> éligible
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ numero: 1, pnCorvette: 2, nombreGardien: 1 });
+  // Secteur 2 : possédé mais aucun Gardien -> non éligible
+  db._stores.secteursPartie['p1|2'] = secteurDeBase_({ numero: 2, pnCorvette: 1, nombreGardien: 0 });
+  // Secteur 3 : porte un Gardien mais du Néant (non possédé) -> non éligible
+  db._stores.secteursPartie['p1|3'] = secteurDeBase_({ numero: 3, pnCorvette: 0, pnNeant: 3, nombreGardien: 1 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.obtenirSecteursEligiblesRetraitGardien('p1').then(function (eligibles) {
+    assert.strictEqual(eligibles.length, 1);
+    assert.strictEqual(eligibles[0].numero, 1);
+  });
+});
+
+// ---------------------------------------------------------------
 // placerCorruption / obtenirSecteursEligiblesGainCorruption
 // ---------------------------------------------------------------
 

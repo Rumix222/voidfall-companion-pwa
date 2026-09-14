@@ -680,6 +680,27 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Retirer un Gardien : Effet UNIQUEMENT (signe > 0). Chantier
+    // "Refuges" (§3, docs-rules-corruption-gardiens-refuges-technoConsume.md
+    // — une des 4 récompenses de tuile complétée, GameService.
+    // appliquerRecompenseRefuge). Ouvre une popup dédiée (contexte
+    // 'retirer_gardien', strategieService.js) qui laisse le joueur choisir
+    // PARMI les secteurs qu'il possède et qui portent au moins un Gardien
+    // (SecteurService.obtenirSecteursEligiblesRetraitGardien/retirerGardien),
+    // ou "Ailleurs" (bord de secteur/Trou de ver/plateau Crise — jamais
+    // suivis en base, option toujours proposée, résolution manuelle comme
+    // l'option "Programme" de retirer_corruption ci-dessus). Même
+    // contrat : la popup fait le choix ET la persistance (focusEngine
+    // reste pur, aucun accès DB ici) ; resoudreCle_ relaie juste le
+    // résumé dans le journal. ---
+    if (cle === 'retirer_gardien' && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'retirer_gardien',
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
     // --- Gagner une Corruption : Effet UNIQUEMENT (signe > 0). Miroir de
     // retirer_corruption ci-dessus — ouvre une popup dédiée (contexte
     // 'gagner_corruption', strategieService.js) qui laisse le joueur

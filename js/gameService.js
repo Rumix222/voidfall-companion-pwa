@@ -482,7 +482,23 @@ var GameService = (function () {
     //   voidfall-focus-prefere-report.md), donc jamais déductible
     //   automatiquement — condition focus_preferes_absents_de_defausse
     //   (Événement E) lit sa négation.
-    'jetonsCatastrophePlateauCrise', 'corruptionsConservees', 'focusPrefereEnDefausse'
+    'jetonsCatastrophePlateauCrise', 'corruptionsConservees', 'focusPrefereEnDefausse',
+    // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+    // technoConsume.md) — voir GameService.ajouterCubeRefuge/
+    // appliquerRecompenseRefuge ci-dessous, seuls écrivains de `refuges`
+    // (jamais via index.html directement, contrairement aux compteurs
+    // manuels ci-dessus). `refuges` : `[{cubes, recompenseAppliquee}, ...]`
+    // — un élément par tuile de Refuge du scénario (index aligné sur
+    // `scenarios.json.refuges`, voir GameService.obtenirConfigRefuges),
+    // complété à la volée avec `{cubes:0, recompenseAppliquee:false}` pour
+    // les index manquants — même tableau non diffable/écrit tel quel que
+    // `gloire`/`offresProgramme` ci-dessus.
+    'refuges',
+    // Cube Niveau 4 de piste de Civilisation déjà réclamé pour ce Refuge —
+    // un événement UNIQUE par piste (les niveaux ne redescendent jamais),
+    // mêmes conventions plates que civCorrompueSociete/Gouvernement/
+    // Economie (CivilisationService).
+    'refugeNiveau4Societe', 'refugeNiveau4Gouvernement', 'refugeNiveau4Economie'
   ];
 
   // ------------------------------------------------------------
@@ -1238,7 +1254,30 @@ var GameService = (function () {
       criseCoutScience: pm.criseCoutScience || 0,
       criseCoutCredit: pm.criseCoutCredit || 0,
       criseCoutInfluence: pm.criseCoutInfluence || 0,
-      crisePerpetuelle: pm.crisePerpetuelle || 0
+      crisePerpetuelle: pm.crisePerpetuelle || 0,
+      // Bug corrigé en passant (14/09/2026, chantier "Refuges") : ces 3
+      // compteurs manuels étaient whitelistés (CHAMPS_PLATEAU_MAISON_
+      // AUTORISES) et bien persistés par index.html/renderPlateauCrise_,
+      // mais jamais RELUS ici — StrategieService.construireContexteObjectifs_
+      // (jetonsCatastrophePlateauCrise/corruptionsConservees/Ligne) lisait
+      // donc toujours 0/false quel que soit ce que le joueur avait saisi
+      // (jetons_catastrophe_plateau_crise/corruption_conservee/focus_
+      // preferes_absents_de_defausse restaient à tort "condition remplie"
+      // par défaut). Jamais remarqué faute de test couvrant la relecture
+      // (les tests existants injectent le contexte directement).
+      jetonsCatastrophePlateauCrise: pm.jetonsCatastrophePlateauCrise || 0,
+      corruptionsConservees: pm.corruptionsConservees || 0,
+      focusPrefereEnDefausse: !!pm.focusPrefereEnDefausse,
+      // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+      // technoConsume.md) — voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus
+      // pour le détail. `refuges` brut (PAS complété à la longueur du
+      // scénario ici — ce module n'a pas accès synchrone à `scenarios.json`,
+      // voir GameService.obtenirConfigRefuges/index.html qui font le
+      // padding à l'usage).
+      refuges: Array.isArray(pm.refuges) ? pm.refuges : [],
+      refugeNiveau4Societe: !!pm.refugeNiveau4Societe,
+      refugeNiveau4Gouvernement: !!pm.refugeNiveau4Gouvernement,
+      refugeNiveau4Economie: !!pm.refugeNiveau4Economie
     };
 
     return partie;
@@ -1519,6 +1558,136 @@ var GameService = (function () {
       GameService.sauvegarderPartie(ctx.partie, 'objectif_galactique_applique', ctx.cleCycle + ' — objectif ' + ctx.cleLigne)
     ]).then(function () {
       return rechargerPartie_(partieId);
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Refuges (§3, docs-rules-corruption-gardiens-refuges-technoConsume.md)
+  // — tuiles à N emplacements (N fixé par le scénario, data/catalogue/
+  // scenarios.json champ `refuges`, ex. [2,2] pour solo_1) que le joueur
+  // remplit de cubes de Puissance Navale selon 3 déclencheurs :
+  //   - manuel ("2 surproductions dans le même tour" — aucune notion de
+  //     tour suivie par l'appli, bouton toujours disponible côté
+  //     index.html, voir renderRefuges_) ;
+  //   - Niveau 4 atteint sur une piste de Civilisation (pistesNiveau4
+  //     EligiblesRefuge/appliquerRefugeNiveau4 ci-dessous) ;
+  //   - secteur Pur à 6 Population/3 Guildes en Phase Évaluation
+  //     (appliquerRefugePhaseEval ci-dessous, popup 'phase_evaluation'
+  //     strategieService.js — même géométrie que les Objectifs
+  //     galactiques : recalculé à chaque rendu, jamais une popup qui
+  //     interrompt).
+  // `plateauMaison.refuges` = [{cubes, recompenseAppliquee}, ...], un
+  // élément par tuile (voir CHAMPS_PLATEAU_MAISON_AUTORISES) — jamais
+  // initialisé à la création de partie, complété à la volée à la lecture
+  // (completerRefuges_ ci-dessous), même principe que
+  // technologiesObtenues/programmesUtilises.
+  // ------------------------------------------------------------
+
+  // Copie volontairement indépendante de focusEngine.js/strategieService.js
+  // (même total fixe de cubes de Puissance Navale, voir leurs en-têtes
+  // respectifs — ces 3 fichiers ne partagent délibérément aucune constante).
+  var NB_CUBES_TOTAL = 14;
+
+  /**
+   * Config Refuges du scénario (tableau des tailles de tuile, ex. [2,2])
+   * — [] si le scénario n'en définit pas (rétro-compatible, voir
+   * data/catalogue/scenarios.json).
+   */
+  function obtenirConfigRefuges_(scenarioId) {
+    if (!scenarioId) return Promise.resolve([]);
+    return DB.get('scenarios', scenarioId).then(function (scenario) {
+      return (scenario && Array.isArray(scenario.refuges)) ? scenario.refuges : [];
+    });
+  }
+
+  /**
+   * Complète `refugesBruts` (plateauMaison.refuges, potentiellement plus
+   * court que `config` — jamais initialisé à la création de partie) à la
+   * longueur de `config` avec des tuiles vides. Ne tronque JAMAIS une
+   * tuile au-delà de la longueur de `config` (état déjà en base conservé
+   * tel quel, même si le scénario changeait — cas jamais rencontré à ce
+   * jour, un seul scénario existe).
+   */
+  function completerRefuges_(refugesBruts, config) {
+    var refuges = (refugesBruts || []).map(function (r) { return r || { cubes: 0, recompenseAppliquee: false }; });
+    for (var i = refuges.length; i < config.length; i++) {
+      refuges.push({ cubes: 0, recompenseAppliquee: false });
+    }
+    return refuges;
+  }
+
+  function totalCubesSurRefuges_(refuges) {
+    return (refuges || []).reduce(function (somme, r) { return somme + (r ? (r.cubes || 0) : 0); }, 0);
+  }
+
+  /**
+   * Source 1 cube de Puissance Navale pour un Refuge — MUTE `pm` en
+   * mémoire (`cubeActif` si besoin, jamais `refuges` ici) et retourne une
+   * Promise résolue avec `{ok:true}`, ou `{annule:true}` si aucune source
+   * n'est disponible ET que le joueur annule la popup de rappel. Règle du
+   * livret (§3) : un cube inactif en priorité (rien à faire, juste
+   * autorisé) ; sinon désactive un cube actif (`cubeActif -= 1`) ; sinon
+   * rappelle un cube déployé puis le désactive aussitôt — réutilise TEL
+   * QUEL le contexte `demanderChoix({type:'rappeler_cube_cout', ...})`
+   * déjà implémenté côté strategieService.js pour le Coût Focus
+   * "rappeler_cube" (mêmes secteurs éligibles, mêmes règles d'abandon de
+   * secteur) : cette popup fait le choix ET la persistance
+   * (SecteurService.rappelerCube) elle-même, comme retirer_corruption/
+   * construire — rien à écrire ici dans ce dernier cas, le cube ne
+   * "repasse" jamais par `cubeActif`.
+   */
+  function sourcerCubeRefuge_(partieId, pm, demanderChoix) {
+    if (typeof SecteurService === 'undefined') throw new Error('SecteurService indisponible.');
+    return SecteurService.obtenirAgregatsInfluenceSecteursPurs(partieId).then(function (agregats) {
+      var totalDeploye = (agregats.secteursPossedes || []).reduce(function (s, sec) { return s + (sec.cubes || 0); }, 0);
+      var cubeInactifDisponible = NB_CUBES_TOTAL - (pm.cubeActif || 0) - totalDeploye - totalCubesSurRefuges_(pm.refuges);
+
+      if (cubeInactifDisponible > 0) return { ok: true };
+      if ((pm.cubeActif || 0) > 0) {
+        pm.cubeActif -= 1;
+        return { ok: true };
+      }
+      if (!demanderChoix) return { annule: true };
+      return Promise.resolve(demanderChoix({ type: 'rappeler_cube_cout', source: 'Refuge', partieId: partieId }))
+        .then(function (reponse) { return (!reponse || reponse.annule) ? { annule: true } : { ok: true }; });
+    });
+  }
+
+  /**
+   * Boilerplate commun aux fonctions `*Refuge*` ci-dessous — charge
+   * partieId/plateauMaison + config scénario, revalide `indexRefuge`
+   * (existe, pas déjà pleine) AVANT toute mutation. `ctx.pm.refuges` est
+   * déjà complété (completerRefuges_) — l'appelant peut le persister tel
+   * quel après avoir incrémenté `ctx.refuges[ctx.indexRefuge].cubes`.
+   */
+  function chargerRefugeOuvrable_(partieId, indexRefuge) {
+    return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+      var lignePartie = resultats[0], pm = resultats[1];
+      if (!lignePartie || !pm) throw new Error('Partie introuvable.');
+      return obtenirConfigRefuges_(lignePartie.scenarioId).then(function (config) {
+        var tailleTuile = config[indexRefuge];
+        if (tailleTuile == null) throw new Error('Refuge introuvable.');
+        var refuges = completerRefuges_(pm.refuges, config);
+        if (refuges[indexRefuge].cubes >= tailleTuile) throw new Error('Ce Refuge est déjà complet.');
+        pm.refuges = refuges;
+        return { pm: pm, refuges: refuges, indexRefuge: indexRefuge, config: config };
+      });
+    });
+  }
+
+  /**
+   * Source 1 cube (sourcerCubeRefuge_) puis l'ajoute à la tuile de `ctx`
+   * (chargerRefugeOuvrable_) — persiste `ctx.pm` et recharge la partie.
+   * `avantPersist(pm)` optionnel : mutation additionnelle à appliquer
+   * juste avant l'écriture (ex. poser le flag Niveau 4), dans LA MÊME
+   * écriture que l'incrément de la tuile — jamais deux `DB.put` séparés.
+   */
+  function finaliserAjoutCubeRefuge_(partieId, ctx, demanderChoix, avantPersist) {
+    return sourcerCubeRefuge_(partieId, ctx.pm, demanderChoix).then(function (resultatSource) {
+      if (resultatSource.annule) return { annule: true };
+      ctx.refuges[ctx.indexRefuge].cubes += 1;
+      if (avantPersist) avantPersist(ctx.pm);
+      return DB.put('plateauMaison', ctx.pm).then(function () { return rechargerPartie_(partieId); });
     });
   }
 
@@ -2836,6 +3005,145 @@ var GameService = (function () {
         }
 
         throw new Error('Cette ligne d\'Objectif ne peut pas être appliquée automatiquement (mode non pris en charge).');
+      });
+    },
+
+    /**
+     * Config Refuges du scénario (tableau des tailles de tuile, ex. [2,2])
+     * — voir obtenirConfigRefuges_ ci-dessus. Exposée pour index.html
+     * (renderRefuges_), qui a déjà `partie.scenarioId` sous la main.
+     */
+    obtenirConfigRefuges: function (scenarioId) {
+      return obtenirConfigRefuges_(scenarioId);
+    },
+
+    /**
+     * Complète `refugesBruts` à la longueur de `config` — voir
+     * completerRefuges_ ci-dessus. Exposée pour que index.html/
+     * renderRefuges_ n'ait pas à dupliquer cette logique.
+     */
+    completerRefuges: function (refugesBruts, config) {
+      return completerRefuges_(refugesBruts, config);
+    },
+
+    /**
+     * Pistes de Civilisation ayant atteint le Niveau 4 mais dont le cube
+     * Refuge correspondant n'a pas encore été réclamé (§3, déclencheur
+     * "Niveau 4 de piste") — pure, synchrone, à partir d'une partie déjà
+     * assemblée. Les niveaux ne redescendant jamais, ce cube ne peut être
+     * réclamé qu'UNE fois par piste (flag `refugeNiveau4<Piste>`).
+     */
+    pistesNiveau4EligiblesRefuge: function (partie) {
+      if (!partie) return [];
+      var civ = partie.civilisation || {};
+      var pm = partie.plateauMaison || {};
+      return [
+        { cle: 'societe', label: 'Société', niveau: civ.societe || 0, reclame: !!pm.refugeNiveau4Societe },
+        { cle: 'gouvernement', label: 'Gouvernement', niveau: civ.gouvernement || 0, reclame: !!pm.refugeNiveau4Gouvernement },
+        { cle: 'economie', label: 'Économie', niveau: civ.economie || 0, reclame: !!pm.refugeNiveau4Economie }
+      ].filter(function (p) { return p.niveau >= 4 && !p.reclame; });
+    },
+
+    /**
+     * Ajoute 1 cube à la tuile `indexRefuge` (déclencheur manuel — "2
+     * surproductions dans le même tour", bouton toujours disponible côté
+     * index.html tant que la tuile n'est pas pleine — voir en-tête de la
+     * section Refuges ci-dessus). `demanderChoix` ne sert QUE si aucun
+     * cube inactif/actif n'est disponible (popup 'rappeler_cube_cout',
+     * voir sourcerCubeRefuge_).
+     */
+    ajouterCubeRefuge: function (partieId, indexRefuge, demanderChoix) {
+      return chargerRefugeOuvrable_(partieId, indexRefuge).then(function (ctx) {
+        return finaliserAjoutCubeRefuge_(partieId, ctx, demanderChoix);
+      });
+    },
+
+    /**
+     * Déclencheur "Niveau 4 de piste" (voir pistesNiveau4EligiblesRefuge
+     * ci-dessus) — source 1 cube pour la tuile `indexRefuge` ET pose le
+     * flag `refugeNiveau4<Piste>` dans LA MÊME écriture (jamais l'un sans
+     * l'autre : un cube réclamé sans le flag serait re-réclamable, un flag
+     * posé sans cube perdrait le cube).
+     */
+    appliquerRefugeNiveau4: function (partieId, piste, indexRefuge, demanderChoix) {
+      var champPiste = {
+        societe: 'refugeNiveau4Societe', gouvernement: 'refugeNiveau4Gouvernement', economie: 'refugeNiveau4Economie'
+      }[piste];
+      if (!champPiste) return Promise.reject(new Error('Piste de Civilisation inconnue : ' + piste));
+      return chargerRefugeOuvrable_(partieId, indexRefuge).then(function (ctx) {
+        if (ctx.pm[champPiste]) throw new Error('Le cube Niveau 4 de cette piste a déjà été réclamé.');
+        return finaliserAjoutCubeRefuge_(partieId, ctx, demanderChoix, function (pm) { pm[champPiste] = true; });
+      });
+    },
+
+    /**
+     * Déclencheur "secteur Pur 6 Population/3 Guildes" (Phase Évaluation,
+     * §3) — appelée depuis la popup 'phase_evaluation' (strategieService.js),
+     * qui calcule déjà `nombreEligibles` (agregatsSecteursEval.secteursPurs,
+     * déjà chargé pour les Objectifs galactiques) et le revalide ici avant
+     * d'incrémenter `evenementCycle.refugeCubesPhaseEval` — jamais plus
+     * d'1 cube par secteur éligible et par Cycle (le compteur est remis à
+     * 0 automatiquement à chaque nouveau Cycle, même `evenementCycle` que
+     * `objectifsAppliques`/`cadresAppliques`).
+     */
+    appliquerRefugePhaseEval: function (partieId, cycle, indexRefuge, nombreEligibles, demanderChoix) {
+      return chargerRefugeOuvrable_(partieId, indexRefuge).then(function (ctx) {
+        return DB.get('parties', partieId).then(function (lignePartie) {
+          var cleCycle = 'cycle' + cycle;
+          var evenementCycle = (lignePartie.etatJson.evenements || {})[cleCycle];
+          if (!evenementCycle) throw new Error('Aucun Événement galactique choisi pour ce cycle.');
+          var dejaAppliques = evenementCycle.refugeCubesPhaseEval || 0;
+          if (dejaAppliques >= nombreEligibles) throw new Error('Allocation de cubes Refuge déjà atteinte pour ce Cycle.');
+
+          return sourcerCubeRefuge_(partieId, ctx.pm, demanderChoix).then(function (resultatSource) {
+            if (resultatSource.annule) return { annule: true };
+            ctx.refuges[ctx.indexRefuge].cubes += 1;
+            evenementCycle.refugeCubesPhaseEval = dejaAppliques + 1;
+            lignePartie.etatJson.evenements[cleCycle] = evenementCycle;
+            return Promise.all([DB.put('plateauMaison', ctx.pm), DB.put('parties', lignePartie)]).then(function () {
+              return rechargerPartie_(partieId);
+            });
+          });
+        });
+      });
+    },
+
+    /**
+     * Complétion d'une tuile (§3) — choix d'UNE récompense parmi les 4 du
+     * livret, déléguée à FocusEngine.resoudreEffet (MÊME mécanisme que le
+     * mode "exclusif" des Objectifs galactiques, Lot 2 — un seul gain
+     * résolu au final, aucun risque de persistance partielle) : 3 des 4
+     * clés sont déjà pleinement automatisées (retirer_corruption/
+     * ressource_choix/deployer_cube) ; `retirer_gardien` est nouvelle
+     * (voir focusEngine.js/secteurService.js).
+     */
+    appliquerRecompenseRefuge: function (partieId, indexRefuge, demanderChoix) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], pm = resultats[1];
+        if (!lignePartie || !pm) throw new Error('Partie introuvable.');
+        return obtenirConfigRefuges_(lignePartie.scenarioId).then(function (config) {
+          var tailleTuile = config[indexRefuge];
+          if (tailleTuile == null) throw new Error('Refuge introuvable.');
+          var refuges = completerRefuges_(pm.refuges, config);
+          var tuile = refuges[indexRefuge];
+          if (tuile.cubes < tailleTuile) throw new Error('Ce Refuge n\'est pas encore complet.');
+          if (tuile.recompenseAppliquee) throw new Error('La récompense de ce Refuge a déjà été appliquée.');
+          if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+          var effet = { choix: [{ retirer_corruption: 1 }, { retirer_gardien: 1 }, { ressource_choix: 3 }, { deployer_cube: 2 }] };
+          var source = 'Refuge complété';
+          var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, pm);
+
+          return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, effet, source, '', demanderChoix).then(function (resultatEffet) {
+            if (!resultatEffet.succes) return { annule: true };
+            var champs = {};
+            resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+            Object.keys(champs).forEach(function (champ) { pm[champ] = champs[champ]; });
+            pm.refuges = refuges;
+            tuile.recompenseAppliquee = true;
+            return DB.put('plateauMaison', pm).then(function () { return rechargerPartie_(partieId); });
+          });
+        });
       });
     },
 
