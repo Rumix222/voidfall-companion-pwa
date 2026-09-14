@@ -2138,15 +2138,20 @@ var GameService = (function () {
     },
 
     /**
-     * Plateau Crise (light) — "Payer" (retour utilisateur, 13/09/2026) :
-     * décrémente les VRAIES ressources (Matériel/Énergie/Science/Crédit)
-     * et l'Influence du montant indiqué par les 5 compteurs criseCout*
-     * (jamais sous 0, comme toute ressource de l'appli), PUIS remet ces 5
-     * compteurs à 0 (le coût vient d'être payé, rien à repayer tant qu'un
-     * nouveau Plateau Crise ne les repositionne pas) — même transaction
-     * lecture-fusion-écriture unique, jamais 2 écritures séparées.
-     * `criseModificateurEscarmouche`/`crisePerpetuelle` ne sont PAS
-     * concernés (pas un coût, voir CHAMPS_PLATEAU_MAISON_AUTORISES).
+     * Plateau Crise (light) — "Payer" (retour utilisateur, 13/09/2026,
+     * puis 14/09/2026 — "ne pas vider les champs ressource après avoir
+     * payer... vider le champ influence c'est ok par contre") : décrémente
+     * les VRAIES ressources (Matériel/Énergie/Science/Crédit) et
+     * l'Influence du montant indiqué par les 5 compteurs criseCout*
+     * (jamais sous 0, comme toute ressource de l'appli). Les 4 compteurs
+     * `criseCout<Ressource>` NE SONT PAS remis à 0 — ce sont des valeurs
+     * FIXES rappelées d'un Cycle à l'autre (le coût imprimé sur la carte
+     * Crise en cours ne change pas tant qu'elle reste active) : les
+     * effacer forcerait à les retaper à chaque paiement. Seul
+     * `criseCoutInfluence` (une pénalité ponctuelle, recalculée à la main
+     * à chaque fois) est remis à 0. `criseModificateurEscarmouche`/
+     * `crisePerpetuelle` ne sont pas concernés (pas un coût, voir
+     * CHAMPS_PLATEAU_MAISON_AUTORISES).
      */
     payerCoutCrise: function (partieId) {
       return DB.get('plateauMaison', partieId).then(function (ligne) {
@@ -2156,10 +2161,6 @@ var GameService = (function () {
         ligne.ressourceScience = Math.max(0, (ligne.ressourceScience || 0) - (ligne.criseCoutScience || 0));
         ligne.ressourceCredit = Math.max(0, (ligne.ressourceCredit || 0) - (ligne.criseCoutCredit || 0));
         ligne.influence = Math.max(0, (ligne.influence || 0) - (ligne.criseCoutInfluence || 0));
-        ligne.criseCoutMateriel = 0;
-        ligne.criseCoutEnergie = 0;
-        ligne.criseCoutScience = 0;
-        ligne.criseCoutCredit = 0;
         ligne.criseCoutInfluence = 0;
         return DB.put('plateauMaison', ligne);
       }).then(function () {
@@ -2257,10 +2258,10 @@ var GameService = (function () {
           pm.ressourceScience = Math.max(0, (pm.ressourceScience || 0) - (Number(paiement.science) || 0));
           pm.ressourceCredit = Math.max(0, (pm.ressourceCredit || 0) - (Number(paiement.credit) || 0));
           pm.influence = Math.max(0, (pm.influence || 0) - (Number(paiement.influence) || 0));
-          pm.criseCoutMateriel = 0;
-          pm.criseCoutEnergie = 0;
-          pm.criseCoutScience = 0;
-          pm.criseCoutCredit = 0;
+          // Même règle que GameService.payerCoutCrise (retour utilisateur,
+          // 14/09/2026) : les 4 compteurs `criseCout<Ressource>` restent
+          // en base (valeur fixe rappelée au Cycle suivant), seul
+          // `criseCoutInfluence` (pénalité ponctuelle) est remis à 0.
           pm.criseCoutInfluence = 0;
 
           evenementCycle.escarmoucheResoluePhaseEval = true;

@@ -349,6 +349,15 @@ input:disabled {
   white-space: nowrap;
 }
 
+/* Rappel "capacité de Maison à ne pas oublier" (retour utilisateur,
+   14/09/2026) — visible même quand #bloc-maison-details est replié,
+   masqué (via [hidden]) pour les 4 maisons "de base" sans capacité. */
+.icone-capacite-maison {
+  color: var(--color-coral);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
 /* Bandeau d'en-tête de l'écran — titre "Cycle X" (+ Entretien dû, en
    petit dessous) à gauche, bouton "Fin du cycle"/"Terminer la partie" à
    droite. .titre-cycle n'a volontairement PAS le trait orange de
@@ -625,6 +634,14 @@ input:disabled {
 .galaxie-plateau .hex-secteur { cursor: pointer; }
 .galaxie-plateau .fond-hex { stroke-width: 3; transition: filter 0.15s; }
 .galaxie-plateau .hex-secteur:active .fond-hex { filter: brightness(1.25); }
+/* Secteur sélectionné (retour utilisateur, 14/09/2026 : "rendre visuel
+   quand c'est sélectionné") — voir SecteurVueService, la classe est
+   posée/retirée au clic ET reconstruite après un redessin complet
+   (rafraichirApresEdition_). */
+.galaxie-plateau .hex-secteur-selectionnee .fond-hex {
+  stroke: var(--color-coral);
+  stroke-width: 5;
+}
 .galaxie-plateau text { font-family: inherit; }
 .galaxie-detail {
   max-width: 640px;
@@ -643,8 +660,14 @@ input:disabled {
 .galaxie-detail .vide { color: var(--color-text-muted); font-style: italic; }
 /* Champs éditables du panneau détail (Population/Corrompu/cube du Néant/
    jeton Prime/jeton Libération — SecteurService.majSecteur, aucune
-   validation de règle, voir js/secteurVueService.js). */
-.galaxie-detail-input {
+   validation de règle, voir js/secteurVueService.js). Retour utilisateur
+   (14/09/2026) : "les champs numérique sont énorme" — MÊME piège de
+   spécificité que .ressource-case-input-sm (voir plus haut, css/style.css) :
+   .galaxie-detail-input à 1 seule classe se faisait écraser par
+   input[type="number"] (même spécificité, déclaré plus bas dans ce
+   fichier) — corrigé en la scopant .galaxie-detail .galaxie-detail-input
+   (2 classes). */
+.galaxie-detail .galaxie-detail-input {
   width: 56px;
   padding: 2px 4px;
   border: 1px solid var(--color-border);
@@ -682,6 +705,14 @@ input:disabled {
 .nav-ecrans .btn-toggle {
   flex-shrink: 0;
   white-space: nowrap;
+  /* Plusieurs libellés tiennent désormais sur 2 lignes (<br>, retour
+     utilisateur 14/09/2026 : "Mise en place"/"Plateau Galactique"/"Fiche
+     Maison" — pour réduire la largeur de chaque bouton, la barre de nav
+     tenant alors mieux sans scroll horizontal) — centré, interligne
+     resserré, padding vertical réduit pour ne pas trop grandir la barre. */
+  text-align: center;
+  line-height: 1.2;
+  padding: 10px 14px;
 }
 
 /* --- Écran Stratégie : suivi de ressources --- */
@@ -881,37 +912,48 @@ input:disabled {
   background: rgba(255, 107, 82, 0.08);
 }
 
-/* Bouton compact (ex. "Escarmouche"/"Payer" glissés sur une ligne de
-   .plateau-influence — voir #bloc-plateau-crise), à côté d'un label/
-   d'un champ plutôt qu'en pleine largeur comme .btn par défaut. */
+/* Boutons compacts (ex. "Escarmouche"/"Payer" glissés sur une ligne de
+   .plateau-influence — voir #bloc-plateau-crise ; boutons Refuge), à côté
+   d'un label/d'un champ plutôt qu'en pleine largeur comme .btn par
+   défaut. .btn-sm (Escarmouche/Payer, retour utilisateur 14/09/2026 :
+   "agrandir légèrement le texte") est plus grand que .btn-xs (boutons
+   Refuge, même retour : "diminuer un peu la taille du texte") —
+   directions opposées, 2 classes distinctes plutôt qu'une seule. */
 .btn-sm {
+  padding: 7px 12px;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.btn-xs {
   padding: 6px 10px;
   font-size: 0.8rem;
   flex-shrink: 0;
 }
 
-/* Groupe "bouton + label" tassé à gauche d'une .plateau-influence (ex.
-   "Escarmouche" à gauche de "Modificateur") — laisse .plateau-influence
-   (space-between) placer ce groupe et le champ à ses 2 extrémités
+/* Groupe "label + champ" tassé à droite d'une .plateau-influence (ex.
+   "Modificateur" aligné avec son champ, à droite du bouton "Escarmouche"
+   — retour utilisateur 14/09/2026) — laisse .plateau-influence
+   (space-between) placer le bouton et ce groupe à ses 2 extrémités
    habituelles, sans toucher au reste de son comportement. */
-.plateau-influence-groupe {
+.crise-modificateur-champ {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
-/* Ligne "Coût à payer" du Plateau Crise (light) : ressources abrégées
+/* Lignes "Coût à payer" du Plateau Crise (light) : ressources abrégées
    (M/E/S/C, pastille colorée comme la grille Plat. Maison —
-   .pastille-ressource/--couleur-ressource, voir champRessourceHTML_)
-   + bouton "Payer" + Influence (losange-argente, comme le bloc
-   Corruption/Influence ci-dessus) — tout sur UNE ligne, wrap seulement
-   si l'écran est trop étroit. */
+   .pastille-ressource/--couleur-ressource, voir champRessourceHTML_) sur
+   une 1re ligne ; bouton "Payer" + Influence (losange-argente, comme le
+   bloc Corruption/Influence ci-dessus) sur une 2e ligne juste dessous
+   (retour utilisateur 14/09/2026) — gap élargi avec la place gagnée par
+   ce découpage en 2 lignes. */
 .crise-cout-ligne {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 14px;
   margin-top: 10px;
 }
 .crise-cout-item {

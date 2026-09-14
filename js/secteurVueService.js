@@ -420,10 +420,23 @@ var SecteurVueService = (function () {
     return { fond: 'var(--galaxie-standard)', bord: 'var(--galaxie-standard-bord)' };
   }
 
-  function construireHexagone_(item, cx, cy, onSelect) {
+  // Secteur actuellement sélectionné (surlignage visuel, retour
+  // utilisateur 14/09/2026) — le <g> lui-même, pour un toggle immédiat au
+  // clic SANS attendre un redessin complet (rendrePlateau_ le réinitialise
+  // à chaque appel, un nouveau <g> étant créé pour chaque secteur).
+  var groupeSelectionne_ = null;
+
+  function selectionnerGroupe_(g) {
+    if (groupeSelectionne_) groupeSelectionne_.classList.remove('hex-secteur-selectionnee');
+    groupeSelectionne_ = g;
+    g.classList.add('hex-secteur-selectionnee');
+  }
+
+  function construireHexagone_(item, cx, cy, onSelect, estSelectionne) {
     var secteur = item.secteur;
     var couleurs = couleurSecteur_(item.type);
     var g = creerSvgEl_('g', { class: 'hex-secteur', 'data-numero': secteur.numero });
+    if (estSelectionne) { g.classList.add('hex-secteur-selectionnee'); groupeSelectionne_ = g; }
 
     var hex = creerSvgEl_('polygon', { points: pointsHexPlat_(cx, cy, TAILLE_HEX), class: 'fond-hex', fill: couleurs.fond, stroke: couleurs.bord });
     g.appendChild(hex);
@@ -432,7 +445,7 @@ var SecteurVueService = (function () {
       if (secteur.pnNeant > 0) {
         g.appendChild(icoCubeNaval_(cx, cy, 'var(--galaxie-orange)', '#7a4a1a', secteur.pnNeant));
       }
-      g.addEventListener('click', function () { onSelect(item); });
+      g.addEventListener('click', function () { selectionnerGroupe_(g); onSelect(item); });
       return g;
     }
 
@@ -475,7 +488,7 @@ var SecteurVueService = (function () {
 
     if (secteur.corrompu) { hex.setAttribute('stroke-dasharray', '6,3'); }
 
-    g.addEventListener('click', function () { onSelect(item); });
+    g.addEventListener('click', function () { selectionnerGroupe_(g); onSelect(item); });
     return g;
   }
 
@@ -631,8 +644,9 @@ var SecteurVueService = (function () {
     brancherEditionDetail_(secteur.numero);
   }
 
-  function rendrePlateau_(conteneur, items) {
+  function rendrePlateau_(conteneur, items, numeroSelectionne) {
     conteneur.innerHTML = '';
+    groupeSelectionne_ = null; // les <g> précédents viennent d'être détruits (innerHTML='')
     var pixels = items.map(function (item) {
       var brut = axialVersPixel_(item.q, item.r);
       return orienterPoint_(brut.x, brut.y);
@@ -642,7 +656,8 @@ var SecteurVueService = (function () {
     var svg = creerSvgEl_('svg', { viewBox: vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h, width: '100%', height: 'auto', style: 'display:block' });
 
     items.forEach(function (item, i) {
-      svg.appendChild(construireHexagone_(item, pixels[i].x, pixels[i].y, afficherDetail_));
+      var estSelectionne = numeroSelectionne != null && item.secteur.numero === numeroSelectionne;
+      svg.appendChild(construireHexagone_(item, pixels[i].x, pixels[i].y, afficherDetail_, estSelectionne));
     });
 
     conteneur.appendChild(svg);
@@ -705,7 +720,7 @@ var SecteurVueService = (function () {
         return;
       }
 
-      rendrePlateau_(conteneur, items);
+      rendrePlateau_(conteneur, items, numeroDetailAOuvrir);
 
       var itemAOuvrir = numeroDetailAOuvrir != null
         ? items.filter(function (it) { return it.secteur.numero === numeroDetailAOuvrir; })[0]

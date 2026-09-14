@@ -78,7 +78,7 @@ test('majPlateauMaison : les 7 champs Plateau Crise sont whitelistés', function
   });
 });
 
-test('payerCoutCrise : décrémente les vraies ressources/Influence puis remet les 5 coûts à 0', function () {
+test('payerCoutCrise : décrémente les vraies ressources/Influence, remet SEULEMENT criseCoutInfluence à 0 (retour utilisateur 14/09/2026 — les 4 autres sont des valeurs fixes rappelées au Cycle suivant)', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = ligneParties_('p1');
   db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1', {
@@ -95,11 +95,11 @@ test('payerCoutCrise : décrémente les vraies ressources/Influence puis remet l
     assert.strictEqual(partie.plateauMaison.ressources.influence, 1, '10 - 9');
 
     var ligne = db._stores.plateauMaison['p1'];
-    assert.strictEqual(ligne.criseCoutMateriel, 0);
-    assert.strictEqual(ligne.criseCoutEnergie, 0);
-    assert.strictEqual(ligne.criseCoutScience, 0);
-    assert.strictEqual(ligne.criseCoutCredit, 0);
-    assert.strictEqual(ligne.criseCoutInfluence, 0);
+    assert.strictEqual(ligne.criseCoutMateriel, 2, 'valeur fixe, pas remise à 0');
+    assert.strictEqual(ligne.criseCoutEnergie, 1, 'valeur fixe, pas remise à 0');
+    assert.strictEqual(ligne.criseCoutScience, 2, 'valeur fixe, pas remise à 0');
+    assert.strictEqual(ligne.criseCoutCredit, 4, 'valeur fixe, pas remise à 0');
+    assert.strictEqual(ligne.criseCoutInfluence, 0, 'seule pénalité ponctuelle, remise à 0');
     // Pas un coût — jamais remis à 0 par payerCoutCrise.
     assert.strictEqual(ligne.criseModificateurEscarmouche, 3);
     assert.strictEqual(ligne.crisePerpetuelle, 1);

@@ -31,12 +31,18 @@
   <!-- Barre visible uniquement pendant une partie ouverte. -->
   <div id="barre-navigation-partie" class="barre-navigation-partie" hidden>
     <nav id="nav-ecrans" class="nav-ecrans">
-      <button id="nav-mise-en-place" class="btn btn-toggle" data-nav="mise-en-place">Mise en place</button>
-      <button id="nav-plateau-galactique" class="btn btn-toggle active" data-nav="plateau-galactique">Plat. Galactique</button>
-      <button id="nav-plateau-maison" class="btn btn-toggle" data-nav="plateau-maison">Plat. maison</button>
+      <button id="nav-mise-en-place" class="btn btn-toggle" data-nav="mise-en-place">Mise en<br>place</button>
+      <button id="nav-plateau-galactique" class="btn btn-toggle active" data-nav="plateau-galactique">Plateau<br>Galactique</button>
+      <button id="nav-plateau-maison" class="btn btn-toggle" data-nav="plateau-maison">Fiche<br>Maison</button>
       <button id="nav-focus" class="btn btn-toggle" data-nav="focus">Focus</button>
-      <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs">Secteurs</button>
-      <button id="nav-galaxie" class="btn btn-toggle" data-nav="galaxie">Galaxie</button>
+      <!-- "_secteurs" (retour utilisateur, 14/09/2026) : onglet MASQUÉ —
+           écran encore fonctionnel (#screen-secteurs, formulaire
+           "Rappeler un cube" notamment) mais remplacé côté navigation par
+           "Galaxie" ci-dessous (renommé "Secteurs", rendu hexagonal +
+           formulaire "Construire" désormais réunis là). Pour le
+           réafficher : retirer l'attribut `hidden` de ce bouton. -->
+      <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs" hidden>_secteurs</button>
+      <button id="nav-galaxie" class="btn btn-toggle" data-nav="galaxie">Secteurs</button>
       <button id="nav-combat" class="btn btn-toggle" data-nav="combat">Combat</button>
     </nav>
   </div>
@@ -165,11 +171,11 @@
       <summary class="section-title" style="cursor:pointer;">Plateau Crise</summary>
       <div class="game-block">
         <div class="plateau-influence">
-          <span class="plateau-influence-groupe">
-            <button id="btn-escarmouche-standalone" class="btn btn-secondary btn-sm">Escarmouche</button>
+          <button id="btn-escarmouche-standalone" class="btn btn-secondary btn-sm">Escarmouche</button>
+          <span class="crise-modificateur-champ">
             <label for="crise-modificateur-escarmouche">Modificateur</label>
+            <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
           </span>
-          <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
         </div>
 
         <h3 class="subsection-title" style="margin-top:16px;">Coût à payer</h3>
@@ -182,8 +188,11 @@
             <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-science" value="0"></span>
           <span class="crise-cout-item" style="--couleur-ressource:#d1a671;"><span class="pastille-ressource"></span>C
             <input type="number" step="1" min="0" max="4" class="ressource-case-input-sm" id="crise-cout-credit" value="0"></span>
+        </div>
+        <div class="crise-cout-ligne" style="margin-top:10px;">
           <button id="btn-crise-payer" class="btn btn-secondary btn-sm">Payer</button>
-          <span class="crise-cout-item"><span class="losange-argente"></span>
+          <span id="crise-payer-confirmation" class="hint" style="color:var(--color-coral);opacity:0;transition:opacity 0.25s;">✓ Payé</span>
+          <span class="crise-cout-item" style="margin-left:auto;"><span class="losange-argente"></span>
             <input type="number" step="3" min="0" max="18" class="ressource-case-input-sm" id="crise-cout-influence" value="0"></span>
         </div>
 
@@ -296,8 +305,13 @@
          `effet` (GameService.formatMaison_) : AFFICHAGE SEULEMENT, aucune
          des 10 compétences (sur 14 maisons — 4 "de base" n'en ont pas)
          n'est automatisée. Voir renderMaisonEffet_, index.html. -->
-    <h2 class="section-title">Maison</h2>
-    <div class="game-block" id="bloc-maison-effet"></div>
+    <details id="bloc-maison-details" open>
+      <summary class="section-title section-title-avec-suffixe" style="cursor:pointer;">
+        <span id="titre-maison-effet">Maison</span>
+        <span id="icone-maison-capacite" class="icone-capacite-maison" hidden title="Capacité spéciale — à ne pas oublier">★</span>
+      </summary>
+      <div class="game-block" id="bloc-maison-effet"></div>
+    </details>
 
     <h2 class="section-title" style="margin-top:22px;">Ressources</h2>
     <div class="game-block" id="bloc-ressources">
@@ -453,24 +467,16 @@
   </section>
 
   <!-- Écran Secteurs — tableau minimal, pas encore de plateau visuel -->
+  <!-- "_secteurs" (retour utilisateur, 14/09/2026) : écran MASQUÉ de la
+       navigation (voir #nav-secteurs plus haut, hidden) mais toujours
+       fonctionnel — seul point d'entrée restant pour "Rappeler un cube"
+       (SecteurService.rappelerCube), qui n'a PAS été basculé sur l'écran
+       Galaxie/Secteurs ci-dessous (seuls les formulaires D'AJOUT
+       Installation/Guilde l'ont été). Pour le réafficher dans la nav :
+       retirer l'attribut `hidden` du bouton #nav-secteurs. -->
   <section id="screen-secteurs" class="screen" hidden>
     <h2 class="section-title">Plateau des secteurs</h2>
     <div class="game-block" style="overflow-x:auto;" id="secteurs-conteneur"></div>
-
-    <!-- Envahir/Regrouper/Déployer des cubes restent hors périmètre de cet
-         écran (engagement multi-unités, formulaire plus complexe) — seuls
-         Construire et Rappeler un cube sont possibles ici
-         (SecteurService.construire/rappelerCube). -->
-    <div class="game-block" id="bloc-construire" style="margin-top:14px;">
-      <h3 class="subsection-title">Construire</h3>
-      <select id="construire-categorie">
-        <option value="installation">Installation</option>
-        <option value="guilde">Guilde</option>
-      </select>
-      <select id="construire-secteur" style="margin-top:8px;"></select>
-      <select id="construire-type" style="margin-top:8px;"></select>
-      <button id="btn-construire" class="btn btn-primary" style="width:100%;margin-top:10px;">Construire</button>
-    </div>
 
     <div class="game-block" id="bloc-rappeler-cube" style="margin-top:14px;">
       <h3 class="subsection-title">Rappeler un cube</h3>
@@ -480,21 +486,32 @@
     </div>
   </section>
 
-  <!-- Écran Galaxie : rendu hexagonal visuel du plateau des secteurs (port
-       de poc-rendu-secteurs.html/poc-rendu-secteurs-notes.md — voir
-       js/secteurVueService.js pour le détail des choix structurants :
-       coordonnées (q,r) reconstruites à la main pour le scénario solo_1
-       uniquement, orientation figée, emplacements Installation/Guilde
-       génériques reconstitués à partir des compteurs réels de
-       secteursPartie. Lecture seule : les actions restent sur l'onglet
-       Secteurs (formulaires Construire/Rappeler un cube). -->
+  <!-- Écran "Secteurs" (renommé, retour utilisateur 14/09/2026 — remplace
+       l'ancien onglet "Secteurs" ci-dessus, désormais masqué) : rendu
+       hexagonal visuel du plateau (port de poc-rendu-secteurs.html/
+       poc-rendu-secteurs-notes.md — voir js/secteurVueService.js pour le
+       détail des choix structurants : coordonnées (q,r) reconstruites à
+       la main pour le scénario solo_1 uniquement, orientation figée,
+       emplacements Installation/Guilde génériques reconstitués à partir
+       des compteurs réels de secteursPartie). Le formulaire "Construire"
+       (ajout Installation/Guilde) vit désormais ICI, en bas — seul
+       "Rappeler un cube" reste sur l'écran "_secteurs" ci-dessus. -->
   <section id="screen-galaxie" class="screen" hidden>
-    <h2 class="section-title">Galaxie</h2>
-    <p class="hint">Appuyer sur un secteur pour voir son détail.</p>
     <div id="galaxie-conteneur" class="galaxie-plateau"></div>
     <div id="galaxie-detail" class="galaxie-detail">
       <h3>Détail</h3>
       <div class="vide">Sélectionnez un secteur ci-dessus.</div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Ajout Guildes et Installations</h2>
+    <div class="game-block" id="bloc-construire">
+      <select id="construire-categorie">
+        <option value="installation">Installation</option>
+        <option value="guilde">Guilde</option>
+      </select>
+      <select id="construire-secteur" style="margin-top:8px;"></select>
+      <select id="construire-type" style="margin-top:8px;"></select>
+      <button id="btn-construire" class="btn btn-primary" style="width:100%;margin-top:10px;">Construire</button>
     </div>
   </section>
 
@@ -636,8 +653,14 @@
       if (nom === 'secteurs' && partieCourante) {
         renderEcranSecteurs_(partieCourante);
       }
-      if (nom === 'galaxie' && partieCourante && typeof SecteurVueService !== 'undefined') {
-        SecteurVueService.afficher(partieCourante);
+      if (nom === 'galaxie' && partieCourante) {
+        if (typeof SecteurVueService !== 'undefined') SecteurVueService.afficher(partieCourante);
+        // Formulaire "Ajout Guildes et Installations" (retour utilisateur,
+        // 14/09/2026 — basculé depuis l'ancien écran "Secteurs", désormais
+        // masqué) : renderFormulaireConstruire_ SEUL (pas tout
+        // renderEcranSecteurs_, qui reconstruirait aussi #secteurs-conteneur/
+        // "Rappeler un cube", restés sur l'écran masqué, pour rien).
+        renderFormulaireConstruire_(partieCourante);
       }
     }
 
@@ -827,6 +850,17 @@
               renderPlateauCrise_(partieMaj);
               if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
               btnPayer.disabled = false;
+              // Retour visuel (retour utilisateur, 14/09/2026 : "le clic
+              // sur le bouton payer manque de retour visuel") — le
+              // paiement est quasi instantané (IndexedDB local), le seul
+              // signal .disabled ci-dessus passe donc inaperçu. "✓ Payé"
+              // apparaît brièvement à côté du bouton (fondu CSS, voir
+              // #crise-payer-confirmation).
+              var confirmation = document.getElementById('crise-payer-confirmation');
+              if (confirmation) {
+                confirmation.style.opacity = '1';
+                setTimeout(function () { confirmation.style.opacity = '0'; }, 1400);
+              }
             })
             .catch(function (erreur) {
               btnPayer.disabled = false;
@@ -988,12 +1022,22 @@
       if (!conteneur) return;
       var joueur = partie.joueur || {};
       var nomMaison = joueur.nom || '—';
+
+      // Retour utilisateur (14/09/2026) : le nom de la Maison vit
+      // désormais dans le TITRE de la section ("Maison Belitan", plus
+      // besoin de le répéter en <h3> dans le bloc) ; l'icône ★ (masquée
+      // sinon) rappelle qu'une capacité existe même quand la section est
+      // repliée (nouveau <details>, voir index.html).
+      var titre = document.getElementById('titre-maison-effet');
+      if (titre) titre.textContent = 'Maison ' + nomMaison;
+      var icone = document.getElementById('icone-maison-capacite');
+      if (icone) icone.hidden = !joueur.effet;
+
       if (!joueur.effet) {
-        conteneur.innerHTML = '<h3>' + nomMaison + '</h3><p class="hint" style="margin:0;">Aucune capacité spéciale (maison de base).</p>';
+        conteneur.innerHTML = '<p class="hint" style="margin:0;">Aucune capacité spéciale (maison de base).</p>';
         return;
       }
-      var paragraphes = joueur.effet.split('\n\n').map(function (p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
-      conteneur.innerHTML = '<h3>' + nomMaison + '</h3>' + paragraphes;
+      conteneur.innerHTML = joueur.effet.split('\n\n').map(function (p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
     }
 
     /**
@@ -1581,17 +1625,17 @@
           if (plein && r.recompenseAppliquee) {
             actions = '<span class="hint">Récompense déjà appliquée.</span>';
           } else if (plein) {
-            actions = '<button type="button" class="btn btn-secondary btn-refuge-recompense" data-index="' + index + '">Choisir une récompense</button>';
+            actions = '<button type="button" class="btn btn-secondary btn-xs btn-refuge-recompense" data-index="' + index + '">Récompense</button>';
           } else {
-            actions = '<button type="button" class="btn btn-secondary btn-refuge-ajouter" data-index="' + index + '">+1 cube (manuel)</button>' +
+            actions = '<button type="button" class="btn btn-secondary btn-xs btn-refuge-ajouter" data-index="' + index + '">+1 cube</button>' +
               pistesNiveau4.map(function (p) {
-                return '<button type="button" class="btn btn-secondary btn-refuge-niveau4" data-index="' + index + '" data-piste="' + p.cle + '">' +
+                return '<button type="button" class="btn btn-secondary btn-xs btn-refuge-niveau4" data-index="' + index + '" data-piste="' + p.cle + '">' +
                   '+1 cube (Niveau 4 — ' + p.label + ')</button>';
               }).join('');
           }
 
-          return '<div class="plateau-influence" style="margin-bottom:12px;">' +
-            '<label>Refuge ' + (index + 1) + ' <span class="hint">(' + r.cubes + '/' + taille + ')</span></label>' +
+          return '<div class="plateau-influence" style="margin-bottom:12px;border-top:none;padding-top:0;margin-top:0;">' +
+            '<label>Refuge ' + (index + 1) + '</label>' +
             '<div class="hint" style="font-size:1.2em;letter-spacing:3px;">' + emplacements.join(' ') + '</div>' +
             '<div class="modal-choix-boutons" style="margin-top:6px;">' + actions + '</div>' +
             '</div>';
@@ -3148,6 +3192,11 @@
           .then(function () {
             renderEcranSecteurs_(partie);
             rafraichirSecteurs();
+            // Formulaire désormais sur l'écran "Secteurs" (ex-"Galaxie",
+            // retour utilisateur 14/09/2026) : redessine le plateau
+            // hexagonal pour voir l'Installation/Guilde ajoutée sans
+            // devoir quitter/revenir sur l'onglet.
+            if (typeof SecteurVueService !== 'undefined') SecteurVueService.afficher(partie);
             btn.disabled = false;
             btn.textContent = texteOriginal;
           })

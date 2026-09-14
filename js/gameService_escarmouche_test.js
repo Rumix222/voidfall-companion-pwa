@@ -207,7 +207,7 @@ test('appliquerEscarmouche : aucun secteur éligible -> {aucuneCible:true}, aucu
 // appliquerEscarmouchePhaseEval (avec paiement + flag escarmoucheResoluePhaseEval)
 // ---------------------------------------------------------------
 
-test('appliquerEscarmouchePhaseEval : applique le paiement (5 ressources), remet les compteurs criseCout* à 0, pose le flag', function () {
+test('appliquerEscarmouchePhaseEval : applique le paiement (5 ressources), remet SEULEMENT criseCoutInfluence à 0 (les 4 autres restent, retour utilisateur 14/09/2026), pose le flag', function () {
   var fixture = creerFixture({
     plateauMaison: { criseCoutMateriel: 2, criseCoutEnergie: 1, criseCoutInfluence: 3 },
     secteurs: [
@@ -225,9 +225,9 @@ test('appliquerEscarmouchePhaseEval : applique le paiement (5 ressources), remet
     assert.strictEqual(pm.ressourceMateriel, 3); // 5 - 2
     assert.strictEqual(pm.ressourceEnergie, 4); // 5 - 1
     assert.strictEqual(pm.influence, 7); // 10 - 3
-    assert.strictEqual(pm.criseCoutMateriel, 0);
-    assert.strictEqual(pm.criseCoutEnergie, 0);
-    assert.strictEqual(pm.criseCoutInfluence, 0);
+    assert.strictEqual(pm.criseCoutMateriel, 2, 'valeur fixe rappelée au Cycle suivant, pas remise à 0');
+    assert.strictEqual(pm.criseCoutEnergie, 1, 'valeur fixe rappelée au Cycle suivant, pas remise à 0');
+    assert.strictEqual(pm.criseCoutInfluence, 0, 'seule pénalité ponctuelle, remise à 0');
     assert.strictEqual(ctx.parties[PARTIE_ID].etatJson.evenements.cycle1.escarmoucheResoluePhaseEval, true);
     assert.strictEqual(resultat.cible.numero, 1);
   });

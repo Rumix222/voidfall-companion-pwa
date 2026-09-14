@@ -1,7 +1,50 @@
 /**
  * version.js
- * Version 152 — 2026-09-14
+ * Version 153 — 2026-09-14
  * Source de vérité unique pour la version de l'application.
+ *
+ * 14/09/2026, suite (retour utilisateur, liste de retouches visuelles) :
+ * - Plateau Crise (light) : "Modificateur" aligné à droite avec son
+ *   champ (groupe déplacé de gauche à droite de la ligne) ; boutons
+ *   "Escarmouche"/"Payer" agrandis (.btn-sm) ; "Payer" + Influence passés
+ *   sur une 2e ligne sous M/E/S/C, dont le gap est élargi avec la place
+ *   gagnée ; retour visuel "✓ Payé" (fondu CSS) au clic "Payer" ;
+ *   `GameService.payerCoutCrise`/`appliquerEscarmouchePhaseEval` ne
+ *   remettent plus les 4 compteurs `criseCout<Ressource>` à 0 après
+ *   paiement (valeur FIXE rappelée au Cycle suivant) — seul
+ *   `criseCoutInfluence` (pénalité ponctuelle) l'est encore.
+ * - Refuges : boutons rétrécis (.btn-xs, direction opposée à .btn-sm
+ *   ci-dessus) ; "(manuel)"/le compte "(x/y)" retirés (les ● /○ suffisent) ;
+ *   "Choisir une récompense" → "Récompense" ; trait de séparation
+ *   au-dessus de chaque tuile retiré.
+ * - Nav (barre d'onglets) : "Plat. Galactique" → "Plateau Galactique",
+ *   "Plat. maison" → "Fiche Maison" (renommé), "Mise en place" — les 3
+ *   sur 2 lignes (`<br>`, réduit la largeur de chaque bouton).
+ * - Section "Maison" (Fiche Maison) : nom de la Maison désormais DANS le
+ *   titre ("Maison Belitan"), section repliable (`<details>`), icône ★
+ *   à droite du titre (visible même repliée) si la Maison a une capacité
+ *   spéciale à ne pas oublier.
+ * - Onglet "Secteurs" (ex-"Galaxie") : titre "Galaxie"/description
+ *   retirés ; secteur sélectionné désormais surligné (contour corail,
+ *   `.hex-secteur-selectionnee`) ; champs éditables du panneau détail
+ *   (Population/Cube du Néant/jeton Prime/Libération) rétrécis — même
+ *   piège de spécificité CSS que `.ressource-case-input-sm` (Version 152,
+ *   Plateau Crise) : `.galaxie-detail-input` à 1 seule classe se faisait
+ *   écraser par `input[type="number"]`, corrigé en la scopant
+ *   `.galaxie-detail .galaxie-detail-input` ; formulaire "Construire"
+ *   (ajout Installation/Guilde) basculé depuis l'ancien onglet "Secteurs"
+ *   dans une nouvelle section "Ajout Guildes et Installations" en bas de
+ *   CET onglet.
+ * - Ancien onglet "Secteurs" : masqué de la nav (bouton `hidden`, renommé
+ *   "_secteurs" dans le DOM) — reste fonctionnel (seul point d'entrée
+ *   restant pour "Rappeler un cube", jamais basculé) ; note laissée en
+ *   commentaire (index.html) pour le réafficher au besoin (retirer
+ *   `hidden`).
+ * Aucun test unitaire nouveau pour le CSS/HTML pur ; `payerCoutCrise`/
+ * `appliquerEscarmouchePhaseEval` (comportement changé) : tests existants
+ * mis à jour (js/gameService_plateau_crise_test.js,
+ * js/gameService_escarmouche_test.js). 281 tests au vert. Vérifié
+ * visuellement en navigateur (voir détail dans la conversation).
  *
  * 14/09/2026, suite (retour utilisateur : "Amélioration visuelle section
  * plateau crise") — bloc "Plateau Crise" (light) persistant,
@@ -5447,4 +5490,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260914.8';
+var APP_VERSION = '20260914.9';
