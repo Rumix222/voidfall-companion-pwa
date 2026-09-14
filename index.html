@@ -164,36 +164,37 @@
     <details id="bloc-plateau-crise" style="margin-bottom:22px;">
       <summary class="section-title" style="cursor:pointer;">Plateau Crise</summary>
       <div class="game-block">
-        <button id="btn-escarmouche-standalone" class="btn btn-secondary" style="width:100%;margin-bottom:14px;">Escarmouche</button>
         <div class="plateau-influence">
-          <label for="crise-modificateur-escarmouche">Modificateur escarmouche (s'ajoute à la puissance du Néant)</label>
+          <span class="plateau-influence-groupe">
+            <button id="btn-escarmouche-standalone" class="btn btn-secondary btn-sm">Escarmouche</button>
+            <label for="crise-modificateur-escarmouche">Modificateur</label>
+          </span>
           <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
         </div>
 
-        <h3 class="subsection-title" style="margin-top:16px;">Coût à payer (résolution du Plateau Crise)</h3>
-        <div class="plateau-influence-ligne">
-          <div class="plateau-influence"><label for="crise-cout-materiel">Matériel</label>
-            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-materiel" value="0"></div>
-          <div class="plateau-influence"><label for="crise-cout-energie">Énergie</label>
-            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-energie" value="0"></div>
-          <div class="plateau-influence"><label for="crise-cout-science">Science</label>
-            <input type="number" step="1" min="0" max="2" class="ressource-case-input" id="crise-cout-science" value="0"></div>
-          <div class="plateau-influence"><label for="crise-cout-credit">Crédit</label>
-            <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-cout-credit" value="0"></div>
-          <div class="plateau-influence"><label for="crise-cout-influence">Influence</label>
-            <input type="number" step="3" min="0" max="18" class="ressource-case-input" id="crise-cout-influence" value="0"></div>
+        <h3 class="subsection-title" style="margin-top:16px;">Coût à payer</h3>
+        <div class="crise-cout-ligne">
+          <span class="crise-cout-item" style="--couleur-ressource:#ec0d69;"><span class="pastille-ressource"></span>M
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-materiel" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#f8a21b;"><span class="pastille-ressource"></span>E
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-energie" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#06afe5;"><span class="pastille-ressource"></span>S
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-science" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#d1a671;"><span class="pastille-ressource"></span>C
+            <input type="number" step="1" min="0" max="4" class="ressource-case-input-sm" id="crise-cout-credit" value="0"></span>
+          <button id="btn-crise-payer" class="btn btn-secondary btn-sm">Payer</button>
+          <span class="crise-cout-item"><span class="losange-argente"></span>
+            <input type="number" step="3" min="0" max="18" class="ressource-case-input-sm" id="crise-cout-influence" value="0"></span>
         </div>
-        <button id="btn-crise-payer" class="btn btn-secondary" style="margin-top:12px;">Payer</button>
 
-        <h3 class="subsection-title" style="margin-top:18px;">Crise perpétuelle</h3>
-        <div class="plateau-influence">
-          <label for="crise-perpetuelle">Crise perpétuelle (utilisée en fin de partie)</label>
+        <div class="plateau-influence" style="margin-top:16px;">
+          <label for="crise-perpetuelle">Crise perpétuelle</label>
           <input type="number" step="1" min="0" class="ressource-case-input" id="crise-perpetuelle" value="0">
         </div>
 
         <h3 class="subsection-title" style="margin-top:18px;">Objectifs galactiques (aide au calcul)</h3>
         <div class="plateau-influence">
-          <label for="crise-jetons-catastrophe">Jetons Catastrophe sur le plateau Crise</label>
+          <label for="crise-jetons-catastrophe">Jetons Catastrophe sur le plat. Crise</label>
           <input type="number" step="1" min="0" class="ressource-case-input" id="crise-jetons-catastrophe" value="0">
         </div>
         <div class="plateau-influence">

@@ -1,7 +1,38 @@
 /**
  * version.js
- * Version 151 — 2026-09-14
+ * Version 152 — 2026-09-14
  * Source de vérité unique pour la version de l'application.
+ *
+ * 14/09/2026, suite (retour utilisateur : "Amélioration visuelle section
+ * plateau crise") — bloc "Plateau Crise" (light) persistant,
+ * `index.html`/`#bloc-plateau-crise`, purement visuel (aucun changement
+ * de comportement/de champ) :
+ * - "Modificateur escarmouche (s'ajoute à la puissance du Néant)" →
+ *   "Modificateur", avec le bouton "Escarmouche" glissé sur la même
+ *   ligne, à sa gauche (`.plateau-influence-groupe`, nouvelle classe).
+ * - "Coût à payer" : les 4 ressources substituables tiennent sur une
+ *   seule ligne (y compris à ~400px, largeur téléphone — mesuré : ~340px
+ *   nécessaires), abrégées (M/E/S/C) avec une pastille colorée identique
+ *   à la grille Plat. Maison (`.pastille-ressource`/`--couleur-ressource`,
+ *   mêmes couleurs que `CHAMP_RESSOURCE`) ; le bouton "Payer" est placé
+ *   avant Influence, qui porte désormais le même losange argenté que le
+ *   bloc Corruption/Influence plus bas. Nouvelles classes CSS
+ *   `.crise-cout-ligne`/`.crise-cout-item`/`.ressource-case-input-sm`
+ *   (champs compacts, 30px) + `.btn-sm` (bouton compact réutilisable).
+ *   Piège rencontré : `.ressource-case-input-sm` à 1 seule classe se
+ *   faisait écraser par `input[type="number"]` (même spécificité,
+ *   déclaré plus bas dans ce fichier) — corrigé en la scopant
+ *   `.crise-cout-item .ressource-case-input-sm` (2 classes), même
+ *   principe que `.plateau-influence .ressource-case-input` déjà en
+ *   place.
+ * - "Crise perpétuelle" : titre `<h3>` et précision "(utilisée en fin de
+ *   partie)" retirés — une seule ligne label + champ, comme Corruption/
+ *   Influence.
+ * - "Jetons Catastrophe sur le plateau Crise" → "...sur le plat. Crise"
+ *   (tient sur une ligne).
+ * Aucun test (pur CSS/HTML statique, aucune logique) — vérifié
+ * visuellement en navigateur (largeur desktop ET ~400px, mesure directe
+ * de la largeur totale nécessaire de la ligne "Coût à payer").
  *
  * 14/09/2026, suite (BUG trouvé en testant le chantier Escarmouche en
  * navigateur — popup "Phase Évaluation" plantait avec "Cannot read
@@ -5416,4 +5447,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260914.7';
+var APP_VERSION = '20260914.8';

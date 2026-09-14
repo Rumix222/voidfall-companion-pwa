@@ -881,6 +881,66 @@ input:disabled {
   background: rgba(255, 107, 82, 0.08);
 }
 
+/* Bouton compact (ex. "Escarmouche"/"Payer" glissés sur une ligne de
+   .plateau-influence — voir #bloc-plateau-crise), à côté d'un label/
+   d'un champ plutôt qu'en pleine largeur comme .btn par défaut. */
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* Groupe "bouton + label" tassé à gauche d'une .plateau-influence (ex.
+   "Escarmouche" à gauche de "Modificateur") — laisse .plateau-influence
+   (space-between) placer ce groupe et le champ à ses 2 extrémités
+   habituelles, sans toucher au reste de son comportement. */
+.plateau-influence-groupe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Ligne "Coût à payer" du Plateau Crise (light) : ressources abrégées
+   (M/E/S/C, pastille colorée comme la grille Plat. Maison —
+   .pastille-ressource/--couleur-ressource, voir champRessourceHTML_)
+   + bouton "Payer" + Influence (losange-argente, comme le bloc
+   Corruption/Influence ci-dessus) — tout sur UNE ligne, wrap seulement
+   si l'écran est trop étroit. */
+.crise-cout-ligne {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.crise-cout-item {
+  --couleur-ressource: var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+/* Sélecteur à 2 classes (comme .plateau-influence .ressource-case-input
+   ci-dessus) — nécessaire pour l'emporter sur input[type="number"] plus
+   bas dans ce fichier (même spécificité qu'un sélecteur à 1 classe seule,
+   c'est l'ordre d'apparition qui déciderait sinon). */
+.crise-cout-item .ressource-case-input-sm {
+  width: 30px;
+  padding: 4px 1px;
+  border: 1px solid var(--couleur-ressource, var(--color-border));
+  border-radius: 6px;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-align: center;
+  background: var(--color-surface-2);
+}
+
 .ressources-journal {
   margin-top: 14px;
 }
