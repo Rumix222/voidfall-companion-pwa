@@ -353,7 +353,11 @@ var StrategieService = (function () {
     etablir_guilde: 'guilde',
     construire_installation: 'installation',
     augmenter_population: 'population',
-    augmenter_population_pure: 'population'
+    augmenter_population_pure: 'population',
+    // Focus Développement Fenrax "Recruter" (retour utilisateur, 15/09/2026
+    // — "implémente le cas Fenrax pendant qu'on y est") :
+    deployer_cube: 'cube',
+    deploy_cube: 'cube'
   };
   function genresMemeSecteur_(cles) {
     var genres = [];
@@ -363,14 +367,31 @@ var StrategieService = (function () {
     });
     return genres;
   }
+  // Secteurs éligibles pour déployer 1 cube en mode "libre" (MÊME règle
+  // que le formulaire dédié 'deployer_cube' — vousAppartientDeploiement_,
+  // feuilleFlowDeployerCube_/branche #modal-choix plus bas) : un secteur
+  // possédé, OU le Secteur-Mère (toujours éligible, même à 0 Puissance
+  // Navale).
+  function secteursEligiblesDeployerCubeLibre_(partieId) {
+    var partie = partieAffichee;
+    return Promise.all([
+      SecteurService.obtenirSecteurs(partieId),
+      SecteurService.obtenirSecteurMere(partie.scenarioId)
+    ]).then(function (resultats) {
+      var secteurs = resultats[0], numeroMere = resultats[1];
+      return secteurs
+        .filter(function (s) { return secteurEstPossede_(s) || s.numero === numeroMere; })
+        .map(function (s) { return { numero: s.numero }; });
+    });
+  }
   // Intersection (par numéro) des secteurs éligibles pour CHAQUE genre
   // demandé — mêmes fonctions d'éligibilité que 'construire'/
-  // 'augmenter_population_pure' individuels ci-dessous.
+  // 'augmenter_population_pure'/'deployer_cube' individuels ci-dessous.
   function chargerEligiblesMemeSecteur_(partieId, genres) {
     return Promise.all(genres.map(function (genre) {
-      return genre === 'population'
-        ? SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure(partieId)
-        : SecteurService.obtenirSecteursEligiblesConstruction(partieId, genre);
+      if (genre === 'population') return SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure(partieId);
+      if (genre === 'cube') return secteursEligiblesDeployerCubeLibre_(partieId);
+      return SecteurService.obtenirSecteursEligiblesConstruction(partieId, genre);
     })).then(function (listes) {
       var numeros = null;
       listes.forEach(function (liste) {
@@ -381,28 +402,40 @@ var StrategieService = (function () {
     });
   }
   // Applique séquentiellement, SUR LE MÊME secteur `numero`, chaque genre
-  // demandé — `typesChoisis` = { guilde: cle, installation: cle } (absent
-  // pour 'population', aucun sous-choix de type). Retourne les détails
-  // dans l'ordre, MÊME formulation que 'construire'/'augmenter_population_
-  // pure' individuels (pousser un journal cohérent avec le reste).
+  // demandé — `typesChoisis` = { guilde: cle, installation: cle, cube:
+  // cleVaisseau } (absent pour 'population', aucun sous-choix de type).
+  // Retourne {details, totalCubes, coutParRessource} — MÊME contrat que
+  // la réponse attendue par FocusEngine.resoudreOptionsMemeSecteur_ pour
+  // la clé 'deployer_cube' dédiée (cubeActif/coût par type délégués côté
+  // moteur, jamais débités ici — cette popup ne fait que le placement).
   function appliquerGenresMemeSecteur_(partieId, numero, genres, typesChoisis) {
+    var resultat = { details: [], totalCubes: 0, coutParRessource: {} };
     return genres.reduce(function (promesse, genre) {
-      return promesse.then(function (details) {
+      return promesse.then(function () {
         if (genre === 'population') {
           return SecteurService.augmenterPopulationPure(partieId, numero).then(function () {
-            return details.concat(['Population du Secteur ' + numero + ' augmentée de 1.']);
+            resultat.details.push('Population du Secteur ' + numero + ' augmentée de 1.');
+          });
+        }
+        if (genre === 'cube') {
+          var typeVaisseau = typesChoisis.cube;
+          return SecteurService.deployerCube(partieId, numero, typeVaisseau, 1).then(function () {
+            resultat.totalCubes += 1;
+            var coutCube = COUT_DEPLOIEMENT_PAR_TYPE[typeVaisseau];
+            if (coutCube) resultat.coutParRessource[coutCube.ressource] = (resultat.coutParRessource[coutCube.ressource] || 0) + coutCube.parCube;
+            resultat.details.push('1 ' + labelVaisseau_(typeVaisseau) + ' déployé(e) sur le Secteur ' + numero + '.');
           });
         }
         var type = typesChoisis[genre];
         var typesConnus = genre === 'installation' ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
         var labelType = typesConnus.filter(function (t) { return t.cle === type; })[0].label;
         return SecteurService.construire(partieId, numero, genre, type).then(function () {
-          return details.concat([genre === 'installation'
+          resultat.details.push(genre === 'installation'
             ? 'Installation ' + labelType + ' construite sur le Secteur ' + numero + '.'
-            : 'Guilde ' + labelType + ' établie sur le Secteur ' + numero + '.']);
+            : 'Guilde ' + labelType + ' établie sur le Secteur ' + numero + '.');
         });
       });
-    }, Promise.resolve([]));
+    }, Promise.resolve()).then(function () { return resultat; });
   }
 
   // Pour le formulaire "Déployer des cubes".
@@ -411,6 +444,27 @@ var StrategieService = (function () {
     cuirasse: { ressource: 'materiel', parCube: 1, label: 'Matériel' },
     porte_vaisseau: { ressource: 'nourriture', parCube: 1, label: 'Nourriture' }
   };
+  // EVOLUTION 32 (todo.md, retour utilisateur : "quand je déploie un cube
+  // de puissance et que je choisis un cuirassé je n'ai pas la possibilité
+  // de payer en crédit") : ce coût par type de vaisseau est substituable
+  // en Crédit (focusEngine.js délègue au cas générique RESSOURCES_
+  // SUBSTITUABLES_CREDIT_ juste après cette popup, voir CLES_DEPLOYER_CUBE/
+  // resoudreOptionsMemeSecteur_) — le formulaire "Déployer des cubes" ne
+  // doit donc plus bloquer sur la seule réserve de Matériel/Nourriture :
+  // le manque total (toutes ressources confondues, le Crédit étant un
+  // pool UNIQUE partagé entre elles) doit simplement tenir dans le Crédit
+  // disponible. Utilisée par feuilleFlowDeployerCube_ ET la branche
+  // #modal-choix équivalente (repli des cartes pas encore migrées),
+  // ainsi que par la popup combinée 'construire_meme_secteur' (EVOLUTION
+  // 31, Focus Développement Fenrax "Recruter").
+  function coutDeploiementCouvertParCredit_(coutParRessource, etatRessourcesLocal) {
+    var manqueTotal = 0;
+    Object.keys(coutParRessource).forEach(function (r) {
+      var manque = coutParRessource[r] - (etatRessourcesLocal[r] || 0);
+      if (manque > 0) manqueTotal += manque;
+    });
+    return manqueTotal <= (etatRessourcesLocal.credit || 0);
+  }
 
   // Mapping clé TYPES_VAISSEAU -> nom de champ attendu par
   // CombatService.resoudreInvasion (aligné sur construireCamp) — seule
@@ -4178,7 +4232,8 @@ var StrategieService = (function () {
     var etatRessourcesLocal = {
       cubeActif: contexte.cubeActif,
       materiel: contexte.ressourceMateriel,
-      nourriture: contexte.ressourceNourriture
+      nourriture: contexte.ressourceNourriture,
+      credit: contexte.ressourceCredit
     };
 
     // Coût combiné sur ce même écran UNIQUEMENT si c'est le tout premier
@@ -4275,14 +4330,18 @@ var StrategieService = (function () {
             return;
           }
 
-          var cout = COUT_DEPLOIEMENT_PAR_TYPE[type];
-          if (cout) {
-            var dejaEngageCoutant = deploiements.filter(function (d) { return d.type === type; }).reduce(function (s, d) { return s + d.quantite; }, 0);
-            var coutTotal = (dejaEngageCoutant + quantite) * cout.parCube;
-            if (coutTotal > etatRessourcesLocal[cout.ressource]) {
-              window.alert('Pas assez de ' + cout.label + ' (' + cout.parCube + ' par cube) : ' + etatRessourcesLocal[cout.ressource] + ' disponible(s).');
-              return;
-            }
+          // EVOLUTION 32 (todo.md) : le coût par type de vaisseau est
+          // substituable en Crédit (voir coutDeploiementCouvertParCredit_)
+          // — ne bloque plus sur la seule réserve de Matériel/Nourriture,
+          // seulement si même le Crédit combiné ne suffirait pas.
+          var coutHypothetique = {};
+          deploiements.concat([{ type: type, quantite: quantite }]).forEach(function (d) {
+            var c = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
+            if (c) coutHypothetique[c.ressource] = (coutHypothetique[c.ressource] || 0) + c.parCube * d.quantite;
+          });
+          if (!coutDeploiementCouvertParCredit_(coutHypothetique, etatRessourcesLocal)) {
+            window.alert('Ressource(s) et Crédit combinés insuffisants pour ce déploiement.');
+            return;
           }
 
           deploiements.push({ numero: numero, type: type, quantite: quantite });
@@ -4296,10 +4355,10 @@ var StrategieService = (function () {
             var cout = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
             if (cout) coutParRessource[cout.ressource] = (coutParRessource[cout.ressource] || 0) + cout.parCube * d.quantite;
           });
-          var ressourceInsuffisante = Object.keys(coutParRessource).some(function (r) { return coutParRessource[r] > etatRessourcesLocal[r]; });
+          var ressourceInsuffisante = !coutDeploiementCouvertParCredit_(coutParRessource, etatRessourcesLocal);
           var totalCubes = totalEngage_();
           if (ressourceInsuffisante || totalCubes > etatRessourcesLocal.cubeActif) {
-            window.alert('Ressources ou Cube actif insuffisant(s) pour ce déploiement.');
+            window.alert('Ressources ou Cube actif insuffisant(s) (même en substituant le Crédit disponible) pour ce déploiement.');
             return;
           }
 
@@ -4678,6 +4737,14 @@ var StrategieService = (function () {
     var genres = genresMemeSecteur_(contexte.cles);
     var veutGuilde = genres.indexOf('guilde') !== -1;
     var veutInstallation = genres.indexOf('installation') !== -1;
+    // Focus Développement Fenrax "Recruter" (deployer_cube + augmenter_
+    // population, retour utilisateur 15/09/2026) : type de vaisseau au
+    // choix, MÊME liste que la popup 'deployer_cube' dédiée
+    // (typesVaisseauDeployables_) — 1 seul cube, jamais le formulaire
+    // multi-engagement complet (hors périmètre de ce combo, voir
+    // focusEngine.js/CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_).
+    var veutCube = genres.indexOf('cube') !== -1;
+    var typesVaisseauCombo = veutCube ? typesVaisseauDeployables_(partie) : [];
 
     var etape = { titre: etiquette + 'Choisir un secteur', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
     feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
@@ -4700,17 +4767,28 @@ var StrategieService = (function () {
           ? '<label class="hint" for="feuille-meme-secteur-installation" style="margin-top:8px;display:block;">Installation</label>' +
             '<select id="feuille-meme-secteur-installation">' + TYPES_INSTALLATION_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>'
           : '') +
+        (veutCube
+          ? '<label class="hint" for="feuille-meme-secteur-cube" style="margin-top:8px;display:block;">Type de vaisseau</label>' +
+            '<select id="feuille-meme-secteur-cube">' + typesVaisseauCombo.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>'
+          : '') +
         '</div>';
       etapeCourante.onValider = function () {
         var numero = Number(feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-secteur').value);
         var typesChoisis = {};
         if (veutGuilde) typesChoisis.guilde = feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-guilde').value;
         if (veutInstallation) typesChoisis.installation = feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-installation').value;
+        if (veutCube) {
+          typesChoisis.cube = feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-cube').value;
+          if ((contexte.cubeActif || 0) < 1) {
+            window.alert('Pas assez de Cube actif pour déployer.');
+            return;
+          }
+        }
         feuilleEls_.btnValider.disabled = true;
-        appliquerGenresMemeSecteur_(partie.id, numero, genres, typesChoisis).then(function (details) {
+        appliquerGenresMemeSecteur_(partie.id, numero, genres, typesChoisis).then(function (resultat) {
           feuilleEls_.btnValider.disabled = false;
           feuilleRejetCourant_ = null;
-          resolve({ detail: details.join(' '), numero: numero });
+          resolve({ detail: resultat.details.join(' '), numero: numero, totalCubes: resultat.totalCubes, coutParRessource: resultat.coutParRessource });
         }).catch(function (erreur) {
           feuilleEls_.btnValider.disabled = false;
           window.alert('Échec : ' + erreur.message);
@@ -5357,7 +5435,8 @@ var StrategieService = (function () {
         var etatRessourcesLocal = {
           cubeActif: contexte.cubeActif,
           materiel: contexte.ressourceMateriel,
-          nourriture: contexte.ressourceNourriture
+          nourriture: contexte.ressourceNourriture,
+          credit: contexte.ressourceCredit
         };
 
         // EVOLUTION todo.md (retour utilisateur) : le Secteur-Mère vous
@@ -5451,14 +5530,17 @@ var StrategieService = (function () {
               return;
             }
 
-            var cout = COUT_DEPLOIEMENT_PAR_TYPE[type];
-            if (cout) {
-              var dejaEngageCoutant = deploiements.filter(function (d) { return d.type === type; }).reduce(function (s, d) { return s + d.quantite; }, 0);
-              var coutTotal = (dejaEngageCoutant + quantite) * cout.parCube;
-              if (coutTotal > etatRessourcesLocal[cout.ressource]) {
-                window.alert('Pas assez de ' + cout.label + ' (' + cout.parCube + ' par cube) : ' + etatRessourcesLocal[cout.ressource] + ' disponible(s).');
-                return;
-              }
+            // EVOLUTION 32 (todo.md) : voir coutDeploiementCouvertParCredit_
+            // — ne bloque plus sur la seule réserve de Matériel/Nourriture,
+            // seulement si même le Crédit combiné ne suffirait pas.
+            var coutHypothetique = {};
+            deploiements.concat([{ type: type, quantite: quantite }]).forEach(function (d) {
+              var c = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
+              if (c) coutHypothetique[c.ressource] = (coutHypothetique[c.ressource] || 0) + c.parCube * d.quantite;
+            });
+            if (!coutDeploiementCouvertParCredit_(coutHypothetique, etatRessourcesLocal)) {
+              window.alert('Ressource(s) et Crédit combinés insuffisants pour ce déploiement.');
+              return;
             }
 
             deploiements.push({ numero: numero, type: type, quantite: quantite });
@@ -5474,10 +5556,10 @@ var StrategieService = (function () {
               var cout = COUT_DEPLOIEMENT_PAR_TYPE[d.type];
               if (cout) coutParRessource[cout.ressource] = (coutParRessource[cout.ressource] || 0) + cout.parCube * d.quantite;
             });
-            var ressourceInsuffisante = Object.keys(coutParRessource).some(function (r) { return coutParRessource[r] > etatRessourcesLocal[r]; });
+            var ressourceInsuffisante = !coutDeploiementCouvertParCredit_(coutParRessource, etatRessourcesLocal);
             var totalCubes = totalEngage_();
             if (ressourceInsuffisante || totalCubes > etatRessourcesLocal.cubeActif) {
-              window.alert('Ressources ou Cube actif insuffisant(s) pour ce déploiement.');
+              window.alert('Ressources ou Cube actif insuffisant(s) (même en substituant le Crédit disponible) pour ce déploiement.');
               return;
             }
 
@@ -6089,6 +6171,11 @@ var StrategieService = (function () {
         var genresMS = genresMemeSecteur_(contexte.cles);
         var veutGuildeMS = genresMS.indexOf('guilde') !== -1;
         var veutInstallationMS = genresMS.indexOf('installation') !== -1;
+        // Focus Développement Fenrax "Recruter" (retour utilisateur,
+        // 15/09/2026) — voir feuilleFlowConstruireMemeSecteur_ (même
+        // logique, 1 seul cube, MÊME liste que 'deployer_cube').
+        var veutCubeMS = genresMS.indexOf('cube') !== -1;
+        var typesVaisseauMS = veutCubeMS ? typesVaisseauDeployables_(partieAffichee) : [];
         titre.textContent = 'Choisir un secteur';
         contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
         btnValider.hidden = true;
@@ -6113,6 +6200,10 @@ var StrategieService = (function () {
             (veutInstallationMS
               ? '<select id="meme-secteur-select-installation" class="modal-choix-select" style="margin-top:8px;">' +
                 TYPES_INSTALLATION_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">Installation — ' + t.label + '</option>'; }).join('') + '</select>'
+              : '') +
+            (veutCubeMS
+              ? '<select id="meme-secteur-select-cube" class="modal-choix-select" style="margin-top:8px;">' +
+                typesVaisseauMS.map(function (t) { return '<option value="' + t.cle + '">Vaisseau — ' + t.label + '</option>'; }).join('') + '</select>'
               : '');
 
           btnValider.hidden = false;
@@ -6122,11 +6213,18 @@ var StrategieService = (function () {
             var typesChoisis = {};
             if (veutGuildeMS) typesChoisis.guilde = document.getElementById('meme-secteur-select-guilde').value;
             if (veutInstallationMS) typesChoisis.installation = document.getElementById('meme-secteur-select-installation').value;
+            if (veutCubeMS) {
+              typesChoisis.cube = document.getElementById('meme-secteur-select-cube').value;
+              if ((contexte.cubeActif || 0) < 1) {
+                window.alert('Pas assez de Cube actif pour déployer.');
+                return;
+              }
+            }
             btnValider.disabled = true;
-            appliquerGenresMemeSecteur_(partieMS.id, numero, genresMS, typesChoisis).then(function (details) {
+            appliquerGenresMemeSecteur_(partieMS.id, numero, genresMS, typesChoisis).then(function (resultat) {
               fermerModale_();
               btnValider.disabled = false;
-              resolve({ detail: details.join(' '), numero: numero });
+              resolve({ detail: resultat.details.join(' '), numero: numero, totalCubes: resultat.totalCubes, coutParRessource: resultat.coutParRessource });
             }).catch(function (erreur) {
               btnValider.disabled = false;
               window.alert('Échec : ' + erreur.message);

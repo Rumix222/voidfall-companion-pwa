@@ -1,7 +1,62 @@
 /**
  * version.js
- * Version 157 — 2026-09-15
+ * Version 158 — 2026-09-15
  * Source de vérité unique pour la version de l'application.
+ *
+ * 15/09/2026, suite (retour utilisateur sur la session précédente —
+ * "Évolution 29 je comprend pas... Implémente le cas Fenrax recruter...
+ * Évolution 32 le problème est quand je déploie un cube de puissance et
+ * que je choisis un cuirassé je n'ai pas la possibilité de payer en
+ * crédit") :
+ * - EVOLUTION 29, cause réelle trouvée : la vérification précédente
+ *   (session d'avant) ne testait que la propriété JS `.hidden` de
+ *   `#chambre-decontamination-depart-ligne` (bien à `true`), jamais le
+ *   rendu RÉEL — `css/style.css`/`.plateau-influence { display: flex; }`
+ *   écrasait silencieusement `[hidden]` (même piège déjà connu pour
+ *   `.btn[hidden]`/`.screen[hidden]` etc., simplement jamais recopié pour
+ *   cette classe) : le champ restait donc TOUJOURS visible malgré
+ *   `hidden` posé côté JS. Corrigé par une règle `.plateau-influence[hidden]
+ *   { display: none; }`. Au passage (retour utilisateur), le libellé du
+ *   champ perd son suffixe redondant : "Corruption (Chambres de
+ *   décontamination)" -> "Corruption" (index.html, Plat. maison
+ *   uniquement — les popups de choix de cible Secteur/Piste/Programme/
+ *   Chambres de décontamination gardent le nom complet, nécessaire pour
+ *   distinguer les 4 options).
+ * - EVOLUTION 31, suite (Focus Développement Fenrax "Recruter" — retour
+ *   utilisateur "implémente le cas Fenrax pendant qu'on y est") :
+ *   `focusEngine.js`/CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_ inclut
+ *   désormais 'deployer_cube'/'deploy_cube' (en plus de etablir_guilde/
+ *   construire_installation/augmenter_population(_pure)) — un choix
+ *   et/ou {deployer_cube, augmenter_population} + `meme_secteur` ouvre
+ *   donc lui aussi la popup combinée 'construire_meme_secteur' (1 seul
+ *   cube, 1 seul type de vaisseau, jamais le formulaire multi-engagement
+ *   complet — ce card ne demande jamais plus d'1 cube). `strategieService.js` :
+ *   genre "cube" ajouté à la popup combinée (Feuille + #modal-choix) —
+ *   secteur éligible = possédé (ou Secteur-Mère) ET Pur/Population < 6 à
+ *   la fois ; cubeActif/coût par type délégués à FocusEngine, MÊME
+ *   contrat que la clé 'deployer_cube' dédiée (totalCubes/coutParRessource).
+ * - EVOLUTION 32, suite (retour utilisateur : la substitution Crédit sur
+ *   les coûts de Technologie était déjà correcte, mais PAS sur le coût
+ *   "par cube déployé" — Cuirassé 1 Matériel/cube, Porte-Vaisseau
+ *   1 Nourriture/cube, COUT_DEPLOIEMENT_PAR_TYPE) : ce coût était débité
+ *   directement sur `etat`, sans jamais ouvrir la popup 'paiement_
+ *   ressource'. `focusEngine.js` (CLES_DEPLOYER_CUBE ET
+ *   resoudreOptionsMemeSecteur_) délègue désormais ce coût au MÊME cas
+ *   générique de substitution (RESSOURCES_SUBSTITUABLES_CREDIT_) que
+ *   n'importe quel autre coût Matériel/Nourriture. `strategieService.js`
+ *   (feuilleFlowDeployerCube_ + branche #modal-choix 'deployer_cube',
+ *   nouvelle fonction partagée `coutDeploiementCouvertParCredit_`) : la
+ *   validation du formulaire de déploiement (par ajout ET à la
+ *   validation finale) ne bloque plus sur la seule réserve de Matériel/
+ *   Nourriture — le manque total (toutes ressources confondues, le
+ *   Crédit étant un pool unique partagé) doit simplement tenir dans le
+ *   Crédit disponible ; la substitution proprement dite se fait ensuite,
+ *   séquentiellement par ressource, via la popup dédiée.
+ * Tests : `js/focusEngine.test.js` — 1 test 'deployer_cube (mode libre)'
+ * adapté au nouveau parcours (+ 1 nouveau : Matériel manquant -> substitué
+ * en Crédit) et 1 nouveau test bout-en-bout du combo Fenrax (choice et/ou
+ * {deployer_cube, augmenter_population} + meme_secteur -> exactement 1
+ * popup 'construire_meme_secteur', jamais 2 popups indépendantes).
  *
  * 15/09/2026, suite (retour utilisateur, TODO.md évolutions 29-32) :
  * - EVOLUTION 29 (Corruption Chambres de décontamination affichée même
@@ -5616,4 +5671,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260915.4';
+var APP_VERSION = '20260915.5';

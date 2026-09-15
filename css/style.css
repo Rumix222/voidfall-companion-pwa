@@ -860,6 +860,14 @@ input:disabled {
   padding-top: 14px;
   border-top: 1px solid var(--color-border);
 }
+/* EVOLUTION 29 (todo.md, retour utilisateur, 15/09/2026) : .plateau-influence
+   force display:flex, ce qui écrasait [hidden] (même piège que .btn[hidden]
+   ci-dessus) — #chambre-decontamination-depart-ligne restait donc visible
+   malgré `.hidden = true` posé par renderEcranPlateauMaison_ (index.html),
+   alors même que la propriété JS `hidden` était correctement à `true`. */
+.plateau-influence[hidden] {
+  display: none;
+}
 .plateau-influence label {
   display: flex;
   align-items: center;

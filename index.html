@@ -346,7 +346,7 @@
            renderTechnologiesObtenues_) — jamais les deux à la fois, une
            Technologie n'occupe qu'un seul emplacement. -->
       <div class="plateau-influence" id="chambre-decontamination-depart-ligne" style="margin-top:8px;" hidden>
-        <label>Corruption (Chambres de décontamination)</label>
+        <label>Corruption</label>
         <input type="number" step="1" min="0" class="ressource-case-input" id="chambre-decontamination-depart-input">
       </div>
     </div>
@@ -1253,7 +1253,7 @@
           '</div>' +
           (texteDetail ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + slot + '" hidden><p>' + texteDetail + '</p></div>' : '') +
           (estChambreObtenue
-            ? '<div class="plateau-influence" style="margin-top:4px;margin-bottom:8px;"><label>Corruption (Chambres de décontamination)</label>' +
+            ? '<div class="plateau-influence" style="margin-top:4px;margin-bottom:8px;"><label>Corruption</label>' +
               '<input type="number" step="1" min="0" class="ressource-case-input chambre-decontamination-obtenue-input" value="' + corruptionChambre + '"></div>'
             : '');
       }).join('');

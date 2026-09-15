@@ -182,20 +182,27 @@ var FocusEngine = (function () {
   };
   var CLES_CONSTRUIRE = Object.keys(CATEGORIE_PAR_CLE_CONSTRUIRE_);
   // EVOLUTION 31 (todo.md, retour utilisateur) : sous-ensemble de clés
-  // secteur-scopées qui ne demandent JAMAIS qu'un simple choix "1 secteur
-  // parmi une liste" (via 'construire'/'augmenter_population_pure',
-  // ci-dessous) — PAS 'deployer_cube' (formulaire multi-engagement séparé,
-  // hors périmètre de ce combo). Utilisée UNIQUEMENT quand un `choice`
-  // "et/ou" (options_inclusives) porte le modificateur `same_sector`/
-  // `meme_secteur` (ex. Focus Développement Héroïque "Développer" :
-  // etablir_guilde + augmenter_population) ET que le joueur retient AU
-  // MOINS 2 de ces options : demande alors le secteur UNE SEULE fois
-  // (popup 'construire_meme_secteur', strategieService.js) au lieu
-  // d'ouvrir 2 popups indépendantes qui pourraient désigner 2 secteurs
-  // différents — contraire à la carte ("dans le même secteur"). Un seul
-  // de ces mots-clés retenu (ou aucun) retombe sur le chemin normal
-  // ci-dessous (resoudreOption_ un par un), inchangé.
-  var CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_ = ['etablir_guilde', 'construire_installation', 'augmenter_population', 'augmenter_population_pure'];
+  // secteur-scopées combinables en UNE SEULE popup 'construire_meme_secteur'
+  // (strategieService.js) quand un `choice` "et/ou" (options_inclusives)
+  // porte le modificateur `same_sector`/`meme_secteur` (ex. Focus
+  // Développement Héroïque "Développer" : etablir_guilde + augmenter_
+  // population ; Focus Développement Fenrax "Recruter" : deployer_cube +
+  // augmenter_population) ET que le joueur retient AU MOINS 2 de ces
+  // options : demande alors le secteur UNE SEULE fois au lieu d'ouvrir 2
+  // popups indépendantes qui pourraient désigner 2 secteurs différents —
+  // contraire à la carte ("dans le même secteur"). Un seul de ces
+  // mots-clés retenu (ou aucun) retombe sur le chemin normal ci-dessous
+  // (resoudreOption_ un par un), inchangé. 'deployer_cube'/'deploy_cube'
+  // couverts DEPUIS le 15/09/2026 (retour utilisateur, "implémente le cas
+  // Fenrax pendant qu'on y est") : la popup combinée gère un formulaire
+  // "1 cube, 1 type, 1 secteur" simplifié (PAS le formulaire multi-
+  // engagement complet de CLES_DEPLOYER_CUBE ci-dessous, ce card ne
+  // demande jamais plus d'1 cube en pratique — voir resoudreOption_,
+  // une clé "bare" dans un tableau `choice` résout toujours `{cle:1}`).
+  // 'deployer_cube_par_chantier'/'deployer_cube_secteur_mere' restent
+  // hors de cette liste (mode imposé, sans réel choix de secteur à
+  // fusionner).
+  var CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_ = ['etablir_guilde', 'construire_installation', 'augmenter_population', 'augmenter_population_pure', 'deployer_cube', 'deploy_cube'];
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
   var MODE_PAR_CLE_DEPLOYER_CUBE = {
     deployer_cube_par_chantier: 'par_chantier',
@@ -349,17 +356,32 @@ var FocusEngine = (function () {
    * exactement comme demanderChoixEtJournaliser_ ci-dessus pour un cas
    * simple. Toutes ces clés sont Effet UNIQUEMENT (jamais un Coût),
    * signe toujours +1 — pas de paramètre `signe` à transmettre.
+   *
+   * Si `cles` inclut 'deployer_cube'/'deploy_cube' (Fenrax "Recruter",
+   * depuis le 15/09/2026), la popup répond aussi `totalCubes`/
+   * `coutParRessource` (MÊME contrat que la clé 'deployer_cube' dédiée
+   * ci-dessous) : cubeActif décrémenté ICI, et le coût par type de
+   * vaisseau (Cuirassé/Porte-Vaisseau) délégué au cas générique de
+   * substitution Crédit (EVOLUTION 32) plutôt que débité directement.
    */
   function resoudreOptionsMemeSecteur_(cles, source, etat, journal, demanderChoix) {
     return Promise.resolve(demanderChoix({
       type: 'construire_meme_secteur',
       cles: cles,
       source: source,
-      partieId: etat.partieId
+      partieId: etat.partieId,
+      cubeActif: etat.cubeActif,
+      ressourceMateriel: etat.ressourceMateriel,
+      ressourceNourriture: etat.ressourceNourriture,
+      ressourceCredit: etat.ressourceCredit
     })).then(function (reponse) {
       if (reponseAnnulee_(reponse)) return false;
+      var totalCubes = Number(reponse.totalCubes) || 0;
+      if (totalCubes) etat.cubeActif = Math.max(0, etat.cubeActif - totalCubes);
       journal.push(source + ' : ' + reponse.detail);
-      return true;
+      var coutParRessource = reponse.coutParRessource || {};
+      if (!Object.keys(coutParRessource).length) return true;
+      return resoudreJsonInterne_(coutParRessource, -1, source, '', etat, journal, demanderChoix);
     });
   }
 
@@ -656,21 +678,26 @@ var FocusEngine = (function () {
         partieId: etat.partieId,
         cubeActif: etat.cubeActif,
         ressourceMateriel: etat.ressourceMateriel,
-        ressourceNourriture: etat.ressourceNourriture
+        ressourceNourriture: etat.ressourceNourriture,
+        ressourceCredit: etat.ressourceCredit
       })).then(function (reponse) {
         if (reponseAnnulee_(reponse)) return false;
         var totalCubes = Number(reponse.totalCubes) || 0;
         etat.cubeActif = Math.max(0, etat.cubeActif - totalCubes);
+        journal.push(source + ' : Déployer — ' + reponse.detail + '.');
+        // EVOLUTION 32 (todo.md, retour utilisateur : "quand je déploie un
+        // cube ... et que je choisis un cuirassé je n'ai pas la possibilité
+        // de payer en crédit") : le coût "par cube déployé" (Cuirassé/
+        // Porte-Vaisseau — COUT_DEPLOIEMENT_PAR_TYPE, strategieService.js)
+        // était débité directement sur `etat`, sans jamais passer par la
+        // popup 'paiement_ressource' — délègue désormais au MÊME cas
+        // générique de substitution Crédit tout en haut de cette fonction
+        // (RESSOURCES_SUBSTITUABLES_CREDIT_) : `coutParRessource` ne
+        // contient jamais que "materiel"/"nourriture" (COUT_DEPLOIEMENT_
+        // PAR_TYPE), toujours substituables.
         var coutParRessource = reponse.coutParRessource || {};
-        Object.keys(coutParRessource).forEach(function (r) {
-          var champRessource = CHAMP_PAR_CLE[r];
-          if (champRessource) etat[champRessource] = Math.max(0, etat[champRessource] - coutParRessource[r]);
-        });
-        journal.push(source + ' : Déployer — ' + reponse.detail +
-          (Object.keys(coutParRessource).length
-            ? ' (coût : ' + Object.keys(coutParRessource).map(function (r) { return coutParRessource[r] + ' ' + r; }).join(', ') + ')'
-            : '') + '.');
-        return true;
+        if (!Object.keys(coutParRessource).length) return true;
+        return resoudreJsonInterne_(coutParRessource, -1, source, '', etat, journal, demanderChoix);
       });
     }
 

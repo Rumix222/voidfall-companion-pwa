@@ -1477,27 +1477,98 @@ test('avancer_civilisation : annulé (popup "Annuler") — bloque toute l\u2019a
   });
 });
 
-test('deployer_cube (mode libre) : succès — cubeActif ET coût ressource débités, journalisé', function () {
+test('deployer_cube (mode libre) : succès — cubeActif débité, coût par type payé via la popup "paiement_ressource" (EVOLUTION 32)', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Déployer', effet: { deployer_cube: 2 }, cout: {}, texte: '' };
 
   var demanderChoix = function (contexte) {
-    assert.strictEqual(contexte.type, 'deployer_cube');
-    assert.strictEqual(contexte.mode, 'libre');
-    assert.strictEqual(contexte.quantiteDemandee, 2);
-    assert.strictEqual(contexte.cubeActif, PLATEAU_BASE.cubeActif);
-    assert.strictEqual(contexte.ressourceMateriel, PLATEAU_BASE.ressourceMateriel);
-    // 1 Corvette (gratuite) + 1 Cuirassé (1 Matériel/cube, voir
-    // COUT_DEPLOIEMENT_PAR_TYPE côté strategieService.js)
-    return { totalCubes: 2, coutParRessource: { materiel: 1 }, detail: '1× Corvette → secteur 3, 1× Cuirasse → secteur 3' };
+    if (contexte.type === 'deployer_cube') {
+      assert.strictEqual(contexte.mode, 'libre');
+      assert.strictEqual(contexte.quantiteDemandee, 2);
+      assert.strictEqual(contexte.cubeActif, PLATEAU_BASE.cubeActif);
+      assert.strictEqual(contexte.ressourceMateriel, PLATEAU_BASE.ressourceMateriel);
+      assert.strictEqual(contexte.ressourceCredit, PLATEAU_BASE.ressourceCredit);
+      // 1 Corvette (gratuite) + 1 Cuirassé (1 Matériel/cube, voir
+      // COUT_DEPLOIEMENT_PAR_TYPE côté strategieService.js)
+      return { totalCubes: 2, coutParRessource: { materiel: 1 }, detail: '1× Corvette → secteur 3, 1× Cuirasse → secteur 3' };
+    }
+    // EVOLUTION 32 (todo.md, retour utilisateur : "quand je déploie un
+    // cube ... et que je choisis un cuirassé je n'ai pas la possibilité
+    // de payer en crédit") : le coût par type de vaisseau doit désormais
+    // ouvrir la MÊME popup 'paiement_ressource' que n'importe quel autre
+    // coût substituable — ici le joueur paie tout en Matériel.
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    assert.strictEqual(contexte.ressource, 'materiel');
+    assert.strictEqual(contexte.montant, 1);
+    return { utiliseRessource: 1 };
   };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
     assert.strictEqual(resultat.plateauMaisonApres.cubeActif, 0); // 2 - 2
     assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 4); // 5 - 1
-    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Déployer') !== -1 && l.indexOf('coût : 1 materiel') !== -1; }));
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Déployer') !== -1; }));
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('−1 materiel') !== -1; }));
+  });
+});
+
+test('deployer_cube : Matériel manquant -> substitué en Crédit (EVOLUTION 32)', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var plateauSansMateriel = Object.assign({}, PLATEAU_BASE, { ressourceMateriel: 0 });
+  var action = { action: 'Déployer', effet: { deployer_cube: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    if (contexte.type === 'deployer_cube') {
+      return { totalCubes: 1, coutParRessource: { materiel: 1 }, detail: '1× Cuirasse → secteur 3' };
+    }
+    assert.strictEqual(contexte.type, 'paiement_ressource');
+    assert.strictEqual(contexte.stockRessource, 0);
+    assert.strictEqual(contexte.stockCredit, PLATEAU_BASE.ressourceCredit);
+    return { utiliseRessource: 0 }; // couvert entièrement par le Crédit
+  };
+
+  return ctx.FocusEngine.resoudreAction(plateauSansMateriel, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, 0);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceCredit, PLATEAU_BASE.ressourceCredit - 1);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('substitué') !== -1; }));
+  });
+});
+
+test('EVOLUTION 31 (Focus Développement Fenrax "Recruter") : choice et/ou {deployer_cube, augmenter_population} + meme_secteur -> 1 seule popup combinée', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Développement' };
+  var action = {
+    action: 'Recruter', cout: { science: 1, nourriture: 1 },
+    effet: { choice: ['deployer_cube', 'augmenter_population'], meme_secteur: true },
+    texte: 'Déployez 1 cube et/ou augmentez une Population Pure dans le même secteur.'
+  };
+
+  var appels = [];
+  var demanderChoix = function (contexte) {
+    appels.push(contexte.type);
+    if (contexte.type === 'options_inclusives') return Promise.resolve([0, 1]);
+    if (contexte.type === 'construire_meme_secteur') {
+      // 1 SEULE popup pour les 2 options — jamais 'construire'/
+      // 'augmenter_population_pure'/'deployer_cube' individuellement.
+      assert.deepStrictEqual(contexte.cles, ['deployer_cube', 'augmenter_population']);
+      assert.strictEqual(contexte.cubeActif, PLATEAU_BASE.cubeActif);
+      assert.strictEqual(contexte.ressourceMateriel, PLATEAU_BASE.ressourceMateriel);
+      return Promise.resolve({ detail: '1 Cuirassé déployé(e) sur le Secteur 4. Population du Secteur 4 augmentée de 1.', numero: 4, totalCubes: 1, coutParRessource: { materiel: 1 } });
+    }
+    if (contexte.type === 'paiement_ressource') return Promise.resolve({ utiliseRessource: contexte.montant });
+    return Promise.resolve({ annule: true });
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.deepStrictEqual(appels, ['options_inclusives', 'construire_meme_secteur', 'paiement_ressource', 'paiement_ressource']);
+    assert.strictEqual(resultat.plateauMaisonApres.cubeActif, PLATEAU_BASE.cubeActif - 1);
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceMateriel, PLATEAU_BASE.ressourceMateriel - 1); // coût du cube (Cuirassé)
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceScience, PLATEAU_BASE.ressourceScience - 1); // coût de l'action
+    assert.strictEqual(resultat.plateauMaisonApres.ressourceNourriture, PLATEAU_BASE.ressourceNourriture - 1); // coût de l'action
   });
 });
 
