@@ -1,7 +1,86 @@
 /**
  * version.js
- * Version 156 — 2026-09-15
+ * Version 157 — 2026-09-15
  * Source de vérité unique pour la version de l'application.
+ *
+ * 15/09/2026, suite (retour utilisateur, TODO.md évolutions 29-32) :
+ * - EVOLUTION 29 (Corruption Chambres de décontamination affichée même
+ *   sans la Technologie) : vérifié déjà résolu — le champ manuel
+ *   correspondant (index.html/renderEcranPlateauMaison_/
+ *   renderTechnologiesObtenues_) était déjà masqué/démasqué selon que la
+ *   Technologie de départ OU l'un des 5 emplacements "obtenues" EST
+ *   "Chambres de décontamination" (chantier du 13/09/2026, avant
+ *   l'écriture de cette entrée de TODO.md) — revérifié dans le navigateur
+ *   (Shiveus : champ affiché ; Belitan : masqué). Aucun changement de code.
+ * - EVOLUTION 30 (texte de résolution d'un Cadre "Technologie + Coût"
+ *   trop verbeux, ex. "Cadre #2 (effet) : ... Cadre #2 (coût) : ...") :
+ *   `gameService.js`/`finaliserResolutionCadreFocusEngine_` retire
+ *   désormais entièrement le préfixe "Cadre #N (effet) : " (aucune
+ *   information utile — le titre du Cadre est déjà affiché juste
+ *   au-dessus) et remplace "Cadre #N (coût) : " par "(coût) : " (conservé,
+ *   distingue utilement la ligne de dépense). `strategieService.js`
+ *   (2 popups 'gagner_technologie', Feuille + #modal-choix) : "obtenue
+ *   (De base)" devient "obtenue." (le niveau par défaut n'apporte rien),
+ *   "obtenue (Améliorée)" inchangé. Exemple (Événement "L'aube de la
+ *   technologie") : "Appliqué Technologie « Terraformation » obtenue.
+ *   +1 Pop. Sec. 1 (coût) : −1 science." Vérifié qu'aucun autre parcours
+ *   (Objectifs galactiques, Technologie immédiate via gagnerTechnologieEt
+ *   ResoudreEffet, Piste de Civilisation) ne produit ce même verbiage —
+ *   déjà nettoyés par leur propre logique existante.
+ * - EVOLUTION 31 (Focus Développement Héroïque "Développer" : "Établissez
+ *   une Guilde et/ou augmentez une Population Pure dans le même secteur"
+ *   redemandait un 2e secteur, potentiellement différent, si les 2
+ *   options étaient retenues — la carte impose pourtant le MÊME secteur ;
+ *   popup en plus sur l'ancien modèle #modal-choix, sans le Coût affiché
+ *   en haut avec substitution Crédit) :
+ *   - `focusEngine.js` : un choix "et/ou" (options_inclusives) portant le
+ *     modificateur `same_sector`/`meme_secteur` (déjà présent au
+ *     catalogue, jusqu'ici silencieusement ignoré) et dont ≥ 2 options
+ *     retenues sont des clés secteur-scopées "simples" (etablir_guilde/
+ *     construire_installation/augmenter_population(_pure) — PAS
+ *     deployer_cube, hors périmètre de ce lot, voir ⚠️ ci-dessous) ouvre
+ *     désormais UNE SEULE popup combinée ('construire_meme_secteur',
+ *     nouvelle fonction resoudreOptionsMemeSecteur_) au lieu de résoudre
+ *     chaque option indépendamment (2 popups secteur distinctes avant ce
+ *     correctif). Une seule option secteur-scopée retenue (ou aucune)
+ *     retombe sur le chemin existant, inchangé.
+ *   - `strategieService.js` : nouvelle popup 'construire_meme_secteur'
+ *     (Feuille ET #modal-choix) — 1 secteur (intersection des éligibilités
+ *     de chaque genre demandé, via les mêmes SecteurService.
+ *     obtenirSecteursEligiblesConstruction/AugmenterPopulationPure que les
+ *     popups individuelles) + 1 sous-choix de type par Guilde/Installation
+ *     retenue (population n'en a pas), appliqués séquentiellement sur ce
+ *     secteur. "Développement" "Héroïque" ajouté à
+ *     CARTES_ELIGIBLES_FEUILLE_ (Coût affiché en haut avec substitution
+ *     Crédit pour Nourriture/Énergie/Matériel, comme "Développement"
+ *     "Standard" déjà migré) — les 3 actions (Développer/Croître/
+ *     Harmoniser) n'avaient plus aucune clé bloquante.
+ *   ⚠️ Hors périmètre (noté pour un lot futur) : Focus Développement
+ *   Fenrax "Recruter" (`deployer_cube` + `augmenter_population`, MÊME
+ *   modificateur `meme_secteur`) présente le même bug de fond, mais
+ *   `deployer_cube` ouvre un formulaire multi-engagement (plusieurs cubes/
+ *   secteurs en une fois) trop différent d'un simple choix de secteur
+ *   pour être fusionné sans risque dans ce lot — cette carte continue de
+ *   demander 2 secteurs indépendants pour l'instant. Focus Développement
+ *   Héroïque "Harmoniser" (`retirer_corruption_secteur` + `construire_
+ *   installation`, même modificateur) ne déclenche PAS ce bug en
+ *   pratique : `retirer_corruption_secteur` n'a jamais eu de résolution
+ *   automatisée (repli générique "non automatisé", inchangé), donc jamais
+ *   2 popups secteur simultanées à unifier.
+ * - EVOLUTION 32 (coûts de Technologie en Nourriture/Matériel/Énergie
+ *   substituables en Crédit, ex. "déployer un Cuirassé" — coût 1
+ *   Matériel) : vérifié déjà résolu — `EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_
+ *   COUT_['Cuirassés'].cout = {materiel:1}` (gameService.js) est résolu
+ *   via FocusEngine.resoudreEffetEtCout, qui retombe sur le MÊME cas
+ *   générique "Coût substituable en Crédit" (focusEngine.js,
+ *   RESSOURCES_SUBSTITUABLES_CREDIT_ = nourriture/énergie/matériel,
+ *   popup 'paiement_ressource') que n'importe quel Coût de Focus — donc
+ *   déjà couvert pour LES 28 Technologies du catalogue (mécanisme
+ *   générique, pas une table à compléter au cas par cas). Revérifié par
+ *   un harnais Node direct sur le vrai gameService.js/focusEngine.js
+ *   (Cuirassés, Matériel à 0 en réserve -> popup 'paiement_ressource'
+ *   proposée, substitution en Crédit appliquée correctement). Aucun
+ *   changement de code.
  *
  * 15/09/2026, suite (retour utilisateur) :
  * - GameService.calculerPuissanceNeantDefaut inclut désormais aussi la
@@ -5537,4 +5616,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260915.3';
+var APP_VERSION = '20260915.4';

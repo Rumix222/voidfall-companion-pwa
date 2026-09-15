@@ -1363,9 +1363,22 @@ var GameService = (function () {
     var champs = {};
     resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
 
+    // EVOLUTION 30 (todo.md) : un cadre résolu via FocusEngine.resoudreEffetEtCout
+    // (appliquerCadreOptionTechnologieAvecCout) produit des lignes de journal
+    // préfixées "source (effet) : "/"source (coût) : " (voir focusEngine.js,
+    // resoudreEffetEtCout) — l'ancien code ne retirait que le préfixe simple
+    // "source : ", laissant "Cadre #2 (effet) : "/"Cadre #2 (coût) : " bruts
+    // dans le résumé affiché ("Cadre #N" n'apporte rien côté joueur — le
+    // titre du cadre est déjà affiché juste au-dessus). Le "(effet)" est
+    // retiré entièrement (bruit, aucune info supplémentaire), le "(coût)"
+    // conservé SEUL (distingue utilement la ligne de dépense du reste).
+    var prefixeEffet = source + ' (effet) : ';
+    var prefixeCout = source + ' (coût) : ';
+    var prefixeSimple = source + ' : ';
     var resume = resultatEffet.journal.map(function (ligne) {
-      var prefixe = source + ' : ';
-      return ligne.indexOf(prefixe) === 0 ? ligne.slice(prefixe.length) : ligne;
+      if (ligne.indexOf(prefixeEffet) === 0) return ligne.slice(prefixeEffet.length);
+      if (ligne.indexOf(prefixeCout) === 0) return '(coût) : ' + ligne.slice(prefixeCout.length);
+      return ligne.indexOf(prefixeSimple) === 0 ? ligne.slice(prefixeSimple.length) : ligne;
     }).join(' ').replace(/\.\s*$/, '');
 
     ctx.evenementCycle.cadresAppliques[ordreCadre] = { resume: resume, le: new Date().toISOString() };

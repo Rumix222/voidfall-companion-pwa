@@ -181,6 +181,21 @@ var FocusEngine = (function () {
     construire_defense_secteur: 'defense_secteur'
   };
   var CLES_CONSTRUIRE = Object.keys(CATEGORIE_PAR_CLE_CONSTRUIRE_);
+  // EVOLUTION 31 (todo.md, retour utilisateur) : sous-ensemble de clés
+  // secteur-scopées qui ne demandent JAMAIS qu'un simple choix "1 secteur
+  // parmi une liste" (via 'construire'/'augmenter_population_pure',
+  // ci-dessous) — PAS 'deployer_cube' (formulaire multi-engagement séparé,
+  // hors périmètre de ce combo). Utilisée UNIQUEMENT quand un `choice`
+  // "et/ou" (options_inclusives) porte le modificateur `same_sector`/
+  // `meme_secteur` (ex. Focus Développement Héroïque "Développer" :
+  // etablir_guilde + augmenter_population) ET que le joueur retient AU
+  // MOINS 2 de ces options : demande alors le secteur UNE SEULE fois
+  // (popup 'construire_meme_secteur', strategieService.js) au lieu
+  // d'ouvrir 2 popups indépendantes qui pourraient désigner 2 secteurs
+  // différents — contraire à la carte ("dans le même secteur"). Un seul
+  // de ces mots-clés retenu (ou aucun) retombe sur le chemin normal
+  // ci-dessous (resoudreOption_ un par un), inchangé.
+  var CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_ = ['etablir_guilde', 'construire_installation', 'augmenter_population', 'augmenter_population_pure'];
   var CLES_DEPLOYER_CUBE = ['deployer_cube_par_chantier', 'deployer_cube', 'deploy_cube', 'deployer_cube_secteur_mere'];
   var MODE_PAR_CLE_DEPLOYER_CUBE = {
     deployer_cube_par_chantier: 'par_chantier',
@@ -321,6 +336,31 @@ var FocusEngine = (function () {
 
   function reponseAnnulee_(reponse) {
     return !reponse || reponse.annule === true;
+  }
+
+  /**
+   * EVOLUTION 31 (todo.md) : résout D'UN SEUL COUP ≥ 2 options d'un
+   * `choice` "et/ou" toutes secteur-scopées (CLES_SECTEUR_COMBINABLES_
+   * MEME_SECTEUR_ ci-dessus) quand la carte impose le même secteur pour
+   * les deux — ouvre UNE SEULE popup dédiée (contexte
+   * 'construire_meme_secteur', strategieService.js, `cles` = les clés
+   * retenues dans l'ordre du catalogue) qui choisit le secteur (éligible
+   * pour TOUTES les clés à la fois) puis persiste chaque effet dessus,
+   * exactement comme demanderChoixEtJournaliser_ ci-dessus pour un cas
+   * simple. Toutes ces clés sont Effet UNIQUEMENT (jamais un Coût),
+   * signe toujours +1 — pas de paramètre `signe` à transmettre.
+   */
+  function resoudreOptionsMemeSecteur_(cles, source, etat, journal, demanderChoix) {
+    return Promise.resolve(demanderChoix({
+      type: 'construire_meme_secteur',
+      cles: cles,
+      source: source,
+      partieId: etat.partieId
+    })).then(function (reponse) {
+      if (reponseAnnulee_(reponse)) return false;
+      journal.push(source + ' : ' + reponse.detail);
+      return true;
+    });
   }
 
   /**
@@ -1122,6 +1162,31 @@ var FocusEngine = (function () {
 
       return Promise.resolve(demanderChoix({ type: 'options_inclusives', options: valeur, source: source })).then(function (reponse) {
         var indices = Array.isArray(reponse) ? reponse : [];
+
+        // EVOLUTION 31 (todo.md) : voir CLES_SECTEUR_COMBINABLES_MEME_
+        // SECTEUR_ ci-dessus — ne s'active que si le JSON porte le
+        // modificateur ET qu'au moins 2 options retenues sont de simples
+        // clés secteur combinables (une option nichée, ex. {ressource_
+        // choix:4}, n'est jamais concernée, résolue comme avant).
+        var memeSecteurDemande = !!(jsonParent && (jsonParent.same_sector || jsonParent.meme_secteur));
+        var indicesCombinables = memeSecteurDemande ? indices.filter(function (i) {
+          return CLES_SECTEUR_COMBINABLES_MEME_SECTEUR_.indexOf(valeur[i]) !== -1;
+        }) : [];
+
+        if (indicesCombinables.length > 1) {
+          var indicesRestants = indices.filter(function (i) { return indicesCombinables.indexOf(i) === -1; });
+          return resoudreOptionsMemeSecteur_(indicesCombinables.map(function (i) { return valeur[i]; }), source, etat, journal, demanderChoix)
+            .then(function (succesCombine) {
+              if (succesCombine === false) return false;
+              return indicesRestants.reduce(function (promesse, indexOption) {
+                return promesse.then(function (succesPrecedent) {
+                  if (succesPrecedent === false) return false;
+                  return resoudreOption_(valeur[indexOption], signe, source, etat, journal, demanderChoix);
+                });
+              }, Promise.resolve(true));
+            });
+        }
+
         return indices.reduce(function (promesse, indexOption) {
           return promesse.then(function (succesPrecedent) {
             if (succesPrecedent === false) return false;

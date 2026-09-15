@@ -341,6 +341,70 @@ var StrategieService = (function () {
     { cle: 'scientifiques', label: 'Scientifiques' }
   ];
 
+  // EVOLUTION 31 (todo.md, retour utilisateur) : popup combinée
+  // 'construire_meme_secteur' (FocusEngine.resoudreOptionsMemeSecteur_) —
+  // "genre" d'action par clé secteur-scopée retenue dans un choix "et/ou"
+  // à contrainte `same_sector`/`meme_secteur` (ex. Focus Développement
+  // Héroïque "Développer" : etablir_guilde + augmenter_population). Un
+  // seul secteur, éligible pour TOUS les genres retenus à la fois, plutôt
+  // que 2 popups indépendantes (voir focusEngine.js pour le détail du
+  // bug corrigé).
+  var GENRE_PAR_CLE_MEME_SECTEUR_ = {
+    etablir_guilde: 'guilde',
+    construire_installation: 'installation',
+    augmenter_population: 'population',
+    augmenter_population_pure: 'population'
+  };
+  function genresMemeSecteur_(cles) {
+    var genres = [];
+    (cles || []).forEach(function (cle) {
+      var genre = GENRE_PAR_CLE_MEME_SECTEUR_[cle];
+      if (genre && genres.indexOf(genre) === -1) genres.push(genre);
+    });
+    return genres;
+  }
+  // Intersection (par numéro) des secteurs éligibles pour CHAQUE genre
+  // demandé — mêmes fonctions d'éligibilité que 'construire'/
+  // 'augmenter_population_pure' individuels ci-dessous.
+  function chargerEligiblesMemeSecteur_(partieId, genres) {
+    return Promise.all(genres.map(function (genre) {
+      return genre === 'population'
+        ? SecteurService.obtenirSecteursEligiblesAugmenterPopulationPure(partieId)
+        : SecteurService.obtenirSecteursEligiblesConstruction(partieId, genre);
+    })).then(function (listes) {
+      var numeros = null;
+      listes.forEach(function (liste) {
+        var ces = liste.map(function (e) { return e.numero; });
+        numeros = numeros === null ? ces : numeros.filter(function (n) { return ces.indexOf(n) !== -1; });
+      });
+      return numeros || [];
+    });
+  }
+  // Applique séquentiellement, SUR LE MÊME secteur `numero`, chaque genre
+  // demandé — `typesChoisis` = { guilde: cle, installation: cle } (absent
+  // pour 'population', aucun sous-choix de type). Retourne les détails
+  // dans l'ordre, MÊME formulation que 'construire'/'augmenter_population_
+  // pure' individuels (pousser un journal cohérent avec le reste).
+  function appliquerGenresMemeSecteur_(partieId, numero, genres, typesChoisis) {
+    return genres.reduce(function (promesse, genre) {
+      return promesse.then(function (details) {
+        if (genre === 'population') {
+          return SecteurService.augmenterPopulationPure(partieId, numero).then(function () {
+            return details.concat(['Population du Secteur ' + numero + ' augmentée de 1.']);
+          });
+        }
+        var type = typesChoisis[genre];
+        var typesConnus = genre === 'installation' ? TYPES_INSTALLATION_CONSTRUIRE_ : TYPES_GUILDE_CONSTRUIRE_;
+        var labelType = typesConnus.filter(function (t) { return t.cle === type; })[0].label;
+        return SecteurService.construire(partieId, numero, genre, type).then(function () {
+          return details.concat([genre === 'installation'
+            ? 'Installation ' + labelType + ' construite sur le Secteur ' + numero + '.'
+            : 'Guilde ' + labelType + ' établie sur le Secteur ' + numero + '.']);
+        });
+      });
+    }, Promise.resolve([]));
+  }
+
   // Pour le formulaire "Déployer des cubes".
   var TECH_VAISSEAU = { sentinelle: 'sentinelles', destroyer: 'destroyers', cuirasse: 'cuirassés', porte_vaisseau: 'porte-vaisseaux' };
   var COUT_DEPLOIEMENT_PAR_TYPE = {
@@ -1915,6 +1979,17 @@ var StrategieService = (function () {
   var CARTES_ELIGIBLES_FEUILLE_ = [
     { focus: 'Conquête', type: 'Standard' },
     { focus: 'Développement', type: 'Standard' },
+    // Focus Développement Héroïque (EVOLUTION 31, todo.md, retour
+    // utilisateur : "la popup est sur l'ancien modèle, il n'y a pas le
+    // coût en haut avec slide pour payer en crédit") — 3 actions
+    // (Développer/Croître/Harmoniser) : 'construire'/'augmenter_
+    // population_pure'/'ressource_choix' déjà couverts par un feuilleFlow*
+    // existant, 'construire_meme_secteur' nouveau ci-dessus (Développer/
+    // Harmoniser, contrainte "dans le même secteur"). "retirer_corruption_
+    // secteur" (Harmoniser) reste SANS résolution automatisée (clé jamais
+    // portée, hors périmètre de ce chantier) — repli générique "non
+    // automatisé", inchangé.
+    { focus: 'Développement', type: 'Héroïque' },
     { focus: 'Innovation', type: 'Standard' },
     // Focus Politique — les 4 variantes du catalogue (Standard + 3
     // maisons/héroïque), toutes leurs clés Effet/Coût sont désormais
@@ -2029,6 +2104,9 @@ var StrategieService = (function () {
     'option_exclusive', 'options_inclusives', 'paiement_ressource', 'gagner_programme', 'deplacer_corruption', 'regrouper', 'envahir',
     // Focus Développement Standard (Harmoniser/Croître/Installer) :
     'retirer_corruption', 'construire', 'augmenter_population_pure', 'rappeler_cube_cout',
+    // Focus Développement Héroïque "Développer"/"Harmoniser" (EVOLUTION 31,
+    // todo.md) : secteur unique pour ≥ 2 options "et/ou" combinées :
+    'construire_meme_secteur',
     // Focus Innovation Standard (Rechercher) — résolution automatique, sans
     // interaction utilisateur (feuilleFlowInfluenceSecteur_/
     // feuilleFlowProduireRevenu_) :
@@ -2208,6 +2286,26 @@ var StrategieService = (function () {
     feuilleSequenceEtOu_.position++;
     var etiquette = 'Action ' + feuilleSequenceEtOu_.position + '/' + feuilleSequenceEtOu_.libelles.length + ' — ';
     if (feuilleSequenceEtOu_.position >= feuilleSequenceEtOu_.libelles.length) feuilleSequenceEtOu_ = null;
+    return etiquette;
+  }
+
+  // EVOLUTION 31 (todo.md) : feuilleFlowConstruireMemeSecteur_ résout EN
+  // UNE SEULE popup ≥ 2 des options de la séquence "et/ou" en cours (voir
+  // focusEngine.js/resoudreOptionsMemeSecteur_) — PAS une par une comme
+  // feuilleConsommerEtiquetteSequence_ le suppose. Consomme donc la
+  // totalité des étiquettes restantes D'UN COUP (au lieu d'une seule),
+  // sinon `feuilleSequenceEtOu_` resterait à moitié consommé après cette
+  // popup — la numérotation "Action X/N" fuiterait sur l'étape suivante
+  // qui n'a plus rien à voir avec ce choix "et/ou" (ex. le Coût, déjà
+  // réglé sur l'écran combiné précédent), et l'état stale contaminerait
+  // même la PROCHAINE résolution "et/ou" sans rapport si celle-ci ne
+  // repasse jamais par cette fonction avant la fin de la partie.
+  function feuilleConsommerEtiquettesSequenceCombinee_(nbOptionsCombinees) {
+    if (!feuilleSequenceEtOu_) return '';
+    var debut = feuilleSequenceEtOu_.position + 1;
+    var fin = Math.min(feuilleSequenceEtOu_.libelles.length, feuilleSequenceEtOu_.position + nbOptionsCombinees);
+    var etiquette = 'Action ' + (fin > debut ? debut + '-' + fin : debut) + '/' + feuilleSequenceEtOu_.libelles.length + ' — ';
+    feuilleSequenceEtOu_ = null;
     return etiquette;
   }
 
@@ -3378,7 +3476,9 @@ var StrategieService = (function () {
         feuilleEls_.btnValider.disabled = true;
         GameService.gagnerTechnologieEtResoudreEffet(partieTech.id, slotVide, nomChoisi, niveauChoisi === 'amelioree', demanderChoix)
           .then(function (resultat) {
-            var detailBase = 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisi === 'amelioree' ? 'Améliorée' : 'De base') + ').';
+            // EVOLUTION 30 (todo.md) : "(De base)" n'apporte rien (c'est le
+            // niveau par défaut) — seul "(Améliorée)" reste affiché.
+            var detailBase = 'Technologie "' + nomChoisi + '" obtenue' + (niveauChoisi === 'amelioree' ? ' (Améliorée)' : '') + '.';
             resolve({ detail: resultat.detailImmediat ? (detailBase + ' ' + resultat.detailImmediat) : detailBase });
           })
           .catch(function (erreur) {
@@ -4559,6 +4659,72 @@ var StrategieService = (function () {
   }
 
   /**
+   * EVOLUTION 31 (todo.md, retour utilisateur) : ≥ 2 options d'un choix
+   * "et/ou" secteur-scopées sous contrainte `same_sector`/`meme_secteur`
+   * (ex. Focus Développement Héroïque "Développer" : Établir une Guilde
+   * et/ou Augmenter une Population, "dans le même secteur") — UN SEUL
+   * écran (secteur + type par genre retenu), plutôt que 2 popups
+   * indépendantes 'construire'/'augmenter_population_pure' risquant de
+   * désigner 2 secteurs différents (bug rapporté). Réutilise les mêmes
+   * fonctions SecteurService que ces 2 popups individuelles (voir
+   * chargerEligiblesMemeSecteur_/appliquerGenresMemeSecteur_ plus haut).
+   */
+  function feuilleFlowConstruireMemeSecteur_(contexte) {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquettesSequenceCombinee_((contexte.cles || []).length);
+    var partie = partieAffichee;
+    var genres = genresMemeSecteur_(contexte.cles);
+    var veutGuilde = genres.indexOf('guilde') !== -1;
+    var veutInstallation = genres.indexOf('installation') !== -1;
+
+    var etape = { titre: etiquette + 'Choisir un secteur', nbEtapes: 1, etapeIndex: 0, html: '<p class="hint">Chargement des secteurs…</p>' };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    chargerEligiblesMemeSecteur_(partie.id, genres).then(function (numeros) {
+      var etapeCourante = feuillePile_[feuillePile_.length - 1];
+      if (!numeros.length) {
+        etapeCourante.html = '<p class="hint">Aucun secteur ne réunit toutes ces conditions à la fois actuellement.</p>';
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
+      etapeCourante.html = '<div class="regrouper-form">' +
+        '<label class="hint" for="feuille-meme-secteur-secteur">Secteur</label>' +
+        '<select id="feuille-meme-secteur-secteur">' + numeros.map(function (n) { return '<option value="' + n + '">Secteur ' + n + '</option>'; }).join('') + '</select>' +
+        (veutGuilde
+          ? '<label class="hint" for="feuille-meme-secteur-guilde" style="margin-top:8px;display:block;">Guilde</label>' +
+            '<select id="feuille-meme-secteur-guilde">' + TYPES_GUILDE_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>'
+          : '') +
+        (veutInstallation
+          ? '<label class="hint" for="feuille-meme-secteur-installation" style="margin-top:8px;display:block;">Installation</label>' +
+            '<select id="feuille-meme-secteur-installation">' + TYPES_INSTALLATION_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">' + t.label + '</option>'; }).join('') + '</select>'
+          : '') +
+        '</div>';
+      etapeCourante.onValider = function () {
+        var numero = Number(feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-secteur').value);
+        var typesChoisis = {};
+        if (veutGuilde) typesChoisis.guilde = feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-guilde').value;
+        if (veutInstallation) typesChoisis.installation = feuilleEls_.corpsInner.querySelector('#feuille-meme-secteur-installation').value;
+        feuilleEls_.btnValider.disabled = true;
+        appliquerGenresMemeSecteur_(partie.id, numero, genres, typesChoisis).then(function (details) {
+          feuilleEls_.btnValider.disabled = false;
+          feuilleRejetCourant_ = null;
+          resolve({ detail: details.join(' '), numero: numero });
+        }).catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec : ' + erreur.message);
+        });
+      };
+      feuilleRendreEtape_(etapeCourante, null);
+    }).catch(function (erreur) {
+      window.alert('Échec du chargement des secteurs : ' + erreur.message);
+    });
+
+    return promise;
+  }
+
+  /**
    * Augmenter la Population (Pure), DANS la feuille — Focus Développement
    * Standard "Harmoniser" (l'autre option de son choix exclusif). Portage
    * direct de la branche #modal-choix 'augmenter_population_pure'
@@ -4800,6 +4966,7 @@ var StrategieService = (function () {
     if (contexte.type === 'retirer_corruption') return feuilleFlowRetirerCorruption_();
     if (contexte.type === 'retirer_corruption_programme') return feuilleFlowRetirerCorruptionProgramme_();
     if (contexte.type === 'construire') return feuilleFlowConstruire_(contexte);
+    if (contexte.type === 'construire_meme_secteur') return feuilleFlowConstruireMemeSecteur_(contexte);
     if (contexte.type === 'augmenter_population_pure') return feuilleFlowAugmenterPopulationPure_();
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
     if (contexte.type === 'influence_secteur') return feuilleFlowInfluenceSecteur_(contexte);
@@ -5913,6 +6080,63 @@ var StrategieService = (function () {
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
 
+      } else if (contexte.type === 'construire_meme_secteur') {
+        // EVOLUTION 31 (todo.md, retour utilisateur) : repli #modal-choix
+        // de feuilleFlowConstruireMemeSecteur_ (voir son commentaire) pour
+        // les cartes pas encore migrées à la Feuille — même logique
+        // (chargerEligiblesMemeSecteur_/appliquerGenresMemeSecteur_ plus
+        // haut), un seul secteur pour ≥ 2 options "et/ou" combinées.
+        var genresMS = genresMemeSecteur_(contexte.cles);
+        var veutGuildeMS = genresMS.indexOf('guilde') !== -1;
+        var veutInstallationMS = genresMS.indexOf('installation') !== -1;
+        titre.textContent = 'Choisir un secteur';
+        contenu.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieMS = partieAffichee;
+        chargerEligiblesMemeSecteur_(partieMS.id, genresMS).then(function (numeros) {
+          if (!numeros.length) {
+            contenu.innerHTML = '<p class="hint">Aucun secteur ne réunit toutes ces conditions à la fois actuellement.</p>';
+            return;
+          }
+
+          contenu.innerHTML = '' +
+            '<select id="meme-secteur-select-secteur" class="modal-choix-select">' +
+            numeros.map(function (n) { return '<option value="' + n + '">Secteur ' + n + '</option>'; }).join('') +
+            '</select>' +
+            (veutGuildeMS
+              ? '<select id="meme-secteur-select-guilde" class="modal-choix-select" style="margin-top:8px;">' +
+                TYPES_GUILDE_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">Guilde — ' + t.label + '</option>'; }).join('') + '</select>'
+              : '') +
+            (veutInstallationMS
+              ? '<select id="meme-secteur-select-installation" class="modal-choix-select" style="margin-top:8px;">' +
+                TYPES_INSTALLATION_CONSTRUIRE_.map(function (t) { return '<option value="' + t.cle + '">Installation — ' + t.label + '</option>'; }).join('') + '</select>'
+              : '');
+
+          btnValider.hidden = false;
+          btnValider.textContent = 'Valider';
+          btnValider.onclick = function () {
+            var numero = Number(document.getElementById('meme-secteur-select-secteur').value);
+            var typesChoisis = {};
+            if (veutGuildeMS) typesChoisis.guilde = document.getElementById('meme-secteur-select-guilde').value;
+            if (veutInstallationMS) typesChoisis.installation = document.getElementById('meme-secteur-select-installation').value;
+            btnValider.disabled = true;
+            appliquerGenresMemeSecteur_(partieMS.id, numero, genresMS, typesChoisis).then(function (details) {
+              fermerModale_();
+              btnValider.disabled = false;
+              resolve({ detail: details.join(' '), numero: numero });
+            }).catch(function (erreur) {
+              btnValider.disabled = false;
+              window.alert('Échec : ' + erreur.message);
+            });
+          };
+        }).catch(function (erreur) {
+          contenu.innerHTML = '<p class="hint">Erreur de chargement.</p>';
+          window.alert('Échec du chargement des secteurs : ' + erreur.message);
+        });
+
       } else if (contexte.type === 'augmenter_population_pure') {
         // Popup dédiée pour la clé Focus/Cadre
         // "augmenter_population_pure" (voir focusEngine.js) — même
@@ -6313,7 +6537,10 @@ var StrategieService = (function () {
                 .then(function (resultat) {
                   fermerModale_();
                   btnValider.disabled = false;
-                  var detailBase = 'Technologie "' + nomChoisi + '" obtenue (' + (niveauChoisiModale === 'amelioree' ? 'Améliorée' : 'De base') + ').';
+                  // EVOLUTION 30 (todo.md) : voir le commentaire équivalent
+                  // ci-dessus (feuilleFlow) — "(De base)" retiré, seul
+                  // "(Améliorée)" reste affiché.
+                  var detailBase = 'Technologie "' + nomChoisi + '" obtenue' + (niveauChoisiModale === 'amelioree' ? ' (Améliorée)' : '') + '.';
                   resolve({ detail: resultat.detailImmediat ? (detailBase + ' ' + resultat.detailImmediat) : detailBase });
                 })
                 .catch(function (erreur) {
