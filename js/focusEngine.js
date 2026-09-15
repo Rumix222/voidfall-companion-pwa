@@ -737,6 +737,26 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Retirer une Corruption d'un Programme UNIQUEMENT (Technologie
+    // "Purificateur", effet immédiat — retour utilisateur : contrairement à
+    // 'retirer_corruption' ci-dessus, la carte ne vise QUE les Programmes,
+    // pas Secteur/Piste/Chambres de décontamination). Effet UNIQUEMENT
+    // (signe > 0). Ouvre une popup dédiée (contexte
+    // 'retirer_corruption_programme', strategieService.js) qui liste
+    // directement les Programmes possédés marqués Corrompus
+    // (plateauMaison.programmesUtilises[i].corrompu, même suivi que
+    // l'option "Programme" de 'retirer_corruption' ci-dessus — chantier
+    // "Corruption sur les Programmes") ; la popup fait le choix ET la
+    // persistance (focusEngine reste pur, aucun accès DB ici) ;
+    // resoudreCle_ relaie juste le résumé dans le journal. ---
+    if (cle === 'retirer_corruption_programme' && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'retirer_corruption_programme',
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
     // --- Retirer un Gardien : Effet UNIQUEMENT (signe > 0). Chantier
     // "Refuges" (§3, docs-rules-corruption-gardiens-refuges-technoConsume.md
     // — une des 4 récompenses de tuile complétée, GameService.

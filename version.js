@@ -1,7 +1,54 @@
 /**
  * version.js
- * Version 153 — 2026-09-14
+ * Version 156 — 2026-09-15
  * Source de vérité unique pour la version de l'application.
+ *
+ * 15/09/2026, suite (retour utilisateur) :
+ * - GameService.calculerPuissanceNeantDefaut inclut désormais aussi la
+ *   Corruption stockée sur la Technologie "Chambres de décontamination"
+ *   (plateauMaison.corruptionChambreDecontamination) le cas échéant —
+ *   naturellement 0 si le joueur ne possède pas cette Technologie.
+ * - Popup "Produire — choisissez une ressource" (contexte
+ *   'produire_ressource_choix', Feuille ET #modal-choix,
+ *   strategieService.js) : chaque bouton affiche désormais la pastille
+ *   colorée habituelle de la ressource (nouvelle fonction
+ *   pastilleRessourceHTML_, même variable CSS --couleur-ressource/
+ *   .pastille-ressource que la grille Plat. Maison et le Plateau Crise).
+ *
+ * 15/09/2026, suite (retour utilisateur — "ça me paraît trop élevé") :
+ * GameService.calculerPuissanceNeantDefaut (formule par défaut du champ
+ * "Puissance du Néant", popup "Résoudre l'Escarmouche") comptait la
+ * Corruption totale via ScoreService.calculerCompteursAutomatiques, qui
+ * mélange secteurs Corrompus (plateau galactique) ET pistes de
+ * Civilisation Corrompues. Corrigé : ne compte plus que la Corruption DE
+ * LA FICHE MAISON — pistes de Civilisation Corrompues +
+ * plateauMaison.programmesUtilises[i].corrompu — les secteurs Corrompus
+ * n'influencent plus ce calcul. Le reste de la formule est inchangé
+ * (+ criseModificateurEscarmouche + 1 aux Cycles 2/3).
+ *
+ * 15/09/2026 (retour utilisateur — "quand je gagne la technologie
+ * Purificateur je dois pouvoir choisir un programme", clarifié ensuite en
+ * "l'effet c'est retirer corruption d'un emplacement Programme") :
+ * l'effet immédiat de la Technologie "Purificateur" (payer 1 Science,
+ * retirer 1 Corruption) ouvrait la popup générique 'retirer_corruption'
+ * (4 cibles : Secteur/Piste/Programme/Chambres de décontamination) au lieu
+ * de se limiter au Programme comme l'imprime la carte. Nouvelle clé
+ * FocusEngine `retirer_corruption_programme` (resoudreCle_) + nouveau
+ * contexte 'retirer_corruption_programme' (feuilleFlowRetirerCorruptionProgramme_/
+ * branche #modal-choix, strategieService.js) réutilisant le même suivi que
+ * l'option "Programme" de 'retirer_corruption' (plateauMaison.
+ * programmesUtilises[i].corrompu, chantier "Corruption sur les
+ * Programmes") mais SANS le menu de catégories — directement le sous-choix
+ * par emplacement de Programme (1/2/3), ou message "Aucun Programme
+ * Corrompu actuellement." si aucun. gameService.js
+ * (EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_.Purificateur) traduit désormais
+ * vers cette nouvelle clé au lieu de 'retirer_corruption'. Audit demandé
+ * en parallèle ("voir si d'autres actions gagner un programme ne sont pas
+ * câblées") : toutes les occurrences catalogue de "gagner_programme"
+ * (numérique ou chaîne de type) et "programme_force"/"programme_soutien"/
+ * "programme_domination"/"programme_richesse" bare (focus.json,
+ * pistesCivilisation.json, evenements.json) sont déjà couvertes par
+ * resoudreCle_ (CLE_PROGRAMME_VERS_TYPE_) — aucune autre lacune trouvée.
  *
  * 14/09/2026, suite (retour utilisateur, liste de retouches visuelles) :
  * - Plateau Crise (light) : "Modificateur" aligné à droite avec son
@@ -5490,4 +5537,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260914.9';
+var APP_VERSION = '20260915.3';

@@ -47,6 +47,14 @@ var StrategieService = (function () {
   };
   var RESSOURCES_PRODUCTION = ['nourriture', 'energie', 'materiel', 'credit', 'science'];
 
+  // Pastille colorée (même classe/variable CSS que champRessourceHTML_/
+  // .crise-cout-item, voir style.css) — pour un bouton "choisissez une
+  // ressource" (pas de conteneur flex ici, marge inline à la place du
+  // `gap` habituel).
+  function pastilleRessourceHTML_(cle) {
+    return '<span class="pastille-ressource" style="--couleur-ressource:' + CHAMP_RESSOURCE[cle].couleur + ';margin-right:6px;vertical-align:middle;"></span>';
+  }
+
   // Palette complète — couvre aussi Influence/Commerce/Prime/Libération/
   // Cubes, absents de CHAMP_RESSOURCE (limité aux 5 ressources de la
   // grille "principales"). Utilisée uniquement par couleurCout_/
@@ -531,6 +539,9 @@ var StrategieService = (function () {
     construire_base_stellaire: 'Construire une Base Stellaire',
     construire_defense_secteur: 'Construire une Défense de Secteur',
     retirer_corruption: 'Retirer une Corruption',
+    // Technologie "Purificateur" (effet immédiat) — cible restreinte au
+    // Programme, voir 'retirer_corruption' ci-dessus pour le cas général.
+    retirer_corruption_programme: 'Retirer une Corruption (Programme)',
     // Chantier "Refuges" (§3) — récompense de tuile complétée.
     retirer_gardien: 'Retirer un Gardien',
     // EVOLUTION 14 (todo.md) : "augmenter_population" (pistesCivilisation.json/
@@ -2022,8 +2033,10 @@ var StrategieService = (function () {
     // interaction utilisateur (feuilleFlowInfluenceSecteur_/
     // feuilleFlowProduireRevenu_) :
     'influence_secteur', 'produire_revenu',
-    // Focus Innovation Standard (Inventer) :
-    'gagner_technologie',
+    // Focus Innovation Standard (Inventer) — 'retirer_corruption_programme'
+    // couvre l'effet immédiat de la Technologie "Purificateur" quand elle
+    // est inventée via ce Focus :
+    'gagner_technologie', 'retirer_corruption_programme',
     // Focus Politique (toutes variantes) :
     'avancer_civilisation', 'ameliorer_gloire', 'bonus_commerce',
     // Focus Progrès Héroïque "Restaurer" :
@@ -2844,7 +2857,7 @@ var StrategieService = (function () {
         var niveau = resultat.niveaux[cle] || 0;
         var montant = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
         return '<button type="button" class="btn btn-secondary btn-choix-ressource" data-ressource="' + cle + '" data-montant="' + montant + '">' +
-          CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
+          pastilleRessourceHTML_(cle) + CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
       }).join('') + '</div>';
       etapeCourante.brancher = function (el) {
         Array.prototype.forEach.call(el.querySelectorAll('.btn-choix-ressource'), function (btn) {
@@ -4426,6 +4439,67 @@ var StrategieService = (function () {
   }
 
   /**
+   * Retirer une Corruption d'un Programme, DANS la feuille — Technologie
+   * "Purificateur" (effet immédiat, contexte 'retirer_corruption_programme').
+   * Variante RESTREINTE de feuilleFlowRetirerCorruption_ ci-dessus (retour
+   * utilisateur : l'effet imprimé sur la carte ne vise QUE les Programmes,
+   * pas Secteur/Piste/Chambres de décontamination) — pas de menu de
+   * catégories, directement le sous-choix par emplacement de Programme
+   * (1/2/3), même suivi que l'option "Programme" ci-dessus
+   * (plateauMaison.programmesUtilises[i].corrompu, chantier "Corruption sur
+   * les Programmes"). Code volontairement dupliqué plutôt que factorisé
+   * avec la fonction ci-dessus, même logique que pour retirer_corruption/
+   * deplacer_corruption (voir leur commentaire).
+   */
+  function feuilleFlowRetirerCorruptionProgramme_() {
+    var resolve;
+    var promise = new Promise(function (res) { resolve = res; });
+    feuilleRejetCourant_ = function () { resolve({ annule: true }); };
+    var etiquette = feuilleConsommerEtiquetteSequence_();
+    var partieProg = partieAffichee;
+
+    var slotsProgRCP_ = (partieProg.plateauMaison && Array.isArray(partieProg.plateauMaison.programmesUtilises))
+      ? partieProg.plateauMaison.programmesUtilises : [];
+    function slotProgRCP_(i) { return slotsProgRCP_[i] || { nom: null, entretienActif: false, corrompu: false }; }
+    var indicesProgrammeCorrompusRCP = [1, 2, 3].filter(function (i) { return slotProgRCP_(i).corrompu; });
+    function libelleSlotProgRCP_(i) {
+      var s = slotProgRCP_(i);
+      return 'Programme ' + i + (s.nom ? ' — ' + s.nom : '');
+    }
+    function ecrireProgrammeCorrompuRCP_(index) {
+      var nouveauxSlots = slotsProgRCP_.map(function (s, i) { return i === index ? Object.assign({}, slotProgRCP_(i), { corrompu: false }) : s; });
+      var corruptionMaison = Math.max(0, ((partieProg.plateauMaison && partieProg.plateauMaison.corruptionMaison) || 0) - 1);
+      return GameService.majPlateauMaison(partieProg.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison }).then(function () {
+        partieProg.plateauMaison.programmesUtilises = nouveauxSlots;
+        partieProg.plateauMaison.corruptionMaison = corruptionMaison;
+        slotsProgRCP_ = nouveauxSlots;
+      });
+    }
+
+    var etape = { titre: etiquette + 'Retirer une Corruption — Programme', nbEtapes: 1, etapeIndex: 0 };
+    if (!indicesProgrammeCorrompusRCP.length) {
+      etape.html = '<p class="hint">Aucun Programme Corrompu actuellement.</p>';
+      feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+      return promise;
+    }
+    etape.html = '<div class="feuille-section">' + feuilleRangeeChoixHTML_('retCorProgSel', indicesProgrammeCorrompusRCP.map(libelleSlotProgRCP_), false) + '</div>';
+    etape.brancher = function (el) { feuilleBrancherRangeeChoix_(el, 'retCorProgSel', false); };
+    etape.onValider = function () {
+      var i = Number(feuilleEls_.corpsInner.querySelector('.rangee-choix.selectionnee').dataset.i);
+      var index = indicesProgrammeCorrompusRCP[i];
+      feuilleEls_.btnValider.disabled = true;
+      ecrireProgrammeCorrompuRCP_(index).then(function () {
+        feuilleEls_.btnValider.disabled = false;
+        feuilleRejetCourant_ = null;
+        resolve({ detail: 'Corruption retirée de ' + libelleSlotProgRCP_(index) + '.', index: index });
+      }).catch(function (erreur) { feuilleEls_.btnValider.disabled = false; window.alert('Échec du retrait : ' + erreur.message); });
+    };
+    feuillePousserEtape_(etape, feuillePile_.length ? 'avant' : null);
+
+    return promise;
+  }
+
+  /**
    * Construire (Installation ou Guilde), DANS la feuille — Focus
    * Développement Standard "Croître" (choix exclusif Guilde/Installation).
    * Portage direct de la branche #modal-choix 'construire' équivalente
@@ -4724,6 +4798,7 @@ var StrategieService = (function () {
     if (contexte.type === 'envahir') return feuilleFlowEnvahir_(contexte);
     if (contexte.type === 'deployer_cube') return feuilleFlowDeployerCube_(contexte);
     if (contexte.type === 'retirer_corruption') return feuilleFlowRetirerCorruption_();
+    if (contexte.type === 'retirer_corruption_programme') return feuilleFlowRetirerCorruptionProgramme_();
     if (contexte.type === 'construire') return feuilleFlowConstruire_(contexte);
     if (contexte.type === 'augmenter_population_pure') return feuilleFlowAugmenterPopulationPure_();
     if (contexte.type === 'rappeler_cube_cout') return feuilleFlowRappelerCubeCout_();
@@ -6554,6 +6629,57 @@ var StrategieService = (function () {
             window.alert('Échec du chargement des secteurs : ' + erreur.message);
           });
 
+      } else if (contexte.type === 'retirer_corruption_programme') {
+        // Technologie "Purificateur" (effet immédiat) — variante RESTREINTE
+        // de 'retirer_corruption' ci-dessus (retour utilisateur : la carte
+        // ne vise QUE les Programmes, pas Secteur/Piste/Chambres de
+        // décontamination) : un bouton par Programme possédé marqué
+        // Corrompu (plateauMaison.programmesUtilises[i].corrompu, même
+        // suivi que l'option "Programme" de 'retirer_corruption'
+        // ci-dessus), pas de menu de catégories.
+        titre.textContent = 'Retirer une Corruption — Programme';
+        btnValider.hidden = true;
+        btnAnnuler.hidden = false;
+        btnAnnuler.onclick = function () { fermerModale_(); resolve({ annule: true }); };
+
+        var partieCorruptionProg = partieAffichee;
+        var slotsProgModale = (partieCorruptionProg.plateauMaison && Array.isArray(partieCorruptionProg.plateauMaison.programmesUtilises))
+          ? partieCorruptionProg.plateauMaison.programmesUtilises : [];
+        function slotProgModale_(i) { return slotsProgModale[i] || { nom: null, entretienActif: false, corrompu: false }; }
+        var indicesProgrammeCorrompusModale = [1, 2, 3].filter(function (i) { return slotProgModale_(i).corrompu; });
+        function libelleSlotProgModale_(i) {
+          var s = slotProgModale_(i);
+          return 'Programme ' + i + (s.nom ? ' — ' + s.nom : '');
+        }
+
+        if (!indicesProgrammeCorrompusModale.length) {
+          contenu.innerHTML = '<p class="hint">Aucun Programme Corrompu actuellement.</p>';
+        } else {
+          contenu.innerHTML = '<div class="modal-choix-boutons">' +
+            indicesProgrammeCorrompusModale.map(function (i) {
+              return '<button type="button" class="btn btn-secondary btn-choix-liste" data-index="' + i + '">' + libelleSlotProgModale_(i) + '</button>';
+            }).join('') + '</div>';
+          Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
+            btn.addEventListener('click', function () {
+              var index = Number(btn.dataset.index);
+              btn.disabled = true;
+              var nouveauxSlots = slotsProgModale.map(function (s, i) { return i === index ? Object.assign({}, slotProgModale_(i), { corrompu: false }) : s; });
+              var corruptionMaison = Math.max(0, ((partieCorruptionProg.plateauMaison && partieCorruptionProg.plateauMaison.corruptionMaison) || 0) - 1);
+              GameService.majPlateauMaison(partieCorruptionProg.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison })
+                .then(function () {
+                  partieCorruptionProg.plateauMaison.programmesUtilises = nouveauxSlots;
+                  partieCorruptionProg.plateauMaison.corruptionMaison = corruptionMaison;
+                  fermerModale_();
+                  resolve({ detail: 'Corruption retirée de ' + libelleSlotProgModale_(index) + '.', index: index });
+                })
+                .catch(function (erreur) {
+                  btn.disabled = false;
+                  window.alert('Échec du retrait : ' + erreur.message);
+                });
+            });
+          });
+        }
+
       } else if (contexte.type === 'retirer_gardien') {
         // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
         // technoConsume.md) — popup à un seul niveau, plus simple que
@@ -7194,7 +7320,7 @@ var StrategieService = (function () {
             var niveau = resultat.niveaux[cle] || 0;
             var montant = calculerProductionAvecBonusTechnologie_(cle, niveau, partieAffichee);
             return '<button class="btn btn-secondary btn-choix-liste" data-ressource="' + cle + '" data-montant="' + montant + '">' +
-              CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
+              pastilleRessourceHTML_(cle) + CHAMP_RESSOURCE[cle].label + ' (+' + montant + ', Niveau ' + niveau + ')</button>';
           }).join('') + '</div>';
           Array.prototype.forEach.call(contenu.querySelectorAll('.btn-choix-liste'), function (btn) {
             btn.addEventListener('click', function () {

@@ -257,7 +257,11 @@ var GameService = (function () {
    */
   var EFFET_TECHNOLOGIE_IMMEDIAT_AVEC_COUT_ = {
     'Cellules énergétiques': { effet: { activer_cube: 2 }, cout: { energie: 2 } },
-    'Purificateur': { effet: { retirer_corruption: 1 }, cout: { science: 1 } },
+    // Purificateur : `remove_corruption` du catalogue traduit vers
+    // `retirer_corruption_programme` (retour utilisateur — la carte ne
+    // vise QUE les Programmes, pas Secteur/Piste/Chambres de
+    // décontamination comme le `retirer_corruption` générique).
+    'Purificateur': { effet: { retirer_corruption_programme: 1 }, cout: { science: 1 } },
     'Cuirassés': { effet: {}, cout: { materiel: 1 } },
     'Porte-Vaisseaux': { effet: {}, cout: { nourriture: 1 } }
   };
@@ -2173,26 +2177,35 @@ var GameService = (function () {
      * Escarmouche (chantier "Escarmouche + Plateau Crise", 14/09/2026,
      * retour utilisateur — introuvable telle quelle dans docs-rules-
      * cycle-de-jeu.md §3.1.2, qui se contente de "Calculez la Puissance
-     * Navale totale du Néant" sans jamais la détailler) : Corruption
-     * totale (ScoreService.calculerCompteursAutomatiques — secteurs
-     * Corrompus + pistes de Civilisation Corrompues) + criseModificateur
-     * Escarmouche (champ EXISTANT du Plateau Crise (light), couvre déjà
-     * le "modificateur éventuel effet Shiveus" cité par l'utilisateur) +
-     * 1 aux Cycles 2 et 3. Simple valeur de DÉPART, librement modifiable
-     * par le joueur avant de résoudre (voir strategieService.js) — jamais
-     * cette fonction elle-même qui décide de la valeur finale.
+     * Navale totale du Néant" sans jamais la détailler) : Corruption DE LA
+     * FICHE MAISON (pistes de Civilisation Corrompues + Programmes
+     * Corrompus, plateauMaison.programmesUtilises[i].corrompu + Corruption
+     * stockée sur la Technologie "Chambres de décontamination" le cas
+     * échéant, plateauMaison.corruptionChambreDecontamination (retour
+     * utilisateur 15/09/2026 — champ manuel, naturellement à 0 si le
+     * joueur ne possède pas cette Technologie, voir index.html/
+     * renderTechnologiesObtenues_) — PAS les secteurs Corrompus du plateau
+     * galactique, corrigé 15/09/2026 retour utilisateur "ça me paraît trop
+     * élevé" ; l'ancienne formule utilisait à tort ScoreService.
+     * calculerCompteursAutomatiques, dont le compteur "corruption" mélange
+     * secteurs + pistes) + criseModificateur Escarmouche (champ EXISTANT
+     * du Plateau Crise (light), couvre déjà le "modificateur éventuel
+     * effet Shiveus" cité par l'utilisateur) + 1 aux Cycles 2 et 3. Simple
+     * valeur de DÉPART, librement modifiable par le joueur avant de
+     * résoudre (voir strategieService.js) — jamais cette fonction
+     * elle-même qui décide de la valeur finale.
      */
     calculerPuissanceNeantDefaut: function (partieId) {
-      return Promise.all([
-        rechargerPartie_(partieId),
-        ScoreService.calculerCompteursAutomatiques(partieId)
-      ]).then(function (resultats) {
-        var partie = resultats[0];
+      return rechargerPartie_(partieId).then(function (partie) {
         if (!partie) throw new Error('Partie introuvable.');
-        var compteurs = resultats[1];
+        var corrompues = (partie.civilisation && partie.civilisation.corrompues) || {};
+        var pistesCorrompues = ['societe', 'gouvernement', 'economie'].filter(function (k) { return !!corrompues[k]; }).length;
+        var programmesUtilises = (partie.plateauMaison && partie.plateauMaison.programmesUtilises) || [];
+        var programmesCorrompus = programmesUtilises.filter(function (p) { return p && p.corrompu; }).length;
+        var corruptionChambreDecontamination = (partie.plateauMaison && partie.plateauMaison.corruptionChambreDecontamination) || 0;
         var modificateur = (partie.plateauMaison && partie.plateauMaison.criseModificateurEscarmouche) || 0;
         var bonusCycle = (Number(partie.cycleNum) || 1) >= 2 ? 1 : 0;
-        return (compteurs.corruption || 0) + modificateur + bonusCycle;
+        return pistesCorrompues + programmesCorrompus + corruptionChambreDecontamination + modificateur + bonusCycle;
       });
     },
 

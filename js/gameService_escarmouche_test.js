@@ -104,18 +104,58 @@ function secteurPossede_(numero, champs) {
 // calculerPuissanceNeantDefaut
 // ---------------------------------------------------------------
 
-test('calculerPuissanceNeantDefaut : Corruption totale + criseModificateurEscarmouche + 1 aux Cycles 2/3', function () {
+// Corrigé 15/09/2026 (retour utilisateur "ça me paraît trop élevé") : la
+// Corruption comptée est celle de la fiche Maison (pistes de Civilisation +
+// Programmes), PAS les secteurs Corrompus du plateau galactique — un
+// secteur Corrompu ne doit donc PLUS influencer ce calcul.
+test('calculerPuissanceNeantDefaut : Corruption fiche Maison (pistes + Programmes) + criseModificateurEscarmouche + 1 aux Cycles 2/3', function () {
   var fixture = creerFixture({
     cycleNum: 1,
-    plateauMaison: { criseModificateurEscarmouche: 2 },
+    plateauMaison: {
+      criseModificateurEscarmouche: 2,
+      civCorrompueSociete: true,
+      programmesUtilises: [null, { nom: 'X', entretienActif: true, corrompu: true }, null, null]
+    },
+    // Secteur Corrompu : ne doit PAS être compté (hors fiche Maison).
     secteurs: [secteurPossede_(1, { corrompu: true }), secteurPossede_(2, { corrompu: false })]
   });
   var ctx = creerSandbox(fixture);
   var GameService = ctx.sandbox.GameService;
 
   return GameService.calculerPuissanceNeantDefaut(PARTIE_ID).then(function (puissance) {
-    // Corruption (1 secteur Corrompu) + modificateur (2) + 0 (Cycle 1) = 3.
-    assert.strictEqual(puissance, 3);
+    // Piste Société Corrompue (1) + Programme Corrompu (1) + modificateur (2) + 0 (Cycle 1) = 4.
+    assert.strictEqual(puissance, 4);
+  });
+});
+
+test('calculerPuissanceNeantDefaut : secteur Corrompu seul (aucune Corruption fiche Maison) -> ignoré, ne compte que le modificateur', function () {
+  var fixture = creerFixture({
+    cycleNum: 1,
+    plateauMaison: { criseModificateurEscarmouche: 1 },
+    secteurs: [secteurPossede_(1, { corrompu: true })]
+  });
+  var ctx = creerSandbox(fixture);
+  var GameService = ctx.sandbox.GameService;
+
+  return GameService.calculerPuissanceNeantDefaut(PARTIE_ID).then(function (puissance) {
+    assert.strictEqual(puissance, 1);
+  });
+});
+
+// Ajouté 15/09/2026 (retour utilisateur — "ne pas oublier la Corruption de
+// la Technologie Chambres de décontamination le cas échéant") : ce compteur
+// manuel (index.html/renderTechnologiesObtenues_) fait partie de la
+// Corruption de la fiche Maison au même titre que pistes/Programmes.
+test('calculerPuissanceNeantDefaut : Corruption stockée sur Chambres de décontamination comptée', function () {
+  var fixture = creerFixture({
+    cycleNum: 1,
+    plateauMaison: { corruptionChambreDecontamination: 2 }
+  });
+  var ctx = creerSandbox(fixture);
+  var GameService = ctx.sandbox.GameService;
+
+  return GameService.calculerPuissanceNeantDefaut(PARTIE_ID).then(function (puissance) {
+    assert.strictEqual(puissance, 2);
   });
 });
 

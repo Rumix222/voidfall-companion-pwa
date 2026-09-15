@@ -697,6 +697,41 @@ test('retirer_corruption : annulé (popup "Annuler") — bloque toute l\u2019act
   });
 });
 
+// "retirer_corruption_programme" (Technologie "Purificateur", effet
+// immédiat) — variante RESTREINTE de retirer_corruption ci-dessus (retour
+// utilisateur : la carte ne vise QUE les Programmes) : même contrat
+// (délègue à demanderChoix, la popup fait le choix ET la persistance).
+test('retirer_corruption_programme : succès — délègue à demanderChoix({type:"retirer_corruption_programme"}), journalisé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_corruption_programme: 1 }, cout: {}, texte: '' };
+
+  var demanderChoix = function (contexte) {
+    assert.strictEqual(contexte.type, 'retirer_corruption_programme');
+    assert.strictEqual(contexte.partieId, 'partie-test');
+    return { detail: 'Corruption retirée de Programme 2 - Force.' };
+  };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, true);
+    assert.ok(resultat.journal.some(function (l) { return l.indexOf('Corruption retirée de Programme 2') !== -1; }));
+  });
+});
+
+test('retirer_corruption_programme : annulation (popup "Annuler") bloque toute l-action, cout jamais debite', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Jouer', effet: { retirer_corruption_programme: 1 }, cout: { science: 1 }, texte: '' };
+
+  var demanderChoix = function () { return { annule: true }; };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.mutations.length, 0);
+    assert.strictEqual(resultat.plateauMaisonApres, PLATEAU_BASE);
+  });
+});
+
 // "retirer_gardien" (chantier "Refuges", §3) délègue à
 // demanderChoix({type:'retirer_gardien'}) — miroir exact de
 // retirer_corruption ci-dessus, même contrat.
