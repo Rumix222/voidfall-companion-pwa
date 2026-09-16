@@ -139,3 +139,19 @@ Tests : `js/combatService.test.js` (+5), `js/secteurService_actions.test.js` (+9
 
 #Evolution 32 : Substitution en crédit pour cout effet technologie
 ✅ Traité (15/09/2026) — le Coût `immediat.cost` d'une Technologie (ex. Cuirassés : 1 Matériel) était déjà correct (FocusEngine.resoudreEffetEtCout, substitution Crédit générique). Le bug réel (retour utilisateur) : le coût "par cube déployé" (Cuirassé/Porte-Vaisseau, COUT_DEPLOIEMENT_PAR_TYPE, formulaire "Déployer des cubes") était débité directement, sans jamais ouvrir la popup 'paiement_ressource'. focusEngine.js (CLES_DEPLOYER_CUBE + resoudreOptionsMemeSecteur_) délègue désormais ce coût au même mécanisme générique. strategieService.js : la validation du formulaire (par ajout + validation finale) ne bloque plus sur la seule réserve Matériel/Nourriture — le manque total doit simplement tenir dans le Crédit disponible (nouvelle fonction partagée `coutDeploiementCouvertParCredit_`). Voir version.js pour le détail.
+
+#Evolution 33 : Rappeler des cubes de puissance naval du secteur d'un joueur
+Rendre possible le rappel de cube de puissance naval depuis le secteur d'un joueur, il faut pouvoir diminuer le nombre sur une flotte de notre choix, implique l'incrémentation du nombre de cube actif
+Rappel : Le joueur a toujours 14 cubes au total repartie en inactif, actif, déployé sur des secteurs ou sur des refuges
+
+#Evolution 34 : Un cube mis sur un refuge doit etre décrémenté
+1 - Décrémenter les cubes inactifs si possible
+2 - Sinon afficher un message pour indiquer de désactiver ou rappeler un cube
+
+#Evolution 35 : Technologie consumée
+AJouter dans la section plateau crise, en dessous de "Jetons Catastrophe..." (a renommer au passage en juste "Jetons Catastrophes", un champ numérique "Technologies consumées" qui sert au calcul des points du néant en fin de partie. Pré remplir le champ correspondant avec cette valeur en fin de partie.
+
+#Evolution 36 : Simplifier texte fin de cycle
+Dans la popup fin de cycle, supprimer le texte (cf. section "Plateau Crise" du Plat. Galactique) :
+Dans Paiement (§3.1.3) supprimer la mention du paragraphe (§3.1.3)
+Partie objectifs galactiques, sauter une ligne entre le texte de l'objectif et le mention condition rempli ou non
