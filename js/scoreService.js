@@ -120,11 +120,15 @@ var ScoreService = (function () {
   }
 
   // Postes du barème calculables depuis l'état déjà suivi par l'app —
-  // le reste (catastrophes, crises permanentes, technologies consumées,
-  // difficulté de base) ne vit que sur le plateau physique et reste à
-  // saisir à la main. `refugesIncomplets` a rejoint cette liste le
-  // 14/09/2026 (chantier "Refuges", §3) — voir refugesIncomplets_ ci-dessous.
-  var CLES_COMPTEURS_AUTOMATISABLES = ['secteursFaille', 'gardiens', 'maisonsDechues', 'populationNeant', 'corruption', 'refugesIncomplets'];
+  // le reste (catastrophes, crises permanentes, difficulté de base) ne vit
+  // que sur le plateau physique et reste à saisir à la main.
+  // `refugesIncomplets` a rejoint cette liste le 14/09/2026 (chantier
+  // "Refuges", §3) — voir refugesIncomplets_ ci-dessous. `technologiesConsommees`
+  // l'a rejointe le 17/09/2026 (EVOLUTION 35, todo.md) — compteur manuel
+  // simple (plateauMaison.technologiesConsommees, saisi sur Plat.
+  // Galactique/section Plateau Crise), simplement recopié ici, pas de
+  // calcul — voir compteursAutomatiquesDepuisEtat_ ci-dessous.
+  var CLES_COMPTEURS_AUTOMATISABLES = ['secteursFaille', 'gardiens', 'maisonsDechues', 'populationNeant', 'corruption', 'refugesIncomplets', 'technologiesConsommees'];
 
   /**
    * Nombre de tuiles de Refuge INCOMPLÈTES (§3, docs-rules-corruption-
@@ -165,8 +169,12 @@ var ScoreService = (function () {
    *   Corrompues. Partiel : ne compte pas la Corruption des Programmes/
    *   fiches Maison/offre de Programmes, non suivie par l'app — à
    *   compléter à la main si besoin.
+   * - technologiesConsommees (EVOLUTION 35, todo.md) : simple recopiage du
+   *   compteur manuel `plateauMaison.technologiesConsommees` (section
+   *   Plateau Crise, Plat. Galactique) — aucun calcul, ce n'est pas un
+   *   agrégat déduit des secteurs comme les autres postes ci-dessus.
    */
-  function compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges) {
+  function compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges, technologiesConsommees) {
     secteurs = secteurs || [];
 
     var gardiens = 0;
@@ -191,7 +199,8 @@ var ScoreService = (function () {
       maisonsDechues: maisonsDechues,
       populationNeant: populationNeant,
       corruption: corruptionSecteurs + corruptionCivilisation,
-      refugesIncomplets: refugesIncomplets_(refugesBruts, configRefuges || [])
+      refugesIncomplets: refugesIncomplets_(refugesBruts, configRefuges || []),
+      technologiesConsommees: toNombre_(technologiesConsommees)
     };
   }
 
@@ -220,8 +229,9 @@ var ScoreService = (function () {
 
         var corrompuesCivilisation = partie && partie.civilisation && partie.civilisation.corrompues;
         var refugesBruts = partie && partie.plateauMaison && partie.plateauMaison.refuges;
+        var technologiesConsommees = partie && partie.plateauMaison && partie.plateauMaison.technologiesConsommees;
 
-        return compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges);
+        return compteursAutomatiquesDepuisEtat_(secteurs, nombreSecteursFaille, corrompuesCivilisation, refugesBruts, configRefuges, technologiesConsommees);
       });
     });
   }

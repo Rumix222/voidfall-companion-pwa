@@ -1,7 +1,51 @@
 /**
  * version.js
- * Version 158 — 2026-09-15
+ * Version 159 — 2026-09-17
  * Source de vérité unique pour la version de l'application.
+ *
+ * 17/09/2026 (retour utilisateur : "pull puis implémente ce qu'il reste
+ * dans le fichier todo") — les 4 dernières entrées de docs/TODO.md :
+ * - EVOLUTION 33 (rappel de cube depuis un secteur) : `SecteurService.
+ *   rappelerCube` ne touchait jusqu'ici QUE `secteursPartie` (PN décrémentée)
+ *   — `plateauMaison.cubeActif` n'était jamais recrédité, contrairement à
+ *   ce que docs-rules-flottes.md §1.5/§4 prévoit ("rappeler un cube ajoute
+ *   à la zone active"). Corrigé en un seul point (2e écriture DB dans
+ *   `rappelerCube`, secteur PUIS plateauMaison) : les 3 chemins d'appel
+ *   existants (formulaire "Rappeler un cube" de l'écran Secteurs, popup
+ *   'rappeler_cube' — option "recall" d'un Cadre —, popup
+ *   'rappeler_cube_cout' — Coût Focus "rappeler_cube") en bénéficient sans
+ *   modification. `index.html` : le formulaire de l'écran Secteurs
+ *   rafraîchit désormais aussi Plat. maison (cubeActif affiché) en plus de
+ *   Secteurs (Piège n°2) ; commentaire obsolète de
+ *   `appliquerCadreRappelCubeEtRafraichir_` corrigé au passage (affirmait à
+ *   tort que `plateauMaison` n'était "jamais concerné"). 2 tests ajoutés
+ *   (`secteurService_actions.test.js`).
+ * - EVOLUTION 34 (cube posé sur un Refuge) : vérifiée déjà ENTIÈREMENT
+ *   TRAITÉE par le chantier "Refuges" du 14/09/2026 (`GameService.
+ *   sourcerCubeRefuge_`, les 3 branches du livret — cube inactif > cube
+ *   actif désactivé > popup `rappeler_cube_cout` — appelées par les 3
+ *   points d'ajout de cube existants) : aucun changement de code, entrée
+ *   simplement restée non cochée dans le todo malgré le chantier terminé
+ *   avant son ajout à cette liste.
+ * - EVOLUTION 35 (Technologies consumées) : nouveau compteur manuel
+ *   `plateauMaison.technologiesConsommees` (section "Objectifs galactiques
+ *   (aide au calcul)" du bloc Plateau Crise, sous "Jetons Catastrophes" —
+ *   libellé simplifié au passage, "sur le plat. Crise" retiré), whitelisté
+ *   (`CHAMPS_PLATEAU_MAISON_AUTORISES`) et RELU dès son ajout dans
+ *   `assemblerPartie_` (contrairement au bug latent des 3 compteurs voisins,
+ *   corrigé le 14/09/2026). `ScoreService.CLES_COMPTEURS_AUTOMATISABLES`
+ *   l'intègre (simple recopiage, pas un agrégat calculé comme les autres
+ *   postes) : pré-rempli mais modifiable sur l'écran Fin de partie, comme
+ *   `refugesIncomplets` — `scoreVueService.js` déjà générique, aucun
+ *   changement nécessaire.
+ * - EVOLUTION 36 (simplification textes popup fin de cycle,
+ *   `strategieService.js`/`renderPhaseEvaluation_`) : mention "(cf. section
+ *   "Plateau Crise" du Plat. Galactique)" retirée du montant à payer
+ *   Escarmouche ; "(§3.1.3)" retiré du titre "Paiement" (Escarmouche Phase
+ *   Évaluation) ; dans la section Objectifs galactiques, le texte de
+ *   chaque ligne et son statut ("Condition remplie"/"non remplie" etc.)
+ *   sont désormais séparés par un retour à la ligne (`<br>`, même motif
+ *   que le détail Programme) au lieu d'être sur la même ligne (" — ").
  *
  * 15/09/2026, suite (retour utilisateur sur la session précédente —
  * "Évolution 29 je comprend pas... Implémente le cas Fenrax recruter...
@@ -5671,4 +5715,4 @@
  *   le signaler).
  */
 
-var APP_VERSION = '20260915.5';
+var APP_VERSION = '20260917.1';

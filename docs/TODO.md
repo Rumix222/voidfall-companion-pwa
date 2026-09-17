@@ -64,6 +64,7 @@ v20260819.19
 - Couverture tests : `db_enregistrement_test.js` (mécanisme générique, faux IndexedDB), `gameService_evolution18_undo_test.js` (intégration bout-en-bout via les 2 orchestrateurs, reproduit exactement le scénario "Conquête Planifier" rapporté), tests ajoutés dans `focusEngine.test.js`/`civilisationService_test.js`. Vérifié aussi manuellement dans un vrai navigateur (Playwright) : bouton, groupement du journal, aucune erreur JS.
 
 #Evolution 19 : Implémenter le  gain jeton prime
+✅ Traité (entrée jamais cochée malgré le chantier terminé — voir mémoire de session voidfall-jeton-prime-recompense.md/focusEngine.js TOKENS_PRIME_/resoudreGainJetonsPrime_) — les 11 vraies faces de jeton Prime sont résolues via une popup 'option_exclusive' dédiée.
 
 #Evolution 20 : Implémenter actions immédiate techno restante
 ✅ Traité (27/08/2026) — 28/28 technologies portées (chantier complet), voir mémoire de session voidfall-technologies-resolution-plan.md pour le détail des 4 tables de traduction (gains simples/choice, deploy fixe Secteur-Mère, cost+effet via la nouvelle FocusEngine.resoudreEffetEtCout, choice avec une alternative en deploy fixe).
@@ -143,15 +144,19 @@ Tests : `js/combatService.test.js` (+5), `js/secteurService_actions.test.js` (+9
 #Evolution 33 : Rappeler des cubes de puissance naval du secteur d'un joueur
 Rendre possible le rappel de cube de puissance naval depuis le secteur d'un joueur, il faut pouvoir diminuer le nombre sur une flotte de notre choix, implique l'incrémentation du nombre de cube actif
 Rappel : Le joueur a toujours 14 cubes au total repartie en inactif, actif, déployé sur des secteurs ou sur des refuges
+✅ Traité (17/09/2026) — `SecteurService.rappelerCube` ne touchait jusqu'ici QUE `secteursPartie` (PN décrémentée), jamais `plateauMaison.cubeActif`. Corrigé en un seul point (2e écriture DB dans `rappelerCube`) : les 3 chemins d'appel existants (formulaire "Rappeler un cube" de l'écran Secteurs, popup 'rappeler_cube' — option "recall" d'un Cadre —, popup 'rappeler_cube_cout' — Coût Focus "rappeler_cube") en bénéficient sans modification. `index.html` : le formulaire de l'écran Secteurs rafraîchit désormais aussi Plat. maison (Piège n°2). Voir version.js pour le détail.
 
 #Evolution 34 : Un cube mis sur un refuge doit etre décrémenté
 1 - Décrémenter les cubes inactifs si possible
 2 - Sinon afficher un message pour indiquer de désactiver ou rappeler un cube
+✅ Déjà traité (vérifié 17/09/2026, aucun changement nécessaire) — entièrement couvert par le chantier "Refuges" du 14/09/2026 (`GameService.sourcerCubeRefuge_`, appelée par les 3 points d'ajout de cube sur un Refuge) : cube inactif dérivé en priorité, sinon désactivation automatique d'un cube actif, sinon popup `rappeler_cube_cout` — plus automatisé que le "message" initialement demandé. Entrée restée non cochée dans ce todo malgré le chantier déjà terminé.
 
 #Evolution 35 : Technologie consumée
 AJouter dans la section plateau crise, en dessous de "Jetons Catastrophe..." (a renommer au passage en juste "Jetons Catastrophes", un champ numérique "Technologies consumées" qui sert au calcul des points du néant en fin de partie. Pré remplir le champ correspondant avec cette valeur en fin de partie.
+✅ Traité (17/09/2026) — nouveau compteur manuel `plateauMaison.technologiesConsommees` (section "Objectifs galactiques (aide au calcul)" du bloc Plateau Crise, sous "Jetons Catastrophes" — libellé simplifié), whitelisté et relu dans `assemblerPartie_`. `ScoreService.CLES_COMPTEURS_AUTOMATISABLES` l'intègre : pré-rempli mais modifiable sur l'écran Fin de partie, comme `refugesIncomplets` (`scoreVueService.js` déjà générique, aucun changement nécessaire). Voir version.js pour le détail.
 
 #Evolution 36 : Simplifier texte fin de cycle
 Dans la popup fin de cycle, supprimer le texte (cf. section "Plateau Crise" du Plat. Galactique) :
 Dans Paiement (§3.1.3) supprimer la mention du paragraphe (§3.1.3)
 Partie objectifs galactiques, sauter une ligne entre le texte de l'objectif et le mention condition rempli ou non
+✅ Traité (17/09/2026) — `strategieService.js`/`renderPhaseEvaluation_` : mention "(cf. section "Plateau Crise" du Plat. Galactique)" retirée du montant à payer Escarmouche ; "(§3.1.3)" retiré du titre "Paiement" (Escarmouche Phase Évaluation) ; dans la section Objectifs galactiques, le texte de chaque ligne et son statut sont désormais séparés par un `<br>` au lieu d'être sur la même ligne. Voir version.js pour le détail.

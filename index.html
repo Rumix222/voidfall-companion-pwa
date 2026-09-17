@@ -203,8 +203,12 @@
 
         <h3 class="subsection-title" style="margin-top:18px;">Objectifs galactiques (aide au calcul)</h3>
         <div class="plateau-influence">
-          <label for="crise-jetons-catastrophe">Jetons Catastrophe sur le plat. Crise</label>
+          <label for="crise-jetons-catastrophe">Jetons Catastrophes</label>
           <input type="number" step="1" min="0" class="ressource-case-input" id="crise-jetons-catastrophe" value="0">
+        </div>
+        <div class="plateau-influence">
+          <label for="crise-technologies-consommees">Technologies consumées</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="crise-technologies-consommees" value="0">
         </div>
         <div class="plateau-influence">
           <label for="evenement-corruptions-conservees">Corruptions conservées ce Cycle (Cadre "Le visage du mal")</label>
@@ -770,7 +774,14 @@
       // pour le détail de chacun ; même principe manuel que
       // crisePerpetuelle ci-dessus.
       { id: 'crise-jetons-catastrophe', champ: 'jetonsCatastrophePlateauCrise', min: 0, max: null },
-      { id: 'evenement-corruptions-conservees', champ: 'corruptionsConservees', min: 0, max: null }
+      { id: 'evenement-corruptions-conservees', champ: 'corruptionsConservees', min: 0, max: null },
+      // EVOLUTION 35 (todo.md) : suivi manuel des Technologies consumées
+      // (docs-rules-corruption-gardiens-refuges-technoConsume.md §3), sert
+      // au calcul des points du Néant en fin de partie (ScoreService.BAREME
+      // .technologiesConsommees) — pré-rempli sur l'écran Fin de partie
+      // (ScoreService.calculerCompteursAutomatiques), champ laissé
+      // modifiable comme les autres compteurs automatisables.
+      { id: 'crise-technologies-consommees', champ: 'technologiesConsommees', min: 0, max: null }
     ];
     function renderPlateauCrise_(partie) {
       var pm = partie.plateauMaison || {};
@@ -2144,11 +2155,10 @@
      * Option "recall: {cube:1}" (voir GameService.
      * appliquerCadreChoixRappelCube, gameService.js — Événement H Cycle 1
      * Cadre 1) — la popup 'rappeler_cube' (strategieService.js) mute
-     * toujours un secteur (App.renderSecteurs nécessaire) ; Plat. maison
-     * n'est jamais concerné par un rappel de cube (cubeActif touché côté
-     * secteursPartie seulement, pas plateauMaison — voir
-     * SecteurService.rappelerCube), StrategieService.afficher est
-     * néanmoins rappelé par cohérence avec les autres wrappers de cadre.
+     * toujours un secteur (App.renderSecteurs nécessaire) ET Plat. maison
+     * (EVOLUTION 33, todo.md — SecteurService.rappelerCube recrédite
+     * désormais aussi `cubeActif`), d'où l'appel à StrategieService.
+     * afficher ci-dessous, nécessaire et pas seulement "par cohérence".
      */
     function appliquerCadreRappelCubeEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
       if (typeof StrategieService === 'undefined') return;
@@ -3236,7 +3246,14 @@
 
         SecteurService.rappelerCube(partie.id, numero, type)
           .then(function () {
-            renderEcranSecteurs_(partie);
+            // EVOLUTION 33 (todo.md) : le rappel recrédite désormais aussi
+            // `cubeActif` (plateauMaison) — rafraîchit Plat. maison en plus
+            // de Secteurs (Piège n°2, CLAUDE.md).
+            return rafraichirPartieCourante();
+          })
+          .then(function (partieMaj) {
+            renderEcranSecteurs_(partieMaj || partie);
+            if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj || partie);
             btn.disabled = false;
             btn.textContent = texteOriginal;
           })

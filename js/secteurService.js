@@ -341,6 +341,18 @@ var SecteurService = (function () {
     });
   }
 
+  /**
+   * Rappelle 1 cube de Puissance Navale depuis un secteur vers la zone
+   * active (EVOLUTION 33, todo.md — retour utilisateur : le rappel doit
+   * "impliquer l'incrémentation du nombre de cube actif", jusqu'ici
+   * seul `secteursPartie` était touché, `plateauMaison.cubeActif` jamais
+   * recrédité). Écriture en 2 temps (secteur PUIS plateauMaison) : seule
+   * source de vérité pour cette mécanique, utilisée par les 3 chemins
+   * d'appel existants (formulaire "Rappeler un cube" de l'écran Secteurs,
+   * popup 'rappeler_cube' — option "recall" d'un Cadre d'Événement —, et
+   * popup 'rappeler_cube_cout' — Coût Focus "rappeler_cube") — aucun n'a
+   * besoin d'être modifié pour bénéficier du correctif.
+   */
   function rappelerCube(partieId, numero, type) {
     var champ = CHAMP_PN_PAR_TYPE[type];
     if (!champ) return Promise.reject(new Error('Type de vaisseau inconnu : ' + type));
@@ -350,7 +362,13 @@ var SecteurService = (function () {
       var stock = secteur[champ] || 0;
       if (stock <= 0) throw new Error('Aucun ' + type + ' à rappeler dans le secteur ' + numero + '.');
       secteur[champ] = stock - 1;
-      return DB.put('secteursPartie', secteur).then(function () { return { ok: true }; });
+      return DB.put('secteursPartie', secteur);
+    }).then(function () {
+      return DB.get('plateauMaison', partieId);
+    }).then(function (pm) {
+      if (!pm) return { ok: true };
+      pm.cubeActif = (pm.cubeActif || 0) + 1;
+      return DB.put('plateauMaison', pm).then(function () { return { ok: true }; });
     });
   }
 

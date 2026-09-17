@@ -487,6 +487,13 @@ var GameService = (function () {
     //   automatiquement — condition focus_preferes_absents_de_defausse
     //   (Événement E) lit sa négation.
     'jetonsCatastrophePlateauCrise', 'corruptionsConservees', 'focusPrefereEnDefausse',
+    // EVOLUTION 35 (todo.md) : compteur manuel des Technologies consumées
+    // (docs-rules-corruption-gardiens-refuges-technoConsume.md §3), même
+    // principe que les 3 compteurs ci-dessus — sert au calcul des points
+    // du Néant en fin de partie (ScoreService.BAREME.technologiesConsommees,
+    // désormais dans CLES_COMPTEURS_AUTOMATISABLES, pré-rempli mais
+    // modifiable sur l'écran Fin de partie).
+    'technologiesConsommees',
     // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
     // technoConsume.md) — voir GameService.ajouterCubeRefuge/
     // appliquerRecompenseRefuge ci-dessous, seuls écrivains de `refuges`
@@ -1272,6 +1279,10 @@ var GameService = (function () {
       jetonsCatastrophePlateauCrise: pm.jetonsCatastrophePlateauCrise || 0,
       corruptionsConservees: pm.corruptionsConservees || 0,
       focusPrefereEnDefausse: !!pm.focusPrefereEnDefausse,
+      // EVOLUTION 35 (todo.md) — voir CHAMPS_PLATEAU_MAISON_AUTORISES
+      // ci-dessus. Relu dès l'ajout de ce champ, contrairement aux 3
+      // précédents (bug corrigé le 14/09/2026, voir commentaire ci-dessus).
+      technologiesConsommees: pm.technologiesConsommees || 0,
       // Chantier "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
       // technoConsume.md) — voir CHAMPS_PLATEAU_MAISON_AUTORISES ci-dessus
       // pour le détail. `refuges` brut (PAS complété à la longueur du

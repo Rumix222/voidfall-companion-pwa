@@ -8198,7 +8198,7 @@ var StrategieService = (function () {
               pmCrise.criseCoutInfluence ? pmCrise.criseCoutInfluence + ' Influence' : null
             ].filter(Boolean);
             var texteMontant = montantDu.length
-              ? '<p class="hint">Montant à payer (cf. section "Plateau Crise" du Plat. Galactique) : ' + montantDu.join(', ') + '.</p>'
+              ? '<p class="hint">Montant à payer : ' + montantDu.join(', ') + '.</p>'
               : '<p class="hint">Aucun montant à payer.</p>';
 
             var dejaResolue = !!(evenementCycleEval && evenementCycleEval.escarmoucheResoluePhaseEval);
@@ -8333,7 +8333,7 @@ var StrategieService = (function () {
               } else if (r.rempli === true && GameService.gainObjectifAutomatisable(r.ligne)) {
                 boutonAuto = ' <button type="button" class="btn btn-secondary btn-objectif-appliquer" data-bloc="' + r.blocIndex + '" data-ligne="' + r.ligneIndex + '">Appliquer</button>';
               }
-              return prefixe + '<p>' + r.ligne.texte + ' — ' + libelleStatutObjectif_(r) + noteAuto + boutonAuto + '</p>';
+              return prefixe + '<p>' + r.ligne.texte + '<br>' + libelleStatutObjectif_(r) + noteAuto + boutonAuto + '</p>';
             }).join('');
             return { html: html, gainInfluence: gainInfluence };
           }
@@ -8741,7 +8741,7 @@ var StrategieService = (function () {
             var texteSectionPaiement = '';
             if (estPhaseEval) {
               var cca = contexte.criseCoutActuel || {};
-              texteSectionPaiement = '<h4 class="modal-section-titre" style="margin-top:14px;">Paiement (§3.1.3)</h4>' +
+              texteSectionPaiement = '<h4 class="modal-section-titre" style="margin-top:14px;">Paiement</h4>' +
                 '<p class="hint">Substitution de la Nourriture/Énergie/Matériel par du Crédit autorisée ; chaque ressource non payée fait perdre 3 Influence.</p>' +
                 '<div class="plateau-influence-ligne">' +
                 ['materiel', 'energie', 'science', 'credit', 'influence'].map(function (cle) {

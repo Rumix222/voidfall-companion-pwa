@@ -161,6 +161,29 @@ test('rappelerCube : stock suffisant -> décrémente', function () {
   });
 });
 
+test('rappelerCube : plateauMaison existant -> recrédite cubeActif (EVOLUTION 33)', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ pnCorvette: 2 });
+  db._stores.plateauMaison['p1'] = { partieId: 'p1', cubeActif: 3 };
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.rappelerCube('p1', 1, 'corvette').then(function (resultat) {
+    assert.strictEqual(resultat.ok, true);
+    assert.strictEqual(db._stores.secteursPartie['p1|1'].pnCorvette, 1);
+    assert.strictEqual(db._stores.plateauMaison['p1'].cubeActif, 4);
+  });
+});
+
+test('rappelerCube : aucun plateauMaison -> réussit quand même (pas de crédit)', function () {
+  var db = creerDbFactice_();
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ pnCorvette: 2 });
+  var ctx = creerContexte_(db);
+
+  return ctx.SecteurService.rappelerCube('p1', 1, 'corvette').then(function (resultat) {
+    assert.strictEqual(resultat.ok, true);
+  });
+});
+
 test('rappelerCube : stock à 0 -> rejette', function () {
   var db = creerDbFactice_();
   db._stores.secteursPartie['p1|1'] = secteurDeBase_({ pnCorvette: 0 });
