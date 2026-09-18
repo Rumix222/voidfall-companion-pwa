@@ -13,7 +13,12 @@ var DB = (function () {
   'use strict';
 
   var NOM_BASE = 'voidfallCompanion';
-  var VERSION_BASE = 3;
+  // À incrémenter à chaque nouveau store ajouté à STORES ci-dessous — sinon
+  // onupgradeneeded ne se redéclenche pas chez les joueurs ayant déjà une
+  // base ouverte à une version antérieure (store manquant -> erreur
+  // IDBDatabase.transaction "object store was not found"). v4 : ajout de
+  // scenarioTempetes (18/09/2026).
+  var VERSION_BASE = 4;
   var promesseDB_ = null;
 
   /**

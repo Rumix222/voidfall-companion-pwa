@@ -5760,6 +5760,17 @@
  * `rendrePlateau_` ; panneau détail d'un secteur concerné : nouvelle ligne
  * "Tempête du Néant — adjacence cassée avec le secteur X". Nouvelle
  * variable CSS `--galaxie-tempete` (`css/style.css`).
+ *
+ * 18/09/2026 (correctif — bug utilisateur : "Erreur de chargement des
+ * secteurs : Failed to execute 'transaction' on 'IDBDatabase': One of the
+ * specified object stores was not found.") : l'ajout du store
+ * `scenarioTempetes` (ci-dessus) dans `STORES` ne suffit pas seul —
+ * `onupgradeneeded` (js/db.js) ne se redéclenche que si `VERSION_BASE` a
+ * augmenté par rapport à la base déjà ouverte dans le navigateur du joueur,
+ * oublié lors de ce chantier. `VERSION_BASE` passé de 3 à 4 : les joueurs
+ * ayant déjà une partie récupèrent le store manquant à la prochaine
+ * ouverture de l'app, sans perte de données (STORES existants inchangés,
+ * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260918.2';
+var APP_VERSION = '20260918.3';
