@@ -5,5 +5,12 @@
     "complexite": 1,
     "nombreSecteurs": 10,
     "refuges": [2, 2]
+  },
+  {
+    "id": "solo_2",
+    "nom": "Ultime résistance",
+    "complexite": 2,
+    "nombreSecteurs": 12,
+    "refuges": [2, 3]
   }
 ]

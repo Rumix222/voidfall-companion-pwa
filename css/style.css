@@ -620,6 +620,12 @@ input:disabled {
   --galaxie-mere-bord: #3a3a5c;
   --galaxie-faille: #451c40;
   --galaxie-faille-bord: #7a3a70;
+  --galaxie-ceinture: #4a4438;
+  --galaxie-ceinture-bord: #8a7f5a;
+  --galaxie-genese: #5a3a1a;
+  --galaxie-genese-bord: #c98a3a;
+  --galaxie-colonie: #1e4a30;
+  --galaxie-colonie-bord: #4a9a5f;
   --galaxie-orange: #e08a2b;
   --galaxie-jaune: #e0b23d;
   --galaxie-bleu: #3a7bd5;

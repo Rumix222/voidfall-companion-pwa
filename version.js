@@ -5713,6 +5713,34 @@
  *   actif pour le cycle en cours, un retrait de Corruption sur une piste
  *   ne décrémente PAS ce compteur (petit message ajouté au journal pour
  *   le signaler).
+ *
+ * 18/09/2026 (scénario solo_2 "Ultime résistance", corrigé en direct avec
+ * le porteur du projet à partir du POC poc-rendu-secteurs.html) :
+ * - Données portées dans le vrai catalogue : `data/catalogue/scenarios.json`
+ *   (complexité 2, 12 secteurs, refuges [2, 3]), `scenarioSecteurs.json` (12
+ *   lignes, numérotation officielle confirmée — Secteur-Mère = 1, dizaine =
+ *   distance à la Mère, unité = ordre horaire) et `scenarioAdjacences.json`
+ *   (20 paires, dérivées directement du placement q,r confirmé, moins les 4
+ *   paires cassées par une Tempête du Néant — non automatisée, cf.
+ *   docs-rules-secteurs.md §1.1, à gérer physiquement sur le plateau).
+ * - `secteurVueService.js` (écran Galaxie) : `COORDS_PAR_SCENARIO_.solo_2`
+ *   ajouté ; orientation du plateau sortie du code en dur (60°) vers
+ *   `ORIENTATION_PAR_SCENARIO_` (solo_1 = 60°, solo_2 = 180°, toujours
+ *   miroir horizontal + vertical) ; couleurs dédiées (sans icône, retour
+ *   utilisateur) pour les types Genèse/Ceinture d'Astéroïdes/Colonie de
+ *   Survivants (déjà pris en charge par le rendu générique existant —
+ *   typesSecteur.json les a toujours eus à 0 emplacement Installation/
+ *   Guilde), nouvelles variables CSS `--galaxie-{genese,ceinture,colonie}
+ *   {,-bord}` (css/style.css).
+ * - Choix du scénario ajouté à l'écran de création de partie : nouveau
+ *   `<select id="select-scenario">` (index.html), peuplé par
+ *   `GameService.obtenirScenariosCatalogue` (nouvelle fonction, lecture
+ *   simple du store `scenarios`) dans `setupService.js`
+ *   (`peuplerSelectScenario_`, sélection par défaut = `SecteurService.
+ *   SCENARIO_PAR_DEFAUT`) ; `options.scenarioId` transmis à
+ *   `GameService.creerPartie` pour les 3 branches (manuel, manuel avec mise
+ *   en place, aléatoire) — ce paramètre existait déjà côté `creerPartie`
+ *   sans jamais être renseigné depuis l'écran de création.
  */
 
-var APP_VERSION = '20260917.1';
+var APP_VERSION = '20260918.1';

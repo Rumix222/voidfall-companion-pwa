@@ -42,14 +42,15 @@
  *   secteurMereInstallationChantierNaval=1 chez toutes les maisons). Le
  *   nombre de slots dessinés est donc `Math.max(nombreMax, comptés)` —
  *   couvre les deux cas sans branche spéciale par type de secteur.
- * - Coordonnées (q,r) : reconstruites à la main pour le scénario 'solo_1'
- *   uniquement (aucune coordonnée dans les données du projet, voir
+ * - Coordonnées (q,r) : reconstruites à la main pour 'solo_1' puis 'solo_2'
+ *   (aucune coordonnée dans les données du projet, voir
  *   COORDS_PAR_SCENARIO_ ci-dessous) — un scénario sans entrée dans cette
  *   table affiche un message de repli plutôt que de deviner.
- * - Orientation du plateau : figée au réglage validé en session POC
- *   (rotation 60° + miroir horizontal + miroir vertical), pas de contrôle
- *   utilisateur ici (le POC en avait un pour la phase d'exploration
- *   uniquement, plus nécessaire une fois le réglage arrêté).
+ * - Orientation du plateau : réglage par scénario validé avec le porteur du
+ *   projet (ORIENTATION_PAR_SCENARIO_ — solo_1 en 60°, solo_2 en 180°,
+ *   toujours miroir horizontal + vertical), pas de contrôle utilisateur ici
+ *   (le POC en avait un pour la phase d'exploration uniquement, plus
+ *   nécessaire une fois chaque réglage arrêté).
  * - Flotte de Puissance Navale : le POC démontrait le système de lettres
  *   de type via un champ de démonstration (flottesDemo, secteur #11
  *   uniquement). secteursPartie a en réalité un compteur par type
@@ -84,8 +85,38 @@ var SecteurVueService = (function () {
       31: { q: 2, r: 1 },
       32: { q: 1, r: 2 },
       40: { q: 2, r: 2 }
+    },
+    // solo_2 : coordonnées + numérotation officielle confirmées par le
+    // porteur du projet le 18/09/2026 (Secteur-Mère = 1, dizaine = distance
+    // à la Mère, unité = ordre horaire). Adjacence dérivée directement de
+    // ce placement (scenarioAdjacences.json), moins les 4 paires cassées
+    // par une Tempête du Néant (non automatisée, à gérer physiquement sur
+    // le plateau — cf. docs-rules-secteurs.md §1.1).
+    solo_2: {
+      1:  { q: 3, r: 1 },
+      11: { q: 2, r: 2 },
+      12: { q: 2, r: 1 },
+      13: { q: 3, r: 0 },
+      21: { q: 1, r: 3 },
+      22: { q: 1, r: 2 },
+      23: { q: 1, r: 1 },
+      24: { q: 2, r: 0 },
+      31: { q: 0, r: 3 },
+      32: { q: 0, r: 2 },
+      33: { q: 0, r: 1 },
+      34: { q: 1, r: 0 }
     }
   };
+
+  // Orientation du plateau : le graphe d'adjacence ne dit rien sur
+  // l'orientation réelle à la table, donc un réglage par scénario a été
+  // validé avec le porteur du projet (rotation + miroirs, appliqués à la
+  // position des hexagones uniquement — jamais au contenu de chacun).
+  var ORIENTATION_PAR_SCENARIO_ = {
+    solo_1: { rotationDeg: 60, miroirH: true, miroirV: true },
+    solo_2: { rotationDeg: 180, miroirH: true, miroirV: true }
+  };
+  var ORIENTATION_PAR_DEFAUT_ = { rotationDeg: 60, miroirH: true, miroirV: true };
 
   var TAILLE_HEX = 66; // rayon du centre au sommet
 
@@ -96,14 +127,16 @@ var SecteurVueService = (function () {
     };
   }
 
-  // Orientation figée (voir en-tête du fichier) — le plateau entier est
-  // pivoté/retourné en bloc (position des hexagones), jamais le contenu de
-  // chaque hexagone (icônes toujours lisibles à l'endroit).
-  function orienterPoint_(x, y) {
-    var rad = 60 * Math.PI / 180;
+  // Le plateau entier est pivoté/retourné en bloc (position des hexagones),
+  // jamais le contenu de chaque hexagone (icônes toujours lisibles à
+  // l'endroit) — réglage par scénario, voir ORIENTATION_PAR_SCENARIO_.
+  function orienterPoint_(x, y, orientation) {
+    var rad = orientation.rotationDeg * Math.PI / 180;
     var xr = x * Math.cos(rad) - y * Math.sin(rad);
     var yr = x * Math.sin(rad) + y * Math.cos(rad);
-    return { x: -xr, y: -yr }; // miroir horizontal + miroir vertical
+    if (orientation.miroirH) { xr = -xr; }
+    if (orientation.miroirV) { yr = -yr; }
+    return { x: xr, y: yr };
   }
 
   function pointsHexPlat_(cx, cy, taille) {
@@ -414,9 +447,22 @@ var SecteurVueService = (function () {
 
   // ---- Construction d'un secteur ----
 
+  // Couleurs par type de secteur spécifique — pas d'icône dédiée (retour
+  // utilisateur 18/09/2026, cf. maquette poc-rendu-secteurs.html) : la
+  // couleur de fond/bordure de l'hexagone suffit à distinguer ces types,
+  // qui restent sinon rendus par le même chemin générique que 'standard'
+  // (nombreInstallationMax/nombreGuildeMax = 0 pour ces types dans
+  // typesSecteur.json, donc aucun emplacement dessiné).
+  var COULEURS_TYPE_SPECIAL_ = {
+    ceinture_asteroides: { fond: 'var(--galaxie-ceinture)', bord: 'var(--galaxie-ceinture-bord)' },
+    genese: { fond: 'var(--galaxie-genese)', bord: 'var(--galaxie-genese-bord)' },
+    colonie_survivants: { fond: 'var(--galaxie-colonie)', bord: 'var(--galaxie-colonie-bord)' }
+  };
+
   function couleurSecteur_(type) {
     if (type === 'secteur_mere') return { fond: 'var(--galaxie-mere)', bord: 'var(--galaxie-mere-bord)' };
     if (type === 'faille') return { fond: 'var(--galaxie-faille)', bord: 'var(--galaxie-faille-bord)' };
+    if (COULEURS_TYPE_SPECIAL_[type]) return COULEURS_TYPE_SPECIAL_[type];
     return { fond: 'var(--galaxie-standard)', bord: 'var(--galaxie-standard-bord)' };
   }
 
@@ -644,12 +690,12 @@ var SecteurVueService = (function () {
     brancherEditionDetail_(secteur.numero);
   }
 
-  function rendrePlateau_(conteneur, items, numeroSelectionne) {
+  function rendrePlateau_(conteneur, items, numeroSelectionne, orientation) {
     conteneur.innerHTML = '';
     groupeSelectionne_ = null; // les <g> précédents viennent d'être détruits (innerHTML='')
     var pixels = items.map(function (item) {
       var brut = axialVersPixel_(item.q, item.r);
-      return orienterPoint_(brut.x, brut.y);
+      return orienterPoint_(brut.x, brut.y, orientation);
     });
     var vb = calculerViewBox_(pixels);
 
@@ -720,7 +766,8 @@ var SecteurVueService = (function () {
         return;
       }
 
-      rendrePlateau_(conteneur, items, numeroDetailAOuvrir);
+      var orientation = ORIENTATION_PAR_SCENARIO_[partie.scenarioId] || ORIENTATION_PAR_DEFAUT_;
+      rendrePlateau_(conteneur, items, numeroDetailAOuvrir, orientation);
 
       var itemAOuvrir = numeroDetailAOuvrir != null
         ? items.filter(function (it) { return it.secteur.numero === numeroDetailAOuvrir; })[0]

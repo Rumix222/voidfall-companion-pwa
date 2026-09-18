@@ -49,6 +49,24 @@ var SetupService = (function () {
     document.getElementById('bloc-mise-en-place-manuelle').hidden = true;
   }
 
+  /**
+   * Liste déroulante Scénario (data/catalogue/scenarios.json, via
+   * GameService.obtenirScenariosCatalogue) — sélectionne solo_1 par défaut
+   * (SecteurService.SCENARIO_PAR_DEFAUT) tant qu'un seul scénario a de
+   * vraies données ; devient utile dès qu'un 2e scénario existe.
+   */
+  function peuplerSelectScenario_(scenarios) {
+    var select = document.getElementById('select-scenario');
+    var scenariosTries = scenarios.slice().sort(function (a, b) {
+      return (Number(a.complexite) || 0) - (Number(b.complexite) || 0);
+    });
+    var defaut = (typeof SecteurService !== 'undefined') ? SecteurService.SCENARIO_PAR_DEFAUT : null;
+    select.innerHTML = scenariosTries.map(function (s) {
+      return '<option value="' + s.id + '">' + s.nom + ' (difficulté ' + s.complexite + ')</option>';
+    }).join('');
+    if (defaut) { select.value = defaut; }
+  }
+
   function peuplerListes_(maisons) {
     maisonsCache = maisons;
 
@@ -288,12 +306,15 @@ var SetupService = (function () {
       selectMaison.disabled = true;
       btnLancer.disabled = true;
 
-      GameService.obtenirMaisonsCatalogue()
-        .then(function (maisons) {
+      Promise.all([GameService.obtenirMaisonsCatalogue(), GameService.obtenirScenariosCatalogue()])
+        .then(function (resultats) {
+          var maisons = resultats[0];
+          var scenarios = resultats[1];
           if (!maisons.length) {
             throw new Error('Catalogue vide — synchronise-le depuis l\'accueil avant de créer une partie.');
           }
           peuplerListes_(maisons);
+          peuplerSelectScenario_(scenarios);
           selectMaison.disabled = false;
           btnLancer.disabled = false;
         })
@@ -322,6 +343,8 @@ var SetupService = (function () {
       } else {
         options = { mode: 'aleatoire', complexite: document.getElementById('select-complexite').value };
       }
+
+      options.scenarioId = document.getElementById('select-scenario').value || undefined;
 
       var texteOriginal = btn.textContent;
       btn.disabled = true;

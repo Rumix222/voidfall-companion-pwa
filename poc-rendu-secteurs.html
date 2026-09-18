@@ -1,0 +1,991 @@
+<!--
+  ============================================================================
+  POC — Rendu visuel hexagonal des secteurs (Voidfall Companion)
+  ============================================================================
+  Version : 20260909.1 — 09/09/2026
+  Statut  : Preuve de concept isolée. Fichier autonome, sans dépendance,
+            non intégré au repo voidfall-companion-pwa (pas référencé dans
+            index.html, pas dans service-worker.js/FICHIERS_A_METTRE_EN_CACHE).
+            Ne PAS considérer ce fichier comme prêt à copier tel quel dans
+            l'app — c'est un brouillon visuel à faire évoluer/porter.
+
+  OBJECTIF
+  --------
+  Explorer un rendu hexagonal des secteurs (plateau galactique) inspiré des
+  tuiles physiques du jeu, pour préparer une future vue "plateau" dans la
+  PWA. Construit itérativement avec le porteur du projet à partir de photos
+  de tuiles réelles et de l'iconographie officielle (Guildes, Installations).
+
+  Voir aussi : docs-rules-secteurs.md (règles Secteurs), typesSecteur.json
+  (nombreInstallationMax / nombreGuildeMax par type), scenarioSecteurs.json
+  (mise en place solo_1), scenarioAdjacences.json (graphe d'adjacence).
+
+  ============================================================================
+  DÉCISIONS STRUCTURANTES (à relire avant de reprendre ce travail)
+  ============================================================================
+
+  1) COORDONNÉES DU PLATEAU
+     Aucune coordonnée hexagonale n'existe dans les données actuelles du
+     projet (scenarioSecteurs.json n'a qu'un `numero`, scenarioAdjacences
+     ne donne qu'un graphe de paires). Les coordonnées axiales (q,r) ci-
+     dessous ont donc été reconstruites à la main pour le scénario solo_1,
+     vérifiées une à une pour respecter exactement les 18 paires du graphe
+     d'adjacence réel. Si un autre scénario doit être ajouté, il faudra
+     refaire cet exercice (ou, mieux : faire porter une vraie donnée de
+     coordonnées côté projet plutôt que de la deviner ici).
+
+  2) ORIENTATION DU PLATEAU
+     Le graphe d'adjacence ne dit rien sur l'orientation réelle à la table.
+     Plutôt que deviner, le plateau entier peut être pivoté/retourné en bloc
+     via 3 boutons (rotation 60°, miroir horizontal, miroir vertical) sans
+     jamais faire pivoter le contenu de chaque hexagone (icônes toujours
+     lisibles). Réglage validé et figé par défaut : Rotation 60° · Miroir
+     horizontal oui · Miroir vertical oui (place le secteur 1 / Secteur-Mère
+     en bas à gauche, conforme à la disposition réelle sur table).
+
+  3) DISPOSITION D'UN SECTEUR STANDARD (de haut en bas)
+     - Haut    : 3 emplacements d'Installation (triangles, orientation
+                 haut/bas/haut alternée selon la position du slot — motif
+                 fixe imprimé sur la tuile physique).
+     - Milieu  : dé de Population (collé à gauche) · cube(s) de Puissance
+                 au centre · Gardien (collé à droite, légèrement remonté).
+     - Bas     : emplacements de Guilde (roues crantées).
+     Le nombre d'emplacements Installation/Guilde n'est PAS codé en dur :
+     il vient de typesSecteur.json (nombreInstallationMax / nombreGuildeMax)
+     via le dictionnaire TYPES_SECTEUR ci-dessous. Secteur-Mère n'a par
+     exemple que 2 emplacements de Guilde et 0 Installation (contre 3/3
+     pour un secteur standard) — voir la branche "secteur_mere" plus bas.
+
+  4) EMPLACEMENTS GÉNÉRIQUES (Installations ET Guildes)
+     Point de vigilance important, clarifié en cours de session : les
+     emplacements d'Installation sont GÉNÉRIQUES, exactement comme les
+     Guildes. N'importe quel type (Défense/Chantier/Base) peut occuper
+     n'importe quel emplacement, y compris en double sur un même secteur
+     (ex. 3× Défense de Secteur — démontré sur le secteur #31). Seule
+     l'ORIENTATION du triangle (haut/bas) est fixe et liée à la POSITION du
+     slot (motif imprimé sur la tuile), jamais au type qui l'occupe.
+     Les deux familles de slots sont représentées en mémoire comme des
+     tableaux ORDONNÉS, remplis par la gauche par défaut :
+       - `guildesDemo`       : ex. ["scientifiques","banquiers","mineurs"]
+       - `installationsDemo` : ex. ["defense","chantier","base"]
+     ⚠️ Ces deux champs sont des données de DÉMONSTRATION ajoutées à la main
+     dans SECTEURS ci-dessous : scenarioSecteurs.json ne contient aujourd'hui
+     ni attribution de Guilde, ni détail Installation par type (seul
+     `installationDefenseSecteurDepart` existe réellement). Avant tout
+     portage dans l'app, il faudra décider comment persister ces tableaux
+     côté vraies données (voir section "OUVERT / À DÉCIDER" plus bas).
+
+  5) TYPES DE VAISSEAUX / CUBES DE PUISSANCE
+     Un cube de Puissance Navale empile au maximum 3 vaisseaux d'un même
+     type (MAX_PAR_CUBE). Au-delà, la quantité se répartit automatiquement
+     sur plusieurs cubes (`decouperEnCubes_`, ex. 4 → un cube "3" + un cube
+     "1"). Chaque cube affiche sa valeur directement sur sa face, plus une
+     lettre de type (LETTRE_VAISSEAU) : Corvette = aucune lettre,
+     Sentinelle = S, Destroyer = D, Cuirassé = C, Porte-vaisseau = P.
+     Démontré sur l'Avant-Poste (secteur #11, champ `flottesDemo`) avec un
+     cube "3S" et un cube "3D".
+     Couleur du cube = camp : orange = Puissance du Néant, bleu = joueur
+     (démo de mise en place sur le Secteur-Mère uniquement pour l'instant).
+     Jamais les deux en même temps sur un même emplacement.
+
+  6) MAPPING ICÔNE <-> DONNÉE (validé au fil des itérations avec photos)
+     - Dé (points bleus)                 → Population (populationDepart),
+       pointes orange courtes autour     → secteur Corrompu (corrompuDepart)
+     - Buste orange (tête+épaules)       → Gardiens (nombreGardienDepart,
+                                            toujours 1 max ⇒ jamais de "×N")
+     - Cube isométrique orange/bleu      → Puissance Navale (Néant/joueur),
+                                            valeur ou lettre+valeur dessus
+     - Triangle rose + hexagone doré     → Installation Défense de Secteur
+     - Triangle vert + clé à molette     → Installation Chantier Naval
+     - Triangle violet + globe doré      → Installation Base Stellaire
+     - Roue crantée + symbole coloré     → Guilde (5 types, cf. GUILDES)
+     - Badge blanc demi-cercle + valeur  → Jeton Gloire (jetonGloireDepart)
+     - Amas de gemmes rouge/or           → Jeton Prime (jetonPrimeDepart)
+     - Hexagone sombre + ruban doré      → Jeton Libération
+                                            (jetonLiberationDepart)
+     - Point jaune sous le Gardien       → indique la présence de
+       récompenses (Gloire/Prime/Libération), affichées en détail au clic
+       plutôt que sur l'hexagone lui-même (trop chargé sinon).
+     Le numéro de secteur et le sous-type (Avant-poste/Maison déchue) ne
+     s'affichent plus SUR l'hexagone (trop de bruit visuel) : ils restent
+     visibles dans le panneau de détail au clic, qui liste aussi désormais
+     les emplacements Installations/Guildes (dans l'ordre gauche→droite)
+     et les récompenses en icônes tout en haut.
+
+  ============================================================================
+  OUVERT / À DÉCIDER (pour la suite, en dehors de ce POC)
+  ============================================================================
+  - Où et comment persister les tableaux ordonnés Installations/Guildes
+    (aujourd'hui simulés via `installationsDemo`/`guildesDemo`) dans le vrai
+    schéma de données (scenarioSecteurs.json et/ou IndexedDB db.js) ?
+  - Étendre les coordonnées (q,r) aux autres scénarios que solo_1.
+  - Le mapping Chantier Naval / Base Stellaire (triangle vert/violet) est
+    une interprétation par élimination : seul Défense de Secteur (triangle
+    rose) a été confirmé directement sur photo par le porteur du projet.
+  - Les icônes de Guildes sont des approximations vectorielles maison
+    (pas un décalque fidèle de l'iconographie officielle), notamment
+    Scientifiques et Banquiers, les plus abstraites.
+  - Aucune interaction d'écriture (construire/retirer une Installation ou
+    une Guilde) n'est implémentée : c'est un rendu en lecture seule.
+  - Densité visuelle : sur un hexagone cumulant sous-type + beaucoup
+    d'éléments remplis, certains espacements restent tendus sur petit écran
+    (à re-tester une fois branché sur de vraies données de scénario).
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POC — Rendu secteurs Voidfall</title>
+<style>
+  :root {
+    --couleur-fond: #0b0b16;
+    --couleur-standard: #3d2f66;
+    --couleur-standard-bord: #6f5aa8;
+    --couleur-mere: #14142b;
+    --couleur-mere-bord: #3a3a5c;
+    --couleur-faille: #451c40;
+    --couleur-faille-bord: #7a3a70;
+    --couleur-texte: #f3f0ff;
+    --couleur-teal: #3f8f83;
+    --couleur-orange: #e08a2b;
+    --couleur-jaune: #e0b23d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--couleur-fond);
+    color: var(--couleur-texte);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 16px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sous-titre { font-size: 13px; color: #a89fce; margin: 0 0 16px; }
+  #zone-plateau {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    touch-action: pan-y pinch-zoom;
+  }
+  #controles-orientation {
+    max-width: 640px;
+    margin: 0 auto 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #controles-orientation button {
+    flex: 1;
+    min-width: 90px;
+    background: #241f42;
+    color: var(--couleur-texte);
+    border: 1px solid #3d3670;
+    border-radius: 8px;
+    padding: 10px 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  #controles-orientation button:active { background: #342c5e; }
+  #controles-scenario {
+    max-width: 640px;
+    margin: 0 auto 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #controles-scenario button {
+    flex: 1;
+    min-width: 140px;
+    background: #241f42;
+    color: var(--couleur-texte);
+    border: 1px solid #3d3670;
+    border-radius: 8px;
+    padding: 10px 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  #controles-scenario button.actif { background: var(--couleur-teal); border-color: var(--couleur-teal); }
+  #etat-orientation {
+    max-width: 640px;
+    margin: 0 auto 12px;
+    font-size: 11.5px;
+    color: #8a80b0;
+    text-align: center;
+  }
+  .hex-secteur { cursor: pointer; }
+  .hex-secteur .fond-hex { stroke-width: 3; transition: filter 0.15s; }
+  .hex-secteur:active .fond-hex { filter: brightness(1.25); }
+  .hex-secteur text { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .libelle-multiplicateur { font-size: 17px; font-weight: 800; fill: #fff; }
+  .libelle-population { font-size: 15px; font-weight: 700; fill: #fff; }
+  #panneau-detail {
+    max-width: 640px;
+    margin: 16px auto 0;
+    background: #17172c;
+    border: 1px solid #33305a;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #panneau-detail h2 { font-size: 14px; margin: 0 0 6px; color: #cdbfff; }
+  #panneau-detail .ligne { display: flex; justify-content: space-between; border-bottom: 1px solid #262444; padding: 3px 0; }
+  #panneau-detail .ligne:last-child { border-bottom: none; }
+  #panneau-detail .cle { color: #9a90c2; }
+  #panneau-detail .vide { color: #6a6489; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>POC — Rendu hexagonal des secteurs</h1>
+<p class="sous-titre" id="sous-titre">appuyer sur un hexagone pour voir le détail des données</p>
+
+<div id="controles-scenario">
+  <button id="btn-scenario-1" class="btn-scenario">solo_1 · Première ligne</button>
+  <button id="btn-scenario-2" class="btn-scenario">solo_2 · Ultime résistance (brouillon)</button>
+</div>
+
+<div id="controles-orientation">
+  <button id="btn-pivoter">↻ Pivoter 60°</button>
+  <button id="btn-miroir-h">⇋ Miroir horizontal</button>
+  <button id="btn-miroir-v">⇕ Miroir vertical</button>
+</div>
+<div id="etat-orientation"></div>
+
+<div id="zone-plateau"></div>
+
+<div id="panneau-detail">
+  <h2>Détail</h2>
+  <div class="vide">Sélectionnez un secteur ci-dessus.</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Données : extrait de typesSecteur.json ----
+  var TYPES_SECTEUR = {
+    "standard": { nom: "Secteur standard", nombreInstallationMax: 3, nombreGuildeMax: 3 },
+    "secteur_mere": { nom: "Secteur-Mère", nombreInstallationMax: 0, nombreGuildeMax: 2 },
+    "faille": { nom: "Faille", nombreInstallationMax: 0, nombreGuildeMax: 0 },
+    "ceinture_asteroides": { nom: "Ceinture d'Astéroïdes", nombreInstallationMax: 0, nombreGuildeMax: 0 },
+    "genese": { nom: "Secteur Genèse", nombreInstallationMax: 0, nombreGuildeMax: 0 },
+    "colonie_survivants": { nom: "Colonie de Survivants", nombreInstallationMax: 0, nombreGuildeMax: 0 }
+  };
+
+  // ---- Données : extrait de scenarioSecteurs.json (scenarioId = solo_1) ----
+  // + coordonnées axiales (q,r) reconstruites à la main à partir de
+  // scenarioAdjacences.json (voir en-tête du fichier).
+  var SECTEURS_SOLO_1 = [
+    { numero: 1,  type: "secteur_mere", sousType: null, populationDepart: null, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 0, r: 0 },
+    { numero: 11, type: "standard", sousType: "avant_poste", populationDepart: null, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 1, r: 0,
+      // Démo uniquement : illustre le système de types de vaisseaux (lettre
+      // + répartition automatique sur plusieurs cubes de 3 maximum). Pas de
+      // champ correspondant dans scenarioSecteurs.json pour l'instant.
+      flottesDemo: [{ type: "sentinelle", nombre: 3 }, { type: "destroyer", nombre: 3 }] },
+    { numero: 12, type: "standard", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 0, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 0, q: 0, r: 1 },
+    { numero: 21, type: "standard", sousType: null, populationDepart: 2, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 1, jetonPrimeDepart: 0, jetonGloireDepart: 1, jetonLiberationDepart: 0, q: 2, r: 0 },
+    { numero: 22, type: "standard", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 1, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 0, q: 1, r: 1,
+      // Démo uniquement (pas de champ correspondant dans scenarioSecteurs.json
+      // pour l'instant) : sert à visualiser un secteur avec installations +
+      // guildes toutes remplies. Les emplacements d'Installation sont
+      // génériques, comme les Guildes (n'importe quel type sur n'importe
+      // quel emplacement) : ici un exemple avec les 3 types différents.
+      installationsDemo: ["defense", "chantier", "base"],
+      guildesDemo: ["scientifiques", "banquiers", "mineurs"] },
+    { numero: 23, type: "standard", sousType: null, populationDepart: 4, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 1, pnNeantDepart: 1, jetonPrimeDepart: 0, jetonGloireDepart: 3, jetonLiberationDepart: 2, q: 0, r: 2 },
+    { numero: 24, type: "standard", sousType: "maison_dechue", populationDepart: null, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 1, jetonLiberationDepart: 0, q: -1, r: 2 },
+    { numero: 31, type: "standard", sousType: null, populationDepart: 4, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 1, pnNeantDepart: 3, jetonPrimeDepart: 0, jetonGloireDepart: 4, jetonLiberationDepart: 2, q: 2, r: 1,
+      // Démo uniquement : illustre qu'un même type peut occuper plusieurs
+      // emplacements sur le même secteur (ici 3× Défense de Secteur).
+      installationsDemo: ["defense", "defense", "defense"] },
+    { numero: 32, type: "standard", sousType: null, populationDepart: 2, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 0, pnNeantDepart: 1, jetonPrimeDepart: 0, jetonGloireDepart: 1, jetonLiberationDepart: 0, q: 1, r: 2 },
+    { numero: 40, type: "faille", sousType: null, populationDepart: 0, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 3, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 2, r: 2 }
+  ];
+  var TEMPETES_SOLO_1 = [];
+
+  // ---- Données : scénario solo_2 "Ultime résistance" — TRANSCRIPTION EN
+  // COURS, à valider avec le porteur du projet avant tout portage réel dans
+  // scenarioSecteurs.json/scenarioAdjacences.json. Numérotation et
+  // coordonnées (q,r) inventées pour ce POC (aucune numérotation officielle
+  // connue) ; adjacences et valeurs de mise en place confirmées secteur par
+  // secteur en conversation à partir d'une photo du plateau imprimé et de la
+  // page de règles décrivant la légende (mise en place §3-5).
+  // 3 paires de secteurs sont géométriquement adjacentes sur la photo mais
+  // séparées par un jeton Tempête du Néant (§1.1 docs-rules-secteurs.md,
+  // casse l'adjacence, non automatisé dans l'app) : elles sont donc
+  // volontairement ABSENTES de la liste d'adjacence ci-dessous et listées à
+  // part dans TEMPETES_SOLO_2 (juste pour l'affichage POC).
+  var SECTEURS_SOLO_2 = [
+    { numero: 1,  type: "secteur_mere", sousType: null, populationDepart: null, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 3, r: 1 },
+    { numero: 2,  type: "faille", sousType: null, populationDepart: 0, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 3, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 0, r: 1 },
+    { numero: 3,  type: "standard", sousType: null, populationDepart: 5, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 1, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 4, jetonLiberationDepart: 1, q: 1, r: 0 },
+    { numero: 4,  type: "standard", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 0, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 0, q: 2, r: 0 },
+    { numero: 5,  type: "standard", sousType: null, populationDepart: 4, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 1, pnNeantDepart: 2, jetonPrimeDepart: 0, jetonGloireDepart: 4, jetonLiberationDepart: 2, q: 0, r: 2 },
+    { numero: 6,  type: "standard", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 1, q: 1, r: 1 },
+    { numero: 7,  type: "standard", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 2, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 0, q: 2, r: 1 },
+    { numero: 8,  type: "ceinture_asteroides", sousType: null, populationDepart: null, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 1, jetonLiberationDepart: 0, q: 3, r: 0 },
+    { numero: 9,  type: "colonie_survivants", sousType: null, populationDepart: 3, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 0, r: 3 },
+    { numero: 10, type: "genese", sousType: null, populationDepart: 3, corrompuDepart: true, nombreGardienDepart: 1, installationDefenseSecteurDepart: 0, pnNeantDepart: 3, jetonPrimeDepart: 1, jetonGloireDepart: 2, jetonLiberationDepart: 0, q: 1, r: 2 },
+    { numero: 11, type: "standard", sousType: "maison_dechue", populationDepart: null, corrompuDepart: true, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 1, jetonGloireDepart: 1, jetonLiberationDepart: 0, q: 1, r: 3 },
+    { numero: 12, type: "standard", sousType: "avant_poste", populationDepart: null, corrompuDepart: false, nombreGardienDepart: 0, installationDefenseSecteurDepart: 0, pnNeantDepart: 0, jetonPrimeDepart: 0, jetonGloireDepart: 0, jetonLiberationDepart: 0, q: 2, r: 2 }
+  ];
+  // Paires [numeroA, numeroB] séparées par une Tempête du Néant (cf. note ci-dessus).
+  var TEMPETES_SOLO_2 = [[3, 6], [6, 10], [2, 6]];
+
+  var SCENARIOS_POC_ = {
+    solo_1: { nom: "solo_1 · Première ligne", secteurs: SECTEURS_SOLO_1, tempetes: TEMPETES_SOLO_1 },
+    solo_2: { nom: "solo_2 · Ultime résistance (brouillon)", secteurs: SECTEURS_SOLO_2, tempetes: TEMPETES_SOLO_2 }
+  };
+  var scenarioActif_ = "solo_1";
+
+  var TAILLE_HEX = 66; // rayon du centre au sommet
+
+  function axialVersPixel_(q, r) {
+    return {
+      x: TAILLE_HEX * 1.5 * q,
+      y: TAILLE_HEX * Math.sqrt(3) * (r + q / 2)
+    };
+  }
+
+  // ---- Orientation du plateau ----
+  // Le graphe d'adjacence ne dit rien sur l'orientation réelle à la table.
+  // Plutôt que de deviner des coordonnées, on tourne/retourne l'ensemble
+  // du plateau en bloc (position des hexagones uniquement — le contenu de
+  // chaque hexagone, lui, reste toujours droit et lisible).
+  // Réglage de départ : miroir vertical, car le secteur 1 (Secteur-Mère)
+  // doit être en bas à gauche, pas en haut.
+  var etatOrientation_ = { rotationDeg: 60, miroirH: true, miroirV: true };
+
+  function orienterPoint_(x, y) {
+    var rad = etatOrientation_.rotationDeg * Math.PI / 180;
+    var xr = x * Math.cos(rad) - y * Math.sin(rad);
+    var yr = x * Math.sin(rad) + y * Math.cos(rad);
+    if (etatOrientation_.miroirH) { xr = -xr; }
+    if (etatOrientation_.miroirV) { yr = -yr; }
+    return { x: xr, y: yr };
+  }
+
+  function pointsHexPlat_(cx, cy, taille) {
+    var pts = [];
+    for (var i = 0; i < 6; i++) {
+      var angle = Math.PI / 180 * (60 * i);
+      pts.push((cx + taille * Math.cos(angle)).toFixed(1) + "," + (cy + taille * Math.sin(angle)).toFixed(1));
+    }
+    return pts.join(" ");
+  }
+
+  function creerSvgEl_(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) { el.setAttribute(k, attrs[k]); }
+    return el;
+  }
+
+  // ---- Icônes (formes simplifiées, cf. hypothèses en en-tête) ----
+
+  // Cube "isométrique" (hexagone + lignes internes) : sert de base à
+  // toutes les icônes de type cube (Gardien/Corruption en orange, cube
+  // bleu de mise en place, Flottes du Néant en sombre...).
+  function dessinerCubeIsometrique_(cx, cy, taille, remplissage, trait) {
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    var sommets = [];
+    for (var i = 0; i < 6; i++) {
+      var angle = Math.PI / 180 * (60 * i - 90);
+      sommets.push([taille * Math.cos(angle), taille * Math.sin(angle)]);
+    }
+    var contour = sommets.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    g.appendChild(creerSvgEl_("polygon", { points: contour, fill: remplissage, stroke: trait, "stroke-width": 2 }));
+    [0, 2, 4].forEach(function (i) {
+      g.appendChild(creerSvgEl_("line", { x1: 0, y1: 0, x2: sommets[i][0], y2: sommets[i][1], stroke: trait, "stroke-width": 1.3, opacity: 0.7 }));
+    });
+    return g;
+  }
+
+  function icoGardien_(cx, cy) {
+    // Gardien : petit buste-figurine orange (tête et épaules jointives)
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    g.appendChild(creerSvgEl_("circle", { cx: 0, cy: -6, r: 5, fill: "var(--couleur-orange)" }));
+    g.appendChild(creerSvgEl_("path", { d: "M -8,9 C -8,-4.3 8,-4.3 8,9 Z", fill: "var(--couleur-orange)" }));
+    return g;
+  }
+
+  function icoCubeNaval_(cx, cy, remplissage, trait, valeur) {
+    // Cube de Puissance Navale. Couleur = camp (orange = Néant, bleu =
+    // joueur en mise en place). Le nombre (et la lettre de type, cf.
+    // construireFlotte_) s'affiche directement sur la face du cube.
+    var g = dessinerCubeIsometrique_(cx, cy, 13, remplissage, trait);
+    if (valeur) {
+      g.appendChild(icoTexte_(0, 1, String(valeur), 12, 800, "#fff"));
+    }
+    return g;
+  }
+
+  // --- Types de Vaisseaux ---
+  // Chaque cube empile au maximum 3 vaisseaux d'un même type. Au-delà, on
+  // répartit sur plusieurs cubes (ex. 4 Sentinelles -> un cube "3S" + un
+  // cube "1S"). Une lettre identifie le type (Corvette = aucune lettre).
+  var LETTRE_VAISSEAU = {
+    corvette: "", sentinelle: "S", destroyer: "D", cuirasse: "C", porte_vaisseau: "P"
+  };
+  var NOM_VAISSEAU = {
+    corvette: "Corvette", sentinelle: "Sentinelle", destroyer: "Destroyer",
+    cuirasse: "Cuirassé", porte_vaisseau: "Porte-vaisseau"
+  };
+  var MAX_PAR_CUBE = 3;
+
+  function decouperEnCubes_(nombre, maxParCube) {
+    var cubes = [];
+    var reste = nombre;
+    while (reste > 0) {
+      var n = Math.min(reste, maxParCube);
+      cubes.push(n);
+      reste -= n;
+    }
+    return cubes;
+  }
+
+  function construireFlotte_(g, flottes, remplissage, trait, cx, cy) {
+    // flottes : [{ type: "sentinelle", nombre: 3 }, ...]
+    var etiquettes = [];
+    flottes.forEach(function (f) {
+      var lettre = LETTRE_VAISSEAU[f.type] || "";
+      decouperEnCubes_(f.nombre, MAX_PAR_CUBE).forEach(function (n) {
+        etiquettes.push(n + lettre);
+      });
+    });
+    var ecart = 30;
+    var depart = -(etiquettes.length - 1) / 2;
+    etiquettes.forEach(function (texte, i) {
+      g.appendChild(icoCubeNaval_(cx + (depart + i) * ecart, cy, remplissage, trait, texte));
+    });
+  }
+
+  function icoDePopulation_(cx, cy, valeur, corrompu) {
+    // Dé de Population (1 à 6). Pointes orange autour du dé = secteur Corrompu.
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    if (corrompu) {
+      var pointes = [[-11,-11,-13,-13],[11,-11,13,-13],[-11,11,-13,13],[11,11,13,13],[0,-11,0,-13],[0,11,0,13],[-11,0,-13,0],[11,0,13,0]];
+      pointes.forEach(function (p) {
+        g.appendChild(creerSvgEl_("line", { x1: p[0], y1: p[1], x2: p[2], y2: p[3], stroke: "var(--couleur-orange)", "stroke-width": 2, "stroke-linecap": "round" }));
+      });
+    }
+    g.appendChild(creerSvgEl_("rect", { x: -11, y: -11, width: 22, height: 22, rx: 4, fill: "#2a2450", stroke: corrompu ? "var(--couleur-orange)" : "#7d6bc4", "stroke-width": 2 }));
+    var motifs = {
+      1: [[0,0]],
+      2: [[-5,-5],[5,5]],
+      3: [[-5,-5],[0,0],[5,5]],
+      4: [[-5,-5],[5,-5],[-5,5],[5,5]],
+      5: [[-5,-5],[5,-5],[0,0],[-5,5],[5,5]],
+      6: [[-5,-5.5],[5,-5.5],[-5,0],[5,0],[-5,5.5],[5,5.5]]
+    };
+    (motifs[valeur] || []).forEach(function (p) {
+      g.appendChild(creerSvgEl_("circle", { cx: p[0], cy: p[1], r: 1.9, fill: "#bcd8ff" }));
+    });
+    return g;
+  }
+
+  // --- Emplacements d'Installation (3 triangles en haut de la tuile,
+  // celui du milieu inversé — cf. photo de la vraie tuile) ---
+
+  function icoTriangleInstallation_(cx, cy, versHaut, remplie, couleurFond, couleurContour, dessinerIcone) {
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    var pts = versHaut ? "0,-13 14,13 -14,13" : "0,13 14,-13 -14,-13";
+    var attrsTri = {
+      points: pts,
+      fill: remplie ? couleurFond : "none",
+      stroke: remplie ? couleurContour : "#5a5578",
+      "stroke-width": 1.6
+    };
+    if (!remplie) { attrsTri["stroke-dasharray"] = "3,2"; }
+    g.appendChild(creerSvgEl_("polygon", attrsTri));
+    if (remplie && dessinerIcone) { dessinerIcone(g); }
+    return g;
+  }
+
+  function icoInstallation_(cx, cy, versHaut, type) {
+    var infos = INFOS_INSTALLATION[type];
+    return icoTriangleInstallation_(cx, cy, versHaut, true, infos.fond, infos.contour, infos.dessiner);
+  }
+
+  function icoInstallationVide_(cx, cy, versHaut) {
+    return icoTriangleInstallation_(cx, cy, versHaut, false, null, null, null);
+  }
+
+  var INFOS_INSTALLATION = {
+    defense: {
+      // Défense de Secteur : triangle rose + hexagone doré (cf. photo)
+      fond: "#8a4a6a", contour: "#c98aa8",
+      dessiner: function (g) {
+        var hexPts = [];
+        for (var i = 0; i < 6; i++) {
+          var a = Math.PI / 180 * (60 * i);
+          hexPts.push((4.8 * Math.cos(a)).toFixed(1) + "," + (4.8 * Math.sin(a) + 1.5).toFixed(1));
+        }
+        g.appendChild(creerSvgEl_("polygon", { points: hexPts.join(" "), fill: "#d8b978", stroke: "#8a4a6a", "stroke-width": 1 }));
+      }
+    },
+    chantier: {
+      // Chantier Naval : triangle vert + clé à molette verticale (cf. photo)
+      fond: "#3a5f47", contour: "#6a9a7a",
+      dessiner: function (g) {
+        g.appendChild(creerSvgEl_("rect", { x: -1.2, y: -6, width: 2.4, height: 12, fill: "#1f3a2a" }));
+        g.appendChild(creerSvgEl_("circle", { cx: 0, cy: -6.5, r: 2.6, fill: "none", stroke: "#1f3a2a", "stroke-width": 1.8 }));
+        g.appendChild(creerSvgEl_("circle", { cx: 0, cy: 6.5, r: 2.6, fill: "none", stroke: "#1f3a2a", "stroke-width": 1.8 }));
+      }
+    },
+    base: {
+      // Base Stellaire : triangle violet + globe doré (cf. photo)
+      fond: "#3b2f7a", contour: "#6a5aa8",
+      dessiner: function (g) {
+        g.appendChild(creerSvgEl_("circle", { cx: 0, cy: 1, r: 6.5, fill: "none", stroke: "#c9a86a", "stroke-width": 1.3 }));
+        g.appendChild(creerSvgEl_("ellipse", { cx: 0, cy: 1, rx: 2.6, ry: 6.5, fill: "none", stroke: "#c9a86a", "stroke-width": 1.1 }));
+        g.appendChild(creerSvgEl_("line", { x1: -6.5, y1: 1, x2: 6.5, y2: 1, stroke: "#c9a86a", "stroke-width": 1.1 }));
+      }
+    }
+  };
+
+  // --- Emplacements de Guilde (roues crantées, cf. photo + iconographie
+  // officielle des Guildes) ---
+
+  var GUILDES = {
+    fermiers:      { couleur: "#4a9d5f" },
+    ingenieurs:    { couleur: "#e0932b" },
+    mineurs:       { couleur: "#d1497a" },
+    scientifiques: { couleur: "#4aa8d8" },
+    banquiers:     { couleur: "#a67c4a" }
+  };
+
+  function dessinerRoueDentee_(cx, cy, rayon, remplissage, trait) {
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    for (var i = 0; i < 8; i++) {
+      var angle = i * 45;
+      g.appendChild(creerSvgEl_("rect", {
+        x: -2, y: -(rayon + 4), width: 4, height: 5,
+        fill: trait, transform: "rotate(" + angle + ")"
+      }));
+    }
+    g.appendChild(creerSvgEl_("circle", { cx: 0, cy: 0, r: rayon, fill: remplissage, stroke: trait, "stroke-width": 1.4 }));
+    return g;
+  }
+
+  function dessinerSymboleGuilde_(g, idGuilde) {
+    if (idGuilde === "fermiers") {
+      g.appendChild(creerSvgEl_("path", { d: "M 0,-6 C 3,-3 3,3 0,6 C -3,3 -3,-3 0,-6 Z", fill: "#fff" }));
+      g.appendChild(creerSvgEl_("line", { x1: 0, y1: -6, x2: 0, y2: 6, stroke: "#4a9d5f", "stroke-width": 0.8 }));
+    } else if (idGuilde === "ingenieurs") {
+      g.appendChild(creerSvgEl_("polygon", { points: "1,-7 -4,1 -0.5,1 -2,7 4,-1 0.5,-1", fill: "#fff" }));
+    } else if (idGuilde === "mineurs") {
+      [-4, 0, 4].forEach(function (dy) {
+        g.appendChild(creerSvgEl_("path", { d: "M -6," + dy + " Q 0," + (dy - 3) + " 6," + dy, fill: "none", stroke: "#fff", "stroke-width": 1.5 }));
+      });
+    } else if (idGuilde === "scientifiques") {
+      var rot = creerSvgEl_("g", { transform: "rotate(-30)" });
+      rot.appendChild(creerSvgEl_("ellipse", { cx: -2, cy: -2, rx: 5, ry: 2.4, fill: "#fff" }));
+      rot.appendChild(creerSvgEl_("ellipse", { cx: 2, cy: 2, rx: 5, ry: 2.4, fill: "#fff" }));
+      g.appendChild(rot);
+    } else if (idGuilde === "banquiers") {
+      g.appendChild(creerSvgEl_("polygon", { points: "0,-7 3,0 0,3 -3,0", fill: "#fff" }));
+      g.appendChild(creerSvgEl_("polygon", { points: "0,7 3,0 0,-3 -3,0", fill: "#fff", opacity: "0.6" }));
+    }
+  }
+
+  function icoGuilde_(cx, cy, idGuilde) {
+    var infos = GUILDES[idGuilde];
+    var g = dessinerRoueDentee_(cx, cy, 10, infos.couleur, "#2a2a2a");
+    dessinerSymboleGuilde_(g, idGuilde);
+    return g;
+  }
+
+  function icoEmplacementGuildeVide_(cx, cy) {
+    return dessinerRoueDentee_(cx, cy, 10, "none", "#5a5578");
+  }
+
+  function icoGloire_(cx, cy, valeur) {
+    // Jeton Gloire : badge blanc en demi-cercle, valeur affichée au centre (cf. photo)
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    g.appendChild(creerSvgEl_("path", { d: "M -13,4 A 13,13 0 1 1 13,4 Z", fill: "#eceafd", stroke: "#9a90c2", "stroke-width": 1.5 }));
+    [-9, -4.5, 0, 4.5, 9].forEach(function (dx) {
+      g.appendChild(creerSvgEl_("line", { x1: dx, y1: -13.5, x2: dx * 0.7, y2: -9.5, stroke: "#9a90c2", "stroke-width": 1 }));
+    });
+    g.appendChild(icoTexte_(0, 2, String(valeur), 13, 800, "#6a6489"));
+    return g;
+  }
+
+  function icoJetonLiberation_(cx, cy) {
+    // Jeton Libération : hexagone sombre + ruban doré (cf. photo, icône "bookmark")
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    var hexPts = [];
+    for (var i = 0; i < 6; i++) {
+      var a = Math.PI / 180 * (60 * i);
+      hexPts.push((11 * Math.cos(a)).toFixed(1) + "," + (11 * Math.sin(a)).toFixed(1));
+    }
+    g.appendChild(creerSvgEl_("polygon", { points: hexPts.join(" "), fill: "#3a2e42", stroke: "#5fc8e0", "stroke-width": 1.5 }));
+    g.appendChild(creerSvgEl_("path", { d: "M -5,-7 L 5,-7 L 5,8 L 0,4 L -5,8 Z", fill: "var(--couleur-jaune)", stroke: "#7a5a1a", "stroke-width": 1 }));
+    return g;
+  }
+
+  function icoJetonPrime_(cx, cy) {
+    // Jeton Prime : amas de gemmes (rouge/or) sur socle sombre, contour cyan (cf. photo)
+    var g = creerSvgEl_("g", { transform: "translate(" + cx + "," + cy + ")" });
+    g.appendChild(creerSvgEl_("path", {
+      d: "M -13,-6 C -13,-14 -6,-15 0,-13 C 8,-15 14,-9 13,-2 C 15,4 10,12 2,13 C -6,15 -14,9 -13,-6 Z",
+      fill: "#2a1a1e", stroke: "#5fc8e0", "stroke-width": 1.8
+    }));
+    g.appendChild(creerSvgEl_("polygon", { points: "-6,-8 -1,-9 1,-3 -4,-2", fill: "#c0392b", stroke: "#7a1f18", "stroke-width": 0.8 }));
+    g.appendChild(creerSvgEl_("polygon", { points: "1,-9 6,-7 5,0 0,-2", fill: "#e0743a", stroke: "#7a1f18", "stroke-width": 0.8 }));
+    g.appendChild(creerSvgEl_("polygon", { points: "-5,0 1,-1 3,6 -3,7", fill: "#e0b23d", stroke: "#7a5a1a", "stroke-width": 0.8 }));
+    g.appendChild(creerSvgEl_("polygon", { points: "1,1 6,2 5,8 0,7", fill: "#c0392b", stroke: "#7a1f18", "stroke-width": 0.8 }));
+    return g;
+  }
+
+  function icoTexte_(cx, cy, texte, taille, poids, couleur) {
+    var t = creerSvgEl_("text", { x: cx, y: cy, "text-anchor": "middle", "dominant-baseline": "middle", "font-size": taille, "font-weight": poids || 600, fill: couleur || "#fff" });
+    t.textContent = texte;
+    return t;
+  }
+
+  function calculerInstallationsDepart_(secteur) {
+    // Représente les emplacements d'Installation sous forme de tableau
+    // ordonné (rempli par la gauche), exactement comme les Guildes :
+    // n'importe quel type peut occuper n'importe quel emplacement, y
+    // compris en double (ex. 3× Défense de Secteur sur le même secteur).
+    // `installationsDemo` sert de démonstration ; à terme ces données
+    // devraient venir de scenarioSecteurs.json plutôt que du champ réel
+    // installationDefenseSecteurDepart (seul champ existant aujourd'hui).
+    if (secteur.installationsDemo) { return secteur.installationsDemo; }
+    var liste = [];
+    for (var i = 0; i < (secteur.installationDefenseSecteurDepart || 0); i++) { liste.push("defense"); }
+    return liste;
+  }
+
+  function construireLigneInstallations_(g, secteur, nombre, cx, y) {
+    // Le nombre d'emplacements dépend du type de secteur (0 pour
+    // Secteur-Mère/Faille, 3 pour standard — cf. nombreInstallationMax
+    // dans typesSecteur.json). L'orientation (haut/bas) alterne selon la
+    // position du slot sur la tuile imprimée ; le type qui occupe ce slot
+    // est lui entièrement générique (piloté par les données).
+    if (nombre <= 0) { return; }
+    var liste = calculerInstallationsDepart_(secteur);
+    var ecart = 27;
+    var depart = -(nombre - 1) / 2;
+    for (var i = 0; i < nombre; i++) {
+      var dx = (depart + i) * ecart;
+      var versHaut = (i % 2 === 0);
+      var type = liste[i];
+      g.appendChild(type ? icoInstallation_(cx + dx, y, versHaut, type) : icoInstallationVide_(cx + dx, y, versHaut));
+    }
+  }
+
+  function construireLigneGuildes_(g, guildesAffichees, nombre, cx, y) {
+    // Le nombre d'emplacements de Guilde dépend du type de secteur (2 pour
+    // Secteur-Mère, 3 pour standard, 0 pour Faille — cf. nombreGuildeMax
+    // dans typesSecteur.json).
+    if (nombre <= 0) { return; }
+    var ecart = 24;
+    var depart = -(nombre - 1) / 2;
+    for (var i = 0; i < nombre; i++) {
+      var dx = (depart + i) * ecart;
+      var idGuilde = guildesAffichees && guildesAffichees[i];
+      g.appendChild(idGuilde ? icoGuilde_(cx + dx, y, idGuilde) : icoEmplacementGuildeVide_(cx + dx, y));
+    }
+  }
+
+  // ---- Construction d'un secteur ----
+
+  var COULEURS_TYPE_SPECIAL_ = {
+    ceinture_asteroides: { fond: "#4a4438", bord: "#8a7f5a" },
+    genese: { fond: "#5a3a1a", bord: "#c98a3a" },
+    colonie_survivants: { fond: "#1e4a30", bord: "#4a9a5f" }
+  };
+
+  function couleurSecteur_(type) {
+    if (type === "secteur_mere") return { fond: "var(--couleur-mere)", bord: "var(--couleur-mere-bord)" };
+    if (type === "faille") return { fond: "var(--couleur-faille)", bord: "var(--couleur-faille-bord)" };
+    if (COULEURS_TYPE_SPECIAL_[type]) return COULEURS_TYPE_SPECIAL_[type];
+    return { fond: "var(--couleur-standard)", bord: "var(--couleur-standard-bord)" };
+  }
+
+  function construireHexagone_(secteur, cx, cy, onSelect) {
+    var couleurs = couleurSecteur_(secteur.type);
+    var g = creerSvgEl_("g", { class: "hex-secteur", "data-numero": secteur.numero });
+
+    var hex = creerSvgEl_("polygon", {
+      points: pointsHexPlat_(cx, cy, TAILLE_HEX),
+      class: "fond-hex",
+      fill: couleurs.fond,
+      stroke: couleurs.bord
+    });
+    g.appendChild(hex);
+
+    if (secteur.type === "secteur_mere") {
+      var nombreGuildesMere = TYPES_SECTEUR.secteur_mere.nombreGuildeMax;
+      var yMilieuMere = cy;
+      var yGuildeMere = cy + TAILLE_HEX * 0.58;
+      // Secteur-Mère n'a aucun emplacement d'Installation
+      // (nombreInstallationMax = 0 dans typesSecteur.json), donc pas de
+      // rangée en haut ici.
+      // Démo "mise en place" : dé de Population sans corruption (à gauche) +
+      // cube bleu de Puissance joueur (au centre, même emplacement que le
+      // cube orange de Puissance du Néant ailleurs — jamais les deux à la
+      // fois sur un même secteur). Valeurs illustratives, non lues depuis
+      // les données (secteur-mère n'a pas de population/PN par défaut).
+      g.appendChild(icoDePopulation_(cx - 46, yMilieuMere, 3, false));
+      g.appendChild(icoCubeNaval_(cx, yMilieuMere, "#3a7bd5", "#bcd8ff"));
+      // 2 emplacements de Guilde seulement (nombreGuildeMax = 2, contre 3
+      // pour un secteur standard) : Secteur-Mère n'a pas le même nombre
+      // d'emplacements, ça dépend de sa configuration.
+      construireLigneGuildes_(g, secteur.guildesDemo, nombreGuildesMere, cx, yGuildeMere);
+      g.addEventListener("click", function () { onSelect(secteur); });
+      return g;
+    }
+
+    // --- Secteur standard / à emplacements réduits (Faille, Ceinture
+    // d'Astéroïdes, Genèse, Colonie de Survivants...) ---
+    // Le nombre d'emplacements Installation/Guilde vient de
+    // TYPES_SECTEUR (0 pour les types "utilitaires" comme Faille, 3 pour
+    // standard) : aucun type n'est plus codé en dur ici, cf. note "il y a
+    // peut-être d'autres types de secteur" du POC initial.
+    var infosType = TYPES_SECTEUR[secteur.type] || TYPES_SECTEUR.standard;
+    var yHaut = cy - TAILLE_HEX * 0.58;
+    var yBas = cy + TAILLE_HEX * 0.58;
+
+    if (infosType.nombreInstallationMax > 0) {
+      construireLigneInstallations_(g, secteur, infosType.nombreInstallationMax, cx, yHaut);
+    }
+
+    construireBandeauCentral_(g, secteur, cx, cy);
+
+    if (infosType.nombreGuildeMax > 0) {
+      construireLigneGuildes_(g, secteur.guildesDemo, infosType.nombreGuildeMax, cx, yBas);
+    }
+
+    if (secteur.corrompuDepart) {
+      hex.setAttribute("stroke-dasharray", "6,3");
+    }
+
+    g.addEventListener("click", function () { onSelect(secteur); });
+    return g;
+  }
+
+  // Bande centrale commune à tous les types de secteur (hors Secteur-Mère,
+  // qui a son propre rendu de mise en place) : Population (à gauche) / cube
+  // de Puissance au centre (orange = Néant, bleu = joueur, jamais les deux
+  // ensemble) / Gardien + indicateur de récompenses (à droite). Extrait de
+  // l'ancien rendu "standard" pour être réutilisable par les types sans
+  // emplacements Installation/Guilde (Faille, Ceinture d'Astéroïdes,
+  // Genèse, Colonie de Survivants...).
+  function construireBandeauCentral_(g, secteur, cx, cy) {
+    var yGardien = cy - 9;
+
+    if (secteur.populationDepart) {
+      g.appendChild(icoDePopulation_(cx - 46, cy, secteur.populationDepart, secteur.corrompuDepart));
+    }
+
+    if (secteur.flottesDemo) {
+      construireFlotte_(g, secteur.flottesDemo, "var(--couleur-orange)", "#7a4a1a", cx, cy);
+    } else if (secteur.pnNeantDepart > 0) {
+      g.appendChild(icoCubeNaval_(cx, cy, "var(--couleur-orange)", "#7a4a1a", secteur.pnNeantDepart));
+    }
+
+    var aDesRecompenses = secteur.jetonGloireDepart > 0 || secteur.jetonPrimeDepart > 0 || secteur.jetonLiberationDepart > 0;
+
+    if (secteur.nombreGardienDepart > 0) {
+      g.appendChild(icoGardien_(cx + 46, yGardien));
+    }
+    if (aDesRecompenses) {
+      // Petit point d'alerte : des récompenses (Gloire/Prime/Libération)
+      // sont présentes sur ce secteur, visibles au clic dans le détail.
+      // Placé à l'emplacement du Gardien pour rester repérable même
+      // lorsqu'il n'y en a pas sur ce secteur.
+      g.appendChild(creerSvgEl_("circle", { cx: cx + 46, cy: yGardien + 18, r: 4, fill: "var(--couleur-jaune)", stroke: "#7a5a1a", "stroke-width": 1 }));
+    }
+  }
+
+  // ---- Rendu du plateau complet ----
+
+  function calculerViewBox_(pixels) {
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    pixels.forEach(function (p) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    });
+    var marge = TAILLE_HEX * 1.2;
+    return {
+      x: minX - marge, y: minY - marge,
+      w: (maxX - minX) + marge * 2, h: (maxY - minY) + marge * 2
+    };
+  }
+
+  function construireSvgRecompenses_(secteur) {
+    // Réutilise les icônes du plateau pour afficher les récompenses
+    // (Prime/Gloire/Libération) au clic, plutôt que sur l'hexagone lui-même.
+    var items = [];
+    if (secteur.jetonPrimeDepart > 0) {
+      items.push({ icone: icoJetonPrime_, valeur: secteur.jetonPrimeDepart });
+    }
+    if (secteur.jetonGloireDepart > 0) {
+      items.push({ icone: function (cx, cy) { return icoGloire_(cx, cy, secteur.jetonGloireDepart); }, valeur: null });
+    }
+    if (secteur.jetonLiberationDepart > 0) {
+      items.push({ icone: icoJetonLiberation_, valeur: secteur.jetonLiberationDepart });
+    }
+    if (!items.length) { return null; }
+
+    var svg = creerSvgEl_("svg", {
+      viewBox: "0 0 " + (items.length * 60) + " 50",
+      width: "100%", height: "50",
+      style: "display:block;margin-top:8px"
+    });
+    items.forEach(function (item, i) {
+      var cx = 30 + i * 60, cy = 25;
+      if (item.valeur != null) {
+        svg.appendChild(icoTexte_(cx - 14, cy, "×" + item.valeur, 13, 700, "#cdbfff"));
+        svg.appendChild(item.icone(cx + 10, cy));
+      } else {
+        svg.appendChild(item.icone(cx, cy));
+      }
+    });
+    return svg;
+  }
+
+  var NOM_INSTALLATION = { defense: "Défense de Secteur", chantier: "Chantier Naval", base: "Base Stellaire" };
+  var NOM_GUILDE = { fermiers: "Fermiers", ingenieurs: "Ingénieurs", mineurs: "Mineurs", scientifiques: "Scientifiques", banquiers: "Banquiers" };
+
+  function afficherDetail_(secteur) {
+    var panneau = document.getElementById("panneau-detail");
+    var typeNom = (TYPES_SECTEUR[secteur.type] || {}).nom || secteur.type;
+
+    var installations = calculerInstallationsDepart_(secteur).map(function (id) { return NOM_INSTALLATION[id]; });
+    var guildes = (secteur.guildesDemo || []).filter(Boolean).map(function (id) { return NOM_GUILDE[id]; });
+
+    var lignes = [
+      ["Numéro", secteur.numero],
+      ["Type", typeNom],
+      ["Sous-type", secteur.sousType || "—"],
+      ["Population de départ", secteur.populationDepart == null ? "—" : secteur.populationDepart],
+      ["Corrompu au départ", secteur.corrompuDepart ? "Oui" : "Non"],
+      ["Gardiens", secteur.nombreGardienDepart],
+      ["Installations (emplacements, de gauche à droite)", installations.length ? installations.join(", ") : "—"],
+      ["Guildes (emplacements, de gauche à droite)", guildes.length ? guildes.join(", ") : "—"],
+      ["PN Néant", secteur.pnNeantDepart],
+      ["Jeton Prime", secteur.jetonPrimeDepart],
+      ["Jeton Gloire", secteur.jetonGloireDepart],
+      ["Jeton Libération", secteur.jetonLiberationDepart]
+    ];
+    if (secteur.flottesDemo) {
+      var flottesTexte = secteur.flottesDemo.map(function (f) { return f.nombre + " " + NOM_VAISSEAU[f.type]; }).join(", ");
+      lignes.push(["Flottes (démo)", flottesTexte]);
+    }
+    var html = "<h2>Secteur #" + secteur.numero + " — " + typeNom + "</h2>";
+    panneau.innerHTML = html;
+    var svgRecompenses = construireSvgRecompenses_(secteur);
+    if (svgRecompenses) { panneau.appendChild(svgRecompenses); }
+    var suite = "";
+    lignes.forEach(function (l) {
+      suite += '<div class="ligne"><span class="cle">' + l[0] + '</span><span>' + l[1] + "</span></div>";
+    });
+    panneau.insertAdjacentHTML("beforeend", suite);
+  }
+
+  function dessinerTempete_(x1, y1, x2, y2) {
+    // Marqueur POC pour un jeton Tempête du Néant : deux secteurs
+    // géométriquement adjacents sur la photo, mais dont l'adjacence de jeu
+    // est cassée (cf. commentaire sur TEMPETES_SOLO_2). Approximation
+    // visuelle : segment perpendiculaire au milieu du segment reliant les
+    // deux centres d'hexagone (proche de l'arête réellement partagée).
+    var dx = x2 - x1, dy = y2 - y1;
+    var longueur = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / longueur, uy = dy / longueur;
+    var px = -uy, py = ux;
+    var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    var demi = TAILLE_HEX * 0.55;
+    var g = creerSvgEl_("g", {});
+    g.appendChild(creerSvgEl_("line", {
+      x1: mx + px * demi, y1: my + py * demi,
+      x2: mx - px * demi, y2: my - py * demi,
+      stroke: "#e05a2b", "stroke-width": 5, "stroke-linecap": "round", "stroke-dasharray": "3,5"
+    }));
+    return g;
+  }
+
+  function rendrePlateau_() {
+    var zone = document.getElementById("zone-plateau");
+    zone.innerHTML = "";
+    var config = SCENARIOS_POC_[scenarioActif_];
+    var secteurs = config.secteurs;
+    var index = {};
+    var pixels = secteurs.map(function (s, i) {
+      index[s.numero] = i;
+      var brut = axialVersPixel_(s.q, s.r);
+      return orienterPoint_(brut.x, brut.y);
+    });
+    var vb = calculerViewBox_(pixels);
+
+    var svg = creerSvgEl_("svg", {
+      viewBox: vb.x + " " + vb.y + " " + vb.w + " " + vb.h,
+      width: "100%",
+      height: "auto",
+      style: "display:block"
+    });
+
+    secteurs.forEach(function (secteur, i) {
+      var g = construireHexagone_(secteur, pixels[i].x, pixels[i].y, afficherDetail_);
+      svg.appendChild(g);
+    });
+
+    // Dessinés après les hexagones (par-dessus) pour rester visibles.
+    config.tempetes.forEach(function (paire) {
+      var a = pixels[index[paire[0]]], b = pixels[index[paire[1]]];
+      if (a && b) { svg.appendChild(dessinerTempete_(a.x, a.y, b.x, b.y)); }
+    });
+
+    zone.appendChild(svg);
+  }
+
+  function afficherEtatOrientation_() {
+    document.getElementById("etat-orientation").textContent =
+      "Rotation : " + etatOrientation_.rotationDeg + "°  ·  Miroir horizontal : " +
+      (etatOrientation_.miroirH ? "oui" : "non") + "  ·  Miroir vertical : " +
+      (etatOrientation_.miroirV ? "oui" : "non");
+  }
+
+  document.getElementById("btn-pivoter").addEventListener("click", function () {
+    etatOrientation_.rotationDeg = (etatOrientation_.rotationDeg + 60) % 360;
+    rendrePlateau_();
+    afficherEtatOrientation_();
+  });
+  document.getElementById("btn-miroir-h").addEventListener("click", function () {
+    etatOrientation_.miroirH = !etatOrientation_.miroirH;
+    rendrePlateau_();
+    afficherEtatOrientation_();
+  });
+  document.getElementById("btn-miroir-v").addEventListener("click", function () {
+    etatOrientation_.miroirV = !etatOrientation_.miroirV;
+    rendrePlateau_();
+    afficherEtatOrientation_();
+  });
+
+  function afficherSousTitre_() {
+    document.getElementById("sous-titre").textContent =
+      "Scénario " + SCENARIOS_POC_[scenarioActif_].nom + " · appuyer sur un hexagone pour voir le détail des données";
+  }
+
+  function choisirScenario_(id) {
+    scenarioActif_ = id;
+    document.getElementById("btn-scenario-1").classList.toggle("actif", id === "solo_1");
+    document.getElementById("btn-scenario-2").classList.toggle("actif", id === "solo_2");
+    document.getElementById("panneau-detail").innerHTML = '<h2>Détail</h2><div class="vide">Sélectionnez un secteur ci-dessus.</div>';
+    rendrePlateau_();
+    afficherSousTitre_();
+  }
+
+  document.getElementById("btn-scenario-1").addEventListener("click", function () { choisirScenario_("solo_1"); });
+  document.getElementById("btn-scenario-2").addEventListener("click", function () { choisirScenario_("solo_2"); });
+
+  choisirScenario_("solo_1");
+  afficherEtatOrientation_();
+})();
+</script>
+</body>
+</html>

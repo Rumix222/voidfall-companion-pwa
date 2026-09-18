@@ -613,6 +613,16 @@ var GameService = (function () {
   }
 
   /**
+   * Catalogue des scénarios (data/catalogue/scenarios.json) — exposé pour
+   * le <select id="select-scenario"> de l'écran de création de partie
+   * (setupService.js). Store léger (2 lignes pour l'instant), lecture
+   * complète sans jointure.
+   */
+  function obtenirScenariosCatalogue_() {
+    return DB.getAll('scenarios');
+  }
+
+  /**
    * originesMaison est indexé par idCarte (pas par maison+technologie) —
    * lecture complète puis filtre en JS (store léger, ~28 lignes).
    */
@@ -1790,6 +1800,12 @@ var GameService = (function () {
      * d'enjeu de poids de payload réseau à optimiser ici.
      */
     obtenirMaisonsCatalogue: obtenirMaisonsCatalogue_,
+
+    /**
+     * Exposée publiquement pour setupService.js (liste déroulante Scénario
+     * de l'écran de création de partie).
+     */
+    obtenirScenariosCatalogue: obtenirScenariosCatalogue_,
 
     /**
      * Exposée publiquement pour index.html, qui lit directement cette
