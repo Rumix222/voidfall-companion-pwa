@@ -5741,6 +5741,25 @@
  *   `GameService.creerPartie` pour les 3 branches (manuel, manuel avec mise
  *   en place, aléatoire) — ce paramètre existait déjà côté `creerPartie`
  *   sans jamais être renseigné depuis l'écran de création.
+ *
+ * 18/09/2026 (suite — marqueur visuel Tempête du Néant sur l'écran
+ * Galaxie) : la RÈGLE (adjacence cassée, docs-rules-secteurs.md §1.1)
+ * était déjà appliquée gratuitement partout où elle compte
+ * (`regrouper`/`determinerCibleEscarmouche`/placement en masse
+ * `chaque_secteur_neant_adjacent_a_une_faille`, tous lus depuis
+ * `scenarioAdjacences.json` qui exclut déjà ces paires) — ce chantier
+ * n'ajoute que l'AFFICHAGE, pour que le joueur comprenne pourquoi deux
+ * secteurs voisins sur la carte ne le sont pas en jeu. Nouveau fichier
+ * `data/catalogue/scenarioTempetes.json` (4 paires pour solo_2, mêmes
+ * `numeroA`/`numeroB` qu'un jeton Tempête sur le plateau physique — jamais
+ * lu par la logique de jeu, uniquement par `SecteurVueService`) + nouveau
+ * store `scenarioTempetes` (`js/db.js`, `js/catalogueSync.js`,
+ * `service-worker.js`, même schéma que `scenarioTrousDeVer` déjà existant).
+ * `secteurVueService.js` : `dessinerTempete_` (trait pointillé orange entre
+ * les deux hexagones, porté du POC) dessiné par-dessus le plateau dans
+ * `rendrePlateau_` ; panneau détail d'un secteur concerné : nouvelle ligne
+ * "Tempête du Néant — adjacence cassée avec le secteur X". Nouvelle
+ * variable CSS `--galaxie-tempete` (`css/style.css`).
  */
 
-var APP_VERSION = '20260918.1';
+var APP_VERSION = '20260918.2';

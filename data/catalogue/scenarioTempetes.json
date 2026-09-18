@@ -1,0 +1,22 @@
+[
+  {
+    "scenarioId": "solo_2",
+    "numeroA": 21,
+    "numeroB": 22
+  },
+  {
+    "scenarioId": "solo_2",
+    "numeroA": 12,
+    "numeroB": 23
+  },
+  {
+    "scenarioId": "solo_2",
+    "numeroA": 23,
+    "numeroB": 33
+  },
+  {
+    "scenarioId": "solo_2",
+    "numeroA": 23,
+    "numeroB": 34
+  }
+]

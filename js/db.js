@@ -72,6 +72,14 @@ var DB = (function () {
     scenarios: { keyPath: 'id', index: [] },
     scenarioSecteurs: { keyPath: ['scenarioId', 'numero'], index: [] },
     scenarioAdjacences: { keyPath: ['scenarioId', 'numeroA', 'numeroB'], index: [] },
+    // Jetons Tempête du Néant : cassent l'adjacence entre deux secteurs
+    // (docs-rules-secteurs.md §1.1, "aucun effet ne peut les déplacer, ni
+    // en ajouter, ni les retirer" — figés dès la mise en place, jamais un
+    // état de partie). scenarioAdjacences.json les EXCLUT déjà (source de
+    // vérité pour la règle de jeu, voir SecteurService) : ce store ne sert
+    // qu'à l'affichage du marqueur sur l'écran Galaxie
+    // (SecteurVueService), jamais lu ailleurs.
+    scenarioTempetes: { keyPath: ['scenarioId', 'numeroA', 'numeroB'], index: [] },
     scenarioTrousDeVer: { keyPath: ['scenarioId', 'numeroA', 'numeroB'], index: [] },
     typesSecteur: { keyPath: 'id', index: [] },
     originesMaison: { keyPath: 'idCarte', index: [] },

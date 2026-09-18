@@ -67,6 +67,13 @@ var SecteurVueService = (function () {
   // appelants intermédiaires (onSelect passé à construireHexagone_).
   var partieCourante_ = null;
 
+  // Paires [numeroA, numeroB] séparées par une Tempête du Néant pour le
+  // scénario affiché — mémorisées pour permettre à afficherDetail_
+  // d'indiquer sur quel(s) voisin(s) une Tempête bloque l'adjacence, sans
+  // threader la liste à travers construireHexagone_ (même principe que
+  // partieCourante_ ci-dessus).
+  var tempetesCourantes_ = [];
+
   // ⚠️ Coordonnées axiales (q,r) reconstruites à la main à partir de
   // scenarioAdjacences.json (les 18 paires du scénario 'solo_1'), faute de
   // coordonnées existantes dans les données du projet — voir
@@ -550,6 +557,29 @@ var SecteurVueService = (function () {
     return { x: minX - marge, y: minY - marge, w: (maxX - minX) + marge * 2, h: (maxY - minY) + marge * 2 };
   }
 
+  /**
+   * Marqueur d'un jeton Tempête du Néant entre deux secteurs adjacents sur
+   * la photo mais dont l'adjacence de JEU est cassée (docs-rules-
+   * secteurs.md §1.1) — scenarioAdjacences.json exclut déjà ces paires
+   * (seule source de vérité pour les règles, voir SecteurService), ce
+   * marqueur est purement visuel. Segment perpendiculaire au milieu du
+   * segment reliant les deux centres d'hexagone, approximation de l'arête
+   * réellement partagée.
+   */
+  function dessinerTempete_(x1, y1, x2, y2) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var longueur = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / longueur, uy = dy / longueur;
+    var px = -uy, py = ux;
+    var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    var demi = TAILLE_HEX * 0.55;
+    return creerSvgEl_('line', {
+      x1: mx + px * demi, y1: my + py * demi,
+      x2: mx - px * demi, y2: my - py * demi,
+      stroke: 'var(--galaxie-tempete)', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-dasharray': '3,5'
+    });
+  }
+
   function construireSvgRecompenses_(secteur) {
     var items = [];
     if (secteur.jetonPrime > 0) items.push({ icone: icoJetonPrime_, valeur: secteur.jetonPrime });
@@ -635,6 +665,17 @@ var SecteurVueService = (function () {
     });
   }
 
+  /**
+   * Numéros des secteurs séparés du secteur donné par une Tempête du Néant
+   * (tempetesCourantes_, mémorisée par chargerEtDessiner_) — purement
+   * informatif pour le panneau détail, cf. dessinerTempete_ ci-dessus.
+   */
+  function numerosTempeteVoisins_(numero) {
+    return tempetesCourantes_
+      .filter(function (t) { return t.numeroA === numero || t.numeroB === numero; })
+      .map(function (t) { return t.numeroA === numero ? t.numeroB : t.numeroA; });
+  }
+
   function afficherDetail_(item) {
     var secteur = item.secteur;
     var panneau = document.getElementById('galaxie-detail');
@@ -685,15 +726,21 @@ var SecteurVueService = (function () {
     suite += ligneDetailHTML_('Jeton Prime', inputNumeriqueDetailHTML_('galaxie-detail-jeton-prime', secteur.jetonPrime));
     suite += ligneDetailHTML_('Jeton Gloire', listeGloire.length ? listeGloire.join(', ') : '—');
     suite += ligneDetailHTML_('Jeton Libération', inputNumeriqueDetailHTML_('galaxie-detail-jeton-liberation', secteur.jetonLiberation));
+    var voisinsTempete = numerosTempeteVoisins_(secteur.numero);
+    if (voisinsTempete.length) {
+      suite += ligneDetailHTML_('Tempête du Néant', 'adjacence cassée avec le secteur ' + voisinsTempete.join(', '));
+    }
     panneau.insertAdjacentHTML('beforeend', suite);
 
     brancherEditionDetail_(secteur.numero);
   }
 
-  function rendrePlateau_(conteneur, items, numeroSelectionne, orientation) {
+  function rendrePlateau_(conteneur, items, numeroSelectionne, orientation, tempetes) {
     conteneur.innerHTML = '';
     groupeSelectionne_ = null; // les <g> précédents viennent d'être détruits (innerHTML='')
-    var pixels = items.map(function (item) {
+    var indexParNumero = {};
+    var pixels = items.map(function (item, i) {
+      indexParNumero[item.secteur.numero] = i;
       var brut = axialVersPixel_(item.q, item.r);
       return orienterPoint_(brut.x, brut.y, orientation);
     });
@@ -704,6 +751,14 @@ var SecteurVueService = (function () {
     items.forEach(function (item, i) {
       var estSelectionne = numeroSelectionne != null && item.secteur.numero === numeroSelectionne;
       svg.appendChild(construireHexagone_(item, pixels[i].x, pixels[i].y, afficherDetail_, estSelectionne));
+    });
+
+    // Marqueurs Tempête du Néant dessinés APRÈS les hexagones (par-dessus),
+    // pour rester visibles.
+    (tempetes || []).forEach(function (paire) {
+      var iA = indexParNumero[paire.numeroA], iB = indexParNumero[paire.numeroB];
+      if (iA == null || iB == null) return;
+      svg.appendChild(dessinerTempete_(pixels[iA].x, pixels[iA].y, pixels[iB].x, pixels[iB].y));
     });
 
     conteneur.appendChild(svg);
@@ -733,7 +788,8 @@ var SecteurVueService = (function () {
     return Promise.all([
       SecteurService.obtenirSecteurs(partie.id),
       DB.getAll('scenarioSecteurs'),
-      DB.getAll('typesSecteur')
+      DB.getAll('typesSecteur'),
+      DB.getAll('scenarioTempetes')
     ]).then(function (resultats) {
       var secteurs = resultats[0];
       if (!secteurs.length) {
@@ -766,8 +822,10 @@ var SecteurVueService = (function () {
         return;
       }
 
+      tempetesCourantes_ = resultats[3].filter(function (t) { return t.scenarioId === partie.scenarioId; });
+
       var orientation = ORIENTATION_PAR_SCENARIO_[partie.scenarioId] || ORIENTATION_PAR_DEFAUT_;
-      rendrePlateau_(conteneur, items, numeroDetailAOuvrir, orientation);
+      rendrePlateau_(conteneur, items, numeroDetailAOuvrir, orientation, tempetesCourantes_);
 
       var itemAOuvrir = numeroDetailAOuvrir != null
         ? items.filter(function (it) { return it.secteur.numero === numeroDetailAOuvrir; })[0]

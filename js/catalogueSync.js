@@ -33,6 +33,7 @@ var CatalogueSync = (function () {
     { fichier: 'scenarios', store: 'scenarios' },
     { fichier: 'scenarioSecteurs', store: 'scenarioSecteurs' },
     { fichier: 'scenarioAdjacences', store: 'scenarioAdjacences' },
+    { fichier: 'scenarioTempetes', store: 'scenarioTempetes' },
     { fichier: 'scenarioTrousDeVer', store: 'scenarioTrousDeVer' },
     { fichier: 'typesSecteur', store: 'typesSecteur' },
     { fichier: 'originesMaison', store: 'originesMaison' },

@@ -52,6 +52,7 @@ var FICHIERS_A_METTRE_EN_CACHE = [
   './data/catalogue/scenarios.json',
   './data/catalogue/scenarioSecteurs.json',
   './data/catalogue/scenarioAdjacences.json',
+  './data/catalogue/scenarioTempetes.json',
   './data/catalogue/scenarioTrousDeVer.json',
   './data/catalogue/typesSecteur.json',
   './data/catalogue/originesMaison.json',
