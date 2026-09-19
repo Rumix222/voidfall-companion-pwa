@@ -228,10 +228,27 @@ var SecteurService = (function () {
   }
 
   /**
+   * Nombre total d'emplacements Installation du Secteur-Mère du joueur —
+   * la plupart des maisons utilisent le Secteur-Mère standard
+   * (typesSecteur.json, 0 emplacement constructible en plus du Chantier
+   * Naval imprimé), mais certaines ont un plateau différent (ex. Astoran :
+   * 3 emplacements). `maisonJoueurSecteurMere` doit être null pour tout
+   * secteur qui n'est PAS le Secteur-Mère (l'override ne doit jamais
+   * s'appliquer ailleurs).
+   */
+  function maxInstallationSecteurMere_(maisonJoueurSecteurMere, typeSecteur) {
+    if (maisonJoueurSecteurMere && maisonJoueurSecteurMere.secteurMereInstallationMax != null) {
+      return maisonJoueurSecteurMere.secteurMereInstallationMax;
+    }
+    return typeSecteur ? (typeSecteur.nombreInstallationMax || 0) : 0;
+  }
+
+  /**
    * Construit une installation ou une Guilde sur un secteur qui
    * appartient au joueur, si un emplacement est libre (limite définie par
    * typesSecteur.nombreInstallationMax / nombreGuildeMax pour le type de
-   * secteur concerné).
+   * secteur concerné, ou par maisons.json secteurMereInstallationMax pour
+   * les Secteurs-Mères non standard — voir maxInstallationSecteurMere_).
    */
   function construire(partieId, numero, categorie, type) {
     if (categorie !== 'installation' && categorie !== 'guilde') {
@@ -248,15 +265,18 @@ var SecteurService = (function () {
 
         return Promise.all([
           DB.get('scenarioSecteurs', [ligneP.scenarioId, numero]),
-          DB.getAll('typesSecteur')
+          DB.getAll('typesSecteur'),
+          DB.getAll('maisons')
         ]).then(function (r2) {
           var ligneScenario = r2[0];
           var typeSecteur = ligneScenario ? r2[1].filter(function (t) { return t.id === ligneScenario.type; })[0] : null;
+          var estSecteurMere = !!(ligneScenario && ligneScenario.type === 'secteur_mere');
+          var maisonJoueur = (estSecteurMere && ligneP.joueur) ? r2[2].filter(function (m) { return m.nom === ligneP.joueur.nom; })[0] || null : null;
 
           var champ, max, utilises;
           if (categorie === 'installation') {
             champ = { chantier_naval: 'installationChantierNaval', defense_secteur: 'installationDefenseSecteur', base_stellaire: 'installationBaseStellaire' }[type];
-            max = typeSecteur ? (typeSecteur.nombreInstallationMax || 0) : 0;
+            max = maxInstallationSecteurMere_(maisonJoueur, typeSecteur);
             utilises = installationsUtilisees_(secteur);
           } else {
             champ = { fermiers: 'guildeFermiers', ingenieurs: 'guildeIngenieurs', mineurs: 'guildeMineurs', banquiers: 'guildeBanquiers', scientifiques: 'guildeScientifiques' }[type];
@@ -418,16 +438,19 @@ var SecteurService = (function () {
    * avec une contrainte supplémentaire absente du retrait : le
    * Secteur-Mère standard est immunisé à la Corruption
    * (docs-rules-corruption-gardiens-refuges-technoConsume.md §1) — donc
-   * exclu ici via obtenirSecteurMere(scenarioId), jamais éligible en gain
-   * (alors qu'il ne peut de toute façon jamais être Corrompu, donc cette
-   * exclusion ne change rien à obtenirSecteursEligiblesRetraitCorruption).
+   * exclu ici via obtenirSecteurMere(scenarioId), SAUF pour les maisons
+   * dont le Secteur-Mère n'est PAS standard et peut être Corrompu (ex.
+   * Marqualos, Novaris — maisons.json secteurMerePeutEtreCorrompu).
    */
   function obtenirSecteursEligiblesGainCorruption(partieId) {
-    return Promise.all([DB.get('parties', partieId), obtenirSecteurs(partieId)]).then(function (resultats) {
+    return Promise.all([DB.get('parties', partieId), obtenirSecteurs(partieId), DB.getAll('maisons')]).then(function (resultats) {
       var ligneP = resultats[0], secteurs = resultats[1];
+      var maisonJoueur = ligneP && ligneP.joueur ? resultats[2].filter(function (m) { return m.nom === ligneP.joueur.nom; })[0] || null : null;
+      var secteurMerePeutEtreCorrompu = !!(maisonJoueur && maisonJoueur.secteurMerePeutEtreCorrompu);
+
       return obtenirSecteurMere(ligneP ? ligneP.scenarioId : null).then(function (numeroSecteurMere) {
         return secteurs
-          .filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu && s.numero !== numeroSecteurMere; })
+          .filter(function (s) { return appartientAuJoueur_(s) && !s.corrompu && (secteurMerePeutEtreCorrompu || s.numero !== numeroSecteurMere); })
           .map(function (s) { return { numero: s.numero }; });
       });
     });
@@ -1163,24 +1186,35 @@ var SecteurService = (function () {
     return DB.get('parties', partieId).then(function (ligneP) {
       if (!ligneP || !ligneP.scenarioId) return 0;
 
-      return Promise.all([obtenirSecteurs(partieId), DB.getAll('scenarioSecteurs'), DB.getAll('typesSecteur')])
+      return Promise.all([obtenirSecteurs(partieId), DB.getAll('scenarioSecteurs'), DB.getAll('typesSecteur'), DB.getAll('maisons')])
         .then(function (resultats) {
           var secteurs = resultats[0];
           var scenarioSecteurs = resultats[1].filter(function (l) { return l.scenarioId === ligneP.scenarioId; });
           var typesParId = {};
           resultats[2].forEach(function (t) { typesParId[t.id] = t; });
+          var maisonJoueur = ligneP.joueur ? resultats[3].filter(function (m) { return m.nom === ligneP.joueur.nom; })[0] || null : null;
 
           var total = 0;
           secteurs.forEach(function (s) {
             var ligneScenario = scenarioSecteurs.filter(function (l) { return l.numero === s.numero; })[0];
             var typeSecteur = ligneScenario ? typesParId[ligneScenario.type] : null;
             if (!typeSecteur) return;
+            var estSecteurMere = ligneScenario.type === 'secteur_mere';
 
             var guildesUtilisees = guildesUtilisees_(s);
             if ((typeSecteur.nombreGuildeMax || 0) > 0 && guildesUtilisees >= typeSecteur.nombreGuildeMax) total += 1;
 
+            var maxInstallation = estSecteurMere ? maxInstallationSecteurMere_(maisonJoueur, typeSecteur) : (typeSecteur.nombreInstallationMax || 0);
             var installationsUtilisees = installationsUtilisees_(s);
-            if ((typeSecteur.nombreInstallationMax || 0) > 0 && installationsUtilisees >= typeSecteur.nombreInstallationMax) total += 1;
+            if (maxInstallation > 0 && installationsUtilisees >= maxInstallation) total += 1;
+
+            // Certaines maisons (ex. Novaris : deux Chantiers Navals
+            // préimprimés) ont un Secteur-Mère qui coûte un Entretien fixe
+            // supplémentaire tant qu'il appartient au joueur — voir
+            // maisons.json secteurMereEntretienBonus.
+            if (estSecteurMere && maisonJoueur && maisonJoueur.secteurMereEntretienBonus && appartientAuJoueur_(s)) {
+              total += maisonJoueur.secteurMereEntretienBonus;
+            }
           });
           return total;
         });
@@ -1607,6 +1641,10 @@ var SecteurService = (function () {
     // la règle. Le Secteur-Mère est TOUJOURS possédé même sans PN dessus
     // (cas géré séparément par l'appelant via obtenirSecteurMere).
     appartientAuJoueur: appartientAuJoueur_,
+    // Exposée publiquement : réutilisée par secteurVueService.js pour
+    // dessiner le bon nombre d'emplacements Installation sur le
+    // Secteur-Mère des maisons non standard (Astoran...).
+    maxInstallationSecteurMere: maxInstallationSecteurMere_,
     construire: construire,
     deployerCube: deployerCube,
     rappelerCube: rappelerCube,

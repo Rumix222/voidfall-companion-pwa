@@ -1,7 +1,70 @@
 /**
  * version.js
- * Version 159 — 2026-09-17
+ * Version 162 — 2026-09-19
  * Source de vérité unique pour la version de l'application.
+ *
+ * 19/09/2026 (suite, 2 retours utilisateur distincts) :
+ * 1) Effet d'Origine Thegwyn/Matrice neuronale non implémenté ("Prenez en
+ *    main la première carte Programme (face cachée) de l'offre de
+ *    Programmes de type Force") — `data/catalogue/originesMaison.json`
+ *    (champ `effet`, documentation) + nouvelle fonction GameService.
+ *    obtenirProgrammeOrigineForceThegwyn_ (tirage vraiment aléatoire parmi
+ *    les 8 Programmes `type: "Force"` de programmes.json, contrairement
+ *    au Programme de départ qui a une identité fixe) appelée par
+ *    `creerPartie`, ajoute la carte tirée à `programmesEnMain` à la
+ *    création de partie. Hors périmètre pour toute autre maison/
+ *    technologie (null, aucun changement).
+ * 2) Erreur de règle (introduite le 13/09/2026, exemple Shiveus/
+ *    Cuirassés) : la Technologie avancée correspondant à la Technologie
+ *    de départ du joueur ne fait PAS partie de l'offre "Technologies
+ *    avancées" de Plat. Galactique (`GameService.technologiesAdversesToutes_`
+ *    revient aux 8 technologies des maisons déchues UNIQUEMENT). Elle
+ *    reste améliorable, mais via un mécanisme INDÉPENDANT du cycle 1→2→3
+ *    de cette offre : `#check-amelioree-depart` (index.html,
+ *    renderEcranPlateauMaison_) se déverrouille désormais dès que la
+ *    Technologie de départ existe, cycle 1 inclus (seule Technologie
+ *    améliorable aussi tôt). `js/gameService_technologies_avancees_test.js`
+ *    mis à jour (3 tests retournés).
+ *
+ * 19/09/2026 (suite, retour utilisateur : différences du Secteur-Mère de
+ * 3 maisons par rapport au Secteur-Mère standard) — le Secteur-Mère
+ * standard (`typesSecteur.json` "secteur_mere") avait un
+ * `nombreGuildeMax` erroné à 2 au lieu de 3 (corrigé — cohérent avec les
+ * "3 emplacements Guilde" de Thegwyn confirmés juste avant). Introduit 3
+ * nouveaux champs `maisons.json` pour les Secteurs-Mères non standard
+ * (voir docs-architecture-pwa.md §3) : `secteurMereInstallationMax`
+ * (Astoran: 3 — 3 emplacements Installation au lieu de 1),
+ * `secteurMerePeutEtreCorrompu` (Marqualos et Novaris: true — le
+ * Secteur-Mère standard est normalement immunisé à la Corruption),
+ * `secteurMereEntretienBonus` (Novaris: 1 Entretien fixe tant qu'il le
+ * contrôle). Corrigé aussi le contenu fixe imprimé : Novaris
+ * `secteurMereInstallationChantierNaval` 1 → 2 (deux Chantiers Navals
+ * préimprimés), Marqualos `secteurMereGuildeBanquiers` 0 → 1. Nouvelle
+ * fonction `SecteurService.maxInstallationSecteurMere_` (exposée en
+ * public `maxInstallationSecteurMere`, réutilisée par
+ * `secteurVueService.js` pour le rendu de l'hexagone) : résout le
+ * `nombreInstallationMax` effectif du Secteur-Mère du joueur (override
+ * maison sinon valeur générique `typesSecteur.json`) — utilisée par
+ * `construire`, `getEntretien` (+ le bonus Entretien fixe) et
+ * `obtenirSecteursEligiblesGainCorruption` (respecte désormais
+ * `secteurMerePeutEtreCorrompu`). Les 11 autres maisons restent sur le
+ * Secteur-Mère standard, inchangé pour elles.
+ *
+ * 19/09/2026 (retour utilisateur : partie Thegwyn, Guilde de Fermiers
+ * pré-imprimée manquante sur le Secteur-Mère) — `data/catalogue/
+ * maisons.json` : les champs `secteurMereGuilde*`/`maisonDechueGuilde*`
+ * (contenu FIXE imprimé, sommé avec l'Origine choisie dans
+ * `SecteurService.instancierSecteurs`, voir §"Les GUILDES du Secteur-Mère
+ * sont la SOMME de deux sources") étaient à 0 pour les 14 maisons — jamais
+ * renseignés depuis la mise en place du mécanisme. Corrigé pour Thegwyn
+ * seulement (`secteurMereGuildeFermiers`: 0 → 1, confirmé par
+ * l'utilisateur sur le plateau physique) ; les 13 autres maisons restent
+ * à vérifier une par une contre les plateaux physiques (même trou de
+ * données, pas de quoi douter du mécanisme lui-même). Même retour :
+ * `secteurMereInstallationChantierNaval` corrigé 1 → 0 pour Thegwyn (pas
+ * de Chantier Naval sur son Secteur-Mère de départ — cohérent avec sa
+ * compétence de Maison, qui gère explicitement le cas "Guildes de
+ * Fermiers et pas de Chantier Naval").
  *
  * 17/09/2026 (retour utilisateur : "pull puis implémente ce qu'il reste
  * dans le fichier todo") — les 4 dernières entrées de docs/TODO.md :
@@ -5773,4 +5836,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260918.3';
+var APP_VERSION = '20260919.3';

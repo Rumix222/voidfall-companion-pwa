@@ -183,7 +183,7 @@
     "id": "secteur_mere",
     "nom": "Secteur-Mère",
     "nombreInstallationMax": 0,
-    "nombreGuildeMax": 2,
+    "nombreGuildeMax": 3,
     "installationChantierNaval": 0,
     "installationDefenseSecteur": 0,
     "installationBaseStellaire": 0,

@@ -26,7 +26,7 @@ function chargerDansContexte_(chemin, contexte) {
 function creerDbFactice_() {
   var stores = {
     parties: {}, secteursPartie: {}, scenarioSecteurs: {},
-    typesSecteur: {}, scenarioAdjacences: {}, plateauMaison: {}
+    typesSecteur: {}, scenarioAdjacences: {}, plateauMaison: {}, maisons: {}
   };
   function cleDe_(nom, valeur) {
     if (nom === 'parties') return valeur.id;

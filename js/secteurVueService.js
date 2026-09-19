@@ -789,7 +789,8 @@ var SecteurVueService = (function () {
       SecteurService.obtenirSecteurs(partie.id),
       DB.getAll('scenarioSecteurs'),
       DB.getAll('typesSecteur'),
-      DB.getAll('scenarioTempetes')
+      DB.getAll('scenarioTempetes'),
+      DB.getAll('maisons')
     ]).then(function (resultats) {
       var secteurs = resultats[0];
       if (!secteurs.length) {
@@ -802,16 +803,30 @@ var SecteurVueService = (function () {
         .forEach(function (l) { scenarioSecteursParNumero[l.numero] = l; });
       var typesSecteurParId = {};
       resultats[2].forEach(function (t) { typesSecteurParId[t.id] = t; });
+      var maisonJoueur = partie.joueur ? resultats[4].filter(function (m) { return m.nom === partie.joueur.nom; })[0] || null : null;
 
       var items = secteurs
         .filter(function (s) { return coords[s.numero]; })
         .map(function (s) {
           var ligneScenario = scenarioSecteursParNumero[s.numero] || {};
+          var typeInfo = typesSecteurParId[ligneScenario.type] || null;
+          // Secteur-Mère non standard (ex. Astoran, 3 emplacements
+          // Installation) : nombreInstallationMax générique remplacé par
+          // l'override de la maison du joueur, voir SecteurService.
+          // maxInstallationSecteurMere — sur une COPIE, jamais l'entrée
+          // partagée de typesSecteurParId (un seul Secteur-Mère par
+          // scénario, mais typeInfo est la même référence pour tous les
+          // secteurs de ce type).
+          if (ligneScenario.type === 'secteur_mere' && typeInfo) {
+            typeInfo = Object.assign({}, typeInfo, {
+              nombreInstallationMax: SecteurService.maxInstallationSecteurMere(maisonJoueur, typeInfo)
+            });
+          }
           return {
             secteur: s,
             type: ligneScenario.type || 'standard',
             sousType: ligneScenario.sousType || null,
-            typeInfo: typesSecteurParId[ligneScenario.type] || null,
+            typeInfo: typeInfo,
             q: coords[s.numero].q,
             r: coords[s.numero].r
           };

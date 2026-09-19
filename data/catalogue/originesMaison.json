@@ -688,7 +688,7 @@
     "avantPostePnDestroyer": 0,
     "avantPostePnCuirasse": 0,
     "avantPostePnPorteVaisseau": 0,
-    "effet": null,
+    "effet": "Prenez en main la première carte Programme (face cachée) de l'offre de Programmes de type Force.",
     "secteurMereCorrompuDepart": false,
     "avantPosteCorrompuDepart": false,
     "idCarte": 12,

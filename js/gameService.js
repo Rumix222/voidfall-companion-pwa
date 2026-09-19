@@ -650,6 +650,24 @@ var GameService = (function () {
   }
 
   /**
+   * Effet d'Origine Thegwyn/Matrice neuronale (retour utilisateur
+   * 19/09/2026) : "Prenez en main la première carte Programme (face
+   * cachée) de l'offre de Programmes de type Force" — carte VRAIMENT
+   * aléatoire (pioche face cachée, contrairement au Programme de départ
+   * ci-dessus qui a une identité fixe par maison+technologie) : tirée au
+   * hasard parmi les Programmes `type: "Force"` de data/catalogue/
+   * programmes.json (32 cartes, 4 types), ajoutée à `programmesEnMain` à
+   * la création de partie. `null` pour toute autre maison/technologie.
+   */
+  function obtenirProgrammeOrigineForceThegwyn_(nomMaison, nomTechnologie) {
+    if (nomMaison !== 'Thegwyn' || nomTechnologie !== 'Matrice neuronale') return Promise.resolve(null);
+    return DB.getAll('programmes').then(function (programmes) {
+      var force = programmes.filter(function (p) { return p.type === 'Force'; });
+      return force.length ? pickRandom_(force).nom : null;
+    });
+  }
+
+  /**
    * Retrouve le Type d'une technologie de départ à partir des 2
    * technologies déjà connues de la maison (évite un aller IndexedDB
    * supplémentaire — technologieDepart est toujours l'une des deux).
@@ -663,25 +681,25 @@ var GameService = (function () {
   /**
    * Pool de sélection des "Technologies avancées" (Plat. Galactique,
    * `choisirTechnologieAvancee`/`obtenirTechnologiesAvanceesGroupes`
-   * ci-dessous) : les 8 technologies des 4 maisons déchues (mise en
-   * place) PLUS la Technologie de départ DU JOUEUR — retour utilisateur
-   * (13/09/2026, exemple concret Shiveus/Cuirassés) : "Dans la liste des
-   * techno avancé sélectionnable je dois avoir les 8 techno des maisons
-   * déchue PLUS la techno cuirassé [sa Technologie de départ]". Corrige
-   * une confusion antérieure (voir js/gameService_technologies_avancees_
-   * test.js, commentaire historique "on prend toujours QUE les 8
-   * technologies des maisons déchues" — cette règle ne s'appliquait en
-   * fait qu'à `technologiesDisponibles_`/choisirTechnologieObtenue
-   * ci-dessous, jamais vérifiée pour ce pool-ci).
+   * ci-dessous) : UNIQUEMENT les 8 technologies des 4 maisons déchues
+   * (mise en place) — retour utilisateur (19/09/2026, correction d'une
+   * erreur de règle du 13/09/2026 introduite sur un exemple concret
+   * Shiveus/Cuirassés) : la Technologie avancée correspondant à la
+   * Technologie de départ du joueur ne fait PAS partie de cette offre
+   * Plat. Galactique. Elle reste améliorable, mais par un mécanisme
+   * indépendant, cycle 1 inclus (seule Technologie améliorable dès le
+   * cycle 1 — voir #check-amelioree-depart, index.html
+   * renderEcranPlateauMaison_, jamais gatée par
+   * obtenirTechnologiesAvanceesGroupes/groupeActifTechnologiesAvancees_
+   * ci-dessous, contrairement aux 8 technologies de ce pool-ci).
    *
-   * ⚠️ NE PAS réutiliser cette fonction pour le pool "Technologies
-   * obtenues" (choisirTechnologieObtenue, `renderTechnologiesObtenues_`/
-   * `feuilleFlowGagnerTechnologie_` — qui construisent leur PROPRE liste
-   * directement depuis `partie.adversaires`, sans passer par ici) : la
-   * Technologie de départ est déjà possédée depuis le début de partie,
-   * "l'obtenir" une seconde fois dans un des 5 emplacements n'aurait
-   * aucun sens — elle n'appartient QU'au pool des Technologies avancées
-   * (choix de laquelle devient améliorable, jamais un gain).
+   * ⚠️ Idem pour le pool "Technologies obtenues" (choisirTechnologieObtenue,
+   * `renderTechnologiesObtenues_`/`feuilleFlowGagnerTechnologie_` — qui
+   * construisent leur PROPRE liste directement depuis `partie.adversaires`,
+   * sans passer par ici) : la Technologie de départ est déjà possédée
+   * depuis le début de partie, "l'obtenir" une seconde fois dans un des 5
+   * emplacements n'aurait aucun sens — elle n'appartient à AUCUN des deux
+   * pools ci-dessous/ci-dessus.
    */
   function technologiesAdversesToutes_(partie) {
     var toutes = [];
@@ -690,14 +708,6 @@ var GameService = (function () {
         toutes.push({ nom: t.nom, maison: m.nom, type: t.type || '', sansPoint: !!t.sansPoint });
       });
     });
-    var techDepart = partie.joueur && partie.joueur.technologieDepart;
-    if (techDepart && techDepart.nom) {
-      // sansPoint toujours false ici : ce champ ne sert qu'à
-      // FocusEngine.resoudreCle_('gagner_technologie') pour décider du
-      // gain d'Influence à l'ACQUISITION — la Technologie de départ n'est
-      // jamais acquise via ce chemin (déjà possédée depuis le début).
-      toutes.push({ nom: techDepart.nom, maison: partie.joueur.nom, type: techDepart.type || '', sansPoint: false });
-    }
     return toutes;
   }
 
@@ -707,8 +717,8 @@ var GameService = (function () {
    * cycle 2 ; au cycle 3, ce sont les AUTRES technologies du pool (le
    * complément, calculé, jamais choisi manuellement — voir
    * technologiesAdversesToutes_ ci-dessus pour la composition du pool,
-   * 8 des maisons déchues + la Technologie de départ du joueur) qui
-   * deviennent améliorables, à la place des 4 premières (pas en plus).
+   * les 8 des maisons déchues UNIQUEMENT) qui deviennent améliorables, à
+   * la place des 4 premières (pas en plus).
    * Aucune amélioration possible au cycle 1 (rien n'est encore "actif"),
    * ni une fois les 4 emplacements du cycle 1 incomplets (retourne []
    * tant que les 4 ne sont pas tous remplis : le complément ne serait
@@ -1928,12 +1938,21 @@ var GameService = (function () {
             .catch(function (erreur) {
               console.warn('GameService.creerPartie : lecture programmesDepart a échoué (emplacement 0 laissé vide) :', erreur);
               return null;
+            }),
+          // Effet d'Origine Thegwyn/Matrice neuronale (voir
+          // obtenirProgrammeOrigineForceThegwyn_ ci-dessus) — tolérant,
+          // même principe que les 3 lectures catalogue précédentes.
+          obtenirProgrammeOrigineForceThegwyn_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
+            .catch(function (erreur) {
+              console.warn('GameService.creerPartie : lecture programmes (Origine Force Thegwyn) a échoué (carte non ajoutée en main) :', erreur);
+              return null;
             })
         ])
           .then(function (resultats) {
             var origineDepart = resultats[0];
             var focusJoueur = resultats[1];
             var programmeDepart = resultats[2];
+            var programmeForceThegwyn = resultats[3];
             var civilisationDepart = { societe: 0, gouvernement: 0, economie: 0 };
             var ressourcesDepart = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
             var cubeActifDepart = 0;
@@ -2009,7 +2028,7 @@ var GameService = (function () {
               civCorrompueSociete: false,
               civCorrompueGouvernement: false,
               civCorrompueEconomie: false,
-              programmesEnMain: [],
+              programmesEnMain: programmeForceThegwyn ? [programmeForceThegwyn] : [],
               programmesUtilises: programmesUtilisesParDefaut_(programmeDepart
                 ? { code: programmeDepart.code, entretienActif: true, corrompu: false, depart: true }
                 : null),
@@ -3961,11 +3980,11 @@ var GameService = (function () {
     /**
      * Enregistre (ou retire, si nomTechnologie est vide) le choix d'une
      * des 4 Technologies avancées, parmi le pool technologiesAdversesToutes_
-     * ci-dessus (8 des maisons déchues + la Technologie de départ du
-     * joueur) — même principe que choisirTechnologieObtenue (recherche
-     * dans partie.adversaires SEUL, sans la Technologie de départ — voir
-     * la mise en garde de technologiesAdversesToutes_), avec deux règles
-     * propres à cette mécanique :
+     * ci-dessus (les 8 des maisons déchues UNIQUEMENT, jamais la
+     * Technologie de départ du joueur — voir la mise en garde de
+     * technologiesAdversesToutes_) — même principe que
+     * choisirTechnologieObtenue (recherche dans partie.adversaires SEUL),
+     * avec deux règles propres à cette mécanique :
      *   - le choix ne se fait qu'au cycle 1 (rejette sinon — les 4
      *     emplacements sont fixés pour le reste de la partie une fois le
      *     cycle 1 passé) ;
@@ -3975,7 +3994,7 @@ var GameService = (function () {
      *     choisies deviennent le groupe du cycle 3, un doublon fausserait
      *     ce complément).
      * L'amélioration (case à cocher) est gérée séparément par
-     * definirTechnologieAvanceeAmelioree, jamais ici.
+     * definirTechnologieAmelioree, jamais ici.
      */
     choisirTechnologieAvancee: function (partieId, slot, nomTechnologie) {
       slot = Number(slot);
@@ -4015,7 +4034,7 @@ var GameService = (function () {
      * logique d'écriture ci-dessus (groupeActifTechnologiesAvancees_),
      * pour éviter toute divergence entre affichage et persistance.
      *   - toutes : le pool complet (voir technologiesAdversesToutes_ —
-     *     8 des maisons déchues + la Technologie de départ du joueur).
+     *     les 8 des maisons déchues UNIQUEMENT).
      *   - groupeA : les 4 choisies au cycle 1 (partie.technologiesAvancees
      *     Choisies, dans l'ordre des emplacements — peut contenir des null
      *     tant que le choix du cycle 1 n'est pas terminé).

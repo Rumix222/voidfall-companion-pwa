@@ -1062,28 +1062,19 @@
      * (index.html), pas régénéré à chaque rendu — d'où l'usage de
      * .onchange plutôt que addEventListener (idempotent d'un appel à
      * l'autre, jamais de listener dupliqué), même pattern que
-     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas. Elle
-     * n'est déverrouillée que si la Technologie de départ est référencée
-     * sur Plat. Galactique, dans le groupe actif du cycle en cours
-     * (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
-     * même règle, même source de vérité que renderTechnologiesObtenues_
-     * ci-dessous.
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
      *
-     * Retour utilisateur (13/09/2026, "la technologie de base de la
-     * maison n'est pas proposé dans le liste des technologies
-     * améliorées" — précisé ensuite : "les 8 techno des maisons déchue
-     * PLUS la [Technologie de départ]") : la case restait verrouillée en
-     * PERMANENCE, pas parce que cette règle de gating était fausse, mais
-     * parce que le pool sous-jacent (GameService.technologiesAdversesToutes_)
-     * ne contenait QUE les 8 Technologies des maisons déchues — le nom de
-     * la Technologie de départ n'y figurait jamais, donc ne pouvait jamais
-     * apparaître dans .actif. Corrigé À LA SOURCE (technologiesAdversesToutes_
-     * inclut désormais la Technologie de départ du joueur, sélectionnable
-     * comme n'importe quelle autre Technologie avancée sur Plat.
-     * Galactique, voir renderTechnologiesAvancees_ plus bas) — cette
-     * fonction-ci n'a PAS eu besoin de changer, la case se déverrouille
-     * maintenant normalement une fois la Technologie de départ choisie
-     * dans un des 4 emplacements.
+     * Retour utilisateur (19/09/2026, correction d'une erreur de règle du
+     * 13/09/2026) : la Technologie avancée correspondant à la Technologie
+     * de départ du joueur ne fait PAS partie de l'offre "Technologies
+     * avancées" de Plat. Galactique (GameService.technologiesAdversesToutes_
+     * — les 8 des maisons déchues UNIQUEMENT) — donc PAS gatée par
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif comme
+     * les 5 emplacements "Technologies obtenues" ci-dessous. C'est la
+     * SEULE Technologie améliorable dès le cycle 1 (mécanisme indépendant
+     * du cycle 1→2→3 de l'offre Plat. Galactique, docs-rules-cycle-de-jeu.md
+     * §1.2) : case déverrouillée dès que la Technologie de départ existe,
+     * sans condition de cycle ni de groupe actif.
      */
     // Retour utilisateur (14/09/2026) : le champ manuel "Corruption sur la
     // Technologie Chambres de décontamination" (jeton simple,
@@ -1183,9 +1174,8 @@
 
       var checkboxDepart = document.getElementById('check-amelioree-depart');
       if (checkboxDepart) {
-        var nomsAmeliorablesDepart = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
         checkboxDepart.checked = !!techDepart.amelioree;
-        checkboxDepart.disabled = !techDepart.nom || nomsAmeliorablesDepart.indexOf(techDepart.nom) === -1;
+        checkboxDepart.disabled = !techDepart.nom;
         checkboxDepart.onchange = function () {
           var etatDemande = checkboxDepart.checked;
           checkboxDepart.disabled = true;

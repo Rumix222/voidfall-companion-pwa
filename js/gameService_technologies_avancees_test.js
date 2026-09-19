@@ -34,15 +34,15 @@ function creerDbFactice_() {
   };
 }
 
-// 4 maisons déchues x 2 technologies = 8 technologies, plus la Technologie
-// de départ DU JOUEUR (retour utilisateur 13/09/2026, exemple concret
-// Shiveus/Cuirassés : "les 8 techno des maisons déchue PLUS la techno
-// cuirassé" doivent être sélectionnables comme Technologies avancées —
-// voir GameService.technologiesAdversesToutes_/js/gameService.js).
-// Corrige un commentaire antérieur ("on prend toujours QUE les 8
-// technologies des maisons déchues") qui ne s'appliquait en fait qu'au
-// pool "Technologies obtenues" (choisirTechnologieObtenue), jamais
-// vérifié pour celui-ci.
+// 4 maisons déchues x 2 technologies = 8 technologies — pool "Technologies
+// avancées" (Plat. Galactique). Retour utilisateur 13/09/2026 (exemple
+// concret Shiveus/Cuirassés) avait ajouté la Technologie de départ DU
+// JOUEUR à ce pool ; retour utilisateur 19/09/2026 : erreur de règle,
+// retiré à nouveau — la Technologie de départ n'appartient à AUCUN des
+// deux pools "Technologies avancées"/"Technologies obtenues", elle est
+// améliorable par un mécanisme indépendant, dès le cycle 1 (voir
+// GameService.technologiesAdversesToutes_/js/gameService.js et
+// index.html #check-amelioree-depart).
 function ligneParties_(id, extra) {
   var base = {
     id: id,
@@ -180,16 +180,16 @@ test('choisirTechnologieAvancee : nom vide -> retire du slot', function () {
   });
 });
 
-test('choisirTechnologieAvancee : accepte aussi la Technologie de départ DU JOUEUR (pas seulement les maisons déchues)', function () {
+test('choisirTechnologieAvancee : rejette la Technologie de départ DU JOUEUR (hors pool, retour utilisateur 19/09/2026)', function () {
   var db = creerDbFactice_();
   db._stores.parties['p1'] = ligneParties_('p1');
   db._stores.plateauMaison['p1'] = lignePlateauMaison_('p1');
   var ctx = creerContexte_(db);
 
-  return ctx.GameService.choisirTechnologieAvancee('p1', 0, 'TechDepart').then(function (partie) {
-    assert.strictEqual(partie.technologiesAvanceesChoisies[0].nom, 'TechDepart');
-    assert.strictEqual(partie.technologiesAvanceesChoisies[0].maison, 'Maison Test');
-  });
+  return assert.rejects(
+    ctx.GameService.choisirTechnologieAvancee('p1', 0, 'TechDepart'),
+    /introuvable/
+  );
 });
 
 // ---------------------------------------------------------------
@@ -214,12 +214,12 @@ test('obtenirTechnologiesAvanceesGroupes : groupeB vide tant que les 4 emplaceme
     cycleActuel: 1
   };
   var groupes = ctx.GameService.obtenirTechnologiesAvanceesGroupes(partie);
-  assert.strictEqual(groupes.toutes.length, 8, 'partie sans joueur.technologieDepart (fixture minimale) -> pool des seules 8 maisons déchues');
+  assert.strictEqual(groupes.toutes.length, 8, 'pool des 8 maisons déchues');
   assert.strictEqual(groupes.groupeB.length, 0);
   assert.strictEqual(JSON.stringify(groupes.actif), JSON.stringify([]));
 });
 
-test('obtenirTechnologiesAvanceesGroupes : le pool "toutes" inclut la Technologie de départ du joueur (en plus des 8 des maisons déchues)', function () {
+test('obtenirTechnologiesAvanceesGroupes : le pool "toutes" EXCLUT la Technologie de départ du joueur (retour utilisateur 19/09/2026, corrige le 13/09/2026)', function () {
   var db = creerDbFactice_();
   var ctx = creerContexte_(db);
   var partie = {
@@ -230,7 +230,7 @@ test('obtenirTechnologiesAvanceesGroupes : le pool "toutes" inclut la Technologi
   };
   var groupes = ctx.GameService.obtenirTechnologiesAvanceesGroupes(partie);
   var noms = groupes.toutes.map(function (t) { return t.nom; }).sort();
-  assert.strictEqual(JSON.stringify(noms), JSON.stringify(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'TechDepart']));
+  assert.strictEqual(JSON.stringify(noms), JSON.stringify(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2']));
 });
 
 test('obtenirTechnologiesAvanceesGroupes : groupeB = complément une fois les 4 choisies', function () {
