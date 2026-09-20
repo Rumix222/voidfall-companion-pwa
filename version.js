@@ -1,7 +1,26 @@
 /**
  * version.js
- * Version 175 — 2026-09-20
+ * Version 176 — 2026-09-20
  * Source de vérité unique pour la version de l'application.
+ *
+ * 20/09/2026 (suite, retour utilisateur : "Met à jour la documentation")
+ * — `docs/docs-architecture-pwa.md` mis en cohérence avec le code actuel :
+ * 1) `CLES_CIVILISATION_HORS_PERIMETRE` ne listait plus que des clés
+ *    stales — `avancer_civilisation`/`_societe`/`_gouvernement`/
+ *    `_economie`/`_moins_avancee` et `avancer_piste_corrompue` ont
+ *    chacune un cas dédié depuis longtemps (ou depuis v175 pour cette
+ *    dernière) ; seule `avance_rapide` reste réellement hors périmètre.
+ * 2) Table catalogue (§3) — 3 décomptes stales depuis l'ajout du scénario
+ *    solo_2 (commit `1c0b6ba`, jamais répercuté ici) : `scenarios` 1→2,
+ *    `scenarioSecteurs` 10→22, `scenarioAdjacences` 18→38 ; ligne
+ *    `scenarioTempetes.json` (4 entrées) totalement absente de la table.
+ *    `js/catalogueSync.js` : commentaire "synchronise tout le catalogue
+ *    (13 fichiers)" corrigé en 14 (véritable taille de `TABLES`, déjà
+ *    remarqué par une relecture de code le 20/09/2026).
+ * 3) `SecteurService.majSecteur` : `nombreGardien` (v174) ajouté à la
+ *    liste blanche documentée.
+ * 4) `SetupService.libelleOptionMaisonDechue_` (v169) ajoutée à la table
+ *    de fonctions, absente jusqu'ici.
  *
  * 20/09/2026 (suite, bug trouvé pendant la vérification navigateur du
  * Focus Héroïque Thegwyn "S'atteler", v174) — la popup Feuille ET la
@@ -6068,4 +6087,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260920.12';
+var APP_VERSION = '20260920.13';

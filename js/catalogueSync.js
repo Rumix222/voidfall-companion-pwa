@@ -83,7 +83,7 @@ var CatalogueSync = (function () {
   }
 
   /**
-   * Synchronise tout le catalogue (13 fichiers), en parallèle. Retourne
+   * Synchronise tout le catalogue (14 fichiers), en parallèle. Retourne
    * toujours un rapport détaillé par table, jamais un rejet global — un
    * échec partiel ne doit pas empêcher l'app de démarrer avec le
    * catalogue déjà en cache (principe offline-first du projet).

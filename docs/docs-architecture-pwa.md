@@ -204,7 +204,7 @@ source (string), mutations: [{champ, avant, apres}]}`.
 
 ## 3. Catalogue statique (`data/catalogue/*.json`)
 
-Importé par `js/catalogueSync.js` (`CatalogueSync.synchroniser`) : les 12
+Importé par `js/catalogueSync.js` (`CatalogueSync.synchroniser`) : les 14
 fichiers sont lus (`fetch`) et écrasent en bloc (`DB.putTout`, jamais fusionné)
 le store IndexedDB correspondant, en parallèle et de façon tolérante (l'échec
 d'un fichier ne bloque pas les autres). Ce mapping fichier→store est défini
@@ -218,9 +218,10 @@ dans `catalogueSync.js:31-44` (`TABLES`).
 | `evenements.json` | `evenements` | 30 | Événements galactiques — voir détail §3.1 |
 | `pistesCivilisation.json` | `pistesCivilisation` | 231 | Chaque case des 3 pistes (Société/Gouvernement/Économie), Standard + variantes par maison |
 | `programmes.json` | `programmes` | 32 | Cartes Programme (objectifs de score de fin de partie) |
-| `scenarios.json` | `scenarios` | 1 | Scénario(s) solo disponibles (seul `solo_1` a de vraies données) |
-| `scenarioSecteurs.json` | `scenarioSecteurs` | 10 | Mise en place du plateau par scénario (1 ligne/secteur) |
-| `scenarioAdjacences.json` | `scenarioAdjacences` | 18 | Graphe d'adjacence des secteurs par scénario |
+| `scenarios.json` | `scenarios` | 2 | Scénarios solo disponibles — `solo_1` et `solo_2` ("Ultime résistance") ont tous deux de vraies données |
+| `scenarioSecteurs.json` | `scenarioSecteurs` | 22 | Mise en place du plateau par scénario (1 ligne/secteur) |
+| `scenarioAdjacences.json` | `scenarioAdjacences` | 38 | Graphe d'adjacence des secteurs par scénario |
+| `scenarioTempetes.json` | `scenarioTempetes` | 4 | Liaisons d'adjacence cassées par une Tempête du Néant (1 ligne par paire `numeroA`/`numeroB`), scoping `scenarioId` — seul `solo_2` en utilise actuellement (marqueur visuel écran Galaxie, `SecteurVueService`) |
 | `scenarioTrousDeVer.json` | `scenarioTrousDeVer` | 0 | Liaisons trou de ver — **vide**, aucun scénario du catalogue n'en utilise actuellement |
 | `typesSecteur.json` | `typesSecteur` | 13 | Types de secteur spéciaux (limites Installation/Guilde, effet) |
 | `originesMaison.json` | `originesMaison` | 28 | Cartes Origine (2 par maison) — mise en place détaillée ressources/flotte/civilisation |
@@ -386,7 +387,7 @@ d'Influence des secteurs Purs). Pas pur.
 | `obtenirSecteursEligiblesRetraitCorruption` | `(partieId)` | Secteurs possédés ET Corrompus |
 | `obtenirSecteursEligiblesGainCorruption` | `(partieId)` | Secteurs possédés, PAS Corrompus, hors Secteur-Mère |
 | `placerCorruption` | `(partieId, numero)` | `corrompu = true` |
-| `majSecteur` | `(partieId, numero, champs)` | MàJ partielle liste-blanche (`population`/`corrompu`/`pnNeant`/`jetonPrime`/`jetonLiberation`) — correction manuelle SANS validation de règle, panneau détail de l'onglet Galaxie (`secteurVueService.js`) |
+| `majSecteur` | `(partieId, numero, champs)` | MàJ partielle liste-blanche (`population`/`corrompu`/`pnNeant`/`jetonPrime`/`jetonLiberation`/`nombreGardien`, ce dernier ajouté le 20/09/2026 — retour utilisateur, resté en lecture seule dans le panneau détail) — correction manuelle SANS validation de règle, panneau détail de l'onglet Galaxie (`secteurVueService.js`) |
 | `obtenirSecteursEligiblesAugmenterPopulationPure` | `(partieId)` | Secteurs Purs (0 Guilde/Installation) avec Population définie et < 6 |
 | `augmenterPopulationPure` | `(partieId, numero)` | +1 Population sur un secteur Pur éligible |
 | `obtenirAgregatsInfluenceSecteursPurs` | `(partieId)` | Agrège Guildes/Installations/cubes/secteurs sur les seuls secteurs Purs — alimente les formules `influence_par_*` |
@@ -460,12 +461,17 @@ jamais) :
   `installation`, `etablir_guilde`, `guilde`, `retirer_corruption`,
   `rappeler_cube` — ont chacune un cas dédié dans `resoudreCle_`, voir
   ci-dessus).
-- `CLES_CIVILISATION_HORS_PERIMETRE` : `avancer_civilisation_
-  societe/gouvernement/economie`, `avancer_civilisation`, `avance_rapide`,
-  `avancer_civilisation_moins_avancee`, `avancer_piste_corrompue`. Bien
-  implémenté dans `civilisationService.js`, mais uniquement via les boutons
-  dédiés de l'écran Plat. maison — pas de pont automatique depuis une carte
-  Focus.
+- `CLES_CIVILISATION_HORS_PERIMETRE` : `avance_rapide` uniquement (résolue
+  différemment, en aval, à l'intérieur même de `CivilisationService.
+  avancerPiste` — jamais via `resoudreCle_`, cette clé n'apparaît que sur
+  une case déjà en cours d'avancement, jamais comme effet Focus/Cadre à
+  résoudre isolément). Les clés listées ici historiquement —
+  `avancer_civilisation`/`_societe`/`_gouvernement`/`_economie`,
+  `avancer_civilisation_moins_avancee`, `avancer_piste_corrompue` (retour
+  utilisateur 20/09/2026, Focus Héroïque Tentation "S'atteler") — ont
+  chacune un cas dédié dans `resoudreCle_` (popup `avancer_civilisation`,
+  voir ci-dessus), branché sur `CivilisationService.avancerPiste`/
+  `avancerPisteMoinsAvancee`/`avancerPisteCorrompue`.
 - `produire_ressource`, `produire_deux_ressources`, `produire_ressource_
   type` : N'est PLUS hors périmètre (14/09/2026) — CHOIX du joueur parmi
   les 5 ressources via la popup `produire_ressource_choix`
@@ -881,6 +887,7 @@ technologies sans point avec compteur/verrou).
 | Fonction | Paramètres | Rôle |
 |---|---|---|
 | `init` | — | Câble TOUS les écouteurs de cet écran (bascules mode, listes maisons déchues, `#btn-lancer-partie` → `GameService.creerPartie` puis `App.afficherPartieCreee`) ; appelée une fois en fin de bootstrap d'`index.html` |
+| `libelleOptionMaisonDechue_` | `(nom)` | **Pure.** `"Nom (Techno 1 / Techno 2)"` — retour utilisateur 20/09/2026 ("souvent je connais les technos mais ne me souviens pas du nom des maisons"), lit `maisonsCache` (déjà chargé avec `technologies`) ; repli sur le nom seul si introuvable |
 
 ---
 
