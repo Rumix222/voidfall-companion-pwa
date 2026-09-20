@@ -650,21 +650,139 @@ var GameService = (function () {
   }
 
   /**
-   * Effet d'Origine Thegwyn/Matrice neuronale (retour utilisateur
-   * 19/09/2026) : "Prenez en main la première carte Programme (face
-   * cachée) de l'offre de Programmes de type Force" — carte VRAIMENT
-   * aléatoire (pioche face cachée, contrairement au Programme de départ
-   * ci-dessus qui a une identité fixe par maison+technologie) : tirée au
-   * hasard parmi les Programmes `type: "Force"` de data/catalogue/
-   * programmes.json (32 cartes, 4 types), ajoutée à `programmesEnMain` à
-   * la création de partie. `null` pour toute autre maison/technologie.
+   * Origines dont l'effet fait piocher une carte Programme d'un type
+   * donné, face cachée, à la création de partie (retour utilisateur
+   * 19-20/09/2026) — VRAIMENT aléatoire (contrairement au Programme de
+   * départ ci-dessus, qui a une identité fixe par maison+technologie) :
+   * tirée au hasard parmi les Programmes de data/catalogue/programmes.json
+   * (32 cartes, 4 types Force/Domination/Soutien/Richesse) filtrés sur ce
+   * type, ajoutée à `programmesEnMain`. Table maison+technologie -> type,
+   * clé "Maison|Technologie" (aucun des deux ne contient jamais "|").
    */
-  function obtenirProgrammeOrigineForceThegwyn_(nomMaison, nomTechnologie) {
-    if (nomMaison !== 'Thegwyn' || nomTechnologie !== 'Matrice neuronale') return Promise.resolve(null);
+  var PROGRAMME_ORIGINE_ALEATOIRE_ = {
+    'Thegwyn|Matrice neuronale': 'Force',
+    'Fenrax|Surveillance centrale': 'Soutien',
+    'Nervo|Vaisseaux-Arches': 'Richesse',
+    'Shiveus|Chambres de décontamination': 'Soutien',
+    'Kradmor|Purificateur': 'Domination'
+  };
+  function obtenirProgrammeOrigineAleatoire_(nomMaison, nomTechnologie) {
+    var type = PROGRAMME_ORIGINE_ALEATOIRE_[nomMaison + '|' + nomTechnologie];
+    if (!type) return Promise.resolve(null);
     return DB.getAll('programmes').then(function (programmes) {
-      var force = programmes.filter(function (p) { return p.type === 'Force'; });
-      return force.length ? pickRandom_(force).nom : null;
+      var pool = programmes.filter(function (p) { return p.type === type; });
+      return pool.length ? pickRandom_(pool).nom : null;
     });
+  }
+
+  /**
+   * Origines qui améliorent le jeton Gloire de départ (valeur normale : 2
+   * — GLOIRE_DEPART[0], identique à toute autre Maison/Origine) : retour
+   * utilisateur 20/09/2026, Fenrax/Surveillance centrale démarre à 3.
+   * Même table-clé "Maison|Technologie" que PROGRAMME_ORIGINE_ALEATOIRE_
+   * ci-dessus.
+   */
+  var GLOIRE_DEPART_ORIGINE_ = {
+    'Fenrax|Surveillance centrale': 3
+  };
+  function gloireDepart_(nomMaison, nomTechnologie) {
+    var valeur = GLOIRE_DEPART_ORIGINE_[nomMaison + '|' + nomTechnologie];
+    return [valeur != null ? valeur : GLOIRE_DEPART[0], null, null, null, null];
+  }
+
+  /**
+   * Origines dont l'effet donne directement 1 (ou plusieurs) jeton(s)
+   * Commerce à la création de partie (retour utilisateur 20/09/2026,
+   * Valnis/Nacelles) — SIMPLE incrément du compteur
+   * (plateauMaison.jetonCommerce, tableau dont seule la LONGUEUR compte,
+   * voir strategieService.js persisterJeton_), SANS résoudre de
+   * récompense : contrairement à la clé FocusEngine `gagner_commerce`
+   * (qui déclenche le choix d'1 des 6 Bonus Commerce, `BONUS_COMMERCE`),
+   * un jeton Commerce de mise en place ne fait que remplir la réserve —
+   * il sera résolu plus tard, normalement, quand le joueur le retournera
+   * en cours de partie. Même table-clé "Maison|Technologie" que
+   * GLOIRE_DEPART_ORIGINE_ ci-dessus.
+   */
+  var JETON_COMMERCE_DEPART_ORIGINE_ = {
+    'Valnis|Nacelles': 1,
+    'Kradmor|Purificateur': 1,
+    'Marqualos|Drones autonomes': 2,
+    'Marqualos|Nexus de commerce': 1
+  };
+  function jetonCommerceDepart_(nomMaison, nomTechnologie) {
+    var n = JETON_COMMERCE_DEPART_ORIGINE_[nomMaison + '|' + nomTechnologie] || 0;
+    var tokens = [];
+    for (var i = 0; i < n; i++) tokens.push('disponible');
+    return tokens;
+  }
+
+  /**
+   * Origines qui retirent la Corruption par défaut du dernier emplacement
+   * Programme (index 3 de programmesUtilisesParDefaut_, Corrompu dès la
+   * mise en place pour TOUTE maison — règle du livret) — retour
+   * utilisateur 20/09/2026, Kradmor/Purificateur ("Retirer Corruption" de
+   * son effet d'Origine désigne cette Corruption-là, l'UNIQUE candidate à
+   * la création). AUCUN choix à faire (contrairement à Shiveus/
+   * appliquerDeplacerCorruptionOrigine ci-dessus, qui déplace une
+   * Corruption existante vers une autre cible) : résolu entièrement dans
+   * creerPartie (pur, aucune popup) — même table-clé que les autres.
+   */
+  var RETIRER_CORRUPTION_PROGRAMME_DEPART_ORIGINE_ = {
+    'Kradmor|Purificateur': true
+  };
+  function programmeDepartCorrompu_(nomMaison, nomTechnologie) {
+    return !RETIRER_CORRUPTION_PROGRAMME_DEPART_ORIGINE_[nomMaison + '|' + nomTechnologie];
+  }
+
+  /**
+   * Origines dont l'effet donne directement N jeton(s) Prime à la
+   * création de partie (retour utilisateur 20/09/2026, Yarvek — ses 2
+   * Origines) — CONTRAIREMENT à JETON_COMMERCE_DEPART_ORIGINE_ ci-dessus
+   * (simple compteur), un jeton Prime gagné doit toujours faire choisir au
+   * joueur laquelle des 11 faces réelles il a tirée (FocusEngine.
+   * resoudreGainJetonsPrime_, même popup qu'un jeton Prime gagné en cours
+   * de partie, ex. victoire d'Envahir) : nécessite `demanderChoix`
+   * (accès DOM), indisponible dans creerPartie (pur). Résolu séparément
+   * par GameService.appliquerJetonPrimeOrigine ci-dessous, appelée depuis
+   * l'écran juste après la création de partie (index.html
+   * afficherPartieCreee) — jamais depuis creerPartie lui-même. Même
+   * table-clé "Maison|Technologie" que GLOIRE_DEPART_ORIGINE_ ci-dessus.
+   */
+  var JETON_PRIME_DEPART_ORIGINE_ = {
+    'Yarvek|Hyperpropulsion': 3,
+    'Yarvek|Transports tactiques': 1,
+    'Marqualos|Drones autonomes': 1,
+    'Marqualos|Nexus de commerce': 1
+  };
+  function jetonPrimeDepartOrigine_(nomMaison, nomTechnologie) {
+    return JETON_PRIME_DEPART_ORIGINE_[nomMaison + '|' + nomTechnologie] || 0;
+  }
+
+  /**
+   * Origines dont l'effet déplace 1 Corruption à la création de partie
+   * (retour utilisateur 20/09/2026, Shiveus/Chambres de décontamination)
+   * — réutilise la clé FocusEngine `deplacer_corruption` déjà entièrement
+   * outillée (même popup à 2 étapes Source/Destination que tout autre
+   * déplacement de Corruption en cours de partie — Focus, Cadre
+   * d'Événement, ou l'effet immédiat de la Technologie "Chambres de
+   * décontamination" elle-même une fois OBTENUE en jeu, EFFET_
+   * TECHNOLOGIE_IMMEDIAT_ ci-dessus — mécanique identique, mais celle-ci
+   * ne s'applique QUE si cette Technologie est la technologieDepart via
+   * cette Origine précise, jamais dans gagnerTechnologieEtResoudreEffet).
+   * À la création, l'unique Source disponible est en pratique le dernier
+   * emplacement Programme (Corrompu dès la mise en place, voir
+   * programmesUtilisesParDefaut_) ; la Destination est une piste de
+   * Civilisation non Corrompue ou un secteur possédé Pur (menu standard
+   * 'deplacer_corruption', strategieService.js). Résolue par
+   * GameService.appliquerDeplacerCorruptionOrigine ci-dessous — même
+   * raison qu'appliquerJetonPrimeOrigine (a besoin de `demanderChoix`,
+   * indisponible dans creerPartie).
+   */
+  var DEPLACER_CORRUPTION_DEPART_ORIGINE_ = {
+    'Shiveus|Chambres de décontamination': true
+  };
+  function deplacerCorruptionDepartOrigine_(nomMaison, nomTechnologie) {
+    return !!DEPLACER_CORRUPTION_DEPART_ORIGINE_[nomMaison + '|' + nomTechnologie];
   }
 
   /**
@@ -1939,12 +2057,12 @@ var GameService = (function () {
               console.warn('GameService.creerPartie : lecture programmesDepart a échoué (emplacement 0 laissé vide) :', erreur);
               return null;
             }),
-          // Effet d'Origine Thegwyn/Matrice neuronale (voir
-          // obtenirProgrammeOrigineForceThegwyn_ ci-dessus) — tolérant,
+          // Effet d'Origine "carte Programme d'un type précis en main"
+          // (voir obtenirProgrammeOrigineAleatoire_ ci-dessus) — tolérant,
           // même principe que les 3 lectures catalogue précédentes.
-          obtenirProgrammeOrigineForceThegwyn_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
+          obtenirProgrammeOrigineAleatoire_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)
             .catch(function (erreur) {
-              console.warn('GameService.creerPartie : lecture programmes (Origine Force Thegwyn) a échoué (carte non ajoutée en main) :', erreur);
+              console.warn('GameService.creerPartie : lecture programmes (Origine, carte en main) a échoué (carte non ajoutée en main) :', erreur);
               return null;
             })
         ])
@@ -1952,7 +2070,7 @@ var GameService = (function () {
             var origineDepart = resultats[0];
             var focusJoueur = resultats[1];
             var programmeDepart = resultats[2];
-            var programmeForceThegwyn = resultats[3];
+            var programmeOrigineEnMain = resultats[3];
             var civilisationDepart = { societe: 0, gouvernement: 0, economie: 0 };
             var ressourcesDepart = { nourriture: 0, energie: 0, materiel: 0, credit: 0, science: 0 };
             var cubeActifDepart = 0;
@@ -1977,6 +2095,16 @@ var GameService = (function () {
 
             var id = genererIdPartie_();
             var dateCreation = new Date().toISOString();
+
+            // Kradmor/Purificateur retire la Corruption par défaut du
+            // dernier emplacement Programme (index 3) — voir
+            // programmeDepartCorrompu_ ci-dessus.
+            var programmesUtilisesInit = programmesUtilisesParDefaut_(programmeDepart
+              ? { code: programmeDepart.code, entretienActif: true, corrompu: false, depart: true }
+              : null);
+            if (!programmeDepartCorrompu_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom)) {
+              programmesUtilisesInit[3] = Object.assign({}, programmesUtilisesInit[3], { corrompu: false });
+            }
 
             var partie = {
               id: id,
@@ -2020,27 +2148,32 @@ var GameService = (function () {
               cubeActif: cubeActifDepart,
               jetonPrime: 0,
               jetonLiberation: 0,
-              jetonCommerce: [],
-              gloire: GLOIRE_DEPART.slice(),
+              jetonCommerce: jetonCommerceDepart_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom),
+              // Garde-fous anti-double-application de GameService.
+              // appliquerJetonPrimeOrigine/appliquerDeplacerCorruptionOrigine
+              // (cf. leur doc) — false même pour les maisons sans effet
+              // d'Origine correspondant (no-op silencieux dans les deux cas).
+              jetonPrimeOrigineApplique: false,
+              deplacerCorruptionOrigineApplique: false,
+              gloire: gloireDepart_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom),
               civSociete: civilisationDepart.societe,
               civGouvernement: civilisationDepart.gouvernement,
               civEconomie: civilisationDepart.economie,
               civCorrompueSociete: false,
               civCorrompueGouvernement: false,
               civCorrompueEconomie: false,
-              programmesEnMain: programmeForceThegwyn ? [programmeForceThegwyn] : [],
-              programmesUtilises: programmesUtilisesParDefaut_(programmeDepart
-                ? { code: programmeDepart.code, entretienActif: true, corrompu: false, depart: true }
-                : null),
+              programmesEnMain: programmeOrigineEnMain ? [programmeOrigineEnMain] : [],
+              programmesUtilises: programmesUtilisesInit,
               // Reflète la Corruption initiale du dernier emplacement
               // Programme (programmesUtilisesParDefaut_, index 3,
-              // corrompu dès la mise en place) — corruptionMaison
-              // additionne déjà la Corruption des pistes de Civilisation
-              // (CivilisationService.definirCorruption) et, désormais,
-              // celle des emplacements Programme (voir
+              // corrompu dès la mise en place SAUF Origine qui la retire
+              // — voir programmeDepartCorrompu_ ci-dessus) —
+              // corruptionMaison additionne déjà la Corruption des pistes
+              // de Civilisation (CivilisationService.definirCorruption)
+              // et, désormais, celle des emplacements Programme (voir
               // GameService.utiliserProgramme/index.html
               // renderProgrammesPlateauMaison_).
-              corruptionMaison: 1,
+              corruptionMaison: programmeDepartCorrompu_(maisonJoueur.nom, maisonJoueur.technologieDepart.nom) ? 1 : 0,
               offresProgramme: offresProgrammeParDefaut_(),
               technologiesObtenues: [null, null, null, null, null],
               technologiesAvanceesChoisies: [null, null, null, null],
@@ -3389,6 +3522,90 @@ var GameService = (function () {
             pm.refuges = refuges;
             tuile.recompenseAppliquee = true;
             return DB.put('plateauMaison', pm).then(function () { return rechargerPartie_(partieId); });
+          });
+        });
+      });
+    },
+
+    /**
+     * Effet d'Origine "jeton(s) Prime à la création de partie" (Yarvek —
+     * voir JETON_PRIME_DEPART_ORIGINE_/jetonPrimeDepartOrigine_ ci-dessus)
+     * — appelée depuis l'écran juste après GameService.creerPartie
+     * (index.html afficherPartieCreee), JAMAIS depuis creerPartie
+     * lui-même (a besoin de `demanderChoix`, un accès DOM). No-op
+     * silencieux pour toute maison/technologie sans effet (n=0) ou déjà
+     * appliqué (`jetonPrimeOrigineApplique`, garde-fou contre un double
+     * appel accidentel — sans lui, rouvrir la même partie plus tard via
+     * App.ouvrirPartie ne redéclenche PAS cette fonction : seul
+     * afficherPartieCreee l'appelle, mais le garde-fou reste bon marché).
+     * Marque `jetonPrimeOrigineApplique` à true MÊME si le joueur annule
+     * la popup (FocusEngine.resoudreGainJetonsPrime_ annule alors TOUT,
+     * cf. son en-tête) : ce gain est une mise en place ponctuelle, pas une
+     * action rejouable — pas de bouton prévu pour la redéclencher.
+     */
+    appliquerJetonPrimeOrigine: function (partieId, demanderChoix) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], pm = resultats[1];
+        if (!lignePartie || !pm) throw new Error('Partie introuvable.');
+        if (pm.jetonPrimeOrigineApplique) return rechargerPartie_(partieId);
+
+        var joueur = (lignePartie.etatJson || {}).joueur || {};
+        var n = jetonPrimeDepartOrigine_(joueur.nom, pm.technologieDepart);
+        if (!n) {
+          pm.jetonPrimeOrigineApplique = true;
+          return DB.put('plateauMaison', pm).then(function () { return rechargerPartie_(partieId); });
+        }
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+        var source = 'Origine — jeton(s) Prime de départ';
+        var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, pm);
+
+        return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, { prime: n }, source, '', demanderChoix).then(function (resultatEffet) {
+          var champs = {};
+          resultatEffet.mutations.forEach(function (m) { champs[m.champ] = resultatEffet.etatResultat[m.champ]; });
+          Object.keys(champs).forEach(function (champ) { pm[champ] = champs[champ]; });
+          pm.jetonPrimeOrigineApplique = true;
+          return DB.put('plateauMaison', pm).then(function () { return rechargerPartie_(partieId); });
+        });
+      });
+    },
+
+    /**
+     * Effet d'Origine "déplacer 1 Corruption à la création de partie"
+     * (Shiveus — voir DEPLACER_CORRUPTION_DEPART_ORIGINE_/
+     * deplacerCorruptionDepartOrigine_ ci-dessus) — même principe
+     * qu'appliquerJetonPrimeOrigine (appelée depuis index.html
+     * afficherPartieCreee, garde-fou anti-double-application), mais
+     * relit `plateauMaison` APRÈS résolution plutôt que de réutiliser le
+     * `pm` capturé avant l'appel : contrairement à `prime` (simple
+     * compteur muté sur le clone `etat` par FocusEngine), la clé
+     * `deplacer_corruption` fait persister la popup ELLE-MÊME
+     * directement en base (secteurs/pistes de Civilisation/Chambres de
+     * décontamination selon la Source et la Destination choisies —
+     * jamais via `resultatEffet.mutations`, voir gameService.js,
+     * resoudreGainsObjectifSequentiellement_) ; réutiliser `pm` périmé
+     * écraserait cette écriture avec sa valeur d'avant popup.
+     */
+    appliquerDeplacerCorruptionOrigine: function (partieId, demanderChoix) {
+      return Promise.all([DB.get('parties', partieId), DB.get('plateauMaison', partieId)]).then(function (resultats) {
+        var lignePartie = resultats[0], pm = resultats[1];
+        if (!lignePartie || !pm) throw new Error('Partie introuvable.');
+        if (pm.deplacerCorruptionOrigineApplique) return rechargerPartie_(partieId);
+
+        var joueur = (lignePartie.etatJson || {}).joueur || {};
+        if (!deplacerCorruptionDepartOrigine_(joueur.nom, pm.technologieDepart)) {
+          pm.deplacerCorruptionOrigineApplique = true;
+          return DB.put('plateauMaison', pm).then(function () { return rechargerPartie_(partieId); });
+        }
+        if (typeof FocusEngine === 'undefined') throw new Error('FocusEngine indisponible.');
+
+        var source = 'Origine — déplacer 1 Corruption';
+        var lignePlateauMaisonAvecId = Object.assign({ partieId: partieId }, pm);
+
+        return FocusEngine.resoudreEffet(lignePlateauMaisonAvecId, { deplacer_corruption: 1 }, source, '', demanderChoix).then(function () {
+          return DB.get('plateauMaison', partieId).then(function (pmFrais) {
+            pmFrais.deplacerCorruptionOrigineApplique = true;
+            return DB.put('plateauMaison', pmFrais).then(function () { return rechargerPartie_(partieId); });
           });
         });
       });

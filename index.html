@@ -3323,8 +3323,51 @@
     }
 
     // Nom conservé pour setupService.js (aucune modification de ce
-    // fichier nécessaire) — délègue simplement à ouvrirPartie.
-    function afficherPartieCreee(partie) { ouvrirPartie(partie); }
+    // fichier nécessaire). Avant/après l'ouverture de l'écran, résout les
+    // effets d'Origine à popup (no-op silencieux pour toute maison/
+    // technologie sans effet correspondant, cf. leur doc côté
+    // gameService.js) :
+    // 1) "jeton(s) Prime à la création" (Yarvek, GameService.
+    //    appliquerJetonPrimeOrigine) — AVANT ouvrirPartie, la popup
+    //    'option_exclusive' n'a besoin d'aucun état préalable.
+    // 2) "déplacer 1 Corruption à la création" (Shiveus, GameService.
+    //    appliquerDeplacerCorruptionOrigine) — APRÈS ouvrirPartie : la
+    //    popup 'deplacer_corruption' lit StrategieService.partieAffichee
+    //    (calcul des sources/destinations éligibles), qui n'est renseigné
+    //    qu'après un premier appel à StrategieService.afficher (inclus
+    //    dans ouvrirPartie). Un 2e ouvrirPartie ré-affiche les écrans si
+    //    la Corruption a bougé (Piège n°2 — idempotent, voir
+    //    strategieService.js ligne ~8856).
+    // Tolérant de bout en bout — une erreur ici ne doit jamais empêcher
+    // l'ouverture de la partie déjà créée.
+    function afficherPartieCreee(partie) {
+      if (typeof GameService === 'undefined' || typeof StrategieService === 'undefined') {
+        ouvrirPartie(partie);
+        return;
+      }
+      var demanderChoix = StrategieService.demanderChoix;
+      var etapePrime = GameService.appliquerJetonPrimeOrigine
+        ? GameService.appliquerJetonPrimeOrigine(partie.id, demanderChoix)
+        : Promise.resolve(partie);
+
+      etapePrime
+        .catch(function (erreur) {
+          console.warn('App.afficherPartieCreee : effet d\'Origine "jeton Prime" a échoué (partie ouverte quand même) :', erreur);
+          return partie;
+        })
+        .then(function (partieApresPrime) {
+          var p = partieApresPrime || partie;
+          ouvrirPartie(p);
+          if (!GameService.appliquerDeplacerCorruptionOrigine) return;
+          return GameService.appliquerDeplacerCorruptionOrigine(p.id, demanderChoix)
+            .then(function (partieApresCorruption) {
+              if (partieApresCorruption) ouvrirPartie(partieApresCorruption);
+            })
+            .catch(function (erreur) {
+              console.warn('App.afficherPartieCreee : effet d\'Origine "déplacer Corruption" a échoué :', erreur);
+            });
+        });
+    }
 
     document.querySelectorAll('#nav-ecrans .btn-toggle').forEach(function (btn) {
       btn.addEventListener('click', function () { afficherEcran(btn.dataset.nav); });

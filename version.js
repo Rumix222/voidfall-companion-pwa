@@ -1,7 +1,111 @@
 /**
  * version.js
- * Version 162 — 2026-09-19
+ * Version 168 — 2026-09-20
  * Source de vérité unique pour la version de l'application.
+ *
+ * 20/09/2026 (suite, retour utilisateur : effets d'Origine Marqualos non
+ * implémentés, idCarte 25/26 — derniers de l'inventaire, 28/28) —
+ * "[Jeton : prime + 2 commerce]"/"[Jeton : prime + commerce]" précisés :
+ * "Prenez 1 jeton Prime et 2 jetons Commerce."/"Prenez 1 jeton Prime et 1
+ * jeton Commerce." Entièrement couvert par les 2 mécaniques déjà en place
+ * (aucun nouveau code, seulement 4 nouvelles entrées de table) :
+ * `JETON_PRIME_DEPART_ORIGINE_` (Marqualos/Drones autonomes : 1,
+ * Marqualos/Nexus de commerce : 1, résolu via
+ * GameService.appliquerJetonPrimeOrigine, popup jeton Prime) +
+ * `JETON_COMMERCE_DEPART_ORIGINE_` (Drones autonomes : 2, Nexus de
+ * commerce : 1, simple compteur `jetonCommerceDepart_`, sans popup).
+ *
+ * 20/09/2026 (suite, retour utilisateur : effet d'Origine Kradmor/
+ * Purificateur non implémenté, idCarte 24) — "Gagner carte Programme.
+ * Retirer Corruption. [Jeton : commerce]" précisé : Programme de type
+ * Domination (`PROGRAMME_ORIGINE_ALEATOIRE_`, même mécanique que
+ * Thegwyn/Fenrax/Nervo/Shiveus) + 1 jeton Commerce (`JETON_COMMERCE_
+ * DEPART_ORIGINE_`, même mécanique que Valnis) + retrait de la Corruption
+ * par défaut du DERNIER emplacement Programme — nouvelle table
+ * `RETIRER_CORRUPTION_PROGRAMME_DEPART_ORIGINE_` + fonction
+ * `programmeDepartCorrompu_` : contrairement à Shiveus/
+ * appliquerDeplacerCorruptionOrigine (v166), cette Corruption est
+ * l'UNIQUE candidate à la création (règle du livret,
+ * `programmesUtilisesParDefaut_`, index 3) — AUCUN choix, donc résolu
+ * entièrement dans `creerPartie` (`programmesUtilises[3].corrompu` et
+ * `corruptionMaison` ajustés ensemble), sans passer par la popup
+ * `deplacer_corruption` ni par `index.html afficherPartieCreee`.
+ *
+ * 20/09/2026 (suite, retour utilisateur : effets d'Origine Nervo/Shiveus
+ * non implémentés) :
+ * 1) Nervo/Vaisseaux-Arches (idCarte 18, "Obtenir programme") et Shiveus/
+ *    Chambres de décontamination (idCarte 14, "Obtenir programme,
+ *    déplacer corruption") précisés dans `data/catalogue/
+ *    originesMaison.json` (effet complet). `js/gameService.js` :
+ *    `PROGRAMME_ORIGINE_ALEATOIRE_` étendue (Nervo → Richesse, Shiveus →
+ *    Soutien), MÊME mécanique que Thegwyn/Fenrax (résolu entièrement dans
+ *    `creerPartie`, pur, aucune popup).
+ * 2) Déplacement de Corruption de Shiveus — CONTRAIREMENT au gain de
+ *    Programme ci-dessus, nécessite la popup Source/Destination à 2
+ *    étapes existante (clé FocusEngine `deplacer_corruption`, déjà
+ *    outillée pour Focus/Cadres/l'effet immédiat "obtenu en jeu" de la
+ *    même Technologie) : nouvelle table `DEPLACER_CORRUPTION_DEPART_
+ *    ORIGINE_` + fonction `deplacerCorruptionDepartOrigine_` + méthode
+ *    publique `appliquerDeplacerCorruptionOrigine(partieId,
+ *    demanderChoix)` + garde-fou `plateauMaison.
+ *    deplacerCorruptionOrigineApplique` (même principe qu'`appliquerJetonPrimeOrigine`/
+ *    v165, MAIS relit `plateauMaison` À NEUF après résolution avant d'y
+ *    écrire son garde-fou — `deplacer_corruption` persiste directement en
+ *    base depuis sa propre popup, jamais via `resultatEffet.mutations` :
+ *    réutiliser le `pm` capturé avant l'appel écraserait cette écriture
+ *    avec une valeur périmée, contrairement à `prime`, simple compteur
+ *    muté sur le clone `etat`). `index.html` : `afficherPartieCreee`
+ *    appelle désormais `appliquerDeplacerCorruptionOrigine` APRÈS
+ *    `ouvrirPartie` (pas avant, contrairement à `appliquerJetonPrimeOrigine`) —
+ *    la popup `deplacer_corruption` lit `StrategieService.partieAffichee`
+ *    pour calculer les cibles éligibles, renseigné seulement après un
+ *    premier `StrategieService.afficher` ; un 2e `ouvrirPartie`
+ *    ré-affiche les écrans si la Corruption a bougé (idempotent).
+ *
+ * 20/09/2026 (suite, retour utilisateur : effets d'Origine Yarvek non
+ * implémentés) — "3 jeton prime"/"1 jeton prime" précisés : "Prenez 3
+ * jetons Prime."/"Prenez 1 jeton Prime." (`data/catalogue/
+ * originesMaison.json`, idCarte 15/16). CONTRAIREMENT à Valnis/Nacelles
+ * ci-dessous (simple compteur), un jeton Prime doit faire choisir au
+ * joueur 1 des 11 faces réelles (FocusEngine.resoudreGainJetonsPrime_,
+ * même popup qu'un jeton Prime gagné en cours de partie) — nécessite
+ * `demanderChoix` (DOM), indisponible dans `creerPartie` (pur).
+ * `js/gameService.js` : nouvelle table `JETON_PRIME_DEPART_ORIGINE_` +
+ * fonction `jetonPrimeDepartOrigine_`, et nouvelle méthode publique
+ * `appliquerJetonPrimeOrigine(partieId, demanderChoix)` (même mécanique
+ * que `appliquerRecompenseRefuge` : charge `plateauMaison`, résout via
+ * `FocusEngine.resoudreEffet({prime:n})`, persiste) + garde-fou
+ * `plateauMaison.jetonPrimeOrigineApplique` (initialisé à `false` par
+ * `creerPartie`, mis à `true` après résolution même si le joueur annule
+ * la popup — mise en place ponctuelle, pas rejouable). `index.html` :
+ * `afficherPartieCreee` appelle désormais `appliquerJetonPrimeOrigine`
+ * (avec `StrategieService.demanderChoix`) AVANT `ouvrirPartie`, tolérant
+ * (une erreur n'empêche jamais l'ouverture de la partie déjà créée).
+ *
+ * 20/09/2026 (retour utilisateur : effet d'Origine Valnis/Nacelles non
+ * implémenté) — "[Jeton : commerce]" précisé : "Prenez 1 jeton Commerce."
+ * (`data/catalogue/originesMaison.json`, idCarte 2). `js/gameService.js` :
+ * nouvelle table `JETON_COMMERCE_DEPART_ORIGINE_` (maison+technologie ->
+ * nombre de jetons) + fonction `jetonCommerceDepart_`, appelée par
+ * `creerPartie` à la place de `jetonCommerce: []` — SIMPLE incrément du
+ * compteur (tableau `plateauMaison.jetonCommerce`, valeurs `'disponible'`),
+ * sans résoudre de récompense (contrairement à la clé FocusEngine
+ * `gagner_commerce`, qui déclenche un choix parmi les 6 `BONUS_COMMERCE` —
+ * pas ce que demande cette carte Origine).
+ *
+ * 19/09/2026 (suite, retour utilisateur : effet d'Origine Fenrax/
+ * Surveillance centrale non implémenté, même famille que Thegwyn/Matrice
+ * neuronale ci-dessous) — "Gagner carte Programme. Ameliorer jeton
+ * Gloire." précisé :
+ * carte Programme de type Soutien (tirage aléatoire, comme Thegwyn) +
+ * jeton Gloire de départ sur sa face 3 au lieu de 2.
+ * `data/catalogue/originesMaison.json` (texte complet de l'effet).
+ * `js/gameService.js` : généralise `obtenirProgrammeOrigineForceThegwyn_`
+ * en `obtenirProgrammeOrigineAleatoire_` (table maison+technologie ->
+ * type de Programme, couvre désormais Thegwyn ET Fenrax) ; nouvelle
+ * fonction `gloireDepart_` (table maison+technologie -> valeur du jeton
+ * Gloire de départ, GLOIRE_DEPART[0]=2 par défaut sinon) appelée par
+ * `creerPartie` à la place de `GLOIRE_DEPART.slice()`.
  *
  * 19/09/2026 (suite, 2 retours utilisateur distincts) :
  * 1) Effet d'Origine Thegwyn/Matrice neuronale non implémenté ("Prenez en
@@ -5836,4 +5940,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260919.3';
+var APP_VERSION = '20260920.5';
