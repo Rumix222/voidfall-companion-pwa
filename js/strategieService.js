@@ -703,6 +703,12 @@ var StrategieService = (function () {
     avancer_civilisation_gouvernement: 'Avancer sur la piste Gouvernement',
     avancer_civilisation_economie: 'Avancer sur la piste Économie',
     avancer_civilisation_moins_avancee: 'Avancer sur votre piste la moins avancée',
+    // Retour utilisateur 20/09/2026 (Focus Héroïque Tentation "S'atteler") :
+    // affichait la clé brute "sans_benefice_case + avancer_piste_corrompue
+    // (1)" dans la liste et/ou — "sans_benefice_case" est un modificateur
+    // silencieux (voir le filtre juste en dessous, libelleOption_), reste
+    // à traduire "avancer_piste_corrompue" lui-même.
+    avancer_piste_corrompue: 'Avancer sur la piste Corrompue (sans bénéfice de case)',
     avance_rapide: 'Avancer librement sur une piste de Civilisation',
     nourriture: 'Nourriture', energie: 'Énergie', materiel: 'Matériel',
     credit: 'Crédit', science: 'Science', influence: 'Influence',
@@ -1985,15 +1991,16 @@ var StrategieService = (function () {
   function libelleOption_(opt) {
     if (typeof opt === 'string') return LIBELLES_OPTIONS[opt] || opt;
     return Object.keys(opt)
-      // "tie_break" (ex. focus.json id 106, Renfort "Accélérer") est un
-      // MODIFICATEUR silencieux pour FocusEngine (voir
-      // CLES_MODIFICATEURS_SILENCIEUSES), jamais un choix affichable —
-      // sans ce filtre, une option comme {tie_break:"au_choix",
-      // avancer_civilisation_moins_avancee:1} affichait littéralement
-      // "tie_break + Avancer sur votre piste la moins avancée (1)"
-      // (todo.md, retour utilisateur : "libellé tie_break j'ai pas compris
-      // ce que ça signifie").
-      .filter(function (k) { return k !== 'tie_break'; })
+      // "tie_break"/"sans_benefice_case" sont des MODIFICATEURS silencieux
+      // pour FocusEngine (voir CLES_MODIFICATEURS_SILENCIEUSES), jamais un
+      // choix affichable — sans ce filtre, une option comme
+      // {tie_break:"au_choix", avancer_civilisation_moins_avancee:1}
+      // affichait littéralement "tie_break + Avancer sur votre piste la
+      // moins avancée (1)" (todo.md, retour utilisateur : "libellé
+      // tie_break j'ai pas compris ce que ça signifie") — même bug reproduit
+      // le 20/09/2026 pour {sans_benefice_case:true,
+      // avancer_piste_corrompue:1} (Focus Héroïque Tentation "S'atteler").
+      .filter(function (k) { return k !== 'tie_break' && k !== 'sans_benefice_case'; })
       .map(function (k) {
         var v = opt[k];
         // "ressource_choix" (todo.md, retour utilisateur) : label dédié

@@ -1,7 +1,18 @@
 /**
  * version.js
- * Version 174 — 2026-09-20
+ * Version 175 — 2026-09-20
  * Source de vérité unique pour la version de l'application.
+ *
+ * 20/09/2026 (suite, bug trouvé pendant la vérification navigateur du
+ * Focus Héroïque Thegwyn "S'atteler", v174) — la popup Feuille ET la
+ * popup #modal-choix affichaient la clé brute "sans_benefice_case +
+ * avancer_piste_corrompue (1)" au lieu d'un libellé français dans la
+ * liste et/ou de l'Effet. `libelleOption_` (strategieService.js) ne
+ * filtrait que le modificateur silencieux "tie_break" (todo.md, même bug
+ * déjà corrigé une fois pour {tie_break, avancer_civilisation_moins_
+ * avancee}) — "sans_benefice_case" (CLES_MODIFICATEURS_SILENCIEUSES,
+ * focusEngine.js) manquait à ce filtre, et "avancer_piste_corrompue"
+ * n'avait pas d'entrée dans `LIBELLES_OPTIONS`. Les deux ajoutés.
  *
  * 20/09/2026 (suite, retour utilisateur : "Le champ gardiens des secteurs
  * doit être éditable pour pouvoir modifier") — panneau détail de l'onglet
@@ -6057,4 +6068,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260920.11';
+var APP_VERSION = '20260920.12';
