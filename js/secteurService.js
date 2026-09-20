@@ -473,13 +473,16 @@ var SecteurService = (function () {
 
   // Correction manuelle libre d'un secteur (retour utilisateur 13-13/09/2026
   // — panneau détail de l'onglet Galaxie) : Population, Corrompu, cube du
-  // Néant, jeton Prime, jeton Libération. Liste blanche volontaire, MÊME
-  // principe que GameService.CHAMPS_PLATEAU_MAISON_AUTORISES/majPlateauMaison
-  // — ne JAMAIS laisser un appelant écrire un champ arbitraire. Guildes/
-  // Installations/PN de vaisseaux restent réservés aux actions guidées
-  // (construire/déployer/rappeler/envahir, qui revalident les règles) —
-  // hors périmètre ici.
-  var CHAMPS_SECTEUR_MANUELS_AUTORISES_ = ['population', 'corrompu', 'pnNeant', 'jetonPrime', 'jetonLiberation'];
+  // Néant, jeton Prime, jeton Libération, Gardiens (nombreGardien, ajouté
+  // 20/09/2026 — retour utilisateur : champ resté en lecture seule dans le
+  // panneau détail, alors que retirerGardien/le placement en masse
+  // d'Événement écrivent déjà ce même champ ailleurs). Liste blanche
+  // volontaire, MÊME principe que GameService.CHAMPS_PLATEAU_MAISON_
+  // AUTORISES/majPlateauMaison — ne JAMAIS laisser un appelant écrire un
+  // champ arbitraire. Guildes/Installations/PN de vaisseaux restent
+  // réservés aux actions guidées (construire/déployer/rappeler/envahir,
+  // qui revalident les règles) — hors périmètre ici.
+  var CHAMPS_SECTEUR_MANUELS_AUTORISES_ = ['population', 'corrompu', 'pnNeant', 'jetonPrime', 'jetonLiberation', 'nombreGardien'];
 
   /**
    * MàJ partielle liste-blanche d'un secteur (lecture-fusion-écriture,

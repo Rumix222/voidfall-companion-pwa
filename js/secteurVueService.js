@@ -611,19 +611,22 @@ var SecteurVueService = (function () {
     return t ? t.label : cle;
   }
 
-  // Les 5 champs manuels sans validation de règle (SecteurService.
+  // Les 6 champs manuels sans validation de règle (SecteurService.
   // majSecteur) — id DOM statique (un seul panneau détail affiché à la
   // fois, contrairement au tableau Secteurs qui a besoin de data-numero
   // pour distinguer N lignes simultanées) + nom du champ secteursPartie
   // correspondant. `caseACocher` distingue le champ booléen `corrompu`
-  // (checkbox) des 4 compteurs numériques (input number, jamais négatif —
-  // même clamp que CHAMPS_CRISE_SIMPLES_, index.html).
+  // (checkbox) des 5 compteurs numériques (input number, jamais négatif —
+  // même clamp que CHAMPS_CRISE_SIMPLES_, index.html). "Gardiens" ajouté
+  // 20/09/2026 (retour utilisateur : resté en lecture seule alors que
+  // c'est un compteur manuel comme les autres, cf. secteurService.js).
   var CHAMPS_DETAIL_EDITABLES_ = [
     { id: 'galaxie-detail-population', champ: 'population', caseACocher: false },
     { id: 'galaxie-detail-corrompu', champ: 'corrompu', caseACocher: true },
     { id: 'galaxie-detail-cube-neant', champ: 'pnNeant', caseACocher: false },
     { id: 'galaxie-detail-jeton-prime', champ: 'jetonPrime', caseACocher: false },
-    { id: 'galaxie-detail-jeton-liberation', champ: 'jetonLiberation', caseACocher: false }
+    { id: 'galaxie-detail-jeton-liberation', champ: 'jetonLiberation', caseACocher: false },
+    { id: 'galaxie-detail-gardien', champ: 'nombreGardien', caseACocher: false }
   ];
 
   function ligneDetailHTML_(label, valeurHtml) {
@@ -635,7 +638,7 @@ var SecteurVueService = (function () {
   }
 
   /**
-   * Branche l'`onchange` des 5 champs éditables du panneau détail
+   * Branche l'`onchange` des 6 champs éditables du panneau détail
    * (CHAMPS_DETAIL_EDITABLES_ ci-dessus) sur SecteurService.majSecteur —
    * même clamp manuel (jamais négatif) que CHAMPS_CRISE_SIMPLES_
    * (index.html), AUCUNE autre validation (voir en-tête de majSecteur,
@@ -718,7 +721,7 @@ var SecteurVueService = (function () {
       ? ligneDetailHTML_('Population', '—')
       : ligneDetailHTML_('Population', inputNumeriqueDetailHTML_('galaxie-detail-population', secteur.population));
     suite += ligneDetailHTML_('Corrompu', '<input type="checkbox" id="galaxie-detail-corrompu"' + (secteur.corrompu ? ' checked' : '') + '>');
-    suite += ligneDetailHTML_('Gardiens', secteur.nombreGardien || 0);
+    suite += ligneDetailHTML_('Gardiens', inputNumeriqueDetailHTML_('galaxie-detail-gardien', secteur.nombreGardien));
     suite += ligneDetailHTML_('Installations (emplacements)', installations.length ? installations.join(', ') : '—');
     suite += ligneDetailHTML_('Guildes (emplacements)', guildes.length ? guildes.join(', ') : '—');
     suite += ligneDetailHTML_('Flotte', flotteTexte || '—');

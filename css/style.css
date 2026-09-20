@@ -1086,7 +1086,14 @@ input:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 40;
+  /* Retour utilisateur 20/09/2026 : ces ressources doivent rester
+     visibles même quand une popup s'ouvre par-dessus l'écran Focus —
+     z-index au-dessus de .modal-overlay (50) ET .feuille (51), voir plus
+     bas. Ne suffit pas seul : sans réserver la même hauteur en bas de
+     ces popups (règles `body.ecran-focus-actif` ci-dessous), ce bandeau
+     recouvrirait leurs propres boutons Valider/Annuler, eux aussi ancrés
+     tout en bas. */
+  z-index: 55;
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -1397,6 +1404,17 @@ input:disabled {
   align-items: flex-end;
   justify-content: center;
   padding: 0;
+}
+/* Retour utilisateur 20/09/2026 : réserve la hauteur du bandeau
+   .rappel-ressources-footer (92px, même valeur que le padding-bottom de
+   #screen-focus ci-dessus) au bas de la popup QUAND l'écran Focus est
+   actif (classe posée par App.afficherEcran, index.html) — sans ça, le
+   bandeau (z-index au-dessus, voir plus haut) recouvrirait .modal-actions
+   (Valider/Annuler), lui aussi ancré tout en bas via align-items:flex-end
+   ci-dessus. Sur les autres écrans (bandeau absent), aucune réservation :
+   la popup reste flush avec le bas comme avant. */
+body.ecran-focus-actif .modal-overlay {
+  padding-bottom: 92px;
 }
 .modal-overlay[hidden] { display: none; }
 .modal-box {
@@ -1813,6 +1831,14 @@ input[type="number"]:focus-visible {
   overflow: hidden;
 }
 .feuille.feuille-animee { transition: height .28s cubic-bezier(.32,.72,0,1); }
+/* Retour utilisateur 20/09/2026 : même raison que body.ecran-focus-actif
+   .modal-overlay ci-dessus — réserve la hauteur de
+   .rappel-ressources-footer (92px) sous la Feuille quand l'écran Focus
+   est actif, sans quoi son pied (.feuille-pied, boutons Valider/Annuler)
+   se retrouverait sous le bandeau (z-index supérieur, voir plus haut). */
+body.ecran-focus-actif .feuille {
+  bottom: 92px;
+}
 
 .feuille-grabber-zone {
   display: flex;

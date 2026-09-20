@@ -652,6 +652,16 @@
       document.querySelectorAll('.screen').forEach(function (ecran) {
         ecran.hidden = (ecran.id !== 'screen-' + nom);
       });
+      // Retour utilisateur 20/09/2026 : la barre de rappel ressources
+      // (bandeau bas de l'écran Focus, .rappel-ressources-footer) doit
+      // rester visible même quand une popup (#modal-choix ou la Feuille)
+      // s'ouvre par-dessus — voir css/style.css, règles
+      // `body.ecran-focus-actif .modal-overlay`/`.feuille` (réservent la
+      // hauteur du bandeau) + le z-index du bandeau lui-même (au-dessus
+      // des popups). Cette classe est le seul signal CSS disponible pour
+      // savoir quel écran est actif depuis #modal-choix/#feuille, tous
+      // deux hors de la section .screen concernée.
+      document.body.classList.toggle('ecran-focus-actif', nom === 'focus');
       var boutonsNav = document.querySelectorAll('#nav-ecrans .btn-toggle');
       boutonsNav.forEach(function (btn) {
         btn.classList.toggle('active', btn.dataset.nav === nom);

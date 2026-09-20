@@ -1,7 +1,114 @@
 /**
  * version.js
- * Version 169 — 2026-09-20
+ * Version 174 — 2026-09-20
  * Source de vérité unique pour la version de l'application.
+ *
+ * 20/09/2026 (suite, retour utilisateur : "Le champ gardiens des secteurs
+ * doit être éditable pour pouvoir modifier") — panneau détail de l'onglet
+ * Galaxie (js/secteurVueService.js) : "Gardiens" était affiché en texte
+ * brut, seul champ manuel du panneau resté non éditable (Population/
+ * Corrompu/Cube du Néant/Jeton Prime/Jeton Libération l'étaient déjà).
+ * Ajouté à `CHAMPS_DETAIL_EDITABLES_` (6e champ, `galaxie-detail-gardien`
+ * -> `nombreGardien`) + rendu via `inputNumeriqueDetailHTML_` comme les
+ * autres compteurs. `js/secteurService.js`, `CHAMPS_SECTEUR_MANUELS_
+ * AUTORISES_` : `'nombreGardien'` ajouté (sinon `majSecteur` l'aurait
+ * silencieusement ignoré, liste blanche oblige). `secteurService_actions.test.js`
+ * mis à jour (6 champs au lieu de 5).
+ *
+ * 20/09/2026 (suite, retour utilisateur : vérification Focus Héroïque
+ * Thegwyn "S'atteler", focus.json id 110) — 2 gaps distincts :
+ * 1) Clé "avancer_piste_corrompue" ("Avancez sur la piste de Civilisation
+ *    qui vient d'être Corrompue, sans bénéfice de case") jusqu'ici listée
+ *    dans `CLES_CIVILISATION_HORS_PERIMETRE` (focusEngine.js) — message
+ *    brut, non traduit, ni implémenté — alors que
+ *    `CivilisationService.avancerPisteCorrompue` (déterministe : calcule
+ *    seule quelle piste est marquée Corrompue) existait déjà, orpheline
+ *    de toute popup. Nouveau cas dédié dans `resoudreCle_`, réutilisant
+ *    la MÊME popup 'avancer_civilisation' (nouveau flag
+ *    `contexte.corrompue`) que les 3 autres modes (piste imposée/au
+ *    choix/moins avancée) — implémenté dans LES DEUX popups jumelles
+ *    (`js/strategieService.js`, `feuilleFlowAvancerCivilisation_` ET la
+ *    branche #modal-choix classique, Tentation/Héroïque étant Feuille-
+ *    éligible mais d'autres cartes pouvant encore passer par l'autre
+ *    chemin). Retirée de `CLES_CIVILISATION_HORS_PERIMETRE` (ne restait
+ *    que "avance_rapide").
+ * 2) En avançant sur une piste de Civilisation (2e moitié du "choice" de
+ *    ce Focus), une case dont l'effet est "etablir_guilde_fermiers"
+ *    (Thegwyn/piste Gouvernement, case 2) retombait sur le repli
+ *    générique "non automatisé" — le mécanisme de construction de Guilde
+ *    à type forcé (déjà câblé pour Banquiers/Scientifiques,
+ *    `etablir_guilde_banquier`/`etablir_guilde_scientifique`) n'avait
+ *    jamais reçu les 3 variantes restantes. Ajoutées à
+ *    `CATEGORIE_PAR_CLE_CONSTRUIRE_`/`TYPE_FORCE_PAR_CLE_CONSTRUIRE_`
+ *    (focusEngine.js) : `etablir_guilde_fermiers`/`_ingenieurs`/`_mineurs`
+ *    — MÊME popup 'construire', qui gère déjà les 5 types de Guilde
+ *    (strategieService.js) : aucun nouveau mécanisme, 3 entrées de table.
+ *
+ * 20/09/2026 (suite, retour utilisateur : "Afficher la barre en bas de
+ * l'écran focus avec les ressources devant les popups. Ou afficher les
+ * popups au-dessus de cette barre. Le besoin est que ces ressources
+ * soient toujours visibles.") — le bandeau `.rappel-ressources-footer`
+ * (bas de l'écran Focus) était recouvert par #modal-choix ET la Feuille
+ * dès qu'une popup s'ouvrait (z-index 40 < 50/51). Les 2 solutions
+ * proposées sont complémentaires, pas alternatives : `css/style.css` —
+ * (1) z-index du bandeau relevé à 55 (au-dessus des 2 popups) ; (2)
+ * nouvelles règles `body.ecran-focus-actif .modal-overlay`
+ * (padding-bottom: 92px) et `body.ecran-focus-actif .feuille` (bottom:
+ * 92px) qui réservent la hauteur du bandeau SEULEMENT quand l'écran Focus
+ * est actif — sans (2), le bandeau (au-dessus grâce à (1)) recouvrirait
+ * les boutons Valider/Annuler des popups, eux aussi ancrés tout en bas.
+ * `index.html` : `afficherEcran` pose désormais `document.body.
+ * classList.toggle('ecran-focus-actif', nom === 'focus')` — seul signal
+ * CSS possible pour ces 2 popups, situées hors de la section .screen
+ * concernée. Aucun changement sur les autres écrans (bandeau absent,
+ * classe retirée, popups flush avec le bas comme avant).
+ *
+ * 20/09/2026 (suite, retour utilisateur : "L'effet gagnez un jeton
+ * commerce doit incrémenter le compteur jeton commerce. Il y en a sur des
+ * pistes civilisations et des focus.") — `js/focusEngine.js`, cle
+ * `gagner_commerce` (resoudreCle_) : incrémentait le compteur PHYSIQUE
+ * `etat.jetonCommerce` NULLE PART, se contentant de résoudre le Bonus
+ * Commerce choisi (6 récompenses fixes) — corrigé pour faire les DEUX,
+ * comme le jeu physique (docs-rules-cycle-de-jeu.md : "vous ne pouvez pas
+ * le retourner le tour où vous le gagnez, mais vous pouvez le dépenser",
+ * donc le jeton EST bien gagné en plus de son bonus immédiat). `etat.
+ * jetonCommerce` poussé AVANT de résoudre le bonus (même ordre que
+ * resoudreGainJetonsPrime_ pour `prime`) : si le bonus a lui-même un
+ * sous-choix annulé, le jeton ajouté est défait avec le reste (clone
+ * jamais commité). Nouvelle entrée `'jetonCommerce'` dans
+ * `CHAMPS_DIFF_SUIVIS` — sans elle, la mutation restait invisible à
+ * `diffChamps_` (comparaison par CONTENU nécessaire pour un champ
+ * tableau, comme `actionsFocusUtilisees`) et n'était donc jamais
+ * persistée par `GameService.majPlateauMaison` (déjà whitelisté côté
+ * `CHAMPS_PLATEAU_MAISON_AUTORISES`, ce n'était que côté FocusEngine que
+ * la mutation n'était pas détectée). Couvre TOUT appelant existant de
+ * `gagner_commerce` sans changement supplémentaire (mécanisme centralisé,
+ * `FocusEngine.resoudreEffet`) : pistes de Civilisation
+ * (`CivilisationService.avancerPiste`), actions Focus, l'action de
+ * Programme Force (`GameService.EFFET_PROGRAMME_PAR_TYPE_`), et l'effet
+ * immédiat de 3 Technologies (Nacelles/Nexus de commerce/Drones
+ * autonomes, `EFFET_TECHNOLOGIE_IMMEDIAT_`). `js/focusEngine.test.js` :
+ * test existant étendu (assertion jetonCommerce) + nouveau test
+ * "Annuler" (jetonCommerce inchangé, même garde que jetonPrime).
+ *
+ * 20/09/2026 (suite, retour utilisateur : "Ajouter la résolution des
+ * effets programme (quand on les joue depuis le menu Focus) dans les
+ * logs d'action.") — `js/strategieService.js`, `renderProgrammesEnMain_`
+ * (bouton "▶" sur un Programme "en main") : le résultat de
+ * `GameService.utiliserProgramme` (résumé de l'Effet résolu, `resultat.
+ * detail`) n'était JAMAIS poussé au journal (contrairement à
+ * `jouerAction_` pour une action Focus) — corrigé, un groupe
+ * `pousserJournalGroupe_('Programme — <nom>', [resultat.detail])` par
+ * résolution réussie.
+ *
+ * 20/09/2026 (suite, retour utilisateur : "Gagner une ressource suite à
+ * l'obtention d'un jeton prime doit permettre de choisir 1 crédit.") —
+ * `js/focusEngine.js`, `TOKENS_PRIME_`, face "Gagnez 1 ressource." :
+ * choix élargi de 4 à 5 ressources (Nourriture/Énergie/Matériel/Science
+ * -> + Crédit, oubli lors de la capture initiale des 11 faces réelles du
+ * jeu physique). `js/focusEngine.test.js` : commentaire du test
+ * "gagner_commerce -> Bonus Commerce" corrigé en conséquence (4 -> 5
+ * ressources, l'assertion elle-même ne dépendait pas du nombre exact).
  *
  * 20/09/2026 (suite, retour utilisateur : "souvent je connais les technos
  * mais ne me souviens pas du nom des maisons") — écran "Créer une partie"
@@ -5950,4 +6057,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260920.6';
+var APP_VERSION = '20260920.11';

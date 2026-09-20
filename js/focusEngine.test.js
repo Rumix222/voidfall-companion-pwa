@@ -354,8 +354,10 @@ test('gagner_prime : "Annuler" sur le choix de récompense bloque tout, jetonPri
 // rapide -> gagner un jeton commerce -> gagner un jeton prime" : le
 // Bonus Commerce "Gagnez un jeton Prime." (index 4 de BONUS_COMMERCE)
 // doit réellement créditer jetonPrime, pas juste journaliser un rappel
-// manuel.
-test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonPrime et fait choisir une récompense', function () {
+// manuel. Couvre aussi le retour utilisateur 20/09/2026 ("gagnez un jeton
+// Commerce" doit incrémenter le compteur jetonCommerce, pas seulement
+// résoudre le Bonus) : les 2 doivent se produire ENSEMBLE.
+test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jetonCommerce ET jetonPrime, fait choisir une récompense', function () {
   var ctx = creerContexte_();
   var carte = { focus: 'Test' };
   var action = { action: 'Commerce', effet: { gagner_commerce: 1 }, cout: {}, texte: '' };
@@ -366,13 +368,30 @@ test('gagner_commerce -> Bonus Commerce "Gagnez un jeton Prime." : crédite jeto
     assert.strictEqual(contexte.type, 'option_exclusive');
     appelsOptionExclusive++;
     // 1er appel : laquelle des 11 faces ("Gagnez 1 ressource.", index 9) ;
-    // 2e appel : sous-choix parmi les 4 ressources (peu importe laquelle).
+    // 2e appel : sous-choix parmi les 5 ressources (peu importe laquelle).
     return { indexChoisi: appelsOptionExclusive === 1 ? 9 : 0 };
   };
 
   return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, demanderChoix).then(function (resultat) {
     assert.strictEqual(resultat.succes, true);
+    assert.deepStrictEqual(resultat.plateauMaisonApres.jetonCommerce, ['disponible']);
     assert.strictEqual(resultat.plateauMaisonApres.jetonPrime, 1);
+    var mutCommerce = resultat.mutations.filter(function (m) { return m.champ === 'jetonCommerce'; })[0];
+    assert.ok(mutCommerce, 'jetonCommerce doit apparaître dans les mutations (persisté par majPlateauMaison)');
+  });
+});
+
+// "Annuler" sur le Bonus Commerce (ou un sous-choix qu'il ouvre) défait
+// TOUT, y compris le jeton Commerce déjà ajouté à l'état cloné — même
+// règle que resoudreGainJetonsPrime_ (voir son en-tête).
+test('gagner_commerce : "Annuler" sur le choix de Bonus Commerce bloque tout, jetonCommerce inchangé', function () {
+  var ctx = creerContexte_();
+  var carte = { focus: 'Test' };
+  var action = { action: 'Commerce', effet: { gagner_commerce: 1 }, cout: {}, texte: '' };
+
+  return ctx.FocusEngine.resoudreAction(PLATEAU_BASE, carte, action, function () { return { annule: true }; }).then(function (resultat) {
+    assert.strictEqual(resultat.succes, false);
+    assert.strictEqual(resultat.plateauMaisonApres.jetonCommerce, undefined);
   });
 });
 

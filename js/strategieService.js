@@ -1732,6 +1732,12 @@ var StrategieService = (function () {
           }).then(function (resultat) {
             btn.disabled = false;
             if (!resultat || resultat.annule) return;
+            // Retour utilisateur 20/09/2026 : la résolution d'un Programme
+            // joué depuis cet écran n'apparaissait jamais dans le journal
+            // d'action (contrairement à jouerAction_ pour une action
+            // Focus) — même gabarit {action, lignes} que pousserJournalGroupe_
+            // ci-dessus, un seul groupe pour ce Programme.
+            pousserJournalGroupe_('Programme — ' + btn.dataset.nom, [resultat.detail]);
             // Rechargement complet plutôt qu'une fusion locale :
             // utiliserProgramme peut avoir muté ressources/cube/gloire/
             // civilisation/secteurs (selon le type de Programme joué) en
@@ -2142,10 +2148,13 @@ var StrategieService = (function () {
     // retombe donc toujours sur le repli générique "non automatisé",
     // confirmé par un harnais Node direct sur FocusEngine.resoudreAction
     // avant migration (aucun demanderChoix 'gagner_corruption' déclenché).
-    // Les autres clés non reconnues (action_focus_prefere, copy_action,
-    // consulter_evenements, corruption_piste_civilisation, retirer_
-    // programme, avancer_piste_corrompue) suivent le même repli, comme
-    // pour toutes les cartes précédentes.
+    // "avancer_piste_corrompue" (Héroïque "S'atteler") a depuis reçu son
+    // propre cas dédié (retour utilisateur 20/09/2026, même feuilleFlow*
+    // qu'avancer_civilisation_moins_avancee — voir feuilleFlowAvancerCivilisation_/
+    // focusEngine.js resoudreCle_). Les autres clés non reconnues
+    // (action_focus_prefere, copy_action, consulter_evenements,
+    // corruption_piste_civilisation, retirer_programme) suivent toujours
+    // le repli générique, comme pour toutes les cartes précédentes.
     { focus: 'Tentation', type: 'Standard' },
     { focus: 'Tentation', type: 'Kradmor' },
     { focus: 'Tentation', type: 'Héroïque' }
@@ -3238,9 +3247,11 @@ var StrategieService = (function () {
     var actionCivilisation = feuilleActionCourante_ && feuilleActionCourante_.action;
     var titre = (estPremierEcran && actionCivilisation)
       ? (feuilleActionCourante_.carte.focus + ' — ' + (actionCivilisation.action || 'action'))
-      : etiquette + (contexte.moinsAvancee
-        ? 'Avancer sur votre piste la moins avancée'
-        : (contexte.piste ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste] : 'Avancer sur une piste de Civilisation'));
+      : etiquette + (contexte.corrompue
+        ? 'Avancer sur la piste Corrompue'
+        : (contexte.moinsAvancee
+          ? 'Avancer sur votre piste la moins avancée'
+          : (contexte.piste ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste] : 'Avancer sur une piste de Civilisation')));
 
     feuillePousserEtape_({
       titre: titre, nbEtapes: 1, etapeIndex: 0,
@@ -3296,8 +3307,56 @@ var StrategieService = (function () {
         });
     }
 
+    // Retour utilisateur 20/09/2026 (Focus Héroïque Tentation "S'atteler",
+    // focus.json id 110, clé "avancer_piste_corrompue") : même mécanique
+    // que la branche #modal-choix jumelle ci-dessous (voir son
+    // commentaire) — CivilisationService.avancerPisteCorrompue calcule
+    // seule quelle piste est marquée Corrompue, sans choix ni
+    // prévisualisation de case nécessaire (aucun bénéfice résolu).
+    function validerAvancementPisteCorrompue_() {
+      feuilleEls_.btnValider.disabled = true;
+      if (infosCout && infosCout.substituables.length) {
+        feuillePrepaiement_ = {};
+        infosCout.substituables.forEach(function (s, idx) {
+          feuillePrepaiement_[s.cle] = { montant: s.montant, utiliseRessource: estadosCout[idx].v };
+        });
+      }
+      CivilisationService.avancerPisteCorrompue(partieCivilisation.id)
+        .then(function (resultat) {
+          feuilleRejetCourant_ = null;
+          var detail = 'Piste ' + CivilisationService.NOM_PISTE[resultat.piste] + ' (Corrompue) : niveau ' +
+            resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau + ' (sans bénéfice de case).';
+          resolve({ detail: detail, piste: resultat.piste });
+        })
+        .catch(function (erreur) {
+          feuilleEls_.btnValider.disabled = false;
+          window.alert('Échec de l’avancement : ' + erreur.message);
+        });
+    }
+
     obtenirDetailPistesCache_(nomMaisonCivilisation).then(function (detail) {
       var etapeCourante = feuillePile_[feuillePile_.length - 1];
+
+      if (contexte.corrompue) {
+        var pisteCorrompueFeuille = CivilisationService.PISTES.filter(function (p) {
+          return !!(civActuelle.corrompues && civActuelle.corrompues[p]);
+        })[0];
+        if (!pisteCorrompueFeuille) {
+          etapeCourante.html = avecCout_('<p class="hint">Aucune piste n\'est actuellement marquée Corrompue.</p>');
+          etapeCourante.brancher = brancherCout_;
+          etapeCourante.onValider = null;
+          feuilleRendreEtape_(etapeCourante, null);
+          return;
+        }
+        var niveauCorrompueFeuille = civActuelle[pisteCorrompueFeuille] || 0;
+        etapeCourante.html = avecCout_('<p class="hint">Piste marquée Corrompue : ' + CivilisationService.NOM_PISTE[pisteCorrompueFeuille] +
+          ' (niveau ' + niveauCorrompueFeuille + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
+          '<p class="hint">Avancera sans bénéfice de case.</p>');
+        etapeCourante.brancher = brancherCout_;
+        etapeCourante.onValider = niveauCorrompueFeuille >= CivilisationService.NIVEAU_MAX ? null : validerAvancementPisteCorrompue_;
+        feuilleRendreEtape_(etapeCourante, null);
+        return;
+      }
 
       if (contexte.moinsAvancee) {
         var niveauMin = Math.min.apply(null, CivilisationService.PISTES.map(function (p) { return civActuelle[p] || 0; }));
@@ -7793,11 +7852,13 @@ var StrategieService = (function () {
         // resolve({detail}) couvre donc aussi ce cas, jamais
         // {annule:true} : cette popup n'est annulable qu'AVANT validation
         // (bouton Annuler), pas après.
-        titre.textContent = contexte.moinsAvancee
-          ? 'Avancer sur votre piste la moins avancée'
-          : (contexte.piste
-            ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste]
-            : 'Avancer sur une piste de Civilisation');
+        titre.textContent = contexte.corrompue
+          ? 'Avancer sur la piste Corrompue'
+          : (contexte.moinsAvancee
+            ? 'Avancer sur votre piste la moins avancée'
+            : (contexte.piste
+              ? 'Avancer sur la piste ' + CivilisationService.NOM_PISTE[contexte.piste]
+              : 'Avancer sur une piste de Civilisation'));
         contenu.innerHTML = '<p class="hint">Chargement…</p>';
         btnValider.hidden = true;
         btnAnnuler.hidden = false;
@@ -7819,6 +7880,50 @@ var StrategieService = (function () {
           var cases = (detail && detail[piste]) || [];
           var entree = cases[niveau]; // case niveau+1 (index niveau, 0-based)
           return entree ? ('Case ' + entree.case + ' — ' + (entree.texte || '(aucun texte)')) : '';
+        }
+
+        // Retour utilisateur 20/09/2026 (Focus Héroïque Tentation
+        // "S'atteler", focus.json id 110, clé "avancer_piste_corrompue") :
+        // jusqu'ici "hors périmètre" (message brut non traduit) —
+        // CivilisationService.avancerPisteCorrompue calcule elle-même
+        // quelle piste est marquée Corrompue (déterministe, AUCUN choix de
+        // piste — s'il y en avait plusieurs, ce qui ne devrait pas arriver
+        // en jeu normal, elle ne résout que la première dans l'ordre fixe
+        // Société > Gouvernement > Économie) et n'y résout PAS l'effet de
+        // la case ("sans bénéfice de case") : contrairement à
+        // validerAvancementPiste_ ci-dessous, aucun `demanderChoix` à
+        // relayer, ni de prévisualisation de case à charger — court-circuite
+        // donc obtenirDetailPistesCache_ ci-dessous, jamais nécessaire ici.
+        if (contexte.corrompue) {
+          var pisteCorrompueModal = CivilisationService.PISTES.filter(function (p) {
+            return !!(civActuelle.corrompues && civActuelle.corrompues[p]);
+          })[0];
+          if (!pisteCorrompueModal) {
+            contenu.innerHTML = '<p class="hint">Aucune piste n\'est actuellement marquée Corrompue.</p>';
+            return;
+          }
+          var niveauCorrompueModal = civActuelle[pisteCorrompueModal] || 0;
+          contenu.innerHTML = '<p class="hint">Piste marquée Corrompue : ' + CivilisationService.NOM_PISTE[pisteCorrompueModal] +
+            ' (niveau ' + niveauCorrompueModal + '/' + CivilisationService.NIVEAU_MAX + ')</p>' +
+            '<p class="hint">Avancera sans bénéfice de case.</p>';
+          btnValider.hidden = niveauCorrompueModal >= CivilisationService.NIVEAU_MAX;
+          btnValider.textContent = 'Avancer';
+          btnValider.onclick = function () {
+            btnValider.disabled = true;
+            CivilisationService.avancerPisteCorrompue(partieCivilisation.id)
+              .then(function (resultat) {
+                fermerModale_();
+                btnValider.disabled = false;
+                var detail = 'Piste ' + CivilisationService.NOM_PISTE[resultat.piste] + ' (Corrompue) : niveau ' +
+                  resultat.ancienNiveau + ' → ' + resultat.nouveauNiveau + ' (sans bénéfice de case).';
+                resolve({ detail: detail, piste: resultat.piste });
+              })
+              .catch(function (erreur) {
+                btnValider.disabled = false;
+                window.alert('Échec de l\'avancement : ' + erreur.message);
+              });
+          };
+          return;
         }
 
         function validerAvancementPiste_(piste, boutonDeclencheur) {

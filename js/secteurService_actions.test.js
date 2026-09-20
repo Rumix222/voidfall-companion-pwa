@@ -288,18 +288,20 @@ test('placerCorruption : passe corrompu à true', function () {
 
 // ---------------------------------------------------------------
 // majSecteur — correction manuelle libre (retour utilisateur 13-13/09/2026,
-// panneau détail de l'onglet Galaxie) : liste blanche des 5 champs
-// autorisés, AUCUNE validation de règle (même permissivité que
-// placerCorruption/retirerCorruption ci-dessus).
+// panneau détail de l'onglet Galaxie) : liste blanche des 6 champs
+// autorisés (nombreGardien ajouté le 20/09/2026, retour utilisateur :
+// resté en lecture seule dans le panneau détail), AUCUNE validation de
+// règle (même permissivité que placerCorruption/retirerCorruption
+// ci-dessus).
 // ---------------------------------------------------------------
 
-test('majSecteur : écrit les 5 champs autorisés en une seule fois', function () {
+test('majSecteur : écrit les 6 champs autorisés en une seule fois', function () {
   var db = creerDbFactice_();
-  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ population: 2, corrompu: false, pnNeant: 0, jetonPrime: 0, jetonLiberation: 0 });
+  db._stores.secteursPartie['p1|1'] = secteurDeBase_({ population: 2, corrompu: false, pnNeant: 0, jetonPrime: 0, jetonLiberation: 0, nombreGardien: 0 });
   var ctx = creerContexte_(db);
 
   return ctx.SecteurService.majSecteur('p1', 1, {
-    population: 5, corrompu: true, pnNeant: 3, jetonPrime: 2, jetonLiberation: 1
+    population: 5, corrompu: true, pnNeant: 3, jetonPrime: 2, jetonLiberation: 1, nombreGardien: 4
   }).then(function () {
     var secteur = db._stores.secteursPartie['p1|1'];
     assert.strictEqual(secteur.population, 5);
@@ -307,6 +309,7 @@ test('majSecteur : écrit les 5 champs autorisés en une seule fois', function (
     assert.strictEqual(secteur.pnNeant, 3);
     assert.strictEqual(secteur.jetonPrime, 2);
     assert.strictEqual(secteur.jetonLiberation, 1);
+    assert.strictEqual(secteur.nombreGardien, 4);
   });
 });
 

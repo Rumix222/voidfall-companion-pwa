@@ -157,6 +157,16 @@ var FocusEngine = (function () {
     // PAR_CLE_CONSTRUIRE_ ci-dessous).
     etablir_guilde_banquier: 'guilde',
     etablir_guilde_scientifique: 'guilde',
+    // Idem — 3 variantes manquantes repérées au catalogue (retour
+    // utilisateur 20/09/2026, Thegwyn/piste Gouvernement case 2 :
+    // "etablir_guilde_fermiers") : MÊME pattern que etablir_guilde_banquier
+    // ci-dessus (secteur libre + quantité 1, seul le type de Guilde est
+    // figé) — aucun mécanisme nouveau, la popup 'construire' gère déjà
+    // les 5 types de Guilde (strategieService.js, Fermiers/Ingénieurs/
+    // Mineurs/Banquiers/Scientifiques).
+    etablir_guilde_fermiers: 'guilde',
+    etablir_guilde_ingenieurs: 'guilde',
+    etablir_guilde_mineurs: 'guilde',
     // Même popup 'construire' (catégorie 'installation') que
     // construire_installation, type forcé — utilisées par gameService.js/
     // EFFET_TECHNOLOGIE_IMMEDIAT_ (Quais orbitaux/Bases Stellaires,
@@ -176,6 +186,9 @@ var FocusEngine = (function () {
   var TYPE_FORCE_PAR_CLE_CONSTRUIRE_ = {
     etablir_guilde_banquier: 'banquiers',
     etablir_guilde_scientifique: 'scientifiques',
+    etablir_guilde_fermiers: 'fermiers',
+    etablir_guilde_ingenieurs: 'ingenieurs',
+    etablir_guilde_mineurs: 'mineurs',
     construire_chantier_naval: 'chantier_naval',
     construire_base_stellaire: 'base_stellaire',
     construire_defense_secteur: 'defense_secteur'
@@ -222,12 +235,13 @@ var FocusEngine = (function () {
   // avancerPiste — voir son en-tête — jamais via resoudreCle_ : cette clé
   // n'apparaît d'ailleurs que sur une case déjà en cours d'avancement,
   // jamais comme effet Focus/Cadre à résoudre isolément). "avancer_
-  // civilisation_moins_avancee"/"avancer_piste_corrompue" restent hors
-  // périmètre : des fonctions dédiées existent (CivilisationService.
-  // avancerPisteMoinsAvancee/avancerPisteCorrompue) mais aucune popup
-  // Focus/Cadre n'est branchée dessus.
+  // civilisation_moins_avancee" ET "avancer_piste_corrompue" (retour
+  // utilisateur 20/09/2026, ex-hors périmètre) ont désormais elles aussi
+  // leur cas dédié ci-dessous, même famille — CivilisationService.
+  // avancerPisteMoinsAvancee/avancerPisteCorrompue, branchées sur cette
+  // MÊME popup 'avancer_civilisation'.
   var CLES_CIVILISATION_HORS_PERIMETRE = [
-    'avance_rapide', 'avancer_piste_corrompue'
+    'avance_rapide'
   ];
   // Clé Focus/Cadre -> piste imposée (identifiant CivilisationService.PISTES)
   // — absente pour "avancer_civilisation" (piste au choix, voir
@@ -280,7 +294,7 @@ var FocusEngine = (function () {
     { label: 'Gagnez 1 Énergie et 1 Science ou gagnez 1 Influence.', effet: { choice: [{ energie: 1, science: 1 }, { influence: 1 }] } },
     { label: 'Gagnez 1 Énergie et 1 Matériel ou gagnez 1 Influence.', effet: { choice: [{ energie: 1, materiel: 1 }, { influence: 1 }] } },
     { label: 'Gagnez 1 Matériel et 1 Science ou gagnez 1 Influence.', effet: { choice: [{ materiel: 1, science: 1 }, { influence: 1 }] } },
-    { label: 'Gagnez 1 ressource.', effet: { choice: [{ nourriture: 1 }, { energie: 1 }, { materiel: 1 }, { science: 1 }] } },
+    { label: 'Gagnez 1 ressource.', effet: { choice: [{ nourriture: 1 }, { energie: 1 }, { materiel: 1 }, { credit: 1 }, { science: 1 }] } },
     { label: 'Gagnez 1 Science et/ou 1 Influence.', effet: { choice: [{ science: 1 }, { influence: 1 }] }, inclusif: true }
   ];
 
@@ -311,7 +325,13 @@ var FocusEngine = (function () {
     // resoudreAction ci-dessous) — seul champ TABLEAU de cette liste,
     // d'où le passage de diffChamps_ à une comparaison par CONTENU
     // (JSON.stringify) plutôt que par référence, voir plus bas.
-    'actionsFocusUtilisees'
+    'actionsFocusUtilisees',
+    // Retour utilisateur 20/09/2026 : "gagner_commerce" incrémente
+    // désormais etat.jetonCommerce (voir resoudreCle_ ci-dessous) — sans
+    // cette entrée, la mutation restait invisible à diffChamps_ (comme
+    // actionsFocusUtilisees, comparaison par CONTENU nécessaire pour un
+    // tableau).
+    'jetonCommerce'
   ];
 
   // ------------------------------------------------------------
@@ -955,6 +975,31 @@ var FocusEngine = (function () {
       }, source, journal, demanderChoix);
     }
 
+    // --- Avancer sur la piste de Civilisation actuellement marquée
+    // Corrompue, SANS bénéfice de case (retour utilisateur 20/09/2026 —
+    // Focus Héroïque Tentation "S'atteler", focus.json id 110 :
+    // `{sans_benefice_case:true, avancer_piste_corrompue:1}`, un des
+    // "choice" du Focus) : Effet UNIQUEMENT (signe > 0). Réutilise la
+    // MÊME popup 'avancer_civilisation' que ci-dessus (contexte.
+    // corrompue:true) — CivilisationService.avancerPisteCorrompue calcule
+    // elle-même quelle piste est actuellement marquée Corrompue
+    // (déterministe, AUCUN choix de piste possible), avance son niveau et
+    // décoche "Corrompue", SANS jamais résoudre l'effet de la case (donc
+    // sans passer par demanderChoix pour un quelconque sous-choix) — le
+    // modificateur "sans_benefice_case" (CLES_MODIFICATEURS_SILENCIEUSES
+    // ci-dessus) est de toute façon purement informatif ici, c'est bien
+    // avancerPisteCorrompue elle-même qui ne résout aucun effet de case.
+    // Jusqu'ici listée dans CLES_CIVILISATION_HORS_PERIMETRE (repli
+    // générique non traduit, ni implémenté). ---
+    if (cle === 'avancer_piste_corrompue' && signe > 0) {
+      return demanderChoixEtJournaliser_({
+        type: 'avancer_civilisation',
+        corrompue: true,
+        source: source,
+        partieId: etat.partieId
+      }, source, journal, demanderChoix);
+    }
+
     // --- Améliorer un jeton Gloire : Effet UNIQUEMENT (signe > 0). Aucun
     // choix utilisateur — cible TOUJOURS le jeton Gloire de plus petite
     // valeur parmi ceux posés sur la fiche Maison (règle : incrémente d'1,
@@ -1242,12 +1287,23 @@ var FocusEngine = (function () {
       return tourPromise;
     }
 
-    // --- Bonus Commerce : le joueur choisit 1 des 6 bonus fixes, résolu
-    // récursivement (peut lui-même contenir choice/choice_repeat). ---
+    // --- Gagner un jeton Commerce : incrémente etat.jetonCommerce (le
+    // compteur physique, retour utilisateur 20/09/2026 — manquait depuis
+    // la mise en place initiale de ce cas) PUIS fait choisir au joueur 1
+    // des 6 Bonus Commerce fixes, résolu récursivement (peut lui-même
+    // contenir choice/choice_repeat) — les 2 se produisent ensemble : on
+    // garde le jeton physique (dépensable plus tard, docs-rules-cycle-
+    // de-jeu.md §1.4 "vous ne pouvez pas le retourner le tour où vous le
+    // gagnez, mais vous pouvez le dépenser") ET son bonus immédiat.
+    // MÊME ordre mutation-puis-sous-résolution que resoudreGainJetonsPrime_
+    // ci-dessus : si le Bonus Commerce choisi a lui-même un sous-choix
+    // annulé, tout est défait ensemble (clone jamais commité, voir
+    // resoudreJson_). ---
     if (cle === 'gagner_commerce') {
       var optionsLabels = BONUS_COMMERCE.map(function (b) { return b.label; });
       return Promise.resolve(demanderChoix({ type: 'bonus_commerce', options: optionsLabels, source: source })).then(function (reponse) {
         if (reponseAnnulee_(reponse)) return false;
+        etat.jetonCommerce = (Array.isArray(etat.jetonCommerce) ? etat.jetonCommerce : []).concat('disponible');
         var bonus = BONUS_COMMERCE[reponse.indexChoisi];
         return resoudreJsonInterne_(bonus.effet, signe, source + ' (Bonus Commerce)', bonus.label, etat, journal, demanderChoix);
       });
