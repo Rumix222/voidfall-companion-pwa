@@ -102,6 +102,20 @@ var SetupService = (function () {
   }
 
   /**
+   * Libellé d'une <option> de maison déchue — "Nom (Techno 1 / Techno 2)"
+   * (retour utilisateur 20/09/2026 : "souvent je connais les technos mais
+   * ne me souviens pas du nom des maisons") — repli sur le nom seul si la
+   * maison ou ses technologies sont introuvables dans maisonsCache.
+   */
+  function libelleOptionMaisonDechue_(nom) {
+    var maison = maisonsCache.filter(function (m) { return m.nom === nom; })[0];
+    var nomsTechnos = maison && Array.isArray(maison.technologies)
+      ? maison.technologies.map(function (t) { return t.nom; }).join(' / ')
+      : '';
+    return nomsTechnos ? nom + ' (' + nomsTechnos + ')' : nom;
+  }
+
+  /**
    * (Re)peuple les 4 <select> de maisons déchues, en excluant la maison du
    * joueur et les valeurs déjà choisies dans les 3 AUTRES selects, pour
    * empêcher les doublons. Conserve la sélection en cours de chaque select
@@ -125,7 +139,7 @@ var SetupService = (function () {
       }
 
       select.innerHTML = '<option value="">— Choisir —</option>' +
-        options.map(function (nom) { return '<option value="' + nom + '">' + nom + '</option>'; }).join('');
+        options.map(function (nom) { return '<option value="' + nom + '">' + libelleOptionMaisonDechue_(nom) + '</option>'; }).join('');
       select.value = valeurActuelle || '';
     });
   }

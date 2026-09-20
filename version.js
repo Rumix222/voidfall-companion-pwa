@@ -1,7 +1,17 @@
 /**
  * version.js
- * Version 168 — 2026-09-20
+ * Version 169 — 2026-09-20
  * Source de vérité unique pour la version de l'application.
+ *
+ * 20/09/2026 (suite, retour utilisateur : "souvent je connais les technos
+ * mais ne me souviens pas du nom des maisons") — écran "Créer une partie"
+ * (Partie déjà en cours), les 4 <select> "Maisons déchues" affichent
+ * désormais "Nom (Techno 1 / Techno 2)" au lieu du nom seul.
+ * `js/setupService.js` : nouvelle fonction `libelleOptionMaisonDechue_`
+ * (lit `maisonsCache`, déjà chargé avec `technologies: [{nom, ...}]` par
+ * GameService.obtenirMaisonsCatalogue), appelée par
+ * `peuplerSelectsMaisonsDechues_` à la place du nom brut. Repli sur le nom
+ * seul si la maison/ses technologies sont introuvables.
  *
  * 20/09/2026 (suite, retour utilisateur : effets d'Origine Marqualos non
  * implémentés, idCarte 25/26 — derniers de l'inventaire, 28/28) —
@@ -5940,4 +5950,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260920.5';
+var APP_VERSION = '20260920.6';
