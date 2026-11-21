@@ -1,0 +1,3616 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voidfall Companion</title>
+<meta name="theme-color" content="#0a0813">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Voidfall">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<a href="../" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);left:6px;z-index:9999;padding:2px 8px;border-radius:10px;background:rgba(13,15,26,.75);color:#9aa0b8;font:12px system-ui;text-decoration:none">⌂ JDS</a>
+<body>
+
+<div class="starfield"></div>
+<div class="nebula-glow"></div>
+
+<div id="app">
+
+  <header class="topbar">
+    <h1 id="topbar-titre" class="topbar-titre" title="Retour à l'accueil">Voidfall<span class="topbar-accent">Companion</span></h1>
+    <!-- Toggle "garder l'écran allumé" (Screen Wake Lock API) — discret,
+         toujours visible (header commun à tous les écrans), masqué si
+         l'API n'est pas supportée (ex. iOS < 16.4) plutôt que proposé sans
+         effet. Voir le script de câblage en bas de page. -->
+    <button id="btn-veille-ecran" class="btn-veille-ecran" type="button" aria-pressed="false" hidden>☕</button>
+  </header>
+
+  <!-- Barre visible uniquement pendant une partie ouverte. -->
+  <div id="barre-navigation-partie" class="barre-navigation-partie" hidden>
+    <nav id="nav-ecrans" class="nav-ecrans">
+      <button id="nav-mise-en-place" class="btn btn-toggle" data-nav="mise-en-place">Mise en<br>place</button>
+      <button id="nav-plateau-galactique" class="btn btn-toggle active" data-nav="plateau-galactique">Plateau<br>Galactique</button>
+      <button id="nav-plateau-maison" class="btn btn-toggle" data-nav="plateau-maison">Fiche<br>Maison</button>
+      <button id="nav-focus" class="btn btn-toggle" data-nav="focus">Focus</button>
+      <!-- "_secteurs" (retour utilisateur, 14/09/2026) : onglet MASQUÉ —
+           écran encore fonctionnel (#screen-secteurs, formulaire
+           "Rappeler un cube" notamment) mais remplacé côté navigation par
+           "Galaxie" ci-dessous (renommé "Secteurs", rendu hexagonal +
+           formulaire "Construire" désormais réunis là). Pour le
+           réafficher : retirer l'attribut `hidden` de ce bouton. -->
+      <button id="nav-secteurs" class="btn btn-toggle" data-nav="secteurs" hidden>_secteurs</button>
+      <button id="nav-galaxie" class="btn btn-toggle" data-nav="galaxie">Secteurs</button>
+      <button id="nav-combat" class="btn btn-toggle" data-nav="combat">Combat</button>
+    </nav>
+  </div>
+
+  <!-- Écran d'accueil -->
+  <section id="screen-home" class="screen">
+    <button id="btn-nouvelle-partie" class="btn btn-primary">Créer une partie</button>
+
+    <div class="setup-bloc" style="margin-top:24px;">
+      <label>Catalogue de jeu</label>
+      <button id="btn-sync-catalogue" class="btn btn-secondary" style="width:100%;">Synchroniser le catalogue</button>
+      <p class="hint" id="etat-catalogue" style="white-space:pre-line;margin-top:8px;"></p>
+    </div>
+
+    <div class="setup-bloc" id="bloc-parties-enregistrees">
+      <button id="btn-historique" class="btn btn-secondary" style="width:100%;">Historique des parties</button>
+    </div>
+
+    <p class="hint" id="etat-sw" style="text-align:center;"></p>
+    <p style="text-align:center;font-size:0.7rem;color:#4a4d5e;" id="version-app"></p>
+  </section>
+
+  <!-- Écran de création de partie -->
+  <section id="screen-setup" class="screen" hidden>
+    <h2 class="section-title">Nouvelle partie</h2>
+
+    <div class="setup-bloc" id="bloc-scenario">
+      <label for="select-scenario">Scénario</label>
+      <select id="select-scenario"></select>
+    </div>
+
+    <div class="mode-toggle">
+      <button id="mode-manuel" class="btn btn-toggle active" data-mode="manuel">Choix manuel</button>
+      <button id="mode-aleatoire" class="btn btn-toggle" data-mode="aleatoire">Choix aléatoire</button>
+    </div>
+
+    <div id="bloc-manuel" class="setup-bloc">
+      <label for="select-maison">Maison</label>
+      <select id="select-maison"></select>
+
+      <label class="case-mise-en-place-manuelle">
+        <input type="checkbox" id="check-mise-en-place-manuelle">
+        Partie déjà en cours
+      </label>
+
+      <div id="bloc-mise-en-place-manuelle" class="setup-bloc-imbrique" hidden>
+        <p class="hint">Renseigner les éléments de départ</p>
+
+        <label for="select-techno-depart-manuelle">Technologie de départ</label>
+        <select id="select-techno-depart-manuelle">
+          <option value="">— Choisissez une maison ci-dessus —</option>
+        </select>
+
+        <label class="label-section">Maisons déchues</label>
+        <select id="select-maison-dechue-0" class="select-maison-dechue" data-slot="0"></select>
+        <select id="select-maison-dechue-1" class="select-maison-dechue" data-slot="1"></select>
+        <select id="select-maison-dechue-2" class="select-maison-dechue" data-slot="2"></select>
+        <select id="select-maison-dechue-3" class="select-maison-dechue" data-slot="3"></select>
+
+        <label class="label-section">Technologies sans gain d'Influence (choisissez-en exactement 3)</label>
+        <p class="hint" id="compteur-sans-point">0 / 3 sélectionnée(s)</p>
+        <div id="liste-technologies-sans-point" class="liste-technologies-sans-point">
+          <p class="hint">Choisissez d'abord les 4 maisons déchues ci-dessus.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="bloc-aleatoire" class="setup-bloc" hidden>
+      <label for="select-complexite">Difficulté</label>
+      <select id="select-complexite"></select>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-retour-home" class="btn btn-secondary">Retour</button>
+      <button id="btn-lancer-partie" class="btn btn-primary">Lancer la partie</button>
+    </div>
+  </section>
+
+  <!-- Écran Mise en place : maisons déchues et leurs technologies (dont
+       celles sans gain d'Influence, badge-sans-point), et carte du
+       joueur (nom + Difficulté). Contenu figé à la création de partie
+       (creerPartie est le seul point d'écriture de partie.adversaires) :
+       rendu une seule fois depuis App.ouvrirPartie, jamais rafraîchi
+       ensuite — contrairement à Plat. Galactique/Plat. maison. -->
+  <section id="screen-mise-en-place" class="screen" hidden>
+    <h2 class="section-title">Votre maison</h2>
+    <div class="card card-joueur" id="carte-joueur"></div>
+
+    <h2 class="section-title" style="margin-top:22px;">Maisons déchues</h2>
+    <div class="card-list" id="liste-adversaires"></div>
+  </section>
+
+  <!-- Écran Plat. Galactique : cycle, événement galactique, Technologies
+       avancées, Focus héroïques, fin de cycle. renderEcranPlateauGalactique_/
+       renderEcranPlateauMaison_/renderEcranSecteurs_ sont des fonctions
+       privées de la fermeture App : un appel depuis un listener situé
+       dans une autre fermeture doit passer par l'alias public
+       App.renderPlateauGalactique/renderPlateauMaison/renderSecteurs,
+       jamais le nom privé, sous peine de ReferenceError silencieux.
+       #btn-terminer-partie reste caché en permanence dans le DOM (utile
+       uniquement pour que scoreVueService.js y attache son listener par
+       id, ouvrirEcranFin_) — il n'est déclenché que par programme, une
+       fois l'état "termine" atteint ; #btn-fin-cycle prend alors le
+       libellé "Terminer la partie" et le remplace visuellement.
+       Le titre "Cycle X" (.titre-cycle) et l'Entretien dû vivent dans un
+       bandeau d'en-tête (.plateau-galactique-entete) avec le bouton "Fin
+       du cycle" à droite — le titre de l'app (#topbar-titre, voir header
+       plus haut) sert de retour à l'accueil depuis n'importe quel onglet. -->
+  <section id="screen-plateau-galactique" class="screen" hidden>
+    <div class="plateau-galactique-entete">
+      <div>
+        <h2 class="titre-cycle">Cycle <span id="plateau-galactique-cycle">—</span></h2>
+        <p class="hint" id="entretien-secteurs"></p>
+      </div>
+      <button id="btn-fin-cycle" class="btn btn-primary">Fin du cycle</button>
+    </div>
+
+    <!-- Plateau Crise (light) — retour utilisateur (13/09/2026), voir
+         docs-rules-cycle-de-jeu.md §1.0.3 ("Plateau crise light à mettre
+         en place... pour avoir les données nécessaires à la résolution du
+         plateau crise, à la demande ou au début de la phase Évaluation").
+         Repliée par défaut (<details> sans `open`, zéro JS nécessaire) :
+         mécanique encore peu automatisée à ce stade (voir docs/TODO.md
+         EVOLUTION 21 — hésitation notée sur un futur bouton "Résoudre le
+         Plateau Crise"/un onglet dédié selon ce que les Crises impliquent
+         réellement). Rendu par App.renderPlateauGalactique_/
+         renderPlateauCrise_ (index.html), champs simples persistés
+         directement via GameService.majPlateauMaison/payerCoutCrise
+         (js/gameService.js). -->
+    <details id="bloc-plateau-crise" style="margin-bottom:22px;">
+      <summary class="section-title" style="cursor:pointer;">Plateau Crise</summary>
+      <div class="game-block">
+        <div class="plateau-influence">
+          <button id="btn-escarmouche-standalone" class="btn btn-secondary btn-sm">Escarmouche</button>
+          <span class="crise-modificateur-champ">
+            <label for="crise-modificateur-escarmouche">Modificateur</label>
+            <input type="number" step="1" min="0" max="4" class="ressource-case-input" id="crise-modificateur-escarmouche" value="0">
+          </span>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:16px;">Coût à payer</h3>
+        <div class="crise-cout-ligne">
+          <span class="crise-cout-item" style="--couleur-ressource:#ec0d69;"><span class="pastille-ressource"></span>M
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-materiel" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#f8a21b;"><span class="pastille-ressource"></span>E
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-energie" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#06afe5;"><span class="pastille-ressource"></span>S
+            <input type="number" step="1" min="0" max="2" class="ressource-case-input-sm" id="crise-cout-science" value="0"></span>
+          <span class="crise-cout-item" style="--couleur-ressource:#d1a671;"><span class="pastille-ressource"></span>C
+            <input type="number" step="1" min="0" max="4" class="ressource-case-input-sm" id="crise-cout-credit" value="0"></span>
+        </div>
+        <div class="crise-cout-ligne" style="margin-top:10px;">
+          <button id="btn-crise-payer" class="btn btn-secondary btn-sm">Payer</button>
+          <span id="crise-payer-confirmation" class="hint" style="color:var(--color-coral);opacity:0;transition:opacity 0.25s;">✓ Payé</span>
+          <span class="crise-cout-item" style="margin-left:auto;"><span class="losange-argente"></span>
+            <input type="number" step="3" min="0" max="18" class="ressource-case-input-sm" id="crise-cout-influence" value="0"></span>
+        </div>
+
+        <div class="plateau-influence" style="margin-top:16px;">
+          <label for="crise-perpetuelle">Crise perpétuelle</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="crise-perpetuelle" value="0">
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:18px;">Objectifs galactiques (aide au calcul)</h3>
+        <div class="plateau-influence">
+          <label for="crise-jetons-catastrophe">Jetons Catastrophes</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="crise-jetons-catastrophe" value="0">
+        </div>
+        <div class="plateau-influence">
+          <label for="crise-technologies-consommees">Technologies consumées</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="crise-technologies-consommees" value="0">
+        </div>
+        <div class="plateau-influence">
+          <label for="evenement-corruptions-conservees">Corruptions conservées ce Cycle (Cadre "Le visage du mal")</label>
+          <input type="number" step="1" min="0" class="ressource-case-input" id="evenement-corruptions-conservees" value="0">
+        </div>
+        <label class="check-amelioree"><input type="checkbox" id="check-focus-prefere-en-defausse"> Un Focus préféré est dans ma défausse</label>
+      </div>
+    </details>
+
+    <!-- Sélection de l'événement galactique du cycle en cours
+         (GameService.getEvenementsParCycle/choisirEvenement). Le détail
+         (#evenement-cycle-detail) affiche les Cadres (moitié gauche de la
+         carte, §1.5 docs-rules-cycle-de-jeu.md) puis les Objectifs
+         (moitié droite, §3.3), rendus séparément par
+         renderEvenementCycle_/renderCadresEvenement_/renderObjectifsEvenement_. -->
+    <h2 class="section-title section-title-avec-suffixe">
+      <span>Événement galactique</span>
+      <span class="section-title-suffixe" id="plateau-galactique-manches"></span>
+    </h2>
+    <div class="game-block" id="bloc-evenement-cycle" hidden>
+      <select id="select-evenement-cycle">
+        <option value="">— Choisir —</option>
+      </select>
+      <div id="evenement-cycle-detail" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- 4 emplacements — listes déroulantes au cycle 1 (choix parmi les 8
+         technologies des maisons déchues), texte fixe aux cycles 2 (les 4
+         choisies) et 3 (les 4 autres, complément calculé) — voir
+         App.renderTechnologiesAvancees_ (index.html) et
+         GameService.obtenirTechnologiesAvanceesGroupes (gameService.js).
+         Lecture seule ici : la case "Améliorée" vit sur la section
+         "Technologies obtenues" de Plat. maison (#technologies-obtenues-liste),
+         où elle n'est cochable que si la technologie choisie dans la ddl
+         fait partie du groupe actif du cycle en cours
+         (GameService.obtenirTechnologiesAvanceesGroupes(partie).actif) —
+         voir renderTechnologiesObtenues_ plus bas. -->
+    <h2 class="section-title" style="margin-top:22px;">Technologies avancées</h2>
+    <div class="game-block" id="bloc-technologies-avancees">
+      <div id="technologies-avancees-liste"></div>
+    </div>
+
+    <!-- renderFocusHeroiques_ (js/strategieService.js) rend un <select>
+         par emplacement, aligné sur le même gabarit .techno-obtenue-ligne
+         que "Technologies avancées" juste au-dessus. -->
+    <h2 class="section-title" style="margin-top:22px;">Focus héroïques</h2>
+    <div class="game-block">
+      <div id="plateau-galactique-focus-heroiques"></div>
+    </div>
+
+    <!-- Offre publique de Programme — 4 emplacements fixes (1 par type),
+         chacun une carte à révéler (aléatoire du jeu physique, non
+         modélisé — simple <select> dans tout le catalogue de ce type) +
+         une case Corrompu. Persiste tel quel jusqu'à ce que le Programme
+         soit pris par le joueur (GameService.gagnerProgramme retire alors
+         l'entrée correspondante) — voir renderOffreProgrammes_. -->
+    <h2 class="section-title" style="margin-top:22px;">Offre Programmes</h2>
+    <div class="game-block" id="bloc-offre-programmes">
+      <div id="offre-programmes-liste"></div>
+    </div>
+
+    <!-- Refuges (§3, docs-rules-corruption-gardiens-refuges-technoConsume.md)
+         — retour utilisateur (14/09/2026) : section persistante (pas un
+         <details> replié comme Plateau Crise ci-dessus) affichant les
+         tuiles du scénario en cours (GameService.obtenirConfigRefuges) et
+         2 des 3 déclencheurs (bouton manuel "2 surproductions" + Niveau 4
+         de piste) — le 3e (secteur Pur 6 Pop/3 Guildes) vit dans la popup
+         Phase Évaluation (strategieService.js/texteRefugesPhaseEval_),
+         recalculé à chaque Cycle comme les Objectifs galactiques. Rendu
+         par App.renderRefuges_. -->
+    <h2 class="section-title" style="margin-top:22px;">Refuges</h2>
+    <div class="game-block" id="bloc-refuges">
+      <div id="refuges-liste"></div>
+    </div>
+
+    <button id="btn-terminer-partie" class="btn btn-secondary" style="width:100%;margin-top:14px;" hidden>Terminer la partie</button>
+  </section>
+
+
+  <!-- Écran Plat. maison : Ressources / Jetons et cubes de puissance
+       navale / Pistes de Civilisation / Technologies / Influence, dans
+       cet ordre. Rendu par js/strategieService.js, qui cible chaque
+       conteneur par id (StrategieService.afficher() est indépendant de
+       l'écran qui contient physiquement chaque bloc — comme pour les
+       Focus héroïques sur Plat. Galactique). Pas de boutons globaux
+       "Avancer la moins avancée"/"Avancer la piste Corrompue" sur cet
+       écran (décision produit) — CivilisationService.
+       avancerPisteMoinsAvancee/avancerPisteCorrompue restent disponibles
+       pour un futur pont Focus -> Civilisation. Technologies obtenues :
+       5 emplacements + la Technologie de départ (fixe) = 6 technologies
+       max au total. #technologie-depart-plateau-maison est un texte fixe
+       (la Technologie de départ est choisie une fois à la création de
+       partie via setupService.js, jamais modifiable ensuite) — seule sa
+       case "Améliorée" est interactive. -->
+  <section id="screen-plateau-maison" class="screen" hidden>
+    <!-- Compétence de Maison (retour utilisateur 14/09/2026, texte fourni
+         depuis le livret physique) — data/catalogue/maisons.json, champ
+         `effet` (GameService.formatMaison_) : AFFICHAGE SEULEMENT, aucune
+         des 10 compétences (sur 14 maisons — 4 "de base" n'en ont pas)
+         n'est automatisée. Voir renderMaisonEffet_, index.html. -->
+    <details id="bloc-maison-details" open>
+      <summary class="section-title section-title-avec-suffixe" style="cursor:pointer;">
+        <span id="titre-maison-effet">Maison</span>
+        <span id="icone-maison-capacite" class="icone-capacite-maison" hidden title="Capacité spéciale — à ne pas oublier">★</span>
+      </summary>
+      <div class="game-block" id="bloc-maison-effet"></div>
+    </details>
+
+    <h2 class="section-title" style="margin-top:22px;">Ressources</h2>
+    <div class="game-block" id="bloc-ressources">
+      <div class="ressources-liste" id="ressources-principales"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Jetons et cubes de puissance navale</h2>
+    <div class="game-block" id="bloc-jetons-cubes">
+      <div class="ressources-jetons" id="ressources-jetons"></div>
+      <div class="ressources-gloire" id="ressources-gloire"></div>
+      <div class="ressources-liste ressources-cubes" id="ressources-cubes"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Pistes de Civilisation</h2>
+    <div class="game-block" id="bloc-pistes-civilisation">
+      <div class="pistes-civilisation-liste" id="pistes-civilisation-liste"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Technologies</h2>
+    <div class="game-block" id="bloc-technologie-depart">
+      <div class="techno-obtenue-ligne">
+        <span class="champ-technologie-fixe" id="technologie-depart-plateau-maison">—</span>
+        <label class="check-amelioree"><input type="checkbox" id="check-amelioree-depart"> Améliorée</label>
+      </div>
+      <!-- Retour utilisateur (14/09/2026) : "je préférerais que ce champ
+           corruption chambre de décontamination apparaisse au niveau de la
+           technologie concernée" — remplace l'ancien 4e champ conditionnel
+           de la grille "Jetons et cubes de puissance navale". Affiché
+           seulement si la Technologie de départ EST Chambres de
+           décontamination (voir renderEcranPlateauMaison_) ; sinon
+           l'équivalent s'affiche à l'emplacement "obtenues" concerné (voir
+           renderTechnologiesObtenues_) — jamais les deux à la fois, une
+           Technologie n'occupe qu'un seul emplacement. -->
+      <div class="plateau-influence" id="chambre-decontamination-depart-ligne" style="margin-top:8px;" hidden>
+        <label>Corruption</label>
+        <input type="number" step="1" min="0" class="ressource-case-input" id="chambre-decontamination-depart-input">
+      </div>
+    </div>
+    <div class="game-block" id="bloc-technologies-obtenues" style="margin-top:10px;">
+      <div id="technologies-obtenues-liste"></div>
+    </div>
+
+    <!-- Plateau Programme (4 emplacements fixes de la fiche Maison) —
+         emplacement 0 : Programme de départ (data/catalogue/
+         programmesDepart.json, identifié par `code`, jamais Corrompu),
+         emplacements 1-3 remplis via le bouton "Utiliser" d'un Programme
+         "en main" (écran Focus) — voir GameService.utiliserProgramme.
+         Les 4 lignes partagent le même gabarit visuel depuis le retour
+         utilisateur (28/08/2026) "Afficher le programme de départ comme
+         les autres, pas dans un cadre, 0 - devant" — voir
+         renderProgrammesPlateauMaison_ ci-dessous. -->
+    <h2 class="section-title" style="margin-top:22px;">Programmes</h2>
+    <div class="game-block" id="bloc-programmes-plateau">
+      <div id="programmes-plateau-liste"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Corruption maison et influence</h2>
+    <div class="game-block" id="plateau-influence-bloc"></div>
+  </section>
+
+  <!-- Écran Fin de partie : score final + calcul de l'Influence du Néant.
+       Le calcul faisant foi est fait côté ScoreService.enregistrerFinDePartie ;
+       le total affiché ici pendant la saisie n'est qu'un aperçu (voir
+       scoreVueService.js). -->
+  <section id="screen-fin" class="screen" hidden>
+    <h2 class="section-title">Fin de partie</h2>
+
+    <div class="setup-bloc">
+      <label for="fin-score-final">Score final du joueur</label>
+      <span class="field-auto">pré-rempli depuis l'Influence (Plat. maison), à vérifier</span>
+      <input type="number" id="fin-score-final" placeholder="Score total">
+    </div>
+
+    <h2 class="section-title">Influence du Néant</h2>
+    <p class="hint">Renseignez les éléments encore en jeu pour calculer l'Influence finale du Néant dans la galaxie.</p>
+
+    <div class="setup-bloc">
+      <label for="influence-difficulte">Influence de base (selon difficulté choisie)</label>
+      <select id="influence-difficulte">
+        <option value="">— Choisir —</option>
+        <option value="60">60</option>
+        <option value="100">100</option>
+        <option value="140">140</option>
+      </select>
+    </div>
+
+    <div id="influence-champs" class="form-grid"></div>
+
+    <div class="card total-influence">
+      <p>Influence totale du Néant</p>
+      <h3 id="influence-total">0</h3>
+    </div>
+
+    <div class="setup-actions">
+      <button id="btn-retour-fin" class="btn btn-secondary">Retour</button>
+      <button id="btn-enregistrer-fin" class="btn btn-primary">Enregistrer</button>
+    </div>
+  </section>
+
+  <!-- Écran Focus (le module qui le rend garde le nom historique
+       js/strategieService.js — rendu par id, indépendant de l'écran qui
+       contient chaque conteneur) : Actions réalisées (Annuler + journal)
+       / Listes de focus / bandeau permanent de rappel des ressources.
+       #focus-rappel-ressources : bandeau fixe en bas d'écran (position:
+       fixed, voir css/style.css), affiche Nourriture/Énergie/Matériel/
+       Crédit/Science/Cube actif en chiffres colorés (mêmes couleurs que
+       les pastilles de coût des cartes Focus — couleurCout_/abregeCout_,
+       js/strategieService.js). Rendu par renderRappelRessources_, appelée
+       depuis afficher() ; mis à jour en direct par l'input Stock des
+       ressources principales (Plat. maison, #ressources-principales) via
+       majRappelRessourceAffiche_ — même mécanisme que majDeltaAffiche_.
+       Cube actif n'a pas de saisie directe sur cet écran (modifié
+       uniquement par les actions Focus/Secteurs) : rafraîchi seulement à
+       chaque afficher(), comme le reste de l'écran. -->
+  <section id="screen-focus" class="screen" hidden>
+    <h2 class="section-title">Actions réalisées</h2>
+    <div class="bloc-annulation">
+      <button id="btn-annuler-action" class="btn btn-secondary" disabled>Annuler la dernière action</button>
+      <span class="bloc-annulation-compteur" id="annulation-compteur"></span>
+    </div>
+    <div class="game-block" id="bloc-journal" style="margin-top:14px;">
+      <div class="ressources-journal" id="ressources-journal"></div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Listes de focus</h2>
+    <div class="game-block" id="bloc-focus-joueur">
+      <div class="card-list" id="strategie-focus-joueur" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Programmes obtenus par le joueur (plateauMaison.programme1-4) —
+         nom + les 2 Focus liés + l'action de Programme (règle fixe par
+         type, voir GameService.INFO_PROGRAMME_PAR_TYPE), bouton Utiliser
+         en stub (résolution de l'action = Phase 3, non traitée). Voir
+         renderProgrammesEnMain_, js/strategieService.js. -->
+    <h2 class="section-title" style="margin-top:22px;">Programmes en main</h2>
+    <div class="game-block" id="bloc-programmes-main">
+      <div class="card-list" id="programmes-main-liste" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Détail jouable des Focus héroïques choisis pour le cycle en cours
+         (sélection faite sur l'écran Plat. Galactique) — voir
+         renderFocusHeroiquesJoueur_, js/strategieService.js. Bloc entier
+         masqué tant qu'aucun Focus héroïque n'est choisi pour ce cycle
+         (ou partie terminée). -->
+    <div id="bloc-focus-heroiques-joueur" hidden style="margin-top:22px;">
+      <h2 class="section-title">Focus héroïques</h2>
+      <div class="game-block" id="bloc-focus-heroiques-joueur-liste">
+        <div class="card-list" id="focus-heroiques-joueur" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+    </div>
+
+    <div class="rappel-ressources-footer" id="focus-rappel-ressources"></div>
+  </section>
+
+  <!-- Écran Secteurs — tableau minimal, pas encore de plateau visuel -->
+  <!-- "_secteurs" (retour utilisateur, 14/09/2026) : écran MASQUÉ de la
+       navigation (voir #nav-secteurs plus haut, hidden) mais toujours
+       fonctionnel — seul point d'entrée restant pour "Rappeler un cube"
+       (SecteurService.rappelerCube), qui n'a PAS été basculé sur l'écran
+       Galaxie/Secteurs ci-dessous (seuls les formulaires D'AJOUT
+       Installation/Guilde l'ont été). Pour le réafficher dans la nav :
+       retirer l'attribut `hidden` du bouton #nav-secteurs. -->
+  <section id="screen-secteurs" class="screen" hidden>
+    <h2 class="section-title">Plateau des secteurs</h2>
+    <div class="game-block" style="overflow-x:auto;" id="secteurs-conteneur"></div>
+
+    <div class="game-block" id="bloc-rappeler-cube" style="margin-top:14px;">
+      <h3 class="subsection-title">Rappeler un cube</h3>
+      <select id="rappel-secteur"></select>
+      <select id="rappel-type" style="margin-top:8px;"></select>
+      <button id="btn-rappeler-cube" class="btn btn-secondary" style="width:100%;margin-top:10px;">Rappeler</button>
+    </div>
+  </section>
+
+  <!-- Écran "Secteurs" (renommé, retour utilisateur 14/09/2026 — remplace
+       l'ancien onglet "Secteurs" ci-dessus, désormais masqué) : rendu
+       hexagonal visuel du plateau (port de poc-rendu-secteurs.html/
+       poc-rendu-secteurs-notes.md — voir js/secteurVueService.js pour le
+       détail des choix structurants : coordonnées (q,r) reconstruites à
+       la main pour le scénario solo_1 uniquement, orientation figée,
+       emplacements Installation/Guilde génériques reconstitués à partir
+       des compteurs réels de secteursPartie). Le formulaire "Construire"
+       (ajout Installation/Guilde) vit désormais ICI, en bas — seul
+       "Rappeler un cube" reste sur l'écran "_secteurs" ci-dessus. -->
+  <section id="screen-galaxie" class="screen" hidden>
+    <div id="galaxie-conteneur" class="galaxie-plateau"></div>
+    <div id="galaxie-detail" class="galaxie-detail">
+      <h3>Détail</h3>
+      <div class="vide">Sélectionnez un secteur ci-dessus.</div>
+    </div>
+
+    <h2 class="section-title" style="margin-top:22px;">Ajout Guildes et Installations</h2>
+    <div class="game-block" id="bloc-construire">
+      <select id="construire-categorie">
+        <option value="installation">Installation</option>
+        <option value="guilde">Guilde</option>
+      </select>
+      <select id="construire-secteur" style="margin-top:8px;"></select>
+      <select id="construire-type" style="margin-top:8px;"></select>
+      <button id="btn-construire" class="btn btn-primary" style="width:100%;margin-top:10px;">Construire</button>
+    </div>
+  </section>
+
+  <!-- Écran Combat : calculateur Envahir/Escarmouche (voir combatService.js
+       en-tête — la persistance des conséquences sur les secteurs reste
+       hors périmètre, ce n'est qu'un calculateur pour l'instant). -->
+  <section id="screen-combat" class="screen" hidden>
+    <h2 class="section-title">Simulation combat</h2>
+
+    <div class="mode-toggle">
+      <button id="mode-envahir" class="btn btn-toggle active" data-mode-combat="envahir">Envahir</button>
+      <button id="mode-escarmouche" class="btn btn-toggle" data-mode-combat="escarmouche">Escarmouche</button>
+    </div>
+
+    <div class="combat-colonnes">
+      <div class="combat-colonne">
+        <h3 class="subsection-title">Attaquant</h3>
+        <div id="combat-champs-attaquant"></div>
+      </div>
+      <div class="combat-colonne">
+        <h3 class="subsection-title">Défenseur</h3>
+        <div id="combat-champs-defenseur"></div>
+      </div>
+    </div>
+
+    <div class="combat-actions">
+      <button id="btn-simuler-combat" class="btn btn-primary">Simuler</button>
+      <button id="btn-details-combat" class="btn btn-secondary">Détails</button>
+    </div>
+
+    <div id="combat-resultat" class="combat-resultat"></div>
+  </section>
+
+  <!-- Écran Historique — liste enrichie (événements, technologies,
+       vainqueur), reprendre/archiver/supprimer par partie + suppression
+       en masse des parties non archivées (voir historiqueVueService.js). -->
+  <section id="screen-historique" class="screen" hidden>
+    <h2 class="section-title">Historique des parties</h2>
+    <button id="btn-supprimer-non-archivees" class="btn btn-danger" style="width:100%;margin-bottom:12px;">Tout supprimer (parties non archivées)</button>
+    <div id="liste-historique" class="card-list"></div>
+    <div class="setup-actions">
+      <button id="btn-retour-historique" class="btn btn-secondary">Retour</button>
+    </div>
+  </section>
+
+  <!-- Modale de choix (popup) pour les coûts/effets Focus impliquant un
+       choix du joueur — pilotée par js/strategieService.js
+       (StrategieService.demanderChoix), passée à FocusEngine.resoudreAction. -->
+  <div id="modal-choix" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="modal-choix-titre">Choix</h3>
+      <div id="modal-choix-contenu"></div>
+      <div class="modal-actions">
+        <button id="modal-choix-annuler" class="btn btn-secondary">Annuler</button>
+        <button id="modal-choix-valider" class="btn btn-primary" hidden>Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feuille d'action — rendu alternatif de StrategieService.demanderChoix
+       (bottom sheet iPhone-first), utilisé UNIQUEMENT pour le Focus
+       Conquête Standard (voir StrategieService.CARTE_EN_FEUILLE_,
+       maquette-cartes-focus/variante-c-feuille.html pour la maquette
+       d'origine et l'écran Test pour le POC branché sur un état factice).
+       Toute autre carte continue d'utiliser #modal-choix ci-dessus,
+       inchangé. -->
+  <div id="feuille-scrim" class="feuille-scrim" hidden></div>
+  <div id="feuille" class="feuille">
+    <div id="feuille-grabber-zone" class="feuille-grabber-zone">
+      <div class="feuille-grabber"></div>
+    </div>
+    <div class="feuille-tete">
+      <button type="button" class="feuille-retour" id="feuille-retour" hidden>← Retour</button>
+      <h3 class="feuille-titre" id="feuille-titre">Titre</h3>
+      <div class="feuille-etapes" id="feuille-etapes" hidden></div>
+    </div>
+    <div class="feuille-corps" id="feuille-corps">
+      <div class="feuille-corps-inner" id="feuille-corps-inner"></div>
+    </div>
+    <div class="feuille-pied" id="feuille-pied">
+      <button type="button" class="btn btn-primary" id="feuille-valider">Valider</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="version.js"></script>
+<script src="js/db.js"></script>
+<script src="js/catalogueSync.js"></script>
+<script src="js/secteurService.js"></script>
+<script src="js/focusService.js"></script>
+<script src="js/gameService.js"></script>
+<script src="js/focusEngine.js"></script>
+<script src="js/annulationService.js"></script>
+<script src="js/civilisationService.js"></script>
+<script src="js/combatService.js"></script>
+<script src="js/programmeScoreService.js"></script>
+<script src="js/scoreService.js"></script>
+<script src="js/setupService.js"></script>
+<script src="js/objectifsService.js"></script>
+<script src="js/strategieService.js"></script>
+<script src="js/secteurVueService.js"></script>
+<script src="js/combatVueService.js"></script>
+<script src="js/scoreVueService.js"></script>
+<script src="js/historiqueVueService.js"></script>
+<script>
+  /**
+   * index.html (script inline) : orchestration des écrans et de la
+   * navigation (App), modale de choix générique, et rendu DOM des écrans
+   * Plat. Galactique / Mise en place / Plat. maison / Secteurs /
+   * Historique. La logique de jeu pure vit dans js/*Service.js (voir
+   * CLAUDE.md, table des fichiers).
+   */
+  var App = (function () {
+    var partieCourante = null;
+
+    /**
+     * Bascule l'écran visible par data-nav. Rafraîchit en plus, au clic
+     * sur l'onglet correspondant, l'écran Combat (CombatVueService.afficher,
+     * vaisseaux disponibles) et l'écran Secteurs (renderEcranSecteurs_) —
+     * filet de sécurité générique pour ces deux écrans, dont l'état peut
+     * changer sans passer par un rappel explicite de rendu (voir Piège n°2,
+     * CLAUDE.md). Les rappels explicites déjà en place après chaque action
+     * (jouerAction_, appliquerCadre*EtRafraichir_) restent nécessaires pour
+     * les autres écrans, et pour Secteurs quand il est déjà affiché au
+     * moment de l'action.
+     */
+    function afficherEcran(nom) {
+      document.querySelectorAll('.screen').forEach(function (ecran) {
+        ecran.hidden = (ecran.id !== 'screen-' + nom);
+      });
+      // Retour utilisateur 20/09/2026 : la barre de rappel ressources
+      // (bandeau bas de l'écran Focus, .rappel-ressources-footer) doit
+      // rester visible même quand une popup (#modal-choix ou la Feuille)
+      // s'ouvre par-dessus — voir css/style.css, règles
+      // `body.ecran-focus-actif .modal-overlay`/`.feuille` (réservent la
+      // hauteur du bandeau) + le z-index du bandeau lui-même (au-dessus
+      // des popups). Cette classe est le seul signal CSS disponible pour
+      // savoir quel écran est actif depuis #modal-choix/#feuille, tous
+      // deux hors de la section .screen concernée.
+      document.body.classList.toggle('ecran-focus-actif', nom === 'focus');
+      var boutonsNav = document.querySelectorAll('#nav-ecrans .btn-toggle');
+      boutonsNav.forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.nav === nom);
+      });
+      if (nom === 'combat' && partieCourante && typeof CombatVueService !== 'undefined') {
+        CombatVueService.afficher(partieCourante);
+      }
+      if (nom === 'secteurs' && partieCourante) {
+        renderEcranSecteurs_(partieCourante);
+      }
+      if (nom === 'galaxie' && partieCourante) {
+        if (typeof SecteurVueService !== 'undefined') SecteurVueService.afficher(partieCourante);
+        // Formulaire "Ajout Guildes et Installations" (retour utilisateur,
+        // 14/09/2026 — basculé depuis l'ancien écran "Secteurs", désormais
+        // masqué) : renderFormulaireConstruire_ SEUL (pas tout
+        // renderEcranSecteurs_, qui reconstruirait aussi #secteurs-conteneur/
+        // "Rappeler un cube", restés sur l'écran masqué, pour rien).
+        renderFormulaireConstruire_(partieCourante);
+      }
+    }
+
+    function getPartieCourante() { return partieCourante; }
+
+    /**
+     * Recharge partieCourante depuis IndexedDB (source de vérité après
+     * une action Focus jouée/annulée, qui écrit directement en base sans
+     * passer par cette variable en mémoire) et retourne la partie
+     * fraîche. N'affiche rien elle-même — voir StrategieService pour le
+     * rafraîchissement de l'écran Stratégie après coup.
+     */
+    function rafraichirPartieCourante() {
+      if (!partieCourante) return Promise.resolve(null);
+      return GameService.obtenirPartie(partieCourante.id).then(function (partie) {
+        partieCourante = partie;
+        return partie;
+      });
+    }
+
+    function champTexte_(id, texte) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = texte;
+    }
+
+    // `cle` : identifiant unique du badge dans l'écran (index maison +
+    // index technologie) — retour utilisateur : "ajouter les textes des
+    // technologies au clic également dans l'onglet Mise en place, afin
+    // de pouvoir les consulter avant de faire une action" (le `title`
+    // seul, hover uniquement, est peu utilisable au doigt sur mobile).
+    // `title` conservé en plus (bonus desktop, sans coût).
+    function badgeTechnologie_(t, cle) {
+      var cliquable = !!t.texte;
+      var classe = 'badge' + (t.sansPoint ? ' badge-sans-point' : '') + (cliquable ? ' badge-cliquable' : '');
+      var titre = (t.texte || '').replace(/"/g, '&quot;');
+      return '<span class="' + classe + '"' + (cliquable ? ' data-tech-badge="' + cle + '"' : '') + ' title="' + titre + '">' + t.nom + '</span>';
+    }
+
+    /**
+     * Texte de tooltip pour une technologie (case "Améliorée", Plat.
+     * maison) — texteAmeliore si la case est cochée ET que le catalogue en
+     * fournit un, sinon le texte de base. `infosTech` peut être `null`
+     * (technologie non trouvée dans le catalogue local, ex. partie créée
+     * avant l'ajout de ce champ).
+     */
+    function titreTechnologie_(infosTech, amelioree) {
+      if (!infosTech) return '';
+      return (amelioree && infosTech.texteAmeliore) ? infosTech.texteAmeliore : (infosTech.texte || '');
+    }
+
+    /**
+     * #btn-fin-cycle affiche "Terminer la partie" au cycle 3 (et à l'état
+     * "termine") — #btn-terminer-partie reste caché en permanence, ce
+     * libellé le remplace visuellement. Le clic garde le même comportement
+     * (voir listener plus bas) : avancerCycle, puis déclenchement
+     * programmatique de #btn-terminer-partie une fois l'état "termine"
+     * atteint.
+     */
+    function renderEcranPlateauGalactique_(partie) {
+      champTexte_('plateau-galactique-cycle', String(partie.cycleActuel));
+      var btnFinCycle = document.getElementById('btn-fin-cycle');
+      if (btnFinCycle) {
+        var dernierCycle = (partie.cycleActuel === 3 || partie.cycleActuel === 'termine');
+        btnFinCycle.textContent = dernierCycle ? 'Terminer la partie' : 'Fin du cycle';
+      }
+      renderPlateauCrise_(partie);
+      renderEvenementCycle_(partie);
+      renderTechnologiesAvancees_(partie);
+      renderOffreProgrammes_(partie);
+      renderRefuges_(partie);
+      chargerEntretien_(partie);
+    }
+
+    /**
+     * Plateau Crise (light, retour utilisateur 13/09/2026) — 9 compteurs
+     * manuels simples (voir GameService.CHAMPS_PLATEAU_MAISON_AUTORISES
+     * pour le détail de chacun), persistés un par un à l'`onchange`
+     * (même pattern que #corruption-maison-input/#influence-maison-input,
+     * renderEcranPlateauMaison_ plus bas) — clamp manuel (min/max HTML
+     * seuls n'empêchent pas une saisie hors bornes au clavier). Le bouton
+     * "Payer" délègue entièrement à GameService.payerCoutCrise (décrémente
+     * les VRAIES ressources/Influence puis remet les 5 compteurs de coût
+     * à 0, transaction unique) — cette fonction se contente de rafraîchir
+     * l'affichage ensuite (#ressources-principales/le bandeau Focus vivent
+     * sur Plat. maison, StrategieService.afficher() les couvre).
+     *
+     * Sous-section "Objectifs galactiques" (13/09/2026, suite) : 2 des 9
+     * compteurs (jetonsCatastrophePlateauCrise/corruptionsConservees) +
+     * 1 case à cocher (focusPrefereEnDefausse) n'ont AUCUN rapport avec
+     * la résolution du Plateau Crise elle-même — regroupés ici par
+     * commodité (même mécanisme de persistance manuelle, aucun autre
+     * écran dédié) : ils débloquent 3 des lignes d'Objectifs galactiques
+     * (§3.3) qui dépendaient d'un état physique jamais modélisé ailleurs
+     * dans l'appli, lus par ObjectifsService.evaluerCondition/
+     * COMPTEURS_PAR_ via StrategieService.construireContexteObjectifs_.
+     */
+    var CHAMPS_CRISE_SIMPLES_ = [
+      { id: 'crise-modificateur-escarmouche', champ: 'criseModificateurEscarmouche', min: 0, max: 4 },
+      { id: 'crise-cout-materiel', champ: 'criseCoutMateriel', min: 0, max: 2 },
+      { id: 'crise-cout-energie', champ: 'criseCoutEnergie', min: 0, max: 2 },
+      { id: 'crise-cout-science', champ: 'criseCoutScience', min: 0, max: 2 },
+      { id: 'crise-cout-credit', champ: 'criseCoutCredit', min: 0, max: 4 },
+      { id: 'crise-cout-influence', champ: 'criseCoutInfluence', min: 0, max: 18 },
+      { id: 'crise-perpetuelle', champ: 'crisePerpetuelle', min: 0, max: null },
+      // Chantier "Objectifs galactiques", lignes hors périmètre restantes
+      // (13/09/2026) — voir GameService.CHAMPS_PLATEAU_MAISON_AUTORISES
+      // pour le détail de chacun ; même principe manuel que
+      // crisePerpetuelle ci-dessus.
+      { id: 'crise-jetons-catastrophe', champ: 'jetonsCatastrophePlateauCrise', min: 0, max: null },
+      { id: 'evenement-corruptions-conservees', champ: 'corruptionsConservees', min: 0, max: null },
+      // EVOLUTION 35 (todo.md) : suivi manuel des Technologies consumées
+      // (docs-rules-corruption-gardiens-refuges-technoConsume.md §3), sert
+      // au calcul des points du Néant en fin de partie (ScoreService.BAREME
+      // .technologiesConsommees) — pré-rempli sur l'écran Fin de partie
+      // (ScoreService.calculerCompteursAutomatiques), champ laissé
+      // modifiable comme les autres compteurs automatisables.
+      { id: 'crise-technologies-consommees', champ: 'technologiesConsommees', min: 0, max: null }
+    ];
+    function renderPlateauCrise_(partie) {
+      var pm = partie.plateauMaison || {};
+
+      CHAMPS_CRISE_SIMPLES_.forEach(function (info) {
+        var input = document.getElementById(info.id);
+        if (!input) return;
+        input.value = pm[info.champ] || 0;
+        input.onchange = function () {
+          var n = Math.max(info.min, Math.floor(Number(input.value) || 0));
+          if (info.max !== null) n = Math.min(info.max, n);
+          input.value = n;
+          var champs = {};
+          champs[info.champ] = n;
+          GameService.majPlateauMaison(partie.id, champs)
+            .then(function () { partie.plateauMaison[info.champ] = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              input.value = pm[info.champ] || 0;
+            });
+        };
+      });
+
+      var checkFocusPrefereEnDefausse = document.getElementById('check-focus-prefere-en-defausse');
+      if (checkFocusPrefereEnDefausse) {
+        checkFocusPrefereEnDefausse.checked = !!pm.focusPrefereEnDefausse;
+        checkFocusPrefereEnDefausse.onchange = function () {
+          var v = checkFocusPrefereEnDefausse.checked;
+          GameService.majPlateauMaison(partie.id, { focusPrefereEnDefausse: v })
+            .then(function () { partie.plateauMaison.focusPrefereEnDefausse = v; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              checkFocusPrefereEnDefausse.checked = !!pm.focusPrefereEnDefausse;
+            });
+        };
+      }
+
+      // Bouton "Escarmouche" (chantier "Escarmouche + Plateau Crise",
+      // 14/09/2026, retour utilisateur) — Alerte Guerre (§2.3.3) ou tout
+      // autre moment : ouvre la popup 'escarmouche_standalone'
+      // (StrategieService.demanderChoix) qui cible/simule/persiste SANS
+      // paiement (déjà couvert par les compteurs `criseCout*`/"Payer"
+      // ci-dessus) — répétable à volonté, aucun flag "résolu".
+      var btnEscarmoucheStandalone = document.getElementById('btn-escarmouche-standalone');
+      if (btnEscarmoucheStandalone) {
+        btnEscarmoucheStandalone.onclick = function () {
+          if (typeof StrategieService === 'undefined' || !StrategieService.demanderChoix) return;
+          btnEscarmoucheStandalone.disabled = true;
+          GameService.calculerPuissanceNeantDefaut(partie.id)
+            .then(function (puissanceDefaut) {
+              return StrategieService.demanderChoix({
+                type: 'escarmouche_standalone', partieId: partie.id, puissanceNeant: puissanceDefaut
+              });
+            })
+            .then(function (resultat) {
+              btnEscarmoucheStandalone.disabled = false;
+              if (!resultat || resultat.annule) return;
+              partieCourante = resultat.partie;
+              renderPlateauCrise_(resultat.partie);
+              App.renderSecteurs(resultat.partie);
+              StrategieService.afficher(resultat.partie);
+            })
+            .catch(function (erreur) {
+              btnEscarmoucheStandalone.disabled = false;
+              window.alert('Échec de la résolution de l\'Escarmouche : ' + erreur.message);
+            });
+        };
+      }
+
+      var btnPayer = document.getElementById('btn-crise-payer');
+      if (btnPayer) {
+        btnPayer.onclick = function () {
+          btnPayer.disabled = true;
+          GameService.payerCoutCrise(partie.id)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              renderPlateauCrise_(partieMaj);
+              if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+              btnPayer.disabled = false;
+              // Retour visuel (retour utilisateur, 14/09/2026 : "le clic
+              // sur le bouton payer manque de retour visuel") — le
+              // paiement est quasi instantané (IndexedDB local), le seul
+              // signal .disabled ci-dessus passe donc inaperçu. "✓ Payé"
+              // apparaît brièvement à côté du bouton (fondu CSS, voir
+              // #crise-payer-confirmation).
+              var confirmation = document.getElementById('crise-payer-confirmation');
+              if (confirmation) {
+                confirmation.style.opacity = '1';
+                setTimeout(function () { confirmation.style.opacity = '0'; }, 1400);
+              }
+            })
+            .catch(function (erreur) {
+              btnPayer.disabled = false;
+              window.alert('Échec du paiement du Plateau Crise : ' + erreur.message);
+            });
+        };
+      }
+    }
+
+    /**
+     * Écran "Mise en place" : rendu une seule fois depuis App.ouvrirPartie,
+     * jamais rafraîchi après coup (contenu figé à la création de partie —
+     * voir en-tête de screen-mise-en-place, index.html). Les technologies
+     * des maisons déchues sont affichées en badges (badge-sans-point pour
+     * celles qui ne rapportent pas d'Influence) plutôt qu'en simple liste
+     * de noms, pour garder visible l'information la plus utile de cet
+     * écran. Retour utilisateur : le nom cliquable révèle son texte en
+     * dessous (même gabarit .programme-detail-texte que Programmes/
+     * Technologies obtenues) — permet de consulter le texte AVANT de
+     * jouer une action qui gagnerait cette Technologie (Focus Innovation
+     * "Inventer", popup 'gagner_technologie'), pas seulement une fois
+     * obtenue.
+     */
+    function renderEcranMiseEnPlace_(partie) {
+      var joueur = partie.joueur || {};
+      document.getElementById('carte-joueur').innerHTML =
+        '<h3>' + (joueur.nom || '?') + '</h3>' +
+        (joueur.complexite ? '<p>Difficulté : ' + joueur.complexite + '</p>' : '');
+
+      var adversaires = partie.adversaires || [];
+      var container = document.getElementById('liste-adversaires');
+
+      // Champ brut "immediat" absent de partie.adversaires[].technologies[]
+      // (formatMaison_, gameService.js, ne garde que nom/type/texte/
+      // texteAmeliore) — fetch séparé pour le rappel "Effet immédiat",
+      // même principe que la popup 'gagner_technologie' (strategieService.js).
+      var immediatParNomPromise = (typeof DB !== 'undefined')
+        ? DB.getAll('technologies').then(function (catalogue) {
+            var parNom = {};
+            catalogue.forEach(function (t) { parNom[t.nom] = t.immediat; });
+            return parNom;
+          }).catch(function () { return {}; })
+        : Promise.resolve({});
+
+      immediatParNomPromise.then(function (immediatParNom) {
+        container.innerHTML = adversaires.map(function (m, indexMaison) {
+          var technologies = (m.technologies || []).map(function (t, indexTech) {
+            return badgeTechnologie_(t, indexMaison + '-' + indexTech);
+          }).join('');
+          var details = (m.technologies || []).map(function (t, indexTech) {
+            var texteEffetImmediat = (typeof StrategieService !== 'undefined')
+              ? StrategieService.texteEffetImmediatTechnologie(immediatParNom[t.nom])
+              : '';
+            var lignes = [];
+            if (t.texte) lignes.push(t.texte);
+            if (texteEffetImmediat) lignes.push('Effet immédiat : ' + texteEffetImmediat);
+            if (!lignes.length) return '';
+            return '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + indexMaison + '-' + indexTech + '" hidden>' +
+              lignes.map(function (l) { return '<p>' + l + '</p>'; }).join('') + '</div>';
+          }).join('');
+          return '<div class="card"><h3>' + m.nom + '</h3>' +
+            (technologies ? '<div>' + technologies + '</div>' + details : '') +
+            '</div>';
+        }).join('') || '<p class="hint">Aucune maison déchue enregistrée.</p>';
+
+        Array.prototype.forEach.call(container.querySelectorAll('.badge-cliquable'), function (badge) {
+          badge.addEventListener('click', function () {
+            var cible = container.querySelector('[data-tech-detail-cible="' + badge.dataset.techBadge + '"]');
+            if (cible) cible.hidden = !cible.hidden;
+          });
+        });
+      });
+    }
+
+    /**
+     * Affiche ce que GameService.obtenirTechnologiesAvanceesGroupes
+     * retourne (seule source de vérité pour le calcul du groupe actif) :
+     * cycle 1, 4 <select>, choix parmi le pool complet (8 technologies
+     * des maisons déchues + la Technologie de départ du joueur — voir
+     * GameService.technologiesAdversesToutes_ ; un même nom ne peut
+     * occuper 2 emplacements — filtré côté options, revalidé côté
+     * GameService) ; cycle 2, les 4 choisies, texte fixe ; cycle 3, les
+     * AUTRES du pool (complément, jamais choisi manuellement), texte
+     * fixe. Pas de case "Améliorée" ici (lecture seule) : elle vit sur la
+     * case "Améliorée" de la section "Technologies obtenues" (Plat.
+     * maison, 5 ddl) ET sur celle de la Technologie de départ (même
+     * écran) — voir renderTechnologiesObtenues_/renderEcranPlateauMaison_
+     * plus bas, qui relisent GameService.obtenirTechnologiesAvanceesGroupes
+     * (partie).actif (même source de vérité que cette fonction) pour
+     * savoir si la technologie concernée est actuellement améliorable.
+     */
+    function renderTechnologiesAvancees_(partie) {
+      var container = document.getElementById('technologies-avancees-liste');
+      if (!container) return;
+      var cycle = partie.cycleActuel;
+      var groupes = GameService.obtenirTechnologiesAvanceesGroupes(partie);
+
+      if (cycle === 1) {
+        container.innerHTML = [0, 1, 2, 3].map(function (slot) {
+          var actuel = groupes.groupeA[slot];
+          var prisAilleurs = groupes.groupeA
+            .filter(function (t, i) { return i !== slot && t; })
+            .map(function (t) { return t.nom; });
+          var options = groupes.toutes.filter(function (t) { return prisAilleurs.indexOf(t.nom) === -1; });
+          var optionsHtml = '<option value="">— Choisir —</option>' + options.map(function (t) {
+            return '<option value="' + t.nom + '"' + (actuel && actuel.nom === t.nom ? ' selected' : '') + '>' +
+              t.nom + '</option>';
+          }).join('');
+          return '<div class="techno-obtenue-ligne">' +
+            '<select class="select-technologie-avancee" data-slot="' + slot + '">' + optionsHtml + '</select>' +
+            '</div>';
+        }).join('');
+
+        Array.prototype.forEach.call(container.querySelectorAll('.select-technologie-avancee'), function (select) {
+          select.onchange = function () {
+            var slot = Number(select.dataset.slot);
+            select.disabled = true;
+            GameService.choisirTechnologieAvancee(partie.id, slot, select.value)
+              .then(function (partieMaj) {
+                partieCourante = partieMaj;
+                renderTechnologiesAvancees_(partieMaj);
+              })
+              .catch(function (erreur) {
+                select.disabled = false;
+                window.alert('Échec du choix de la technologie avancée : ' + erreur.message);
+              });
+          };
+        });
+        return;
+      }
+
+      var groupeAffiche = cycle === 2 ? groupes.groupeA : groupes.groupeB;
+      if (!groupeAffiche.filter(Boolean).length) {
+        container.innerHTML = '<p class="hint">Aucune technologie avancée disponible' +
+          (cycle === 3 ? ' (complète les 4 choix du cycle 1 pour les voir apparaître ici).' : '.') + '</p>';
+        return;
+      }
+
+      container.innerHTML = groupeAffiche.map(function (t) {
+        if (!t) return '<div class="techno-obtenue-ligne"><span class="champ-technologie-fixe hint">— non choisi —</span></div>';
+        return '<div class="techno-obtenue-ligne">' +
+          '<span class="champ-technologie-fixe">' + t.nom + '</span>' +
+          '</div>';
+      }).join('');
+    }
+
+    /**
+     * Compétence de Maison (retour utilisateur 14/09/2026, texte exact
+     * fourni depuis le livret physique) — data/catalogue/maisons.json,
+     * champ `effet` (GameService.formatMaison_/joueur.effet) : AFFICHAGE
+     * SEULEMENT, aucune des 10 compétences (sur 14 maisons — 4 "de base"
+     * confirmées sans capacité spéciale) n'est automatisée à ce stade.
+     * Paragraphes séparés par "\n\n" dans le catalogue -> une balise
+     * &lt;p&gt; chacun (plusieurs compétences ont 2 effets distincts, ex.
+     * Shiveus désavantage Escarmouche + bonus Influence).
+     */
+    function renderMaisonEffet_(partie) {
+      var conteneur = document.getElementById('bloc-maison-effet');
+      if (!conteneur) return;
+      var joueur = partie.joueur || {};
+      var nomMaison = joueur.nom || '—';
+
+      // Retour utilisateur (14/09/2026) : le nom de la Maison vit
+      // désormais dans le TITRE de la section ("Maison Belitan", plus
+      // besoin de le répéter en <h3> dans le bloc) ; l'icône ★ (masquée
+      // sinon) rappelle qu'une capacité existe même quand la section est
+      // repliée (nouveau <details>, voir index.html).
+      var titre = document.getElementById('titre-maison-effet');
+      if (titre) titre.textContent = 'Maison ' + nomMaison;
+      var icone = document.getElementById('icone-maison-capacite');
+      if (icone) icone.hidden = !joueur.effet;
+
+      if (!joueur.effet) {
+        conteneur.innerHTML = '<p class="hint" style="margin:0;">Aucune capacité spéciale (maison de base).</p>';
+        return;
+      }
+      conteneur.innerHTML = joueur.effet.split('\n\n').map(function (p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
+    }
+
+    /**
+     * Écran "Plat. maison" : Technologie de départ (+ case Améliorée) et
+     * Influence. #check-amelioree-depart est un élément STATIQUE du DOM
+     * (index.html), pas régénéré à chaque rendu — d'où l'usage de
+     * .onchange plutôt que addEventListener (idempotent d'un appel à
+     * l'autre, jamais de listener dupliqué), même pattern que
+     * renderEvenementCycle_/renderTechnologiesObtenues_ plus bas.
+     *
+     * Retour utilisateur (19/09/2026, correction d'une erreur de règle du
+     * 13/09/2026) : la Technologie avancée correspondant à la Technologie
+     * de départ du joueur ne fait PAS partie de l'offre "Technologies
+     * avancées" de Plat. Galactique (GameService.technologiesAdversesToutes_
+     * — les 8 des maisons déchues UNIQUEMENT) — donc PAS gatée par
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif comme
+     * les 5 emplacements "Technologies obtenues" ci-dessous. C'est la
+     * SEULE Technologie améliorable dès le cycle 1 (mécanisme indépendant
+     * du cycle 1→2→3 de l'offre Plat. Galactique, docs-rules-cycle-de-jeu.md
+     * §1.2) : case déverrouillée dès que la Technologie de départ existe,
+     * sans condition de cycle ni de groupe actif.
+     */
+    // Retour utilisateur (14/09/2026) : le champ manuel "Corruption sur la
+    // Technologie Chambres de décontamination" (jeton simple,
+    // plateauMaison.corruptionChambreDecontamination) s'affiche désormais
+    // à l'emplacement de la Technologie elle-même (départ ou l'un des 5
+    // "obtenues") plutôt que dans la grille "Jetons et cubes de puissance
+    // navale" (ancien 4e champ conditionnel, retiré de renderJetons_,
+    // strategieService.js). Comparaison insensible à la casse/aux espaces,
+    // même principe que StrategieService.nomsTechnologiesJoueur_.
+    function estTechnologieChambresDecontamination_(nom) {
+      return (nom || '').trim().toLowerCase() === 'chambres de décontamination';
+    }
+
+    function renderEcranPlateauMaison_(partie) {
+      renderMaisonEffet_(partie);
+
+      var joueur = partie.joueur || {};
+      var techDepart = joueur.technologieDepart || {};
+      var infosTechDepart = (joueur.technologies || []).filter(function (t) { return t.nom === techDepart.nom; })[0] || null;
+      var influence = ((partie.plateauMaison || {}).ressources || {}).influence || 0;
+      var corruptionMaison = (partie.plateauMaison || {}).corruptionMaison || 0;
+
+      var elTechDepart = document.getElementById('technologie-depart-plateau-maison');
+      if (elTechDepart) {
+        elTechDepart.textContent = techDepart.nom ?
+          techDepart.nom + (techDepart.type ? ' (' + techDepart.type + ')' : '') : '—';
+        elTechDepart.title = titreTechnologie_(infosTechDepart, techDepart.amelioree);
+      }
+
+      var ligneChambreDepart = document.getElementById('chambre-decontamination-depart-ligne');
+      if (ligneChambreDepart) {
+        var estChambreDepart = estTechnologieChambresDecontamination_(techDepart.nom);
+        ligneChambreDepart.hidden = !estChambreDepart;
+        var inputChambreDepart = document.getElementById('chambre-decontamination-depart-input');
+        if (estChambreDepart && inputChambreDepart) {
+          var corruptionChambreDepart = (partie.plateauMaison || {}).corruptionChambreDecontamination || 0;
+          inputChambreDepart.value = corruptionChambreDepart;
+          inputChambreDepart.onchange = function () {
+            var n = Math.max(0, Math.floor(Number(inputChambreDepart.value) || 0));
+            inputChambreDepart.value = n;
+            GameService.majPlateauMaison(partie.id, { corruptionChambreDecontamination: n })
+              .then(function () { partie.plateauMaison.corruptionChambreDecontamination = n; })
+              .catch(function (erreur) {
+                window.alert('Échec de l\'enregistrement : ' + erreur.message);
+                inputChambreDepart.value = corruptionChambreDepart;
+              });
+          };
+        }
+      }
+
+      // Bloc "Corruption" (plateauMaison.corruptionMaison) à gauche
+      // d'Influence — champs numériques modifiables (Corruption mise à
+      // jour automatiquement par CivilisationService.definirCorruption
+      // pour les pistes de Civilisation, à ajuster manuellement ici pour
+      // les Programmes/Chambres de décontamination ; Influence mise à
+      // jour automatiquement par les actions Focus/Cadres, à ajuster
+      // manuellement ici pour tout ce que l'app n'automatise pas —
+      // notamment l'évaluation des Objectifs galactiques/Programme,
+      // hors périmètre, voir docs-rules-cycle-de-jeu.md §3.3/3.4).
+      // Régénéré à chaque rendu comme le reste de cet écran — voir Piège
+      // n°2, CLAUDE.md.
+      document.getElementById('plateau-influence-bloc').innerHTML =
+        '<div class="plateau-influence-ligne">' +
+        '<div class="plateau-influence"><label><span class="losange-corail"></span> Corruption</label>' +
+        '<input type="number" step="1" min="0" class="ressource-case-input" id="corruption-maison-input" value="' + corruptionMaison + '"></div>' +
+        '<div class="plateau-influence"><label><span class="losange-argente"></span> Influence</label>' +
+        '<input type="number" step="1" min="0" class="ressource-case-input" id="influence-maison-input" value="' + influence + '"></div>' +
+        '</div>';
+
+      var inputCorruptionMaison = document.getElementById('corruption-maison-input');
+      if (inputCorruptionMaison) {
+        inputCorruptionMaison.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputCorruptionMaison.value) || 0));
+          inputCorruptionMaison.value = n;
+          GameService.majPlateauMaison(partie.id, { corruptionMaison: n })
+            .then(function () { partie.plateauMaison.corruptionMaison = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputCorruptionMaison.value = corruptionMaison;
+            });
+        };
+      }
+
+      var inputInfluenceMaison = document.getElementById('influence-maison-input');
+      if (inputInfluenceMaison) {
+        inputInfluenceMaison.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputInfluenceMaison.value) || 0));
+          inputInfluenceMaison.value = n;
+          GameService.majPlateauMaison(partie.id, { influence: n })
+            .then(function () { partie.plateauMaison.ressources.influence = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputInfluenceMaison.value = influence;
+            });
+        };
+      }
+
+      var checkboxDepart = document.getElementById('check-amelioree-depart');
+      if (checkboxDepart) {
+        checkboxDepart.checked = !!techDepart.amelioree;
+        checkboxDepart.disabled = !techDepart.nom;
+        checkboxDepart.onchange = function () {
+          var etatDemande = checkboxDepart.checked;
+          checkboxDepart.disabled = true;
+          GameService.definirTechnologieAmelioree(partie.id, 'depart', etatDemande)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              checkboxDepart.disabled = false;
+              if (elTechDepart) elTechDepart.title = titreTechnologie_(infosTechDepart, etatDemande);
+            })
+            .catch(function (erreur) {
+              checkboxDepart.checked = !etatDemande;
+              checkboxDepart.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        };
+      }
+
+      renderTechnologiesObtenues_(partie);
+      renderProgrammesPlateauMaison_(partie);
+    }
+
+    /**
+     * 5 emplacements de technologies obtenues (parmi les 8 des maisons
+     * déchues), chacun avec sa case "Améliorée". Avec la Technologie de
+     * départ (fixe, #bloc-technologie-depart), cela fait 6 technologies
+     * maximum au total.
+     *
+     * Lecture seule (retour utilisateur, chantier "résolution des
+     * Technologies") : la Technologie de chaque emplacement n'est PLUS
+     * choisie manuellement ici (ancien <select>, supprimé) — elle est
+     * gagnée via une action (Focus Innovation "Inventer", ou une case de
+     * Piste de Civilisation), voir GameService.gagnerTechnologieEtResoudreEffet
+     * (popup 'gagner_technologie', strategieService.js), qui persiste
+     * directement le bon emplacement (le premier libre). Nom cliquable
+     * pour révéler son texte (texteAmeliore si la case "Améliorée" est
+     * cochée et que le catalogue en fournit un, sinon le texte de base) —
+     * même gabarit que .programme-nom-toggle/.programme-detail-texte
+     * (renderProgrammesPlateauMaison_ plus bas), attributs data-tech-*
+     * propres pour rester indépendant de ce dernier.
+     *
+     * La case "Améliorée" reste ici (mécanique DISTINCTE de l'acquisition
+     * elle-même — améliore une Technologie déjà obtenue, quel que soit
+     * son moyen d'obtention) : verrouillée/déverrouillée selon
+     * GameService.obtenirTechnologiesAvanceesGroupes(partie).actif (liste
+     * de noms — les 4 technologies choisies au cycle 1 pendant le cycle 2,
+     * les 4 autres pendant le cycle 3, aucune au cycle 1 ni à l'état
+     * 'termine' — même source de vérité que Plat. Galactique,
+     * renderTechnologiesAvancees_ ci-dessus). Verrouillée dans tous les
+     * cas si l'emplacement est vide, ou si la technologie qui l'occupe
+     * n'est pas dans le groupe actif du cycle en cours.
+     */
+    function renderTechnologiesObtenues_(partie) {
+      var container = document.getElementById('technologies-obtenues-liste');
+      if (!container) return;
+
+      var toutesLesTechs = [];
+      (partie.adversaires || []).forEach(function (m) {
+        (m.technologies || []).forEach(function (t) { toutesLesTechs.push(t); });
+      });
+      var obtenues = (partie.technologiesObtenues || [null, null, null, null, null]).slice(0, 5);
+      var nomsAmeliorables = GameService.obtenirTechnologiesAvanceesGroupes(partie).actif;
+      var infosTechParNom = {};
+      toutesLesTechs.forEach(function (t) { infosTechParNom[t.nom] = t; });
+
+      var corruptionChambre = (partie.plateauMaison || {}).corruptionChambreDecontamination || 0;
+
+      container.innerHTML = obtenues.map(function (tech, slot) {
+        var infosTech = tech ? (infosTechParNom[tech.nom] || null) : null;
+        var texteDetail = infosTech ? titreTechnologie_(infosTech, tech.amelioree) : '';
+        var libelle = tech ? (tech.nom + (tech.maison ? ' (' + tech.maison + ')' : '')) : '— Vide —';
+        var verrouillee = !tech || nomsAmeliorables.indexOf(tech.nom) === -1;
+        var titreAmelioree = texteDetail.replace(/"/g, '&quot;');
+        // Voir estTechnologieChambresDecontamination_ (renderEcranPlateauMaison_
+        // ci-dessus) — même champ manuel que la Technologie de départ,
+        // affiché ici si c'est CET emplacement qui la possède.
+        var estChambreObtenue = tech && estTechnologieChambresDecontamination_(tech.nom);
+        return '<div class="techno-obtenue-ligne">' +
+          '<span class="champ-technologie-fixe' + (texteDetail ? ' programme-nom-toggle' : '') + '" data-tech-detail="' + slot + '">' + libelle + '</span>' +
+          '<label class="check-amelioree" title="' + titreAmelioree + '"><input type="checkbox" class="check-amelioree-obtenue" data-slot="' + slot + '"' +
+          (tech && tech.amelioree ? ' checked' : '') + (verrouillee ? ' disabled' : '') + '> Améliorée</label>' +
+          '</div>' +
+          (texteDetail ? '<div class="programme-detail-texte hint hint-inline" data-tech-detail-cible="' + slot + '" hidden><p>' + texteDetail + '</p></div>' : '') +
+          (estChambreObtenue
+            ? '<div class="plateau-influence" style="margin-top:4px;margin-bottom:8px;"><label>Corruption</label>' +
+              '<input type="number" step="1" min="0" class="ressource-case-input chambre-decontamination-obtenue-input" value="' + corruptionChambre + '"></div>'
+            : '');
+      }).join('');
+
+      var inputChambreObtenue = container.querySelector('.chambre-decontamination-obtenue-input');
+      if (inputChambreObtenue) {
+        inputChambreObtenue.onchange = function () {
+          var n = Math.max(0, Math.floor(Number(inputChambreObtenue.value) || 0));
+          inputChambreObtenue.value = n;
+          GameService.majPlateauMaison(partie.id, { corruptionChambreDecontamination: n })
+            .then(function () { partie.plateauMaison.corruptionChambreDecontamination = n; })
+            .catch(function (erreur) {
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+              inputChambreObtenue.value = corruptionChambre;
+            });
+        };
+      }
+
+      Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
+        nomEl.addEventListener('click', function () {
+          var cible = container.querySelector('[data-tech-detail-cible="' + nomEl.dataset.techDetail + '"]');
+          if (cible) cible.hidden = !cible.hidden;
+        });
+      });
+
+      Array.prototype.forEach.call(container.querySelectorAll('.check-amelioree-obtenue'), function (cb) {
+        cb.addEventListener('change', function () {
+          var slot = Number(cb.dataset.slot);
+          var etatDemande = cb.checked;
+          cb.disabled = true;
+          GameService.definirTechnologieAmelioree(partie.id, slot, etatDemande)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              cb.disabled = false;
+              var tech = obtenues[slot];
+              var texteMaj = tech ? titreTechnologie_(infosTechParNom[tech.nom] || null, etatDemande) : '';
+              if (cb.parentElement) cb.parentElement.title = texteMaj;
+              // Panneau détail (data-tech-detail-cible, pas juste le
+              // tooltip) mis à jour aussi, sans re-render complet — évite
+              // de refermer le panneau si l'utilisateur l'avait ouvert
+              // avant de cocher "Améliorée".
+              var panneauDetail = container.querySelector('[data-tech-detail-cible="' + slot + '"]');
+              if (panneauDetail && texteMaj) panneauDetail.innerHTML = '<p>' + texteMaj + '</p>';
+            })
+            .catch(function (erreur) {
+              cb.checked = !etatDemande;
+              cb.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        });
+      });
+    }
+
+    /**
+     * Plateau Programme (Plat. maison, Phase 3+) — 4 emplacements fixes
+     * (partie.plateauMaison.programmesUtilises, voir
+     * GameService.programmesUtilisesParDefaut_), rendus depuis le retour
+     * utilisateur (28/08/2026) "Afficher le programme de départ comme
+     * les autres, pas dans un cadre, 0 - devant, l'entretien aligné avec
+     * les autres" comme 4 lignes `.programme-plateau-item` IDENTIQUES
+     * (préfixe "N. ", toggle "Entretien" au même endroit) :
+     * - Emplacement 0, Programme de départ — rempli à la création de
+     *   partie par GameService.creerPartie (data/catalogue/
+     *   programmesDepart.json, cherché par maison+technologie de départ,
+     *   voir obtenirProgrammeDepart_) : `{code, entretienActif, corrompu:
+     *   false, depart:true}` — identifié par `code` (pas de `nom`, ces
+     *   Programmes n'en ont pas, décision utilisateur), jamais un
+     *   <select> (jamais rechoisi manuellement). Affiche ses objectifs +
+     *   bonus de Production éventuel, un toggle "Entretien", AUCUNE case
+     *   "Corrompu" (l'emplacement de départ ne peut jamais être
+     *   Corrompu — docs-rules-programmes-FocusPrefere-
+     *   ConsulterEvenement.md §1). `null`/désactivé si la recherche
+     *   catalogue a échoué à la création (catalogue non synchronisé) ou
+     *   pour une partie créée avant ce câblage.
+     * - Emplacements 1-3, remplis via GameService.utiliserProgramme
+     *   (bouton "Utiliser", écran Focus — jamais choisis ici, donc nom en
+     *   texte fixe comme la Technologie de départ ci-dessus, PAS un
+     *   <select>) : nom + type, toggle "Entretien" (ACTIF par défaut dès
+     *   l'arrivée du Programme sur le plateau depuis le même retour
+     *   utilisateur — voir GameService.utiliserProgramme ; actif = +2 à
+     *   l'Entretien dû, voir chargerEntretien_) et case "Corrompu"
+     *   (ajuste corruptionMaison de ±1 au clic) — écriture directe via
+     *   GameService.majPlateauMaison (tableau entier reconstruit en
+     *   mémoire, lecture-fusion-écriture côté client, même principe que
+     *   #corruption-maison-input ci-dessus).
+     */
+    function renderProgrammesPlateauMaison_(partie) {
+      var container = document.getElementById('programmes-plateau-liste');
+      if (!container) return;
+
+      var slots = Array.isArray(partie.plateauMaison && partie.plateauMaison.programmesUtilises)
+        ? partie.plateauMaison.programmesUtilises
+        : [null, null, null, null];
+
+      Promise.all([DB.getAll('programmes'), DB.getAll('programmesDepart'), StrategieService.calculerPointsProgrammesActifs(partie)]).then(function (resultats) {
+        var catalogue = resultats[0];
+        var catalogueDepart = resultats[1];
+        // Chantier "Points de victoire des Programmes" : { [emplacement]:
+        // ... }. Emplacements 1/2/3 (32 cartes programmes.json) :
+        // {objectif1, objectif2, total, code, nom}. Emplacement 0
+        // (Programme de départ, 28 cartes programmesDepart.json pertinentes,
+        // forme différente — voir js/programmeScoreService.js) :
+        // {lignes:[...], total, code} — `lignes` même longueur/ordre que
+        // carteDepart.objectifs ci-dessous, `total` peut être NÉGATIF
+        // (malus Corruption sur certaines cartes). Affiché en "+N"/"−N" à
+        // côté de chaque objectif (pointsProgrammes[index] peut être
+        // absent si l'emplacement est vide ou le code introuvable).
+        var pointsProgrammes = resultats[2] || {};
+        var parNom = {};
+        catalogue.forEach(function (p) { parNom[p.nom] = p; });
+        var parCode = {};
+        catalogueDepart.forEach(function (p) { parCode[p.code] = p; });
+
+        // Retour utilisateur (28/08/2026) : "Afficher le programme de
+        // départ comme les autres, pas dans un cadre, 0 - devant,
+        // l'entretien aligné avec les autres" — les 4 emplacements
+        // (0 = départ, 1-3 = obtenus) partagent désormais EXACTEMENT le
+        // même gabarit `.programme-plateau-item`/`.techno-obtenue-ligne`.
+        // Seules différences réelles pour l'emplacement 0 : identifié par
+        // `code` (pas `nom`), catalogue programmesDepart.json (`objectifs`
+        // tableau + `pointsProgrammes[0].lignes`, pas objectif1/objectif2),
+        // et AUCUNE case "Corrompu" — l'emplacement de départ ne peut
+        // jamais être Corrompu (docs-rules-programmes-FocusPrefere-
+        // ConsulterEvenement.md §1 : "Votre emplacement de départ [...] ne
+        // peut pas être Corrompu."), contrairement aux emplacements 1-3.
+        var lignesProgrammes = [0, 1, 2, 3].map(function (index) {
+          if (index === 0) {
+            var slot0 = slots[0] || {};
+            var carteDepart = slot0.code ? parCode[slot0.code] : null;
+            var pointsDepart = pointsProgrammes[0];
+            var libelleDepart = '0. ' + (carteDepart ? (carteDepart.maison + ' - ' + carteDepart.origine) : '(Indisponible)');
+            var detailDepart = carteDepart ? carteDepart.objectifs.map(function (o, i) {
+              var ligne = pointsDepart && pointsDepart.lignes[i];
+              var badge = (ligne !== undefined) ? ' <span class="badge">' + (ligne >= 0 ? '+' : '') + ligne + '</span>' : '';
+              return '<p>' + o + badge + '</p>';
+            }).join('') + (carteDepart.bonusPermanent ? '<p>' + carteDepart.bonusPermanent + '</p>' : '') : '';
+            return '<div class="programme-plateau-item">' +
+              '<div class="techno-obtenue-ligne">' +
+              '<span class="champ-technologie-fixe' + (detailDepart ? ' programme-nom-toggle' : '') + '" data-slot-detail="0">' + libelleDepart + '</span>' +
+              '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="0"' +
+              (slot0.entretienActif ? ' checked' : '') + (carteDepart ? '' : ' disabled') + '> Ent.</label>' +
+              '</div>' +
+              (detailDepart ? '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="0" hidden>' + detailDepart + '</div>' : '') +
+              '</div>';
+          }
+
+          var slot = slots[index] || { nom: null, entretienActif: false, corrompu: false };
+          var carte = slot.nom ? parNom[slot.nom] : null;
+          // Numéro d'emplacement (1/2/3, hors Programme de départ) en
+          // préfixe — prérequis pour que la popup "Déplacer une Corruption"
+          // (strategieService.js) puisse désigner un emplacement par son
+          // numéro ("Programme 2"), retrouvable ici par le joueur.
+          var libelle = index + '. ' + (slot.nom ? (slot.nom + (carte ? ' (' + carte.type + ')' : '')) : '— Vide —');
+          var points = pointsProgrammes[index];
+          var detail = carte ? [carte.objectif1, carte.objectif2].map(function (texte, i) {
+            if (!texte) return '';
+            var badge = points ? ' <span class="badge">+' + (i === 0 ? points.objectif1 : points.objectif2) + '</span>' : '';
+            return '<p>' + texte + badge + '</p>';
+          }).join('') : '';
+          return '<div class="programme-plateau-item">' +
+            '<div class="techno-obtenue-ligne">' +
+            '<span class="champ-technologie-fixe' + (detail ? ' programme-nom-toggle' : '') + '" data-slot-detail="' + index + '">' + libelle + '</span>' +
+            '<label class="check-amelioree" title="Entretien"><input type="checkbox" class="check-programme-entretien" data-slot="' + index + '"' +
+            (slot.entretienActif ? ' checked' : '') + (slot.nom ? '' : ' disabled') + '> Ent.</label>' +
+            '<label class="check-amelioree" title="Corrompu"><input type="checkbox" class="check-programme-corrompu" data-slot="' + index + '"' +
+            (slot.corrompu ? ' checked' : '') + '> Cor.</label>' +
+            '</div>' +
+            (detail ? '<div class="programme-detail-texte hint hint-inline" data-slot-detail-cible="' + index + '" hidden>' + detail + '</div>' : '') +
+            '</div>';
+        }).join('');
+
+        container.innerHTML = lignesProgrammes;
+
+        Array.prototype.forEach.call(container.querySelectorAll('.programme-nom-toggle'), function (nomEl) {
+          nomEl.addEventListener('click', function () {
+            var cible = container.querySelector('[data-slot-detail-cible="' + nomEl.dataset.slotDetail + '"]');
+            if (cible) cible.hidden = !cible.hidden;
+          });
+        });
+
+        function persisterSlots_(nouveauxSlots, corruptionDelta, elementDeclencheur) {
+          elementDeclencheur.disabled = true;
+          var corruptionMaison = Math.max(0, ((partie.plateauMaison && partie.plateauMaison.corruptionMaison) || 0) + corruptionDelta);
+          Promise.all([
+            GameService.majPlateauMaison(partie.id, { programmesUtilises: nouveauxSlots, corruptionMaison: corruptionMaison })
+          ]).then(function () {
+            partie.plateauMaison.programmesUtilises = nouveauxSlots;
+            partie.plateauMaison.corruptionMaison = corruptionMaison;
+            renderProgrammesPlateauMaison_(partie);
+            chargerEntretien_(partie);
+            // #corruption-maison-input (bloc Corruption maison et influence,
+            // renderEcranPlateauMaison_ ci-dessus) n'est pas re-rendu par
+            // renderProgrammesPlateauMaison_ — mis à jour ici directement
+            // si l'élément existe déjà dans le DOM (toujours le cas, même
+            // section d'écran), sinon la valeur resterait périmée tant que
+            // l'écran Plat. maison n'est pas quitté puis rouvert.
+            var inputCorruption = document.getElementById('corruption-maison-input');
+            if (inputCorruption) inputCorruption.value = corruptionMaison;
+          }).catch(function (erreur) {
+            elementDeclencheur.disabled = false;
+            window.alert('Échec de l\'enregistrement : ' + erreur.message);
+          });
+        }
+
+        // Object.assign (pas de littéral {nom:...} figé) : l'emplacement 0
+        // (Programme de départ) utilise `code`, les emplacements 1-3
+        // utilisent `nom` — ce handler générique préserve tel quel le
+        // champ identifiant présent sur le slot, quel qu'il soit.
+        Array.prototype.forEach.call(container.querySelectorAll('.check-programme-entretien'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.slot);
+            var nouveauxSlots = slots.map(function (s, i) {
+              return i === index ? Object.assign({}, s, { entretienActif: cb.checked }) : s;
+            });
+            persisterSlots_(nouveauxSlots, 0, cb);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.check-programme-corrompu'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.slot);
+            var nouveauxSlots = slots.map(function (s, i) {
+              return i === index ? Object.assign({}, s, { corrompu: cb.checked }) : s;
+            });
+            persisterSlots_(nouveauxSlots, cb.checked ? 1 : -1, cb);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+      });
+    }
+
+    /**
+     * Offre publique de Programme (Plat. Galactique) — 4 emplacements
+     * fixes, 1 par type (partie.plateauMaison.offresProgramme, toujours
+     * dans l'ordre Domination/Force/Soutien/Richesse — voir
+     * GameService.offresProgrammeParDefaut_). Chaque ligne : un <select>
+     * limité aux Programmes du catalogue de CE type (aléatoire du jeu
+     * physique, non modélisé) + une case Corrompu — même gabarit que
+     * renderTechnologiesObtenues_ ci-dessus (.techno-obtenue-ligne,
+     * select+checkbox). Écriture directe via GameService.majPlateauMaison
+     * (tableau entier reconstruit en mémoire, lecture-fusion-écriture
+     * côté client — comme #corruption-maison-input/#influence-maison-input,
+     * renderEcranPlateauMaison_) : pas de fonction GameService dédiée,
+     * contrairement à choisirTechnologieObtenue, car il n'y a ici aucune
+     * logique métier (juste un set de valeur par type).
+     */
+    function renderOffreProgrammes_(partie) {
+      var container = document.getElementById('offre-programmes-liste');
+      if (!container) return;
+
+      DB.getAll('programmes').then(function (catalogue) {
+        var offres = Array.isArray(partie.plateauMaison && partie.plateauMaison.offresProgramme)
+          ? partie.plateauMaison.offresProgramme
+          : [];
+
+        // Retour utilisateur (28/08/2026) : "Une fois qu'un programme est
+        // obtenu (dans onglet focus ou onglet maison) il ne peut plus
+        // etre selectionner dans la ddl offre programme" — un Programme
+        // déjà en main (onglet Focus, programmesEnMain) ou déjà en jeu
+        // sur un emplacement 1-3 (onglet Plat. maison, programmesUtilises
+        // — jamais l'emplacement 0 "départ", identifié par `code` dans un
+        // catalogue distinct, aucun chevauchement de nom possible) ne
+        // peut physiquement plus être dans l'offre publique (la même
+        // carte ne peut pas être à 2 endroits). Exclu des <option>, SAUF
+        // s'il s'agit de la sélection ACTUELLE de cette ligne d'offre
+        // (reste visible/sélectionné même si obtenu entre-temps par un
+        // autre biais, pour ne jamais perdre silencieusement une valeur
+        // déjà enregistrée).
+        var pm = partie.plateauMaison || {};
+        var nomsDejaObtenus = (Array.isArray(pm.programmesEnMain) ? pm.programmesEnMain : []).slice();
+        [1, 2, 3].forEach(function (index) {
+          var slot = Array.isArray(pm.programmesUtilises) ? pm.programmesUtilises[index] : null;
+          if (slot && slot.nom) nomsDejaObtenus.push(slot.nom);
+        });
+
+        container.innerHTML = offres.map(function (offre, index) {
+          var options = catalogue.filter(function (p) {
+            return p.type === offre.type && (p.nom === offre.nom || nomsDejaObtenus.indexOf(p.nom) === -1);
+          });
+          var optionsHtml = '<option value="">— Aucune —</option>' + options.map(function (p) {
+            return '<option value="' + p.nom + '"' + (offre.nom === p.nom ? ' selected' : '') + '>' + p.nom + '</option>';
+          }).join('');
+          return '<div class="techno-obtenue-ligne">' +
+            '<label style="flex:0 0 auto;min-width:90px;">' + offre.type + '</label>' +
+            '<select class="select-offre-programme" data-index="' + index + '">' + optionsHtml + '</select>' +
+            '<label class="check-amelioree"><input type="checkbox" class="check-offre-programme-corrompue" data-index="' + index + '"' +
+            (offre.corrompu ? ' checked' : '') + '> Corrompu</label>' +
+            '</div>';
+        }).join('') || '<p class="hint">Aucune offre de Programme.</p>';
+
+        function persisterOffres_(nouveauTableau, elementDeclencheur) {
+          elementDeclencheur.disabled = true;
+          GameService.majPlateauMaison(partie.id, { offresProgramme: nouveauTableau })
+            .then(function () {
+              partie.plateauMaison.offresProgramme = nouveauTableau;
+              renderOffreProgrammes_(partie);
+            })
+            .catch(function (erreur) {
+              elementDeclencheur.disabled = false;
+              window.alert('Échec de l\'enregistrement : ' + erreur.message);
+            });
+        }
+
+        Array.prototype.forEach.call(container.querySelectorAll('.select-offre-programme'), function (select) {
+          select.addEventListener('change', function () {
+            var index = Number(select.dataset.index);
+            var nouveauTableau = offres.map(function (o, i) {
+              return i === index ? { type: o.type, nom: select.value || null, corrompu: o.corrompu } : o;
+            });
+            persisterOffres_(nouveauTableau, select);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.check-offre-programme-corrompue'), function (cb) {
+          cb.addEventListener('change', function () {
+            var index = Number(cb.dataset.index);
+            var nouveauTableau = offres.map(function (o, i) {
+              return i === index ? { type: o.type, nom: o.nom, corrompu: cb.checked } : o;
+            });
+            persisterOffres_(nouveauTableau, cb);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement du catalogue Programmes.</p>';
+      });
+    }
+
+    /**
+     * Section "Refuges" (§3, docs-rules-corruption-gardiens-refuges-
+     * technoConsume.md) — persistante en bas de Plat. Galactique (retour
+     * utilisateur 14/09/2026). Affiche chaque tuile du scénario
+     * (GameService.obtenirConfigRefuges/completerRefuges) avec ses
+     * emplacements (●/○ rempli/vide) et 2 des 3 déclencheurs (le 3e —
+     * secteur Pur 6 Population/3 Guildes — vit dans la popup Phase
+     * Évaluation, voir strategieService.js/texteRefugesPhaseEval_,
+     * réévalué à chaque Cycle) :
+     *   - bouton manuel "+1 cube" (2 surproductions dans le même tour —
+     *     aucune notion de tour suivie par l'appli, toujours disponible
+     *     tant que la tuile n'est pas pleine) ;
+     *   - un bouton par piste de Civilisation au Niveau 4 dont le cube
+     *     n'a pas encore été réclamé (GameService.pistesNiveau4EligiblesRefuge
+     *     — un événement UNIQUE par piste, les niveaux ne redescendant
+     *     jamais).
+     * Une tuile pleine dont la récompense n'est pas encore choisie
+     * affiche un bouton "Choisir une récompense" à la place (§3 : 4
+     * options, déléguées à FocusEngine.resoudreEffet — voir
+     * GameService.appliquerRecompenseRefuge).
+     */
+    function renderRefuges_(partie) {
+      var container = document.getElementById('refuges-liste');
+      if (!container) return;
+
+      GameService.obtenirConfigRefuges(partie.scenarioId).then(function (config) {
+        if (!config.length) {
+          container.innerHTML = '<p class="hint">Aucun Refuge pour ce scénario.</p>';
+          return;
+        }
+        var refuges = GameService.completerRefuges((partie.plateauMaison || {}).refuges, config);
+        var pistesNiveau4 = GameService.pistesNiveau4EligiblesRefuge(partie);
+
+        container.innerHTML = refuges.map(function (r, index) {
+          var taille = config[index];
+          var plein = r.cubes >= taille;
+          var emplacements = [];
+          for (var i = 0; i < taille; i++) emplacements.push(i < r.cubes ? '●' : '○');
+
+          var actions;
+          if (plein && r.recompenseAppliquee) {
+            actions = '<span class="hint">Récompense déjà appliquée.</span>';
+          } else if (plein) {
+            actions = '<button type="button" class="btn btn-secondary btn-xs btn-refuge-recompense" data-index="' + index + '">Récompense</button>';
+          } else {
+            actions = '<button type="button" class="btn btn-secondary btn-xs btn-refuge-ajouter" data-index="' + index + '">+1 cube</button>' +
+              pistesNiveau4.map(function (p) {
+                return '<button type="button" class="btn btn-secondary btn-xs btn-refuge-niveau4" data-index="' + index + '" data-piste="' + p.cle + '">' +
+                  '+1 cube (Niveau 4 — ' + p.label + ')</button>';
+              }).join('');
+          }
+
+          return '<div class="plateau-influence" style="margin-bottom:12px;border-top:none;padding-top:0;margin-top:0;">' +
+            '<label>Refuge ' + (index + 1) + '</label>' +
+            '<div class="hint" style="font-size:1.2em;letter-spacing:3px;">' + emplacements.join(' ') + '</div>' +
+            '<div class="modal-choix-boutons" style="margin-top:6px;">' + actions + '</div>' +
+            '</div>';
+        }).join('');
+
+        function apresAction_(promesse, btn) {
+          promesse.then(function (resultat) {
+            if (resultat && resultat.annule) { btn.disabled = false; return; }
+            partieCourante = resultat;
+            renderRefuges_(resultat);
+          }).catch(function (erreur) {
+            btn.disabled = false;
+            window.alert('Échec : ' + erreur.message);
+          });
+        }
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-ajouter'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.ajouterCubeRefuge(partie.id, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-niveau4'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.appliquerRefugeNiveau4(partie.id, btn.dataset.piste, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+
+        Array.prototype.forEach.call(container.querySelectorAll('.btn-refuge-recompense'), function (btn) {
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            apresAction_(GameService.appliquerRecompenseRefuge(partie.id, Number(btn.dataset.index), StrategieService.demanderChoix), btn);
+          });
+        });
+      }).catch(function () {
+        container.innerHTML = '<p class="hint">Erreur de chargement des Refuges.</p>';
+      });
+    }
+
+    /**
+     * Entretien dû : emplacements Installation/Guilde occupés sur le
+     * plateau des secteurs (SecteurService.getEntretien) + 2 par
+     * emplacement Programme "Entretien actif" (Plat. maison,
+     * partie.plateauMaison.programmesUtilises[1-3], voir
+     * renderProgrammesPlateauMaison_ — règle du livret §3.2.1.1,
+     * icônes Entretien des cartes Programme) — purement informatif : rien
+     * n'est déduit automatiquement des ressources.
+     */
+    function chargerEntretien_(partie) {
+      var el = document.getElementById('entretien-secteurs');
+      if (!el) return;
+      var slotsProgramme = (partie.plateauMaison && partie.plateauMaison.programmesUtilises) || [];
+      var entretienProgrammes = slotsProgramme.filter(function (s) { return s && s.entretienActif; }).length * 2;
+
+      SecteurService.getEntretien(partie.id).then(function (unitesSecteurs) {
+        var total = unitesSecteurs + entretienProgrammes;
+        el.textContent = 'Entretien : ' + total;
+        el.title = 'Par unité, au choix : 1 Nourriture, ou 2 Énergie, ou 2 Matériel.' +
+          (entretienProgrammes ? ' Dont ' + entretienProgrammes + ' de Programmes.' : '');
+      }).catch(function () {
+        el.textContent = '';
+      });
+    }
+
+    // Libellés d'affichage pour les Cadres d'Événement galactique (voir
+    // renderCadresEvenement_ ci-dessous) — RESSOURCES_SIMPLES_CADRE côté
+    // gameService.js fixe la liste des 5 clés possibles ; LABEL_RESOLUTION_
+    // CADRE_ couvre les valeurs de `resolution` du catalogue (voir
+    // data/catalogue/evenements.json et docs-rules-cycle-de-jeu.md §1.5.3).
+    // "Par joueur" et "Une fois" n'ont volontairement pas de badge (bruit
+    // visuel — la plupart des cadres sont "par_joueur" ou "unique") ; les
+    // 3 résolutions restantes (permanent/collectif/retardement, moins
+    // fréquentes et significatives pour savoir QUAND résoudre le cadre)
+    // gardent le leur.
+    var LABEL_RESOLUTION_CADRE_ = {
+      permanent: 'Permanent', collectif: 'Collectif', retardement: 'À retardement'
+    };
+
+    // Libellé d'une des 5 ressources simples de Cadre, lu depuis
+    // StrategieService.CHAMP_RESSOURCE (repli sur la clé brute si absente)
+    // — source de vérité unique, partagée avec Plat. maison.
+    function libelleRessourceCadre_(cle) {
+      var infosRessource = StrategieService.CHAMP_RESSOURCE[cle];
+      return infosRessource ? infosRessource.label : cle;
+    }
+
+    function libelleDeltaCadre_(delta) {
+      return Object.keys(delta || {}).map(function (cle) {
+        var valeur = delta[cle];
+        return (valeur > 0 ? '+' : '') + valeur + ' ' + libelleRessourceCadre_(cle);
+      }).join(', ');
+    }
+
+    /**
+     * libelleDeltaCadre_ ci-dessus reste utilisé tel quel par
+     * libelleActionCadre_ pour le libellé des BOUTONS (ex. "Gagner 3
+     * Crédits"). libelleRessourceAbregeeHTML_/libelleDeltaCadreAbrege_ sont
+     * une variante dédiée au texte de résultat "✓ Appliqué (...)" : nom de
+     * ressource abrégé à 3 lettres + "." (ex. "Crédit" -> "Cré.") coloré
+     * comme sur Plat. maison (StrategieService.CHAMP_RESSOURCE).
+     */
+    function libelleRessourceAbregeeHTML_(cle) {
+      var infosRessource = StrategieService.CHAMP_RESSOURCE[cle];
+      var nom = infosRessource ? infosRessource.label : cle;
+      var couleur = infosRessource ? infosRessource.couleur : null;
+      var abrege = nom.slice(0, 3) + '.';
+      return couleur ? '<span style="color:' + couleur + '">' + abrege + '</span>' : abrege;
+    }
+
+    function libelleDeltaCadreAbrege_(delta) {
+      return Object.keys(delta || {}).map(function (cle) {
+        var valeur = delta[cle];
+        return (valeur > 0 ? '+' : '') + valeur + ' ' + libelleRessourceAbregeeHTML_(cle);
+      }).join(', ');
+    }
+
+    // Couleur par Guilde = couleur de la ressource qu'elle produit. Clés =
+    // labels EXACTS de StrategieService.TYPES_GUILDE_CONSTRUIRE_, tels
+    // qu'ils apparaissent dans le texte "Guilde <Label> établie sur le
+    // Secteur N" (resume de GameService.appliquerCadreChoixFocusEngine).
+    // Calculée depuis StrategieService.TYPES_GUILDE_CONSTRUIRE_/
+    // GUILDE_VERS_RESSOURCE/CHAMP_RESSOURCE plutôt que dupliquée en dur —
+    // le préfixe 'guilde' + Cle capitalisée reconstruit la clé attendue
+    // par GUILDE_VERS_RESSOURCE (ex. 'fermiers' -> 'guildeFermiers') —
+    // convention déjà en place des deux côtés, vérifiée pour les 5
+    // Guildes.
+    var COULEUR_PAR_GUILDE_CADRE_ = {};
+    StrategieService.TYPES_GUILDE_CONSTRUIRE_.forEach(function (g) {
+      var champGuilde = 'guilde' + g.cle.charAt(0).toUpperCase() + g.cle.slice(1);
+      var ressource = StrategieService.GUILDE_VERS_RESSOURCE[champGuilde];
+      var infosRessource = ressource ? StrategieService.CHAMP_RESSOURCE[ressource] : null;
+      if (infosRessource) COULEUR_PAR_GUILDE_CADRE_[g.label] = infosRessource.couleur;
+    });
+
+    /**
+     * Abrège spécifiquement le texte de `cadresAppliques[ordre].resume`
+     * (voir GameService.appliquerCadreChoixFocusEngine) pour l'affichage
+     * "✓ Appliqué (...)" d'un Cadre d'Événement galactique
+     * (renderCadresEvenement_ ci-dessous) — le texte SOURCE
+     * (strategieService.js contextes 'construire'/'augmenter_population_pure',
+     * focusEngine.js, gameService.js) n'est PAS modifié : il reste affiché
+     * tel quel dans le journal Focus ("Actions réalisées",
+     * #ressources-journal — StrategieService.renderJournal_), qui
+     * réutilise le même `resume`/journal FocusEngine hors du contexte
+     * Événement galactique. Reconnaît uniquement les 3 gabarits produits à
+     * ce jour par ce chemin (voir strategieService.js) :
+     * - "Population du Secteur N augmentée de 1" -> "+1 Pop. Sec. N"
+     * - "Guilde <Label> établie sur le Secteur N" -> "+1 Guilde <Label
+     *   abrégé coloré> Sec. N"
+     * - "Installation <Label> construite sur le Secteur N" -> "+1
+     *   Installation <Label> Sec. N" (même principe "+1"/"Sec." ; une
+     *   Installation n'étant pas associée à une ressource, son Label reste
+     *   en toutes lettres, non coloré).
+     * Tout texte de resume qui ne correspond à AUCUN de ces 3 gabarits
+     * (ex. cube "+1 cube(s) activé(s)", ou un `resume` manuel du type "X
+     * résolu manuellement") ressort inchangé (regex sans correspondance).
+     */
+    function abregerResumeCadre_(resume) {
+      if (!resume) return resume;
+      var texte = resume;
+
+      texte = texte.replace(/Population du Secteur (\d+) augmentée de (\d+)/g, function (m, numero, valeur) {
+        return '+' + valeur + ' Pop. Sec. ' + numero;
+      });
+
+      texte = texte.replace(/Guilde (\S+) établie sur le Secteur (\d+)/g, function (m, nomGuilde, numero) {
+        var couleur = COULEUR_PAR_GUILDE_CADRE_[nomGuilde];
+        var abrege = nomGuilde.slice(0, 3) + '.';
+        var abregeHtml = couleur ? '<span style="color:' + couleur + '">' + abrege + '</span>' : abrege;
+        return '+1 Guilde ' + abregeHtml + ' Sec. ' + numero;
+      });
+
+      texte = texte.replace(/Installation (.+?) construite sur le Secteur (\d+)/g, function (m, nomInstallation, numero) {
+        return '+1 Installation ' + nomInstallation + ' Sec. ' + numero;
+      });
+
+      return texte;
+    }
+
+    // Seul le Crédit se pluralise en français dans le vocabulaire du jeu
+    // ("Gagnez 2 Crédits.", voir data/catalogue/pistesCivilisation.json) —
+    // Nourriture/Énergie/Matériel/Science restent invariables (noms de
+    // quantité, jamais pluralisés dans le catalogue).
+    var LABEL_RESSOURCE_CADRE_PLURIEL_ = { credit: 'Crédits' };
+
+    /**
+     * Libellés des critères de SecteurService.
+     * resoudrePlacementMultipleNeantAdjacent (cadre.effet.placements[].critere,
+     * data/catalogue/evenements.json) — titre de la popup de désambiguïsation
+     * en cas d'égalité de Population, texte de la popup de confirmation.
+     */
+    var LABEL_CRITERE_PLACEMENT_ = {
+      population_min: 'Population la plus basse', population_max: 'Population la plus élevée'
+    };
+
+    // Libellés courts pour les `elements` d'une option `type: 'placement'`
+    // d'un cadre "choix" — voir libelleOptionPlacementChoix_ ci-dessous.
+    // "guilde" reste générique ici (le type précis n'est choisi qu'au
+    // moment du placement, popup 'placement_critere') ; "gloire" affiche sa
+    // valeur entre parenthèses (ex. "jeton Gloire (2)"), traité à part
+    // ci-dessous plutôt qu'ici.
+    var LABEL_ELEMENT_PLACEMENT_CADRE_ = {
+      guilde: 'Guilde', cube_neant: 'cube du Néant', defense_secteur: 'Défense de Secteur',
+      chantier_naval: 'Chantier Naval', base_stellaire: 'Base Stellaire',
+      liberation: 'jeton Libération', prime: 'jeton Prime'
+    };
+
+    /**
+     * Libellé de bouton (menu "Choisir un effet") pour une option
+     * `type: 'placement'` — ex. "Guilde + cube du Néant (Population la
+     * plus basse)". Le détail (secteur choisi, type de Guilde) n'apparaît
+     * qu'après résolution, dans le statut "✓ Appliqué (...)" (GameService.
+     * construireResumePlacementChoix_).
+     */
+    function libelleOptionPlacementChoix_(option) {
+      var parties = Object.keys(option.elements || {}).map(function (cle) {
+        var valeur = Number(option.elements[cle]) || 0;
+        if (cle === 'gloire') return 'jeton Gloire (' + valeur + ')';
+        var label = LABEL_ELEMENT_PLACEMENT_CADRE_[cle] || cle;
+        return valeur > 1 ? valeur + ' ' + label : label;
+      });
+      var critereLabel = LABEL_CRITERE_PLACEMENT_[option.critere];
+      return parties.join(' + ') + (critereLabel ? ' (' + critereLabel + ')' : '');
+    }
+
+    /**
+     * Filet de sécurité générique pour une option de cadre "choix" dont la
+     * `cle` ne correspond à AUCUNE mécanique automatisée (ni
+     * cube/construction — cleFocusEnginePourOptionCadre_ —, ni
+     * Science->Technologie — optionTechnologieViaScience_) : `label`
+     * (bouton, infinitif) / `resume` (statut "✓ Appliqué (...)", au passé
+     * — voir mémoire projet, toujours "manuellement" jamais "à la
+     * main"/parenthèses imbriquées). Fallback générique
+     * (humaniserCleCadre_) pour toute clé non répertoriée ici, plutôt que
+     * de rendre le cadre bloqué — vide pour l'instant (toutes les clés
+     * connues sont automatisées, voir LABEL_OPTION_FOCUSENGINE_/
+     * cleFocusEnginePourOptionCadre_ ci-dessous) : conservé prêt à
+     * accueillir une future clé réellement non automatisable.
+     */
+    var LABEL_OPTION_CADRE_MANUELLE_ = {};
+    function humaniserCleCadre_(cle) {
+      var texte = String(cle || '').replace(/_/g, ' ');
+      return texte.charAt(0).toUpperCase() + texte.slice(1);
+    }
+
+    /**
+     * Libellé d'action pour le bouton d'une popup de cadre — reprend le
+     * gabarit d'effet du jeu ("Gagnez N Ressource(s).", voir catalogue) au
+     * verbe à l'infinitif pour un bouton ("Gagner 3 Crédits") plutôt que le
+     * delta brut préfixé "Appliquer : ". Ne couvre que le cas à une seule
+     * ressource (le seul rencontré à ce jour, effet.type "choix" simple) ;
+     * retombe sur le format delta générique pour un futur cadre à
+     * plusieurs ressources dans un même delta.
+     */
+    function libelleActionCadre_(delta) {
+      var cles = Object.keys(delta || {});
+      if (cles.length === 1) {
+        var cle = cles[0], valeur = delta[cle];
+        var nom = (Math.abs(valeur) > 1 && LABEL_RESSOURCE_CADRE_PLURIEL_[cle]) || libelleRessourceCadre_(cle);
+        return (valeur > 0 ? 'Gagner ' : 'Perdre ') + Math.abs(valeur) + ' ' + nom;
+      }
+      return 'Appliquer : ' + libelleDeltaCadre_(delta);
+    }
+
+    /**
+     * Reconnaît l'option "dépenser N Science pour gagner une Technologie
+     * de base" (cadre.effet.type === 'choix', voir
+     * data/catalogue/evenements.json). EVOLUTION 20 (suite) : cette forme
+     * est désormais entièrement automatisée via GameService.
+     * niveauxTechnologieOptionAvecCout/appliquerCadreOptionTechnologieAvecCout
+     * (actionsCadre_ ci-dessous) — cette fonction n'est conservée que pour
+     * estAppliqueViaTechnologieScience_ juste après, qui reconnaît un cadre
+     * déjà appliqué via l'ANCIEN chemin "coût automatisé, gain manuel"
+     * (parties commencées avant ce chantier).
+     */
+    function optionTechnologieViaScience_(option) {
+      return !!(option && option.cout && Object.keys(option.cout).length === 1 && typeof option.cout.science === 'number' &&
+        option.gain && Object.keys(option.gain).length === 1 && option.gain.technologie_base);
+    }
+
+    // Détecte si le cadre déjà appliqué l'a été via l'option ci-dessus
+    // (delta = { science: -N } seul) plutôt que via une autre option
+    // "1 clic" du même cadre (ex. +3 Crédit) — même cadresAppliques[ordre]
+    // partagé entre toutes les options d'un cadre "choix" exclusif, donc
+    // appliquer l'une verrouille bien les autres (règle du jeu : un seul
+    // des deux effets du Cadre 2 peut être choisi).
+    function estAppliqueViaTechnologieScience_(cadre, applique) {
+      if (!applique || !applique.delta) return false;
+      var cles = Object.keys(applique.delta);
+      if (cles.length !== 1 || cles[0] !== 'science' || !(applique.delta.science < 0)) return false;
+      if (!cadre.effet || cadre.effet.type !== 'choix' || !Array.isArray(cadre.effet.options)) return false;
+      return cadre.effet.options.some(function (option) {
+        return optionTechnologieViaScience_(option) && option.cout.science === -applique.delta.science;
+      });
+    }
+
+    // Tous les appels utilisent GameService.cleFocusEnginePourOptionCadre
+    // directement (source de vérité unique — ne pas en garder de copie
+    // locale dans ce fichier).
+
+    function libelleOptionCube_(option, cleFocusEngine) {
+      var valeur = Number(option.valeur) || 1;
+      var pluriel = valeur > 1 ? 's' : '';
+      if (cleFocusEngine === 'activer_cube') {
+        return 'Activer ' + valeur + ' cube' + pluriel + ' de Puissance Navale';
+      }
+      if (cleFocusEngine === 'deployer_cube_secteur_mere') {
+        return 'Déployer ' + valeur + ' cube' + pluriel + ' sur le Secteur-Mère';
+      }
+      return 'Déployer ' + valeur + ' cube' + pluriel;
+    }
+
+    // Libellés (bouton, infinitif) pour les clés reconnues par
+    // cleFocusEnginePourOptionCadre_ en dehors des cubes (libelleOptionCube_
+    // ci-dessus) — le détail (secteur + type choisis) n'apparaît qu'après
+    // résolution, dans le statut "✓ Appliqué (...)" (resume dérivé du
+    // journal FocusEngine, voir GameService.appliquerCadreChoixFocusEngine).
+    var LABEL_OPTION_FOCUSENGINE_ = {
+      etablir_guilde: 'Établir une Guilde',
+      construire_installation: 'Construire une Installation',
+      etablir_guilde_banquier: 'Établir une Guilde de Banquiers',
+      // EVOLUTION 14 : libellé harmonisé, aligné sur le texte des cadres
+      // d'Événement/Focus/Civilisation qui utilisent déjà "Augmenter une
+      // population" (le mot "Pure" restait un jargon interne au moteur).
+      augmenter_population_pure: 'Augmenter une population',
+      // Sans cette entrée, un Cadre "retirer_corruption" retomberait sur
+      // libelleOptionCube_ ("Déployer N cube(s)", libellé faux) faute de
+      // correspondance ici.
+      retirer_corruption: 'Retirer une Corruption',
+      // EVOLUTION 10 : même principe que retirer_corruption ci-dessus —
+      // le détail (source + destination choisies) n'apparaît qu'après
+      // résolution, dans le statut "✓ Appliqué (...)".
+      deplacer_corruption: 'Déplacer une Corruption',
+      // 1 libellé par variante de "avancer sur piste de Civilisation" — la
+      // piste précise (si imposée) reste visible sur le bouton, le détail
+      // (niveau atteint) n'apparaît qu'après résolution dans le statut
+      // "✓ Appliqué (...)", comme les autres options ci-dessus.
+      avancer_civilisation: 'Avancer sur une piste de Civilisation',
+      avancer_civilisation_societe: 'Avancer sur la piste Société',
+      avancer_civilisation_gouvernement: 'Avancer sur la piste Gouvernement',
+      avancer_civilisation_economie: 'Avancer sur la piste Économie',
+      // "Améliorer un jeton Gloire" : le détail (quel jeton, quelle
+      // valeur) n'apparaît qu'après résolution, dans le statut
+      // "✓ Appliqué (...)", comme les autres options ci-dessus.
+      ameliorer_gloire: 'Améliorer un jeton Gloire'
+    };
+
+    // Libellé de bouton pour une option de cadre "gagner une Technologie"
+    // (EVOLUTION 20 suite, option directe {cle:'technologie_base', valeur:1}
+    // — voir GameService.NIVEAUX_TECHNOLOGIE_PAR_CLE_CADRE_) : le détail
+    // (LAQUELLE, choisie dans la popup 'gagner_technologie') n'apparaît
+    // qu'après résolution, dans le statut "✓ Appliqué (...)", comme les
+    // autres options LABEL_OPTION_FOCUSENGINE_ ci-dessus.
+    var LABEL_TECHNOLOGIE_NIVEAUX_CADRE_ = {
+      base: 'Gagner une Technologie de base',
+      amelioree: 'Gagner une Technologie améliorée'
+    };
+    function libelleOptionTechnologieFocusEngine_(niveaux, cout) {
+      var libelle = Array.isArray(niveaux)
+        ? 'Gagner une Technologie de base ou améliorée'
+        : (LABEL_TECHNOLOGIE_NIVEAUX_CADRE_[niveaux] || 'Gagner une Technologie');
+      var cles = Object.keys(cout || {});
+      if (!cles.length) return libelle;
+      var coutTexte = cles.map(function (cle) { return '-' + cout[cle] + ' ' + libelleRessourceCadre_(cle); }).join(', ');
+      return libelle + ' (' + coutTexte + ')';
+    }
+
+    /**
+     * Dispatche le libellé de bouton d'une option de cadre "choix"
+     * automatisée via FocusEngine selon la clé reconnue par
+     * cleFocusEnginePourOptionCadre_ — cube (libelleOptionCube_, déjà
+     * existant), Technologie (libelleOptionTechnologieFocusEngine_
+     * ci-dessus) ou LABEL_OPTION_FOCUSENGINE_ (toute autre mécanique
+     * automatisée : construction, Population Pure...).
+     */
+    function libelleOptionFocusEngine_(option, cleFocusEngine) {
+      if (cleFocusEngine === 'gagner_technologie') {
+        return libelleOptionTechnologieFocusEngine_(GameService.niveauxTechnologieOptionCadre(option.cle), null);
+      }
+      if (LABEL_OPTION_FOCUSENGINE_[cleFocusEngine]) return LABEL_OPTION_FOCUSENGINE_[cleFocusEngine];
+      return libelleOptionCube_(option, cleFocusEngine);
+    }
+
+    /**
+     * Applique un cadre "1 clic" (GameService.appliquerCadreEffet) puis
+     * rafraîchit l'écran. #ressources-principales (Plat. maison) et le
+     * bandeau de rappel (Focus) sont rendus par StrategieService.afficher()
+     * — jamais mis à jour tout seuls au changement d'onglet (afficherEcran
+     * ne fait que basculer la visibilité, voir Piège n°2 dans CLAUDE.md) —
+     * d'où le rappel explicite ici, même pattern que le bouton "Fin du
+     * cycle" plus bas (btn-fin-cycle, seule autre action de cet écran qui
+     * modifie les ressources).
+     */
+    function appliquerCadreEtRafraichir_(partie, cycle, ordre, delta, bouton) {
+      bouton.disabled = true;
+      GameService.appliquerCadreEffet(partie.id, cycle, ordre, delta)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de l\'application du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Applique l'option choisie (activer/déployer un cube, établir une
+     * Guilde/construire une Installation, voir
+     * cleFocusEnginePourOptionCadre_ ci-dessus) via GameService.
+     * appliquerCadreChoixFocusEngine, qui délègue à FocusEngine.
+     * resoudreEffet, seule source de vérité pour ces mécaniques (déjà
+     * utilisées par l'écran Focus), en lui passant StrategieService.
+     * demanderChoix pour la popup imbriquée ("Déployer des cubes" ou
+     * "Construire une Installation"/"Établir une Guilde") le cas échéant.
+     * `resultat.annule` (Annuler sur cette popup imbriquée) n'est PAS une
+     * erreur : réactive juste le cadre, comme les autres popups.
+     */
+    function appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixFocusEngine(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          // Cette fonction sert aussi les options etablir_guilde/
+          // construire_installation (en plus des cubes, qui ne touchent
+          // jamais secteursPartie) : un rappel explicite à
+          // App.renderSecteurs est donc nécessaire — App.afficherEcran ne
+          // re-rend rien tout seul (Piège n°2, voir CLAUDE.md), l'onglet
+          // Secteurs resterait sinon affiché avec son dernier rendu, périmé.
+          App.renderSecteurs(resultat);
+          // EVOLUTION 20 (suite) — sert aussi l'option "gagner_technologie"
+          // (Événement F Cycle 1 Cadre 1) : "Technologies obtenues" vit sur
+          // Plat. maison, jamais rafraîchi tout seul (même Piège n°2).
+          App.renderPlateauMaison(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * EVOLUTION 20 (suite) — option de cadre "gagner une Technologie",
+     * avec ou sans coût ressources simples accompagnateur (voir
+     * GameService.appliquerCadreOptionTechnologieAvecCout/
+     * niveauxTechnologieOptionAvecCout ci-dessus) : ouvre la popup dédiée
+     * 'gagner_technologie' (StrategieService.demanderChoix) puis persiste
+     * le choix ET débite le coût éventuel. Rappel explicite à
+     * App.renderPlateauMaison (Piège n°2, CLAUDE.md) — "Technologies
+     * obtenues" vit sur l'écran Plat. maison, jamais rafraîchi tout seul.
+     */
+    function appliquerCadreTechnologieFocusEngineEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreOptionTechnologieAvecCout(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderPlateauMaison(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Option "gain: {corruption:1, gloire:1}" (voir GameService.
+     * appliquerCadreChoixCorruptionGloire, gameService.js — Événement H
+     * Cycle 1 Cadre 1) — même pattern que
+     * appliquerCadreFocusEngineEtRafraichir_ ci-dessus : la popup
+     * 'gagner_corruption' peut cibler un secteur (App.renderSecteurs
+     * nécessaire) ou une piste de Civilisation/Plat. maison
+     * (StrategieService.afficher nécessaire) — les deux sont rappelés
+     * systématiquement, comme appliquerCadreGainCorruptionEtRafraichir_
+     * ci-dessous le fait déjà pour le même popup hors contexte de cadre
+     * "choix".
+     */
+    function appliquerCadreCorruptionGloireEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixCorruptionGloire(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Option "recall: {cube:1}" (voir GameService.
+     * appliquerCadreChoixRappelCube, gameService.js — Événement H Cycle 1
+     * Cadre 1) — la popup 'rappeler_cube' (strategieService.js) mute
+     * toujours un secteur (App.renderSecteurs nécessaire) ET Plat. maison
+     * (EVOLUTION 33, todo.md — SecteurService.rappelerCube recrédite
+     * désormais aussi `cubeActif`), d'où l'appel à StrategieService.
+     * afficher ci-dessous, nécessaire et pas seulement "par cohérence".
+     */
+    function appliquerCadreRappelCubeEtRafraichir_(partie, cycle, ordre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreChoixRappelCube(partie.id, cycle, ordre, indexOption, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Effet "Gagner une Corruption" d'un Cadre d'Événement galactique
+     * (voir GameService.appliquerCadreGainCorruption/
+     * cadreGainCorruptionAutomatisable, gameService.js) : ouvre
+     * la (ou les, si `quantite` > 1) popup(s) 'gagner_corruption'
+     * (StrategieService.demanderChoix, contexte construit côté
+     * GameService à partir de la cible catalogue) puis rafraîchit l'écran.
+     * `resultat.annule` (Annuler sur la TOUTE PREMIÈRE popup, rien encore
+     * placé — seul cas où GameService.appliquerCadreGainCorruption renvoie
+     * `{annule:true}`, voir son JSDoc) n'est pas une erreur : réactive
+     * juste le cadre, sans rafraîchir (rien n'a été persisté). Un
+     * "Annuler" APRÈS au moins un placement réussi (cadre à `quantite` > 1)
+     * ne renvoie PAS `{annule:true}` — le cadre est marqué appliqué avec
+     * le résumé partiel obtenu, et passe donc normalement par le
+     * rafraîchissement ci-dessous.
+     */
+    function appliquerCadreGainCorruptionEtRafraichir_(partie, cycle, ordre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.appliquerCadreGainCorruption(partie.id, cycle, ordre, StrategieService.demanderChoix)
+        .then(function (resultat) {
+          if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+          partieCourante = resultat;
+          renderEvenementCycle_(resultat);
+          App.renderSecteurs(resultat);
+          StrategieService.afficher(resultat);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Applique l'option choisie sans mécanique automatisée (voir
+     * LABEL_OPTION_CADRE_MANUELLE_/
+     * actionsCadre_ ci-dessus) via GameService.appliquerCadreChoixManuel —
+     * `resume` est le même texte au passé affiché ensuite comme statut
+     * "✓ Appliqué (...)" (rendu générique pour cadresAppliques[ordre].resume,
+     * voir renderCadresEvenement_).
+     */
+    function appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, indexOption, resume, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      GameService.appliquerCadreChoixManuel(partie.id, cycle, ordre, indexOption, resume)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec de la résolution du cadre : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Le cadre de type "placement" n'a pas de bouton "Placer" dédié sous
+     * le texte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre la
+     * popup au clic (cf. renderCadresEvenement_ ci-dessous). Comme
+     * appliquerCadrePlacementEtRafraichir_ attend un élément exposant
+     * .disabled (pattern <button>) pour désactiver l'action pendant la
+     * popup/l'appel réseau, ce faux "bouton" adapte un <div> en basculant
+     * simplement une classe CSS (.cadre-carte-en-cours, cursor:not-allowed
+     * + opacité réduite, voir style.css) plutôt que l'attribut natif
+     * disabled — évite de dupliquer la logique d'appel dans
+     * appliquerCadrePlacementEtRafraichir_.
+     */
+    function pseudoBoutonCarte_(carteEl) {
+      return {
+        get disabled() { return carteEl.classList.contains('cadre-carte-en-cours'); },
+        set disabled(valeur) { carteEl.classList.toggle('cadre-carte-en-cours', !!valeur); }
+      };
+    }
+
+    /**
+     * Cadre de type "placement" (zone "secteur_neant_adjacent") — ouvre la
+     * même modale de choix générique que les actions de Focus
+     * (StrategieService.demanderChoix, contexte
+     * 'placement_secteur_neant_adjacent') pour sélectionner le secteur,
+     * puis persiste via GameService.appliquerCadrePlacement (qui revalide
+     * tout côté SecteurService) et rafraîchit l'écran — même pattern
+     * qu'appliquerCadreEtRafraichir_ ci-dessus pour les cadres "1 clic" sur
+     * ressources simples.
+     *
+     * Le titre de la popup est générique ("Choisir un secteur") plutôt que
+     * de rappeler les éléments posés (déjà lisibles sur le texte du cadre,
+     * visible derrière la popup). `elements: cadre.effet.elements` est
+     * transmis à la popup (contexte.elements, voir strategieService.js) —
+     * SecteurService.obtenirSecteursEligiblesPlacementNeantAdjacent en a
+     * besoin pour calculer les emplacements requis (générique, pas figé
+     * sur Défense de Secteur + Guilde de Scientifiques).
+     */
+    function appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'placement_secteur_neant_adjacent',
+        titre: 'Choisir un secteur',
+        elements: cadre.effet.elements
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        return GameService.appliquerCadrePlacement(partie.id, cycle, ordre, resultat.numero)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Cadre de type "placement" à zone GALAXIE ENTIÈRE (chantier "Cadres
+     * placement en masse", 14/09/2026 — ex. "chaque secteur de Faille",
+     * voir GameService.ZONES_PLACEMENT_MASSE) : AUCUN choix du joueur,
+     * contrairement à appliquerCadrePlacementEtRafraichir_ ci-dessus — une
+     * popup de confirmation (Annuler/Valider) récapitule d'abord les
+     * secteurs qui vont être touchés (GameService.
+     * previsualiserCadrePlacementEnMasse, lecture seule) avant d'écrire
+     * quoi que ce soit, pour que le joueur puisse reporter l'effet sur le
+     * plateau physique. 0 secteur éligible reste confirmable (le résumé
+     * l'indique explicitement) plutôt que de bloquer le cadre : la carte
+     * peut légitimement n'avoir plus aucune cible ce cycle-ci (ex. plus
+     * aucune Faille).
+     */
+    function appliquerCadrePlacementMasseEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined' || typeof GameService === 'undefined') return;
+      bouton.disabled = true;
+      GameService.previsualiserCadrePlacementEnMasse(partie.id, cadre).then(function (numeros) {
+        var message = numeros.length
+          ? 'Secteurs concernés : ' + numeros.slice().sort(function (a, b) { return a - b; }).join(', ') + '.'
+          : 'Aucun secteur ne remplit actuellement le critère de cette carte.';
+        return StrategieService.demanderChoix({
+          type: 'confirmation',
+          titre: 'Confirmer le placement',
+          message: message,
+          texteValider: 'Valider'
+        }).then(function (confirmation) {
+          if (!confirmation || confirmation.annule || !confirmation.confirme) { bouton.disabled = false; return; }
+          return GameService.appliquerCadrePlacementEnMasse(partie.id, cycle, ordre).then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+        });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Construit le texte de la popup de confirmation d'un cadre
+     * "placement_multiple" une fois les cibles connues (sans égalité de
+     * Population à trancher) — jamais le texte du cadre répété (déjà
+     * visible sur la carte derrière la popup), juste le résultat calculé,
+     * pour que le joueur puisse le reporter sur le plateau physique.
+     */
+    function libelleConfirmationPlacementMultiple_(casParticulier, groupes, cibles) {
+      if (casParticulier) {
+        return 'Un seul secteur du Néant est adjacent à vos secteurs : tous les jetons sont placés sur le Secteur ' + cibles[0] + '.';
+      }
+      return groupes.map(function (groupe, i) {
+        return (LABEL_CRITERE_PLACEMENT_[groupe.critere] || 'Secteur') + ' → Secteur ' + cibles[i] + '.';
+      }).join('<br>');
+    }
+
+    /**
+     * Résout séquentiellement chaque groupe renvoyé par SecteurService.
+     * resoudrePlacementMultipleNeantAdjacent — un groupe à candidat unique
+     * est retenu directement (aucune interaction, la cible est déterminée
+     * par la règle de Population) ; un groupe à plusieurs candidats
+     * (égalité de Population, cas rare) ouvre la popup de sélection de
+     * secteur déjà utilisée pour un cadre "placement" simple, restreinte à
+     * ces candidats (contexte.numeros, voir strategieService.js). Résout
+     * avec le tableau des cibles choisies (même ordre que `groupes`), ou
+     * `null` si le joueur annule une désambiguïsation en cours de route.
+     */
+    function resoudreGroupesPlacementMultiple_(groupes, index, cibles) {
+      if (index >= groupes.length) return Promise.resolve(cibles);
+      var groupe = groupes[index];
+      if (groupe.candidats.length === 1) {
+        cibles.push(groupe.candidats[0]);
+        return resoudreGroupesPlacementMultiple_(groupes, index + 1, cibles);
+      }
+      return StrategieService.demanderChoix({
+        type: 'placement_secteur_neant_adjacent',
+        titre: 'Choisir un secteur (' + (LABEL_CRITERE_PLACEMENT_[groupe.critere] || 'égalité de Population') + ')',
+        elements: groupe.elements,
+        numeros: groupe.candidats
+      }).then(function (resultatChoix) {
+        if (!resultatChoix || resultatChoix.annule) return null;
+        cibles.push(resultatChoix.numero);
+        return resoudreGroupesPlacementMultiple_(groupes, index + 1, cibles);
+      });
+    }
+
+    /**
+     * Persiste les cibles retenues via
+     * GameService.appliquerCadrePlacementMultiple
+     * (revalide tout côté SecteurService) puis rafraîchit l'écran — même
+     * pattern qu'appliquerCadrePlacementEtRafraichir_ ci-dessus.
+     */
+    function finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton) {
+      return GameService.appliquerCadrePlacementMultiple(partie.id, cycle, ordre, cibles)
+        .then(function (partieMaj) {
+          partieCourante = partieMaj;
+          renderEvenementCycle_(partieMaj);
+          App.renderSecteurs(partieMaj);
+          StrategieService.afficher(partieMaj);
+        })
+        .catch(function (erreur) {
+          bouton.disabled = false;
+          window.alert('Échec du placement : ' + erreur.message);
+        });
+    }
+
+    /**
+     * Cadre de type "placement_multiple" — la cible de chaque
+     * jeu d'éléments est déterminée par la Population des secteurs du
+     * Néant adjacents (voir SecteurService.resoudrePlacementMultipleNeantAdjacent),
+     * pas par un libre choix comme le cadre "placement" simple. Si aucune
+     * désambiguïsation n'a été nécessaire (aucune égalité de Population),
+     * une popup de confirmation (Annuler/Valider — voir mémoire projet :
+     * "La popup a toujours exactement Annuler + Valider") récapitule le
+     * résultat calculé avant d'écrire ; sinon, la ou les popups de
+     * désambiguïsation déjà affichées (resoudreGroupesPlacementMultiple_)
+     * tiennent lieu de confirmation (pas de double confirmation, même
+     * principe que le point 6 des Cadres "choix").
+     */
+    function appliquerCadrePlacementMultipleEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined' || typeof SecteurService === 'undefined') return;
+      bouton.disabled = true;
+      SecteurService.resoudrePlacementMultipleNeantAdjacent(partie.id, cadre.effet).then(function (resultat) {
+        var groupes = resultat.groupes || [];
+        if (!groupes.length || groupes.some(function (g) { return !g.candidats.length; })) {
+          bouton.disabled = false;
+          window.alert('Aucun secteur du Néant adjacent à l’un de vos secteurs, avec les emplacements requis libres actuellement.');
+          return;
+        }
+
+        var desambiguisationRequise = groupes.some(function (g) { return g.candidats.length > 1; });
+
+        return resoudreGroupesPlacementMultiple_(groupes, 0, []).then(function (cibles) {
+          if (!cibles) { bouton.disabled = false; return; }
+
+          if (desambiguisationRequise) {
+            return finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton);
+          }
+
+          return StrategieService.demanderChoix({
+            type: 'confirmation',
+            titre: 'Confirmer le placement',
+            message: libelleConfirmationPlacementMultiple_(resultat.casParticulier, groupes, cibles),
+            texteValider: 'Valider'
+          }).then(function (confirmation) {
+            if (!confirmation || confirmation.annule || !confirmation.confirme) { bouton.disabled = false; return; }
+            return finaliserPlacementMultiple_(partie, cycle, ordre, cibles, bouton);
+          });
+        });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Cadre de type "gain" sans ressource plateauMaison suivie par l'app,
+     * ET dont la cible n'est PAS non plus l'offre de Programme
+     * (appliquerCadreCorruptionOffreProgrammeEtRafraichir_ ci-dessous —
+     * désormais automatisée) — ouvre la même modale générique que les
+     * autres cadres, en réutilisant le contexte 'confirmation' de
+     * StrategieService.demanderChoix (message + Annuler/Valider), puis
+     * persiste juste "cadre résolu" via GameService.appliquerCadreManuel
+     * (aucun delta appliqué, contrairement à appliquerCadreEtRafraichir_
+     * ci-dessus).
+     *
+     * Principe à garder pour les événements : le message n'est jamais le
+     * rappel verbatim de cadre.texte (déjà lisible sur la carte juste
+     * derrière la popup) — c'est une instruction courte, à l'infinitif, en
+     * italique, portée par le catalogue (cadre.instruction, voir
+     * data/catalogue/evenements.json) pour rester spécifique au cadre sans
+     * dupliquer sa description complète. Fallback sur cadre.texte si le
+     * catalogue ne fournit pas encore d'instruction dédiée.
+     */
+    function appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'confirmation',
+        titre: 'Effet à résoudre manuellement',
+        message: '<em>' + (cadre.instruction || cadre.texte) + '</em>',
+        texteValider: 'Valider'
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreManuel(partie.id, cycle, ordre)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec de la validation du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Effet "Placer une Corruption sur l'offre de Programme" d'un Cadre
+     * d'Événement galactique (voir GameService.
+     * appliquerCadreCorruptionOffreProgramme/
+     * cadreCorruptionOffreProgrammeAutomatisable, gameService.js). Retour
+     * utilisateur (28/08/2026) : "L'effet placer une corruption des
+     * événements peu maintenant être automatisé. Exemple événement À
+     * cycle 2" — jusqu'ici ce cadre retombait sur
+     * appliquerCadreManuelEtRafraichir_ ci-dessus (aucun delta), devenu
+     * automatisable depuis que plateauMaison.offresProgramme suit
+     * réellement l'état Corrompu de chaque offre. AUCUN choix du joueur
+     * (la cible est entièrement déterminée par la carte) : même popup
+     * 'confirmation' que le cas manuel ci-dessus (cohérence visuelle),
+     * mais persiste réellement l'état cette fois.
+     */
+    function appliquerCadreCorruptionOffreProgrammeEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'confirmation',
+        titre: 'Corruption d’une offre de Programme',
+        message: '<em>' + (cadre.instruction || cadre.texte) + '</em>',
+        texteValider: 'Valider'
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule || !resultat.confirme) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreCorruptionOffreProgramme(partie.id, cycle, ordre)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            // offresProgramme touché (Piège n°2, CLAUDE.md) : la case
+            // "Corrompu" de l'écran Plat. Galactique (renderOffreProgrammes_,
+            // même écran que le Cadre mais un bloc DOM séparé) ne se
+            // rafraîchit jamais toute seule — rappel explicite ici.
+            renderOffreProgrammes_(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec de la validation du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Un cadre "choix" (options exclusives, ex. +3 Crédit / -1 Science pour
+     * une Technologie) n'affiche pas ses boutons directement sur la
+     * carte — c'est tout le cadre (.cadre-carte-cliquable) qui ouvre une
+     * seule popup listant les effets possibles (contexte
+     * 'resoudre_cadre_evenement', voir strategieService.js), un clic sur
+     * une option = résolution immédiate. `actionsCadre_` construit la
+     * liste normalisée (delta simple / proportionnel / Technologie / cube)
+     * réutilisée à la fois pour savoir si le cadre est cliquable
+     * (renderCadresEvenement_) et pour résoudre le choix une fois la popup
+     * validée.
+     *
+     * Une option "cube" (activer_cube / deployer_cube_secteur_mere)
+     * délègue à appliquerCadreFocusEngineEtRafraichir_ (GameService.
+     * appliquerCadreChoixFocusEngine -> FocusEngine.resoudreEffet) — pour
+     * "déployer", une SECONDE popup imbriquée s'ouvre (choix du type de
+     * Flotte, contexte 'deployer_cube' déjà existant côté Focus) :
+     * comportement attendu, pas un bug.
+     *
+     * Une option "etablir_guilde"/"construire_installation" suit le même
+     * chemin que "cube" ci-dessus (même fonction générique,
+     * cleFocusEnginePourOptionCadre_ les reconnaît aussi) — délègue à
+     * appliquerCadreFocusEngineEtRafraichir_, qui ouvre la popup imbriquée
+     * 'construire' (secteur + type, voir strategieService.js).
+     *
+     * EVOLUTION 20 (suite) — une option "gagner une Technologie" suit
+     * elle aussi ce principe : `{cle:'technologie_base', valeur:1}`
+     * (option DIRECTE) passe par le MÊME chemin que "cube"/"construction"
+     * ci-dessus (cleFocusEnginePourOptionCadre_ la reconnaît aussi) ;
+     * `{cout:{...}, gain:{technologie_base:1}}` (option COMBO, coût
+     * séparé) délègue à appliquerCadreTechnologieFocusEngineEtRafraichir_
+     * (GameService.appliquerCadreOptionTechnologieAvecCout ->
+     * FocusEngine.resoudreEffetEtCout) — les 2 formes ouvrent la MÊME
+     * popup imbriquée 'gagner_technologie' que Focus Innovation
+     * "Inventer"/Piste de Civilisation. Le fallback "manuel" ci-dessous ne
+     * sert donc plus qu'à une option de cadre "choix" sans AUCUNE
+     * mécanique automatisée.
+     *
+     * Le libellé d'une option "delta simple" (ex. +3 Crédit) suit le
+     * gabarit du jeu à l'infinitif ("Gagner 3 Crédits" —
+     * libelleActionCadre_) plutôt que le brut "Appliquer : +3 Crédit".
+     */
+    function actionsCadre_(cadre) {
+      var actions = GameService.actionsSimplesCadre(cadre).map(function (action) {
+        return action.proportionnel
+          ? {
+              proportionnel: true, plafond: action.plafond, action: action,
+              label: 'Échanger ' + libelleRessourceCadre_(action.ressourceCout) +
+                ' → ' + libelleRessourceCadre_(action.ressourceGain)
+            }
+          : { proportionnel: false, action: action, label: libelleActionCadre_(action.delta) };
+      });
+
+      if (cadre.effet && cadre.effet.type === 'choix' && Array.isArray(cadre.effet.options)) {
+        cadre.effet.options.forEach(function (option, indexOption) {
+          // Option `type: 'placement'` (avec `critere` de Population) au
+          // sein d'un cadre "choix" — distinct des options {cle, valeur}
+          // ci-dessous (cleFocusEnginePourOptionCadre_) qui n'ont pas de
+          // `critere`/secteur à choisir. Vérifié en premier (une option
+          // de ce type n'a jamais de `cle`, les blocs suivants la
+          // laisseraient de toute façon passer).
+          if (option.type === 'placement' && option.elements) {
+            actions.push({
+              proportionnel: false, placementChoix: true, indexOption: indexOption,
+              label: libelleOptionPlacementChoix_(option)
+            });
+            return;
+          }
+          // EVOLUTION 20 (suite) — option {cout?, gain:{technologie_...}}
+          // (ex. Événement A Cycle 1 Cadre 2, "Dépensez 1 Science pour
+          // gagner une Technologie de base") : entièrement automatisée via
+          // GameService.appliquerCadreOptionTechnologieAvecCout (popup
+          // 'gagner_technologie' dédiée + coût débité) — remplace l'ancien
+          // repli "coût automatisé, gain manuel" (optionTechnologieViaScience_,
+          // conservé UNIQUEMENT pour le rendu des cadres déjà appliqués
+          // ainsi avant ce chantier, voir estAppliqueViaTechnologieScience_
+          // ci-dessous).
+          var niveauxTechnologieCout = GameService.niveauxTechnologieOptionAvecCout(option);
+          if (niveauxTechnologieCout) {
+            actions.push({
+              proportionnel: false, technologieFocusEngine: true, indexOption: indexOption,
+              label: libelleOptionTechnologieFocusEngine_(niveauxTechnologieCout, option.cout)
+            });
+            return;
+          }
+          var cleFocusEngine = GameService.cleFocusEnginePourOptionCadre(option);
+          if (cleFocusEngine) {
+            actions.push({
+              proportionnel: false, focusEngine: true, indexOption: indexOption,
+              label: libelleOptionFocusEngine_(option, cleFocusEngine)
+            });
+            return;
+          }
+          // Option "gain: {corruption:1, gloire:1}"/"recall: {cube:1}" —
+          // gabarit inédit (Événement H Cycle 1 Cadre 1, seul cas connu),
+          // reconnu ici EXACTEMENT (voir GameService.
+          // appliquerCadreChoixCorruptionGloire/appliquerCadreChoixRappelCube,
+          // gameService.js, pour le détail du filtre) plutôt que de passer
+          // par le fallback manuel ci-dessous (les deux options SONT
+          // automatisables, juste avec un vocabulaire que
+          // cleFocusEnginePourOptionCadre_ ne reconnaît pas).
+          if (option.gain && !option.cout && !option.recall &&
+              Object.keys(option.gain).length === 2 && option.gain.corruption === 1 && option.gain.gloire === 1) {
+            actions.push({
+              proportionnel: false, corruptionGloire: true, indexOption: indexOption,
+              label: 'Gagner une Corruption pour un jeton Gloire (valeur 1)'
+            });
+            return;
+          }
+          if (option.recall && !option.gain && !option.cout &&
+              Object.keys(option.recall).length === 1 && option.recall.cube === 1) {
+            actions.push({
+              proportionnel: false, rappelCube: true, indexOption: indexOption,
+              label: 'Rappeler 1 cube de Puissance Navale'
+            });
+            return;
+          }
+          // Option dont la `cle` ne correspond à aucune mécanique
+          // automatisée connue — reste sélectionnable dans la popup,
+          // résolue manuellement (voir LABEL_OPTION_CADRE_MANUELLE_/
+          // appliquerCadreChoixManuelEtRafraichir_).
+          if (option.cle) {
+            var infoManuelle = LABEL_OPTION_CADRE_MANUELLE_[option.cle] ||
+              { label: humaniserCleCadre_(option.cle), resume: humaniserCleCadre_(option.cle) + ' résolu manuellement' };
+            actions.push({
+              proportionnel: false, manuel: true, indexOption: indexOption,
+              label: infoManuelle.label, resume: infoManuelle.resume
+            });
+          }
+        });
+      }
+
+      return actions;
+    }
+
+    function ouvrirPopupCadreEtRafraichir_(partie, cycle, ordre, cadre, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      var actions = actionsCadre_(cadre);
+      if (!actions.length) return;
+
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'resoudre_cadre_evenement',
+        titre: actions.length > 1 ? 'Choisir un effet' : 'Résoudre l\u2019effet',
+        options: actions.map(function (a) { return { label: a.label, sousTexte: a.sousTexte, proportionnel: a.proportionnel, plafond: a.plafond }; })
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        var choisie = actions[resultat.indexChoisi];
+        if (!choisie) { bouton.disabled = false; return; }
+
+        if (choisie.focusEngine) {
+          appliquerCadreFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.technologieFocusEngine) {
+          appliquerCadreTechnologieFocusEngineEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.corruptionGloire) {
+          appliquerCadreCorruptionGloireEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.rappelCube) {
+          appliquerCadreRappelCubeEtRafraichir_(partie, cycle, ordre, choisie.indexOption, bouton);
+        } else if (choisie.placementChoix) {
+          resoudreOptionPlacementCritereEtRafraichir_(partie, cycle, ordre, cadre, choisie.indexOption, bouton);
+        } else if (choisie.manuel) {
+          appliquerCadreChoixManuelEtRafraichir_(partie, cycle, ordre, choisie.indexOption, choisie.resume, bouton);
+        } else if (choisie.proportionnel) {
+          var quantite = Math.max(0, Math.floor(Number(resultat.quantite) || 0));
+          if (!quantite) { bouton.disabled = false; return; }
+          var deltaProportionnel = {};
+          deltaProportionnel[choisie.action.ressourceCout] = -quantite;
+          deltaProportionnel[choisie.action.ressourceGain] = quantite;
+          appliquerCadreEtRafraichir_(partie, cycle, ordre, deltaProportionnel, bouton);
+        } else {
+          appliquerCadreEtRafraichir_(partie, cycle, ordre, choisie.action.delta, bouton);
+        }
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec de la résolution du cadre : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Résout UNE option `type: 'placement'` d'un cadre "choix" (voir
+     * actionsCadre_/libelleOptionPlacementChoix_ ci-dessus) — ouvre la
+     * popup dédiée 'placement_critere' (StrategieService, secteur
+     * déterminé par `option.critere`, second <select> de type de Guilde si
+     * l'élément "guilde" est générique), puis persiste via GameService.
+     * appliquerCadreChoixPlacement (revalide tout côté SecteurService,
+     * jamais confiance à cette popup) — même pattern que
+     * appliquerCadrePlacementEtRafraichir_/
+     * appliquerCadreFocusEngineEtRafraichir_ ci-dessus.
+     */
+    function resoudreOptionPlacementCritereEtRafraichir_(partie, cycle, ordre, cadre, indexOption, bouton) {
+      if (typeof StrategieService === 'undefined') return;
+      var option = cadre.effet.options[indexOption];
+      bouton.disabled = true;
+      StrategieService.demanderChoix({
+        type: 'placement_critere',
+        titre: 'Choisir un secteur',
+        option: option
+      }).then(function (resultat) {
+        if (!resultat || resultat.annule) { bouton.disabled = false; return; }
+        return GameService.appliquerCadreChoixPlacement(partie.id, cycle, ordre, indexOption, resultat.numero, resultat.type)
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            renderEvenementCycle_(partieMaj);
+            App.renderSecteurs(partieMaj);
+            StrategieService.afficher(partieMaj);
+          });
+      }).catch(function (erreur) {
+        bouton.disabled = false;
+        window.alert('Échec du placement : ' + erreur.message);
+      });
+    }
+
+    /**
+     * Rend les Cadres (moitié gauche de la carte, résolus en Phase
+     * Préparation — voir docs-rules-cycle-de-jeu.md §1.5), un par ligne :
+     * bordure pleine/pointillée selon `obligatoire` (§1.5.1/§1.5.2), badge
+     * de résolution (§1.5.3), texte intégral. Dès qu'un cadre non résolu a
+     * au moins une action possible (placement OU actionsCadre_ non vide),
+     * tout le cadre (.cadre-carte-cliquable, role="button"/tabindex) est
+     * cliquable et ouvre la popup adaptée (placement_secteur_neant_adjacent,
+     * resoudre_cadre_evenement, ou une confirmation générique pour un
+     * cadre "gain" non automatisable). cadresAppliques (persisté sur
+     * evenements.cycleN, voir gameService.js) empêche une double
+     * application et pilote le texte "✓ Appliqué (...)" :
+     * - Cadre "placement" (zone secteur_neant_adjacent) : "✓ Appliqué
+     *   (Secteur N)" — le détail des éléments posés n'est pas réaffiché
+     *   (implicite, toujours les mêmes pour ce cadre).
+     * - Cadre "placement_multiple" : plusieurs jeux d'éléments, chacun
+     *   posé sur un secteur du Néant adjacent déterminé par un critère de
+     *   Population (SecteurService.resoudrePlacementMultipleNeantAdjacent)
+     *   — "✓ Appliqué (Secteur(s) N [et M])".
+     * - Cadre "gain" non automatisable (cadreGainCorruptionAutomatisable
+     *   renvoie faux, ou effet différent de "gain") : résolu manuellement
+     *   sur le plateau physique via une popup de confirmation générique
+     *   (contexte 'confirmation' de StrategieService.demanderChoix) ;
+     *   Valider marque juste le cadre comme fait
+     *   (GameService.appliquerCadreManuel, aucun delta) — "✓ Appliqué
+     *   (manuellement)" (toujours "Appliqué"/"manuellement", jamais
+     *   "Fait"/"à la main", voir mémoire projet).
+     * - Cadre résolu via une option "cube" (GameService.appliquerCadreChoixCube)
+     *   stocke { resume, le } dans cadresAppliques[ordre] (au lieu de
+     *   { delta, le }) — `applique.resume` (déjà le libellé du journal
+     *   FocusEngine, ex. "+1 cube(s) activé(s)") prime sur le rendu delta
+     *   générique.
+     * - Sinon : le texte passe par abregerResumeCadre_(applique.resume) /
+     *   libelleDeltaCadreAbrege_(applique.delta) — Population/Secteur
+     *   abrégés ("Pop."/"Sec."), noms de ressource/Guilde abrégés à 3
+     *   lettres et colorés comme sur Plat. maison, "augmentée de 1"/
+     *   "établie sur" remplacés par un préfixe "+1". Rendu seulement,
+     *   aucune donnée persistée modifiée (cadresAppliques[ordre].resume/
+     *   .delta inchangés en base) — voir JSDoc de ces 2 fonctions plus
+     *   haut dans ce fichier.
+     */
+    function renderCadresEvenement_(partie, cycle, evenementActuel) {
+      var conteneur = document.getElementById('evenement-cadres');
+      if (!conteneur) return;
+      var cadres = evenementActuel && (evenementActuel.cadres || []).length
+        ? evenementActuel.cadres.slice().sort(function (a, b) { return a.ordre - b.ordre; })
+        : [];
+      if (!cadres.length) { conteneur.innerHTML = ''; return; }
+
+      var cadresAppliques = evenementActuel.cadresAppliques || {};
+
+      conteneur.innerHTML = cadres.map(function (cadre) {
+          var applique = cadresAppliques[cadre.ordre];
+          var classeObligatoire = cadre.obligatoire ? 'cadre-carte-obligatoire' : 'cadre-carte-optionnel';
+          var badgeResolution = cadre.resolution && LABEL_RESOLUTION_CADRE_[cadre.resolution]
+            ? '<div class="cadre-entete"><span class="badge">' + LABEL_RESOLUTION_CADRE_[cadre.resolution] + '</span></div>' : '';
+
+          var estPlacementNeantAdjacent = !!(cadre.effet && cadre.effet.type === 'placement' && cadre.effet.zone === 'secteur_neant_adjacent');
+          // Cadre "placement" à zone GALAXIE ENTIÈRE (chantier "Cadres
+          // placement en masse", 14/09/2026 — ex. "chaque secteur de
+          // Faille") : AUCUN choix du joueur (contrairement à
+          // estPlacementNeantAdjacent ci-dessus), pose les mêmes éléments
+          // sur TOUS les secteurs remplissant le critère de la carte —
+          // voir GameService.ZONES_PLACEMENT_MASSE/
+          // appliquerCadrePlacementEnMasse.
+          var estPlacementMasse = !!(cadre.effet && cadre.effet.type === 'placement' && !estPlacementNeantAdjacent &&
+            typeof GameService !== 'undefined' && GameService.ZONES_PLACEMENT_MASSE.indexOf(cadre.effet.zone) !== -1);
+          // Cadre "placement_multiple" : plusieurs jeux d'éléments, chacun
+          // sur un secteur du Néant adjacent déterminé par un critère de
+          // Population (voir
+          // SecteurService.resoudrePlacementMultipleNeantAdjacent), pas un
+          // libre choix comme "placement" simple.
+          var estPlacementMultiple = !!(cadre.effet && cadre.effet.type === 'placement_multiple');
+          // Un cadre "gain" dont la cible est automatisable
+          // (secteur/piste/Programme/Technologie, avec repli éventuel —
+          // jamais "offre_programme" ou un cadre composé, voir
+          // GameService.cadreGainCorruptionAutomatisable) sort du
+          // hors-périmètre "estManuel" ci-dessous — reste manuel SEULEMENT
+          // si non automatisable.
+          var estGainCorruption = !!(cadre.effet && cadre.effet.type === 'gain' &&
+            typeof GameService !== 'undefined' && GameService.cadreGainCorruptionAutomatisable(cadre));
+          // "Placer une Corruption sur l'offre de Programme" (cible fixe,
+          // AUCUN choix du joueur — voir GameService.
+          // cadreCorruptionOffreProgrammeAutomatisable/
+          // appliquerCadreCorruptionOffreProgramme) : sort AUSSI du
+          // hors-périmètre "estManuel" ci-dessous, comme estGainCorruption.
+          var estOffreProgrammeCorrompue = !!(cadre.effet && cadre.effet.type === 'gain' && !estGainCorruption &&
+            typeof GameService !== 'undefined' && GameService.cadreCorruptionOffreProgrammeAutomatisable(cadre));
+          var estManuel = !!(cadre.effet && cadre.effet.type === 'gain') && !estGainCorruption && !estOffreProgrammeCorrompue;
+
+          var statutHtml = '';
+          var actions = [];
+          if (estPlacementNeantAdjacent) {
+            if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (Secteur ' + applique.secteur + ')</p>';
+          } else if (estPlacementMasse || estPlacementMultiple) {
+            if (applique) {
+              var secteursListe = applique.secteurs || [];
+              var secteursTexte = !secteursListe.length
+                ? 'aucun secteur éligible'
+                : (secteursListe.length > 1 ? 'Secteurs ' + secteursListe.join(' et ') : 'Secteur ' + secteursListe[0]);
+              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + secteursTexte + ')</p>';
+            }
+          } else if (estManuel) {
+            if (applique) statutHtml = '<p class="cadre-statut">✓ Appliqué (manuellement)</p>';
+          } else if (applique) {
+            if (applique.resume) {
+              statutHtml = '<p class="cadre-statut">✓ Appliqué (' + abregerResumeCadre_(applique.resume) + ')</p>';
+            } else {
+              statutHtml = estAppliqueViaTechnologieScience_(cadre, applique)
+                ? '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadreAbrege_(applique.delta) + ' / technologie choisie manuellement)</p>'
+                : '<p class="cadre-statut">✓ Appliqué (' + libelleDeltaCadreAbrege_(applique.delta) + ')</p>';
+            }
+          } else {
+            actions = actionsCadre_(cadre);
+          }
+
+          var cliquable = !applique && (estPlacementNeantAdjacent || estPlacementMasse || estPlacementMultiple || estManuel || estGainCorruption || estOffreProgrammeCorrompue || actions.length);
+          var classeCarte = classeObligatoire + (cliquable ? ' cadre-carte-cliquable' : '');
+          var typeDonnee = estPlacementNeantAdjacent ? ' data-placement="1"' :
+            (estPlacementMasse ? ' data-placement-masse="1"' :
+              (estPlacementMultiple ? ' data-placement-multiple="1"' :
+                (estGainCorruption ? ' data-gain-corruption="1"' :
+                  (estOffreProgrammeCorrompue ? ' data-offre-programme="1"' : (estManuel ? ' data-manuel="1"' : ' data-resolution="1"')))));
+          var attributsCarte = cliquable
+            ? ' data-ordre="' + cadre.ordre + '"' + typeDonnee + ' role="button" tabindex="0"'
+            : '';
+
+          return '<div class="cadre-carte ' + classeCarte + '"' + attributsCarte + '>' +
+            badgeResolution +
+            '<p class="cadre-texte">' + cadre.texte + '</p>' +
+            statutHtml +
+            '</div>';
+        }).join('');
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement-masse="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementMasseEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-placement-multiple="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadrePlacementMultipleEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-resolution="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          ouvrirPopupCadreEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-manuel="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreManuelEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-gain-corruption="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreGainCorruptionEtRafraichir_(partie, cycle, ordre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+
+      Array.prototype.forEach.call(conteneur.querySelectorAll('.cadre-carte-cliquable[data-offre-programme="1"]'), function (carteEl) {
+        var ordre = Number(carteEl.dataset.ordre);
+        var cadre = cadres.filter(function (c) { return c.ordre === ordre; })[0];
+        var declencher = function () {
+          if (carteEl.classList.contains('cadre-carte-en-cours')) return;
+          appliquerCadreCorruptionOffreProgrammeEtRafraichir_(partie, cycle, ordre, cadre, pseudoBoutonCarte_(carteEl));
+        };
+        carteEl.addEventListener('click', declencher);
+        carteEl.addEventListener('keydown', function (evenement) {
+          if (evenement.key === 'Enter' || evenement.key === ' ') { evenement.preventDefault(); declencher(); }
+        });
+      });
+    }
+
+    /**
+     * Rend les Objectifs (moitié droite de la carte, évalués en Phase
+     * Évaluation — §3.3 docs-rules-cycle-de-jeu.md), groupés par bloc avec
+     * le séparateur imprimé sur la carte ("OU" entre deux blocs
+     * alternatifs). Affichage seul : leur résolution automatique reste
+     * hors périmètre (contrairement aux Cadres ci-dessus).
+     */
+    function renderObjectifsEvenement_(evenementActuel) {
+      var conteneur = document.getElementById('evenement-objectifs');
+      if (!conteneur) return;
+      var blocs = evenementActuel && evenementActuel.objectifs ? (evenementActuel.objectifs.blocs || []) : [];
+      if (!blocs.length) { conteneur.innerHTML = ''; return; }
+
+      conteneur.innerHTML = '<h3 class="subsection-title" style="margin-top:14px;">Objectifs — Phase Évaluation</h3>' +
+        blocs.map(function (bloc, i) {
+          var separateur = (i > 0 && bloc.separateur_avant)
+            ? '<p class="objectif-separateur">' + bloc.separateur_avant + '</p>' : '';
+          var lignes = (bloc.lignes || []).map(function (ligne) {
+            return '<p class="objectif-ligne">' + ligne.texte + '</p>';
+          }).join('');
+          return separateur + '<div class="objectif-bloc">' + lignes + '</div>';
+        }).join('');
+    }
+
+    /**
+     * Sélection de l'événement galactique du cycle en cours — pas de
+     * gestion de pool de tirage aléatoire (hors périmètre), seul le choix
+     * manuel d'un événement est branché. Masqué si la partie est terminée
+     * (cycleActuel === 'termine').
+     *
+     * Le nombre de manches (coin supérieur droit de la carte, §2
+     * Introduction) rejoint le titre "Cycle X"
+     * (#plateau-galactique-manches) ; le texte de l'événement est rendu
+     * par renderCadresEvenement_/renderObjectifsEvenement_
+     * (#evenement-cycle-detail).
+     */
+    function renderEvenementCycle_(partie) {
+      var bloc = document.getElementById('bloc-evenement-cycle');
+      var cycle = partie.cycleActuel;
+      var manchesEl = document.getElementById('plateau-galactique-manches');
+      if (!cycle || cycle === 'termine') {
+        bloc.hidden = true;
+        if (manchesEl) manchesEl.textContent = '';
+        return;
+      }
+      bloc.hidden = false;
+
+      var select = document.getElementById('select-evenement-cycle');
+      var evenementActuel = (partie.evenements || {})['cycle' + cycle] || null;
+      // Dès qu'au moins un Cadre a été appliqué, le choix de l'Événement
+      // galactique est verrouillé (select
+      // désactivé, onchange non attaché) — changer d'événement en cours de
+      // résolution laisserait des cadresAppliques orphelins (ordre d'un
+      // cadre d'un autre événement).
+      var evenementVerrouille = !!(evenementActuel && evenementActuel.cadresAppliques && Object.keys(evenementActuel.cadresAppliques).length);
+
+      if (manchesEl) {
+        manchesEl.textContent = evenementActuel && evenementActuel.manches
+          ? evenementActuel.manches + ' manche' + (evenementActuel.manches > 1 ? 's' : '')
+          : '';
+      }
+
+      var detail = document.getElementById('evenement-cycle-detail');
+      if (detail) detail.innerHTML = '<div id="evenement-cadres"></div><div id="evenement-objectifs"></div>';
+      renderCadresEvenement_(partie, cycle, evenementActuel);
+      renderObjectifsEvenement_(evenementActuel);
+
+      GameService.getEvenementsParCycle().then(function (groupes) {
+        var options = groupes['cycle' + cycle] || [];
+        select.innerHTML = '<option value="">— Choisir —</option>' +
+          options.map(function (e) {
+            var choisi = evenementActuel && evenementActuel.nom === e.nom;
+            return '<option value="' + e.nom + '"' + (choisi ? ' selected' : '') + '>' + e.nom + '</option>';
+          }).join('');
+        select.disabled = evenementVerrouille;
+        if (evenementVerrouille) return;
+
+        select.onchange = function () {
+          if (!select.value) return;
+          select.disabled = true;
+          GameService.choisirEvenement(partie.id, cycle, select.value)
+            .then(function (partieMaj) {
+              partieCourante = partieMaj;
+              select.disabled = false;
+              renderEvenementCycle_(partieMaj);
+              // StrategieService garde son propre `partieAffichee` en
+              // cache (Piège n°2, CLAUDE.md), jamais rafraîchi
+              // automatiquement par ce select — le choix de l'Événement
+              // galactique influence pourtant le comportement du retrait
+              // de Corruption sur Plat. maison (voir
+              // evenementConserveCorruptionActif_ dans
+              // strategieService.js). Sans cet appel, `partieAffichee`
+              // resterait périmé (ancien Événement) jusqu'à la prochaine
+              // action qui rafraîchit StrategieService, ce qui pourrait
+              // laisser passer/bloquer à tort la conservation du compteur.
+              if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+            })
+            .catch(function (erreur) {
+              select.disabled = false;
+              window.alert('Échec du choix de l\'événement : ' + erreur.message);
+            });
+        };
+      }).catch(function () {
+        select.innerHTML = '<option value="">Erreur de chargement</option>';
+      });
+    }
+
+    // Labels bruts -> texte lisible, n'affiche que les valeurs non nulles
+    // (gain de place sur smartphone).
+    //
+    // Labels compactés pour le tableau Secteurs (gain de place) — Guildes
+    // réduites aux 3 premières lettres + point (Fer./Ing./Min./Ban./Sci.),
+    // "Chantier"/"Défense" abrégés en "Ch."/"Def." dans LABEL_INSTALLATION
+    // (uniquement la colonne du tableau — TYPES_INSTALLATION plus bas, qui
+    // alimente le <select> du formulaire Construire, garde les noms
+    // complets).
+    var LABEL_GUILDE = {
+      guildeFermiers: 'Fer.', guildeIngenieurs: 'Ing.', guildeMineurs: 'Min.',
+      guildeBanquiers: 'Ban.', guildeScientifiques: 'Sci.'
+    };
+    var LABEL_INSTALLATION = {
+      installationChantierNaval: 'Ch. Naval', installationDefenseSecteur: 'Def. Secteur',
+      installationBaseStellaire: 'Base Stellaire'
+    };
+    var LABEL_PN = {
+      pnCorvette: 'Corvette', pnSentinelle: 'Sentinelle', pnDestroyer: 'Destroyer',
+      pnCuirasse: 'Cuirassé', pnPorteVaisseau: 'Porte-Vaisseau'
+    };
+    // jetonPrime/jetonLiberation : vrais compteurs (nombre de jetons face
+    // cachée sur le secteur). jetonGloire est différent — un TABLEAU de
+    // valeurs (un secteur peut porter plusieurs jetons Gloire,
+    // docs-rules-cycle-de-jeu.md §1.5.5, voir
+    // secteurService.js/ligneSecteurParDefaut_ pour le détail complet)
+    // — chaque valeur est celle d'un jeton Gloire distinct posé sur le
+    // secteur (voir js/strategieService.js, résolution 'envahir' : chaque
+    // valeur est recopiée dans un emplacement Gloire libre de la fiche
+    // Maison) — donc affiché à part ("Gloire (2, 3)"), jamais au format
+    // "N× Gloire" du reste du tableau.
+    var LABEL_JETON_SECTEUR = {
+      jetonPrime: 'Prime', jetonLiberation: 'Libération'
+    };
+
+    function listeNonNulle_(secteur, dico) {
+      return Object.keys(dico)
+        .filter(function (cle) { return secteur[cle] > 0; })
+        .map(function (cle) { return (secteur[cle] > 1 ? secteur[cle] + '× ' : '') + dico[cle]; })
+        .join(', ');
+    }
+
+    function ligneSecteurHTML_(secteur) {
+      var guildes = listeNonNulle_(secteur, LABEL_GUILDE) || '—';
+      var installations = listeNonNulle_(secteur, LABEL_INSTALLATION) || '—';
+      var flotte = listeNonNulle_(secteur, LABEL_PN);
+      if (secteur.pnNeant > 0) flotte = (flotte ? flotte + ', ' : '') + secteur.pnNeant + '× Cube néant';
+      flotte = flotte || '—';
+      var jetons = listeNonNulle_(secteur, LABEL_JETON_SECTEUR);
+      var listeGloireSecteur = Array.isArray(secteur.jetonGloire) ? secteur.jetonGloire : (secteur.jetonGloire ? [secteur.jetonGloire] : []);
+      if (listeGloireSecteur.length) jetons = (jetons ? jetons + ', ' : '') + 'Gloire (' + listeGloireSecteur.join(', ') + ')';
+      jetons = jetons || '—';
+      var action = secteur.corrompu
+        ? '<button type="button" class="btn btn-secondary btn-retirer-corruption" data-numero="' + secteur.numero + '" style="font-size:0.72rem;padding:4px 8px;">Retirer</button>'
+        : '—';
+
+      return '<tr' + (secteur.corrompu ? ' class="ligne-corrompue"' : '') + '>' +
+        '<td>' + secteur.numero + '</td>' +
+        '<td>' + (secteur.population === null ? '?' : secteur.population) + '</td>' +
+        '<td>' + guildes + '</td>' +
+        '<td>' + installations + '</td>' +
+        '<td>' + flotte + '</td>' +
+        '<td>' + (secteur.nombreGardien || 0) + '</td>' +
+        '<td>' + jetons + '</td>' +
+        '<td>' + action + '</td>' +
+        '</tr>';
+    }
+
+    // TYPES_INSTALLATION/TYPES_GUILDE/TYPES_VAISSEAU sont des alias directs
+    // des tables StrategieService.TYPES_INSTALLATION_CONSTRUIRE_/
+    // TYPES_GUILDE_CONSTRUIRE_/TYPES_VAISSEAU (clé `cle`, voir
+    // optionsHTML_ ci-dessous).
+    var TYPES_INSTALLATION = StrategieService.TYPES_INSTALLATION_CONSTRUIRE_;
+    var TYPES_GUILDE = StrategieService.TYPES_GUILDE_CONSTRUIRE_;
+    var TYPES_VAISSEAU = StrategieService.TYPES_VAISSEAU;
+
+    function optionsHTML_(liste) {
+      return liste.map(function (o) { return '<option value="' + o.cle + '">' + o.label + '</option>'; }).join('');
+    }
+
+    /**
+     * Formulaire "Construire" (secteur éligible + catégorie + type). Le
+     * sélecteur de secteur ne liste que ceux avec au moins un emplacement
+     * libre pour la catégorie choisie
+     * (SecteurService.obtenirSecteursEligiblesConstruction).
+     */
+    function renderFormulaireConstruire_(partie) {
+      var selectSecteur = document.getElementById('construire-secteur');
+      var selectCategorie = document.getElementById('construire-categorie');
+      var selectType = document.getElementById('construire-type');
+      if (!selectSecteur) return;
+
+      function rafraichirTypes() {
+        selectType.innerHTML = optionsHTML_(selectCategorie.value === 'installation' ? TYPES_INSTALLATION : TYPES_GUILDE);
+      }
+
+      function rafraichirSecteurs() {
+        selectSecteur.innerHTML = '<option value="">Chargement…</option>';
+        SecteurService.obtenirSecteursEligiblesConstruction(partie.id, selectCategorie.value).then(function (eligibles) {
+          if (!eligibles.length) {
+            selectSecteur.innerHTML = '<option value="">Aucun secteur éligible</option>';
+            return;
+          }
+          selectSecteur.innerHTML = eligibles.map(function (e) {
+            return '<option value="' + e.numero + '">Secteur ' + e.numero + ' (' + e.emplacementsLibres + ' libre(s))</option>';
+          }).join('');
+        }).catch(function () {
+          selectSecteur.innerHTML = '<option value="">Erreur de chargement</option>';
+        });
+      }
+
+      rafraichirTypes();
+      rafraichirSecteurs();
+      selectCategorie.onchange = function () { rafraichirTypes(); rafraichirSecteurs(); };
+
+      document.getElementById('btn-construire').onclick = function () {
+        var numero = Number(selectSecteur.value);
+        if (!numero) { window.alert('Choisis un secteur.'); return; }
+        var btn = document.getElementById('btn-construire');
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        SecteurService.construire(partie.id, numero, selectCategorie.value, selectType.value)
+          .then(function () {
+            renderEcranSecteurs_(partie);
+            rafraichirSecteurs();
+            // Formulaire désormais sur l'écran "Secteurs" (ex-"Galaxie",
+            // retour utilisateur 14/09/2026) : redessine le plateau
+            // hexagonal pour voir l'Installation/Guilde ajoutée sans
+            // devoir quitter/revenir sur l'onglet.
+            if (typeof SecteurVueService !== 'undefined') SecteurVueService.afficher(partie);
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec de la construction : ' + erreur.message);
+          });
+      };
+    }
+
+    /**
+     * Formulaire "Rappeler un cube" (secteur + type de vaisseau).
+     */
+    function renderFormulaireRappelerCube_(partie) {
+      var selectSecteur = document.getElementById('rappel-secteur');
+      if (!selectSecteur) return;
+      document.getElementById('rappel-type').innerHTML = optionsHTML_(TYPES_VAISSEAU);
+
+      SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
+        var possedes = secteurs.filter(function (s) {
+          return s.pnNeant === 0 && (s.pnCorvette + s.pnSentinelle + s.pnDestroyer + s.pnCuirasse + s.pnPorteVaisseau) > 0;
+        });
+        selectSecteur.innerHTML = possedes.length
+          ? possedes.map(function (s) { return '<option value="' + s.numero + '">Secteur ' + s.numero + '</option>'; }).join('')
+          : '<option value="">Aucun secteur possédé</option>';
+      });
+
+      document.getElementById('btn-rappeler-cube').onclick = function () {
+        var numero = Number(selectSecteur.value);
+        if (!numero) { window.alert('Choisis un secteur.'); return; }
+        var type = document.getElementById('rappel-type').value;
+        var btn = document.getElementById('btn-rappeler-cube');
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        SecteurService.rappelerCube(partie.id, numero, type)
+          .then(function () {
+            // EVOLUTION 33 (todo.md) : le rappel recrédite désormais aussi
+            // `cubeActif` (plateauMaison) — rafraîchit Plat. maison en plus
+            // de Secteurs (Piège n°2, CLAUDE.md).
+            return rafraichirPartieCourante();
+          })
+          .then(function (partieMaj) {
+            renderEcranSecteurs_(partieMaj || partie);
+            if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj || partie);
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec du rappel : ' + erreur.message);
+          });
+      };
+    }
+
+    /**
+     * Colonnes : N°/Pop./Guildes/Installations/Flotte/Gard./Jetons/Action
+     * (voir ligneSecteurHTML_ ci-dessus). Pas de colonne "Type"
+     * (Secteur-Mère/Déchue/Avant-poste) ni de total PN agrégé — le
+     * Secteur-Mère et le Corrompu restent visibles autrement : ligne
+     * colorée pour Corrompu, Guildes/Installations pour distinguer
+     * visuellement le Secteur-Mère. La colonne Action porte le bouton
+     * "Retirer" la corruption ; les formulaires Construire/Rappeler un
+     * cube sont branchés sur SecteurService.construire/rappelerCube.
+     */
+    function renderEcranSecteurs_(partie) {
+      var conteneur = document.getElementById('secteurs-conteneur');
+      conteneur.innerHTML = '<p class="hint">Chargement des secteurs…</p>';
+
+      SecteurService.obtenirSecteurs(partie.id).then(function (secteurs) {
+        if (!secteurs.length) {
+          conteneur.innerHTML = '<p class="hint">Aucun secteur instancié (scénario "' + partie.scenarioId + '" introuvable dans le catalogue — resynchronise si besoin).</p>';
+          return;
+        }
+
+        var lignes = secteurs.map(ligneSecteurHTML_).join('');
+        conteneur.innerHTML = '<table class="table-secteurs"><thead><tr>' +
+          '<th>N°</th><th>Pop.</th><th>Guildes</th><th>Installations</th><th>Flotte</th><th>Gard.</th><th>Jetons</th><th>Action</th>' +
+          '</tr></thead><tbody>' + lignes + '</tbody></table>';
+
+        Array.prototype.forEach.call(conteneur.querySelectorAll('.btn-retirer-corruption'), function (btn) {
+          btn.addEventListener('click', function () {
+            var numero = Number(btn.dataset.numero);
+            btn.disabled = true;
+            SecteurService.retirerCorruption(partie.id, numero)
+              .then(function () { renderEcranSecteurs_(partie); })
+              .catch(function (erreur) {
+                btn.disabled = false;
+                window.alert('Échec : ' + erreur.message);
+              });
+          });
+        });
+      }).catch(function (erreur) {
+        conteneur.innerHTML = '<p class="hint">Erreur de chargement des secteurs : ' + erreur.message + '</p>';
+      });
+
+      renderFormulaireConstruire_(partie);
+      renderFormulaireRappelerCube_(partie);
+    }
+
+    /**
+     * Point d'entrée commun : ouvre une partie (nouvelle ou existante),
+     * affiche la nav, rend les 4 écrans, bascule sur "Plat. Galactique".
+     */
+    function ouvrirPartie(partie) {
+      partieCourante = partie;
+      document.getElementById('barre-navigation-partie').hidden = false;
+      renderEcranMiseEnPlace_(partie);
+      renderEcranPlateauGalactique_(partie);
+      renderEcranPlateauMaison_(partie);
+      renderEcranSecteurs_(partie);
+      if (typeof StrategieService !== 'undefined') StrategieService.afficher(partie);
+      if (typeof CombatVueService !== 'undefined') CombatVueService.afficher(partie);
+      if (typeof SecteurVueService !== 'undefined') SecteurVueService.afficher(partie);
+      afficherEcran('plateau-galactique');
+    }
+
+    // Nom conservé pour setupService.js (aucune modification de ce
+    // fichier nécessaire). Avant/après l'ouverture de l'écran, résout les
+    // effets d'Origine à popup (no-op silencieux pour toute maison/
+    // technologie sans effet correspondant, cf. leur doc côté
+    // gameService.js) :
+    // 1) "jeton(s) Prime à la création" (Yarvek, GameService.
+    //    appliquerJetonPrimeOrigine) — AVANT ouvrirPartie, la popup
+    //    'option_exclusive' n'a besoin d'aucun état préalable.
+    // 2) "déplacer 1 Corruption à la création" (Shiveus, GameService.
+    //    appliquerDeplacerCorruptionOrigine) — APRÈS ouvrirPartie : la
+    //    popup 'deplacer_corruption' lit StrategieService.partieAffichee
+    //    (calcul des sources/destinations éligibles), qui n'est renseigné
+    //    qu'après un premier appel à StrategieService.afficher (inclus
+    //    dans ouvrirPartie). Un 2e ouvrirPartie ré-affiche les écrans si
+    //    la Corruption a bougé (Piège n°2 — idempotent, voir
+    //    strategieService.js ligne ~8856).
+    // Tolérant de bout en bout — une erreur ici ne doit jamais empêcher
+    // l'ouverture de la partie déjà créée.
+    function afficherPartieCreee(partie) {
+      if (typeof GameService === 'undefined' || typeof StrategieService === 'undefined') {
+        ouvrirPartie(partie);
+        return;
+      }
+      var demanderChoix = StrategieService.demanderChoix;
+      var etapePrime = GameService.appliquerJetonPrimeOrigine
+        ? GameService.appliquerJetonPrimeOrigine(partie.id, demanderChoix)
+        : Promise.resolve(partie);
+
+      etapePrime
+        .catch(function (erreur) {
+          console.warn('App.afficherPartieCreee : effet d\'Origine "jeton Prime" a échoué (partie ouverte quand même) :', erreur);
+          return partie;
+        })
+        .then(function (partieApresPrime) {
+          var p = partieApresPrime || partie;
+          ouvrirPartie(p);
+          if (!GameService.appliquerDeplacerCorruptionOrigine) return;
+          return GameService.appliquerDeplacerCorruptionOrigine(p.id, demanderChoix)
+            .then(function (partieApresCorruption) {
+              if (partieApresCorruption) ouvrirPartie(partieApresCorruption);
+            })
+            .catch(function (erreur) {
+              console.warn('App.afficherPartieCreee : effet d\'Origine "déplacer Corruption" a échoué :', erreur);
+            });
+        });
+    }
+
+    document.querySelectorAll('#nav-ecrans .btn-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () { afficherEcran(btn.dataset.nav); });
+    });
+
+    return {
+      afficherEcran: afficherEcran,
+      afficherPartieCreee: afficherPartieCreee,
+      ouvrirPartie: ouvrirPartie,
+      getPartieCourante: getPartieCourante,
+      rafraichirPartieCourante: rafraichirPartieCourante,
+      renderPlateauGalactique: renderEcranPlateauGalactique_,
+      renderPlateauMaison: renderEcranPlateauMaison_,
+      renderSecteurs: renderEcranSecteurs_
+    };
+  })();
+
+  (function () {
+    var etatSw = document.getElementById('etat-sw');
+    var versionApp = document.getElementById('version-app');
+    var btnSync = document.getElementById('btn-sync-catalogue');
+    var etatCatalogue = document.getElementById('etat-catalogue');
+
+    versionApp.textContent = 'v' + APP_VERSION;
+
+    // La détection native de mise à jour du navigateur ne se déclenche que
+    // si service-worker.js change au niveau octet — un simple incrément
+    // d'APP_VERSION (version.js, importé par service-worker.js) ne suffit
+    // donc pas à réinstaller le Service Worker, qui continuerait de servir
+    // un cache périmé indéfiniment (voir Piège n°1, CLAUDE.md). On vérifie
+    // donc ici, à chaque chargement, la version réellement servie par le
+    // réseau (fetch avec paramètre anti-cache pour forcer un aller-retour
+    // réseau même sous un Service Worker actif — voir js/catalogueSync.js
+    // pour le même principe) : si elle diffère de celle chargée par cette
+    // page, on purge Service Worker + Cache Storage et on recharge une
+    // seule fois. IndexedDB (parties sauvegardées) n'est pas concerné.
+    if ('serviceWorker' in navigator && window.caches) {
+      fetch('./version.js?bust=' + Date.now(), { cache: 'no-store' })
+        .then(function (reponse) { return reponse.text(); })
+        .then(function (texte) {
+          var correspondance = texte.match(/APP_VERSION\s*=\s*'([^']+)'/);
+          if (!correspondance || correspondance[1] === APP_VERSION) return;
+          var versionServeur = correspondance[1];
+          var cleTraitee = 'sw_reload_version_traitee';
+          if (sessionStorage.getItem(cleTraitee) === versionServeur) return;
+          sessionStorage.setItem(cleTraitee, versionServeur);
+          Promise.all([
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            }),
+            caches.keys().then(function (noms) {
+              return Promise.all(noms.map(function (n) { return caches.delete(n); }));
+            })
+          ]).then(function () { location.reload(); });
+        })
+        .catch(function () { /* hors-ligne : on reste sur le cache actuel */ });
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      etatSw.textContent = 'Service Worker : non supporté par ce navigateur.';
+    } else {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(function () {
+          etatSw.textContent = 'Service Worker : installé.';
+        })
+        .catch(function (erreur) {
+          etatSw.textContent = 'Service Worker : échec d\'installation.';
+          console.error('Erreur enregistrement Service Worker :', erreur);
+        });
+    }
+
+    btnSync.addEventListener('click', function () {
+      btnSync.disabled = true;
+      btnSync.textContent = 'Passage en cours…';
+      etatCatalogue.textContent = '';
+
+      CatalogueSync.synchroniser()
+        .then(function (rapport) {
+          var lignes = rapport.map(function (r) {
+            return r.statut === 'ok'
+              ? r.table + ' : ' + r.nombre + ' ligne(s)'
+              : r.table + ' : ERREUR — ' + r.message;
+          });
+          etatCatalogue.textContent = lignes.join('\n');
+        })
+        .catch(function (erreur) {
+          etatCatalogue.textContent = 'Échec de synchronisation : ' + erreur.message;
+        })
+        .finally(function () {
+          btnSync.disabled = false;
+          btnSync.textContent = 'Synchroniser le catalogue';
+        });
+    });
+
+    // La liste "Parties enregistrées" (Continuer/Archiver/Supprimer) est
+    // remplacée par l'écran Historique dédié, enrichi
+    // (événements/technologies/vainqueur), voir historiqueVueService.js.
+
+    // Déclenche l'événement partagé voidfall:retour-accueil, réutilisé
+    // aussi par scoreVueService.js après l'enregistrement d'une fin de
+    // partie.
+    // Bouton "Fin du cycle" : ouvre d'abord la popup "Phase Évaluation"
+    // (StrategieService.demanderChoix, type 'phase_evaluation' —
+    // js/strategieService.js) qui gère le paiement de l'Entretien (seule
+    // section réellement automatisée pour l'instant, les 4 autres restent
+    // de simples rappels textuels — voir le commentaire de ce type dans
+    // strategieService.js). GameService.avancerCycle n'est appelé
+    // qu'après validation de cette popup ("annule" = l'utilisateur a
+    // cliqué trop tôt, on ne touche à rien). La pile d'annulation est
+    // entièrement vidée à chaque cycle (voir annulationService.js
+    // en-tête).
+    document.getElementById('btn-fin-cycle').addEventListener('click', function () {
+      var partie = App.getPartieCourante();
+      if (!partie) return;
+      var btn = document.getElementById('btn-fin-cycle');
+      if (btn.disabled) return;
+      if (typeof StrategieService === 'undefined' || !StrategieService.demanderChoix) return;
+
+      StrategieService.demanderChoix({ type: 'phase_evaluation' }).then(function (resultat) {
+        if (!resultat || resultat.annule) return;
+
+        var texteOriginal = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Passage en cours…';
+
+        GameService.avancerCycle(partie.id)
+          .then(function (partieMaj) {
+            return AnnulationService.viderPile(partie.id).then(function () { return partieMaj; });
+          })
+          .then(function (partieMaj) {
+            partieCourante = partieMaj;
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            if (partieMaj.cycleActuel === 'termine') {
+              document.getElementById('btn-terminer-partie').click();
+              return;
+            }
+            App.renderPlateauGalactique(partieMaj);
+            App.renderPlateauMaison(partieMaj);
+            App.renderSecteurs(partieMaj);
+            if (typeof StrategieService !== 'undefined') StrategieService.afficher(partieMaj);
+          })
+          .catch(function (erreur) {
+            btn.disabled = false;
+            btn.textContent = texteOriginal;
+            window.alert('Échec du passage au cycle suivant : ' + erreur.message);
+          });
+      });
+    });
+
+    // Le titre de l'app sert de "Retour à l'accueil" depuis n'importe quel
+    // onglet (même événement partagé voidfall:retour-accueil, réutilisé
+    // par scoreVueService.js).
+    document.getElementById('topbar-titre').addEventListener('click', function () {
+      document.dispatchEvent(new Event('voidfall:retour-accueil'));
+    });
+
+    document.addEventListener('voidfall:retour-accueil', function () {
+      document.getElementById('barre-navigation-partie').hidden = true;
+      App.afficherEcran('home');
+    });
+
+    SetupService.init();
+  })();
+
+  // ------------------------------------------------------------
+  // Toggle "garder l'écran allumé" (Screen Wake Lock API) — bouton
+  // #btn-veille-ecran, barre de titre (topbar), visible sur tous les
+  // écrans. Supporté par Safari iOS depuis la 16.4 (y compris une PWA
+  // installée en standalone) ; masqué (voir markup, `hidden` par défaut)
+  // sur tout navigateur/version ne l'exposant pas plutôt que proposé sans
+  // effet. Préférence persistée en IndexedDB (`meta`, même mécanisme que
+  // `catalogueVersion` — js/catalogueSync.js), pas en localStorage (seule
+  // persistance du projet, voir CLAUDE.md).
+  //
+  // Le verrou est automatiquement relâché par le navigateur dès que l'app
+  // quitte le premier plan (changement d'app, verrouillage manuel de
+  // l'écran) — c'est le comportement standard de l'API, pas une limite du
+  // code ici. Il est donc redemandé à chaque retour au premier plan
+  // (`visibilitychange`) tant que l'utilisateur a activé le toggle,
+  // silencieusement (un refus, ex. batterie faible, ne doit pas interrompre
+  // l'utilisateur pour un confort optionnel).
+  (function () {
+    var btnVeille = document.getElementById('btn-veille-ecran');
+    if (!btnVeille || !('wakeLock' in navigator)) return;
+
+    var CLE_META_VEILLE = 'veilleEcranActive';
+    var wakeLockSentinel = null;
+    var veilleSouhaitee = false;
+
+    btnVeille.hidden = false;
+
+    function majBoutonVeille_() {
+      btnVeille.classList.toggle('active', veilleSouhaitee);
+      btnVeille.setAttribute('aria-pressed', String(veilleSouhaitee));
+      btnVeille.title = veilleSouhaitee
+        ? 'Écran maintenu allumé — cliquer pour désactiver'
+        : 'Garder l\'écran allumé pendant l\'utilisation';
+    }
+
+    function demanderVerrou_() {
+      if (!veilleSouhaitee || document.visibilityState !== 'visible' || wakeLockSentinel) return;
+      navigator.wakeLock.request('screen').then(function (sentinel) {
+        wakeLockSentinel = sentinel;
+        wakeLockSentinel.addEventListener('release', function () { wakeLockSentinel = null; });
+      }).catch(function () { /* refus silencieux, voir commentaire ci-dessus */ });
+    }
+
+    function relacherVerrou_() {
+      if (!wakeLockSentinel) return;
+      wakeLockSentinel.release().catch(function () {});
+      wakeLockSentinel = null;
+    }
+
+    DB.get('meta', CLE_META_VEILLE).then(function (ligne) {
+      veilleSouhaitee = !!(ligne && ligne.valeur);
+      majBoutonVeille_();
+      demanderVerrou_();
+    });
+
+    btnVeille.addEventListener('click', function () {
+      veilleSouhaitee = !veilleSouhaitee;
+      majBoutonVeille_();
+      DB.put('meta', { cle: CLE_META_VEILLE, valeur: veilleSouhaitee });
+      if (veilleSouhaitee) { demanderVerrou_(); } else { relacherVerrou_(); }
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') demanderVerrou_();
+    });
+  })();
+
+</script>
+</body>
+</html>

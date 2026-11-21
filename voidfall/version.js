@@ -6087,4 +6087,4 @@
  * la boucle de création ignore déjà les stores présents).
  */
 
-var APP_VERSION = '20260920.13';
+var APP_VERSION = '20261121.1';

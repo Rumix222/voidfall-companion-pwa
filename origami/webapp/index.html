@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Origami — Gabarits d'impression</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<a href="../../" style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);left:6px;z-index:9999;padding:2px 8px;border-radius:10px;background:rgba(13,15,26,.75);color:#9aa0b8;font:12px system-ui;text-decoration:none">⌂ JDS</a>
+<header class="app-header">
+  <h1>Gabarits d'origami à imprimer</h1>
+  <nav class="box-type-nav">
+    <button class="box-type-btn active" data-type="modamasu">ModaMasu</button>
+    <button class="box-type-btn" data-type="katta" disabled title="À venir">Boîte &amp; diviseurs Katta</button>
+    <button class="box-type-btn" data-type="pochette">Pochette V</button>
+  </nav>
+</header>
+
+<main class="app-main">
+  <section class="panel-form">
+    <form id="params-form">
+      <fieldset id="modamasu-params">
+        <legend>Dimensions de la boîte (mm)</legend>
+        <label>Longueur<input type="number" id="lg" value="60" min="1" step="0.5" /></label>
+        <label>Largeur<input type="number" id="lr" value="40" min="1" step="0.5" /></label>
+        <label>Hauteur<input type="number" id="ht" value="20" min="1" step="0.5" /></label>
+      </fieldset>
+
+      <fieldset id="modamasu-lid-params">
+        <legend><label><input type="checkbox" id="lid-toggle" checked /> Générer le couvercle</label></legend>
+        <div id="lid-fields">
+          <label>Écart sur les côtés (mm)
+            <input type="number" id="lid-side" value="4" step="0.5" />
+          </label>
+          <label>Écart en hauteur (mm)
+            <input type="number" id="lid-height" value="-1.5" step="0.5" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset id="modamasu-lid-image-params">
+        <legend>Illustration du couvercle</legend>
+        <label>Image <input type="file" id="lid-image-input" accept="image/*" /></label>
+        <div id="lid-image-controls" style="display:none">
+          <label>Zoom (recadrage) — en dessous de 1, l'image entière est visible avec des marges
+            <input type="range" id="lid-image-zoom" min="0.1" max="4" step="0.05" value="1" />
+          </label>
+          <div class="format-presets" id="lid-image-zoom-presets">
+            <button type="button" class="zoom-preset-btn" data-zoom="0.15">15%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="0.25">25%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="0.4">40%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="0.6">60%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="0.8">80%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="1">100%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="1.5">150%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="2">200%</button>
+            <button type="button" class="zoom-preset-btn" data-zoom="3">300%</button>
+          </div>
+          <button type="button" id="lid-image-remove">Retirer l'image</button>
+        </div>
+      </fieldset>
+
+      <fieldset id="pochette-params" style="display:none">
+        <legend>Format de carte</legend>
+        <div class="format-presets" id="card-format-presets">
+          <label><input type="radio" name="card-format" value="petit" checked /> Petit format (44 x 68 mm)</label>
+          <label><input type="radio" name="card-format" value="standard"  /> Standard (63,5 x 88 mm)</label>
+          <label><input type="radio" name="card-format" value="tarot" /> Tarot (70 x 120 mm)</label>
+          <label><input type="radio" name="card-format" value="custom" /> Personnalisé</label>
+        </div>
+        <label>Largeur carte (mm) <input type="number" id="pv-largeur" value="44" step="0.5" /></label>
+      </fieldset>
+
+      <fieldset id="pochette-thickness-params" style="display:none">
+        <legend>Épaisseur du paquet de cartes</legend>
+        <div class="format-presets" id="thickness-mode-presets">
+          <label><input type="radio" name="thick-mode" value="count" checked /> Nombre de cartes</label>
+          <label><input type="radio" name="thick-mode" value="direct" /> Épaisseur directe</label>
+        </div>
+        <div id="thick-count-fields">
+          <label>Nombre de cartes <input type="number" id="pv-count" value="20" min="1" step="1" /></label>
+          <label>Épaisseur par carte (mm) <input type="number" id="pv-mm-per-card" value="0.34" min="0.01" step="0.01" /></label>
+        </div>
+        <div id="thick-direct-fields" style="display:none">
+          <label>Épaisseur du paquet (mm) <input type="number" id="pv-thickness-direct" value="6" min="0.1" step="0.5" /></label>
+        </div>
+        <p class="hint" id="pv-thickness-computed"></p>
+      </fieldset>
+
+      <fieldset id="pochette-cover-params" style="display:none">
+        <legend>Couvercle</legend>
+        <label>Écart côté (mm) <input type="number" id="pv-marge-cote" value="1" step="0.5" /></label>
+        <label>Écart épaisseur (mm) <input type="number" id="pv-marge-epaisseur" value="1" step="0.5" /></label>
+      </fieldset>
+    </form>
+
+    <p class="warning" id="geometry-warning"></p>
+
+    <label class="copies-field">Exemplaires par impression
+      <input type="number" id="copies" value="1" min="1" step="1" />
+    </label>
+    <p class="warning" id="copies-warning"></p>
+
+    <div class="print-buttons">
+      <button id="btn-print-box" type="button">Imprimer <span class="btn-box-label">la boîte</span></button>
+      <button id="btn-print-lid" type="button">Imprimer <span class="btn-lid-label">le couvercle</span></button>
+    </div>
+    <div class="print-buttons" id="combined-print-wrap" style="display:none">
+      <button id="btn-print-combined" type="button" class="btn-combined">Imprimer les deux (1 feuille)</button>
+    </div>
+    <p class="hint">Paramètres d'impression :</p>
+    <ul class="hint print-hint-list">
+      <li>Format : <strong>A4</strong></li>
+      <li>Échelle : <strong>100 % / Taille réelle</strong> (désactivez « Ajuster à la page »)</li>
+      <li>Marges : <strong>minimales/aucune</strong></li>
+    </ul>
+  </section>
+
+  <section class="panel-preview">
+    <div class="preview-block">
+      <h2>Aperçu sur feuille A4</h2>
+      <p class="dim-info" id="info-a4"></p>
+      <div class="a4-wrap" id="preview-a4"></div>
+    </div>
+
+    <details class="preview-block detail-block">
+      <summary><h2>Détail des repères — <span class="box-label">Boîte</span></h2></summary>
+      <p class="dim-info" id="info-box"></p>
+      <div class="svg-wrap" id="preview-box"></div>
+    </details>
+    <details class="preview-block detail-block" id="lid-preview-wrap">
+      <summary><h2>Détail des repères — <span class="lid-label">Couvercle</span></h2></summary>
+      <p class="dim-info" id="info-lid"></p>
+      <div class="svg-wrap" id="preview-lid"></div>
+    </details>
+  </section>
+</main>
+
+<div id="print-area"></div>
+
+<script src="js/geometry-modamasu.js"></script>
+<script src="js/geometry-pochette-v.js"></script>
+<script src="js/svg-render.js"></script>
+<script src="js/print.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
